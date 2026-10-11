@@ -290,8 +290,9 @@ export async function createCheckoutSession(input: {
     CHECKOUT_LOCK_ACQUIRE_BUDGET_MS
   );
   if (!lockToken) {
-    // Ante Redis degradado o una petición concurrente preferimos que el
-    // cliente reintente a abrir dos Checkouts que puedan cobrarse ambos.
+    // Ante el almacén de cerrojos degradado o una petición concurrente
+    // preferimos que el cliente reintente a abrir dos Checkouts que puedan
+    // cobrarse ambos.
     throw new Error("Checkout session is already being prepared; please retry");
   }
 

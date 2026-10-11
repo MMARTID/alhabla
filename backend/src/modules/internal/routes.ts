@@ -1,4 +1,4 @@
-import type { FastifyPluginAsync } from "fastify";
+import type { FastifyBaseLogger, FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { PermanentJobError } from "../../lib/jobErrors.js";
 import { processRecordingJob } from "../../jobs/processRecording.js";
@@ -9,6 +9,7 @@ import { processSendWhatsappJob } from "../../jobs/sendWhatsapp.js";
 import { processRecordarRecadoJob } from "../../jobs/recordarRecado.js";
 import { processRevisarEscaladaJob } from "../../jobs/revisarEscalada.js";
 import { cleanupZombieCallsJob } from "../../jobs/cleanupZombieCalls.js";
+import { purgarCaducados } from "../../lib/almacenTemporal.js";
 import { recordarDesvioSinComprobarJob } from "../../jobs/recordarDesvioSinComprobar.js";
 import { purgeOldRecordingsJob } from "../../jobs/purgeOldRecordings.js";
 import { purgarTextoDeLlamadasJob } from "../../jobs/purgarTextoDeLlamadas.js";
@@ -125,6 +126,36 @@ const SendWhatsappSchema = z.union([
   SendWhatsappLegadoSchema,
 ]);
 
+/**
+ * Purga del estado temporal caducado (cerrojos, contadores y claves de
+ * lib/almacenTemporal.ts). Corre en cleanup-zombie-calls, que Cloud
+ * Scheduler ya ejecuta cada 15 min, ANTES del barrido de zombis y en su
+ * propio try: un fallo de uno no impide el otro. Nunca lanza ni cambia el
+ * código de respuesta del job (el cuerpo lleva el recuento en `purga`, o
+ * `null` si falló), porque la corrección no depende de ella (toda lectura
+ * filtra por `expiraEn`); sin purga solo crecerían las tablas.
+ */
+async function purgarSinLanzar(
+  log: FastifyBaseLogger
+): Promise<Awaited<ReturnType<typeof purgarCaducados>> | null> {
+  try {
+    const purga = await purgarCaducados();
+    if (purga.claves + purga.contadores + purga.cerrojos > 0) {
+      log.info(
+        { purga },
+        `[Purga] Estado temporal caducado borrado: ${purga.claves} claves, ${purga.contadores} contadores y ${purga.cerrojos} cerrojos`
+      );
+    }
+    return purga;
+  } catch (err) {
+    log.error(
+      { err },
+      "[Purga] No se pudo purgar el estado temporal caducado; no afecta a la corrección: las lecturas filtran por expiraEn"
+    );
+    return null;
+  }
+}
+
 // Endpoints invocados por Cloud Tasks/Cloud Scheduler (no por negocios ni
 // desde el frontend) — ver plugins/internalAuth.ts para la verificación del
 // token OIDC. Cloud Tasks reintenta automáticamente cualquier respuesta que
@@ -132,10 +163,11 @@ const SendWhatsappSchema = z.union([
 export const internalJobsRoutes: FastifyPluginAsync = async (fastify) => {
   // Fuera del limitador global de 100/min por IP (server.ts): estas rutas las
   // llaman Cloud Tasks y Cloud Scheduler desde un puñado de IPs de Google y
-  // ya van autenticadas con OIDC. Con el límite hecho global en Redis, drenar
-  // una cola o encolar cien correos del resumen semanal a la vez devolvía
-  // 429 en cadena y Cloud Tasks agotaba reintentos sobre envíos legítimos
-  // (visto el 2026-09-17: 293 × 429 en process-recording en tres minutos).
+  // ya van autenticadas con OIDC. Con el límite hecho global (en Redis hasta
+  // el corte, hoy en Postgres), drenar una cola o encolar cien correos del
+  // resumen semanal a la vez devolvía 429 en cadena y Cloud Tasks agotaba
+  // reintentos sobre envíos legítimos (visto el 2026-09-17: 293 × 429 en
+  // process-recording en tres minutos).
   // Va en las opciones de cada ruta, no en un hook onRoute de este plugin:
   // @fastify/rate-limit lee `config.rateLimit` en su propio hook, que corre
   // antes que cualquiera registrado aquí dentro.
@@ -344,16 +376,17 @@ export const internalJobsRoutes: FastifyPluginAsync = async (fastify) => {
     "/jobs/cleanup-zombie-calls",
     opcionesDeJob,
     async (_request, reply) => {
+      const purga = await purgarSinLanzar(fastify.log);
       try {
         await cleanupZombieCallsJob();
-        return reply.send({ received: true });
+        return reply.send({ received: true, purga });
       } catch (error) {
         if (error instanceof PermanentJobError) {
           fastify.log.warn(
             { err: error, reason: error.reason },
             "cleanup-zombie-calls job failed descartado por fallo definitivo"
           );
-          return reply.send({ received: true, skipped: error.reason });
+          return reply.send({ received: true, skipped: error.reason, purga });
         }
         fastify.log.error({ err: error }, "cleanup-zombie-calls job failed");
         return reply.status(500).send({ error: "Job processing failed" });

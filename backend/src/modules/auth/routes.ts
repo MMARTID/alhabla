@@ -271,11 +271,14 @@ const veryStrictRateLimit = {
 
 /**
  * Techo de respaldo para TODO `/auth/*`, en la memoria de la instancia. El
- * límite de arriba vive en Redis con `skipOnError: true`, así que si Redis se
- * cae deja pasar todo; aquí eso significaría probar contraseñas sin freno.
- * 40 peticiones por minuto y IP está muy por encima de cualquier uso normal
- * (las rutas de arriba permiten 5 o 10 cada una), así que solo muerde cuando
- * el limitador principal se ha rendido.
+ * límite de arriba cuenta en Postgres (lib/limitesDePeticiones.ts) y, si la
+ * BD no responde a tiempo o su cortacircuitos está abierto, decide la cuenta
+ * local de cada instancia, que no ve lo que entra por las demás; y
+ * `skipOnError: true` deja pasar si el almacén llegara a fallar. Aquí eso
+ * significaría probar contraseñas casi sin freno. 40 peticiones por minuto y
+ * IP está muy por encima de cualquier uso normal (las rutas de arriba
+ * permiten 5 o 10 cada una), así que solo muerde cuando el limitador
+ * principal se ha quedado corto.
  */
 const LIMITE_DE_RESPALDO = new LimitadorEnMemoria(40, 60_000);
 
@@ -284,7 +287,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
     if (!LIMITE_DE_RESPALDO.permite(request.ip)) {
       request.log.warn(
         { ip: request.ip, url: request.url },
-        "[Auth] Techo de respaldo en memoria alcanzado (¿Redis caído?)"
+        "[Auth] Techo de respaldo en memoria alcanzado (el límite principal se superó o va degradado: mirar los avisos [Límite])"
       );
       return reply.status(429).send({
         statusCode: 429,

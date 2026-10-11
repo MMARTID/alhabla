@@ -1,12 +1,15 @@
 import Fastify, { FastifyInstance } from "fastify";
 import { ZodError } from "zod";
 import cors from "@fastify/cors";
-import rateLimit from "@fastify/rate-limit";
 import authPlugin from "./plugins/auth.js";
 import rawBody from "fastify-raw-body";
 import { prisma } from "./lib/prisma.js";
-import { getRedis, initRedis } from "./lib/redis.js";
-import { initStorage } from "./lib/storage.js";
+import { getRedis } from "./lib/redis.js";
+import { cerrarConexionDelLimitador } from "./lib/limitesDePeticiones.js";
+import {
+  iniciarServiciosExternos,
+  registrarLimiteDePeticiones,
+} from "./lib/arranqueDelServidor.js";
 import internalAuthPlugin from "./plugins/internalAuth.js";
 import { internalJobsRoutes } from "./modules/internal/routes.js";
 import { authRoutes } from "./modules/auth/routes.js";
@@ -93,8 +96,11 @@ async function start() {
   try {
     // Initialize external services
     console.log("[Server] Initializing external services...");
-    initRedis();
-    initStorage();
+    // Redis, R2 y, con REDIS_URL, el Redis de compatibilidad de los cerrojos:
+    // se espera hasta 3 s a que esté listo; si no llega, se arranca igual y
+    // los cerrojos fallan cerrados hasta que conecte
+    // (lib/arranqueDelServidor.ts).
+    await iniciarServiciosExternos();
 
     // Register plugins
     console.log("[Server] Registering plugins...");
@@ -120,24 +126,9 @@ async function start() {
       // del CSV de llamadas y el aviso de filas que se quedaron fuera.
       exposedHeaders: ["Content-Disposition", "X-Filas-Omitidas"],
     });
-    await fastify.register(rateLimit, {
-      max: 100,
-      timeWindow: "1 minute",
-      // Sin store compartido el contador vive en la memoria de cada instancia:
-      // se reinicia en cada arranque en frío y se multiplica por el número de
-      // instancias de Cloud Run, así que el límite real era muchas veces el
-      // configurado. Redis lo hace global. `skipOnError` deja pasar la
-      // petición si Redis no responde: preferimos quedarnos sin límite un rato
-      // a devolver 500 en toda la API por una caída de la caché.
-      redis: getRedis(),
-      nameSpace: "ratelimit:",
-      skipOnError: true,
-      errorResponseBuilder: (_req, context) => ({
-        statusCode: 429,
-        error: "Too Many Requests",
-        message: `Rate limit exceeded. Retry in ${context.after}`,
-      }),
-    });
+    // 100/min por IP con el contador global en Postgres, para todas las
+    // rutas (lib/arranqueDelServidor.ts y lib/limitesDePeticiones.ts).
+    await registrarLimiteDePeticiones(fastify);
     fastify.register(authPlugin);
     await fastify.register(rawBody, {
       global: false,
@@ -297,6 +288,19 @@ async function apagar(senal: string) {
     await getRedis().quit();
   } catch {
     // Redis no llegó a inicializarse o ya estaba cerrado.
+  }
+  // El Redis de compatibilidad de los cerrojos no se cierra: cerrarlo deja
+  // la revisión en «solo Postgres», y una adquisición que aún estuviera
+  // reintentando se concedería sin la clave de Redis (con una revisión
+  // anterior al PR A en marcha, dos poseedores). process.exit suelta su
+  // socket igualmente.
+  try {
+    await cerrarConexionDelLimitador();
+  } catch (error) {
+    console.error(
+      "[Server] Error al cerrar la conexión propia del limitador:",
+      error
+    );
   }
   await prisma.$disconnect();
   process.exit(0);
