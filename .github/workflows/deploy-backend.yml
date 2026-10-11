@@ -82,6 +82,43 @@ jobs:
 
       - uses: google-github-actions/setup-gcloud@v2
 
+      # Desde el paso a Postgres (PR A), cada instancia abre una conexión
+      # propia para el límite de peticiones: 3 conexiones en marcha normal y
+      # 4 en el peor caso, contra los 50 de max_connections de Cloud SQL. Solo
+      # cabe con como mucho 11 instancias (11 × 4 = 44, más una migración y un
+      # proxy, dentro de los 47 huecos no reservados; AGENTS.md § Pool). Se
+      # comprueba ANTES de construir y migrar: si alguien sube el máximo en la
+      # consola, el deploy se para sin haber tocado nada. Vale el menor de los
+      # dos máximos, el del servicio (`--max`) y el de la plantilla de la
+      # revisión (`--max-instances`); sin ninguno, Cloud Run escala a 100.
+      - name: Comprobar el máximo de instancias (presupuesto de conexiones)
+        env:
+          MAX_INSTANCIAS: "11"
+        run: |
+          JSON=$(gcloud run services describe alhabla-api \
+            --region="${{ env.GCP_REGION }}" \
+            --project="${{ env.GCP_PROJECT_ID }}" \
+            --format=json)
+          SERVICIO=$(jq -r '.metadata.annotations["run.googleapis.com/maxScale"] // empty' <<<"$JSON")
+          PLANTILLA=$(jq -r '.spec.template.metadata.annotations["autoscaling.knative.dev/maxScale"] // empty' <<<"$JSON")
+          EFECTIVO=""
+          for VALOR in "$SERVICIO" "$PLANTILLA"; do
+            [ -z "$VALOR" ] && continue
+            if ! [[ "$VALOR" =~ ^[0-9]+$ ]]; then
+              echo "::error::maxScale ilegible: «$VALOR»"
+              exit 1
+            fi
+            if [ -z "$EFECTIVO" ] || [ "$VALOR" -lt "$EFECTIVO" ]; then
+              EFECTIVO=$VALOR
+            fi
+          done
+          echo "maxScale del servicio: ${SERVICIO:-sin fijar}; de la plantilla: ${PLANTILLA:-sin fijar}"
+          if [ -z "$EFECTIVO" ] || [ "$EFECTIVO" -gt "$MAX_INSTANCIAS" ]; then
+            echo "::error::alhabla-api puede escalar a ${EFECTIVO:-100 (sin fijar)} instancias y el presupuesto de conexiones solo admite $MAX_INSTANCIAS. Bájalo con: gcloud run services update alhabla-api --max=$MAX_INSTANCIAS --region=${{ env.GCP_REGION }}"
+            exit 1
+          fi
+          echo "Máximo efectivo: $EFECTIVO ≤ $MAX_INSTANCIAS"
+
       - name: Construir y publicar la imagen (cloudbuild.yaml aplica las migraciones de Prisma)
         working-directory: backend
         run: |

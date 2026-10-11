@@ -24,7 +24,7 @@ export function initRedis(): RedisClient {
     // espere indefinidamente mientras el cliente reconecta — durante una
     // caída de Redis, un simple `await redis.get(...)` podía colgarse sin
     // límite. Todo el código que usa Redis en este proyecto (voice_config,
-    // booking_lock, etc.) está escrito asumiendo que un try/catch alrededor
+    // OAuth, etc.) está escrito asumiendo que un try/catch alrededor
     // basta para caer a Postgres o a un comportamiento sin caché — pero ese
     // catch nunca llegaba a ejecutarse si el propio await no terminaba
     // nunca, y una tool call de Retell solo tiene 20s de presupuesto total

@@ -13,6 +13,7 @@ import { retryStuckRecordingsJob } from "../../../src/jobs/retryStuckRecordings.
 import { suspendOverdueCallsJob } from "../../../src/jobs/suspendOverdueCalls.js";
 import { attachUsagePricesJob } from "../../../src/jobs/attachUsagePrices.js";
 import { retryUsageReportsJob } from "../../../src/jobs/retryUsageReports.js";
+import { purgarCaducados } from "../../../src/lib/almacenTemporal.js";
 
 vi.mock("../../../src/jobs/processRecording.js", () => ({
   processRecordingJob: vi.fn(),
@@ -45,6 +46,11 @@ vi.mock("../../../src/jobs/attachUsagePrices.js", () => ({
 vi.mock("../../../src/jobs/retryUsageReports.js", () => ({
   retryUsageReportsJob: vi.fn(),
 }));
+// La purga del estado temporal (cerrojos, contadores) corre dentro de
+// cleanup-zombie-calls; aquí no hay base de datos.
+vi.mock("../../../src/lib/almacenTemporal.js", () => ({
+  purgarCaducados: vi.fn(),
+}));
 
 const mockedProcessRecordingJob = vi.mocked(processRecordingJob);
 const mockedProcessRetryFailedBookingJob = vi.mocked(
@@ -59,12 +65,18 @@ const mockedRetryStuckRecordingsJob = vi.mocked(retryStuckRecordingsJob);
 const mockedSuspendOverdueCallsJob = vi.mocked(suspendOverdueCallsJob);
 const mockedAttachUsagePricesJob = vi.mocked(attachUsagePricesJob);
 const mockedRetryUsageReportsJob = vi.mocked(retryUsageReportsJob);
+const mockedPurgarCaducados = vi.mocked(purgarCaducados);
 
 describe("internalJobsRoutes", () => {
   let fastify: ReturnType<typeof Fastify>;
 
   beforeEach(async () => {
     vi.clearAllMocks();
+    mockedPurgarCaducados.mockResolvedValue({
+      claves: 0,
+      contadores: 0,
+      cerrojos: 0,
+    });
     fastify = Fastify();
     // La autenticación OIDC (verifyCloudTasks) se prueba aparte en
     // tests/plugins/internalAuth.test.ts — aquí se deja pasar siempre para
@@ -413,6 +425,57 @@ describe("internalJobsRoutes", () => {
       });
 
       expect(response.statusCode).toBe(500);
+    });
+
+    // Corte de Redis (PR A): la purga del estado temporal caducado va en este
+    // job, ANTES del barrido de zombis y en su propio try.
+    it("purga el estado temporal caducado antes del barrido y devuelve el recuento", async () => {
+      mockedPurgarCaducados.mockResolvedValue({
+        claves: 2,
+        contadores: 5,
+        cerrojos: 1,
+      });
+      mockedCleanupZombieCallsJob.mockResolvedValue(undefined);
+
+      const response = await fastify.inject({
+        method: "POST",
+        url: "/jobs/cleanup-zombie-calls",
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toEqual({
+        received: true,
+        purga: { claves: 2, contadores: 5, cerrojos: 1 },
+      });
+      expect(mockedPurgarCaducados.mock.invocationCallOrder[0]).toBeLessThan(
+        mockedCleanupZombieCallsJob.mock.invocationCallOrder[0]
+      );
+    });
+
+    it("la purga corre aunque el barrido de zombis lance", async () => {
+      mockedCleanupZombieCallsJob.mockRejectedValue(new Error("DB caída"));
+
+      const response = await fastify.inject({
+        method: "POST",
+        url: "/jobs/cleanup-zombie-calls",
+      });
+
+      expect(mockedPurgarCaducados).toHaveBeenCalledTimes(1);
+      expect(response.statusCode).toBe(500);
+    });
+
+    it("un fallo de la purga no cambia el 200 ni impide el barrido", async () => {
+      mockedPurgarCaducados.mockRejectedValue(new Error("Postgres caído"));
+      mockedCleanupZombieCallsJob.mockResolvedValue(undefined);
+
+      const response = await fastify.inject({
+        method: "POST",
+        url: "/jobs/cleanup-zombie-calls",
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toEqual({ received: true, purga: null });
+      expect(mockedCleanupZombieCallsJob).toHaveBeenCalledTimes(1);
     });
   });
 

@@ -207,6 +207,7 @@ model Business {
   clientConversations  ClientConversation[]
   ownerPendingActions  OwnerPendingAction[]
   ownerChatFeedback    OwnerChatFeedback[]
+  clavesTemporales     ClaveTemporal[]
 
   @@index([ownerWhatsappNumber])
   @@map("businesses")
@@ -1058,6 +1059,56 @@ model WhatsappOptOut {
 
   @@unique([phoneNumber, audience])
   @@map("whatsapp_opt_outs")
+}
+
+// Estado efímero que antes vivía en Memorystore (Redis). Se accede con
+// $queryRaw/$executeRaw (src/lib/cerrojos.ts y src/lib/almacenTemporal.ts),
+// pero los modelos tienen que existir: sin ellos `migrate dev` vería drift y
+// propondría borrar las tablas. Todas las caducidades se comparan con now()
+// de la BD, nunca con el reloj de una instancia.
+
+/// Arrendamientos de exclusión mutua (antes SET NX PX + compare-and-delete
+/// en Redis).
+model Cerrojo {
+  clave    String   @id
+  token    String
+  expiraEn DateTime @db.Timestamptz(3)
+
+  @@map("cerrojos")
+}
+
+/// Clave-valor con caducidad (antes SET EX / GET / GETDEL / HSET en Redis).
+model ClaveTemporal {
+  clave      String    @id
+  valor      Json
+  businessId String?
+  expiraEn   DateTime  @db.Timestamptz(3)
+  business   Business? @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([expiraEn])
+  @@index([businessId])
+  @@map("claves_temporales")
+}
+
+/// Contadores de ventana fija. UNLOGGED y fillfactor se fijan en la migración
+/// (Prisma no los representa).
+model Contador {
+  clave    String   @id
+  valor    Int
+  expiraEn DateTime @db.Timestamptz(3)
+
+  @@map("contadores")
+}
+
+/// Rachas del health-check de Telnyx: una sola fila (id "telnyx").
+model SaludTelnyx {
+  id            String   @id @default("telnyx")
+  malas         Int      @default(0)
+  buenas        Int      @default(0)
+  ultimoTick    BigInt   @default(0)
+  actualizadoEn DateTime @default(now()) @db.Timestamptz(3)
+
+  @@map("salud_telnyx")
 }
 
 enum CallStatus {
