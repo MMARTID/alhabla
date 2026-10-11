@@ -38,9 +38,8 @@ crons = ["*/2 * * * *"]
 
 [[kv_namespaces]]
 binding = "ESTADO"
-# Marcador: lo rellena el despliegue con el id que devuelve
-#   npx wrangler kv namespace create alhabla-failover-laliga-estado
-id = "RELLENAR_CON_EL_ID_DEL_NAMESPACE_KV"
+# alhabla-failover-laliga-estado, creado el 11-10-2026 (no es secreto).
+id = "a570046b50c6497280e6b53dde6a5dce"
 
 [vars]
 ZONE_ID = "252ecca77f844b46263852c7699a9421"

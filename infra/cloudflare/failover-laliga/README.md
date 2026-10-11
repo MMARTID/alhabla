@@ -271,6 +271,13 @@ Se sube tal cual (`no_bundle = true`): sin dependencias ni paso de build.
 
 ## Despliegue
 
+**Desplegado el 11-10-2026** (por la API, con el conector de Cloudflare): namespace KV
+`alhabla-failover-laliga-estado` (`a570046b50c6497280e6b53dde6a5dce`, ya en
+`wrangler.toml`) sembrado con `semillas/`, cron cada 2 minutos, `/estado` en
+`https://alhabla-failover-laliga.flat-flower-78e7.workers.dev/estado`, secreto
+`CF_API_TOKEN` puesto desde el panel y `MODO = "activo"` desde las 09:20 UTC. Los pasos
+de abajo sirven para rehacerlo desde cero.
+
 Todo desde esta carpeta (`infra/cloudflare/failover-laliga`).
 
 ### 1. Namespace KV
@@ -279,8 +286,8 @@ Todo desde esta carpeta (`infra/cloudflare/failover-laliga`).
 npx wrangler kv namespace create alhabla-failover-laliga-estado
 ```
 
-Copia el `id` que devuelve en `wrangler.toml` (`[[kv_namespaces]]`, en lugar
-de `RELLENAR_CON_EL_ID_DEL_NAMESPACE_KV`).
+Copia el `id` que devuelve en `wrangler.toml` (`[[kv_namespaces]]`, en lugar del
+que hay ahora).
 
 ### 2. Token de la API (solo DNS de alhabla.ai)
 
