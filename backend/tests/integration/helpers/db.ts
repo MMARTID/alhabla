@@ -11,6 +11,10 @@ import { comprobarEntornoDeTest } from "./entornoDeTest.js";
 export async function resetDb(): Promise<void> {
   // Segunda barrera, por si alguien llama a resetDb sin pasar por setup.ts.
   comprobarEntornoDeTest();
+  // El estado efímero que antes vivía en Redis (cerrojos, contadores del
+  // limitador…): sin esto, un cerrojo o un contador de un test seguiría vivo
+  // en el siguiente.
+  await prisma.$executeRaw`TRUNCATE "cerrojos", "claves_temporales", "contadores", "salud_telnyx"`;
   await prisma.$transaction([
     // Sin FK obligatoria con Call (onDelete: SetNull): borrar llamadas no lo
     // limpia, y un evento ya procesado en un test se daría por duplicado en

@@ -8,6 +8,7 @@ import { telnyxAdapter } from "../../../src/adapters/telnyx/TelnyxAdapter.js";
 import { retellAdapter } from "../../../src/adapters/retell/RetellAdapter.js";
 import { syncAgentToTelnyx } from "../../../src/lib/telnyxAgentSync.js";
 import { invalidarCacheDeVoz } from "../../../src/lib/voiceConfigCache.js";
+import { acquireLock, releaseLock } from "../../../src/lib/bookingLock.js";
 
 vi.mock("../../../src/lib/prisma.js", () => ({
   prisma: {
@@ -33,17 +34,15 @@ vi.mock("../../../src/adapters/retell/RetellAdapter.js", () => ({
   },
 }));
 
-const { mockRedisClient } = vi.hoisted(() => ({
-  mockRedisClient: {
-    set: vi.fn().mockResolvedValue("OK"),
-    del: vi.fn().mockResolvedValue(1),
-    // El lock de aprovisionamiento ahora se libera vía acquireLock/releaseLock
-    // (lib/bookingLock.ts), que usa un EVAL de comparar-y-borrar en vez de un
-    // DEL incondicional — ver hallazgo de la revisión posterior a la
-    // auditoría (un DEL sin más podía borrar el lock de otra ejecución si el
-    // TTL había expirado mientras tanto).
-    eval: vi.fn().mockResolvedValue(1),
-  },
+// El lock de aprovisionamiento va por acquireLock/releaseLock
+// (lib/bookingLock.ts), cuya liberación es un compare-and-delete por token en
+// vez de un DEL incondicional — ver hallazgo de la revisión posterior a la
+// auditoría (un DEL sin más podía borrar el lock de otra ejecución si el TTL
+// había expirado mientras tanto). Desde el corte de Redis (PR A) el cerrojo
+// vive en Postgres: aquí se comprueba por su función, no por el almacén.
+vi.mock("../../../src/lib/bookingLock.js", () => ({
+  acquireLock: vi.fn(),
+  releaseLock: vi.fn(),
 }));
 
 vi.mock("../../../src/modules/whatsapp/alertas.js", () => ({
@@ -53,9 +52,6 @@ vi.mock("../../../src/modules/whatsapp/alertas.js", () => ({
 // aquí solo importa que la compra resincronice el assistant de Telnyx.
 vi.mock("../../../src/lib/telnyxAgentSync.js", () => ({
   syncAgentToTelnyx: vi.fn().mockResolvedValue(undefined),
-}));
-vi.mock("../../../src/lib/redis.js", () => ({
-  getRedis: () => mockRedisClient,
 }));
 // La invalidación de la caché de voz se comprueba por su función, no por la
 // clave de Redis: así el contrato sigue valiendo cuando esa caché cambie de
@@ -72,6 +68,8 @@ const mockedGetNumberOrder = vi.mocked(telnyxAdapter.getNumberOrder);
 const mockedGetNumberByPhoneNumber = vi.mocked(telnyxAdapter.getNumberByPhoneNumber);
 const mockedImportPhoneNumber = vi.mocked(retellAdapter.importPhoneNumber);
 const mockedSyncAgentToTelnyx = vi.mocked(syncAgentToTelnyx);
+const mockedAcquireLock = vi.mocked(acquireLock);
+const mockedReleaseLock = vi.mocked(releaseLock);
 
 const businessId = "biz_123";
 const agentId = "agent_123";
@@ -80,9 +78,8 @@ const retellAgentId = "retell_agent_123";
 describe("provisionPhoneNumber", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockRedisClient.set.mockResolvedValue("OK");
-    mockRedisClient.del.mockResolvedValue(1);
-    mockRedisClient.eval.mockResolvedValue(1);
+    mockedAcquireLock.mockResolvedValue("token-del-cerrojo");
+    mockedReleaseLock.mockResolvedValue(undefined);
     // Por defecto, "no se encontró nada" — el código cae al phoneNumberId
     // del pedido, igual que antes del fix del issue #17. Los tests que
     // verifican la resolución real lo sobrescriben explícitamente.
@@ -615,7 +612,7 @@ describe("provisionPhoneNumber", () => {
   });
 
   it("no compra un segundo número si otra llamada concurrente ya tiene el lock", async () => {
-    mockRedisClient.set.mockResolvedValueOnce(null);
+    mockedAcquireLock.mockResolvedValueOnce(null);
 
     mockedBusinessFindUnique.mockResolvedValue({
       id: businessId,
@@ -665,13 +662,15 @@ describe("provisionPhoneNumber", () => {
     expect(mockedSearchAvailableNumbers).not.toHaveBeenCalled();
     expect(mockedPurchaseNumber).not.toHaveBeenCalled();
     // El lock se adquirió y se liberó igualmente, aunque no hiciera falta
-    // comprar nada — la liberación ahora es un EVAL de comparar-y-borrar
-    // (releaseLock), no un DEL incondicional.
-    expect(mockRedisClient.eval).toHaveBeenCalledWith(
-      expect.any(String),
-      1,
+    // comprar nada — con el token propio (compare-and-delete), no con un DEL
+    // incondicional. Y la relectura que decide es la de DESPUÉS del lock.
+    expect(mockedReleaseLock).toHaveBeenCalledWith(
       `phone_provision_lock:${businessId}`,
-      expect.any(String)
+      "token-del-cerrojo"
+    );
+    expect(mockedBusinessFindUnique).toHaveBeenCalledTimes(2);
+    expect(mockedAcquireLock.mock.invocationCallOrder[0]).toBeLessThan(
+      mockedBusinessFindUnique.mock.invocationCallOrder[1]
     );
   });
 
@@ -707,7 +706,7 @@ describe("provisionPhoneNumber", () => {
     );
   });
 
-  it("libera el lock de Redis incluso si el provisioning falla", async () => {
+  it("libera el lock incluso si el provisioning falla", async () => {
     mockedBusinessFindUnique.mockResolvedValue({
       id: businessId,
       name: "Peluquería Test",
@@ -721,18 +720,16 @@ describe("provisionPhoneNumber", () => {
 
     await provisionPhoneNumber(businessId);
 
-    expect(mockRedisClient.set).toHaveBeenCalledWith(
+    // Un solo intento (presupuesto 0) con un TTL de 60 s: si otra ejecución
+    // ya lo tiene, esta devuelve el estado y no espera.
+    expect(mockedAcquireLock).toHaveBeenCalledWith(
       `phone_provision_lock:${businessId}`,
-      expect.any(String),
-      "PX",
       60_000,
-      "NX"
+      0
     );
-    expect(mockRedisClient.eval).toHaveBeenCalledWith(
-      expect.any(String),
-      1,
+    expect(mockedReleaseLock).toHaveBeenCalledWith(
       `phone_provision_lock:${businessId}`,
-      expect.any(String)
+      "token-del-cerrojo"
     );
   });
 });

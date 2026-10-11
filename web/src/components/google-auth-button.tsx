@@ -10,6 +10,9 @@ type GoogleAuthButtonProps = {
   disabled?: boolean;
   acceptedTerms?: boolean;
   intent?: "login" | "register";
+  // Si llega, el botón sigue activo pero al pulsarlo muestra este aviso en
+  // vez de ir a Google (p. ej. falta aceptar los Términos en el registro).
+  avisoAntesDeEmpezar?: string;
 };
 
 function GoogleIcon() {
@@ -25,9 +28,20 @@ function GoogleIcon() {
 
 // Registro abierto (el bloqueo «por invitación» de producción se retiró el
 // 2026-09-21, cuando el producto quedó listo para la prueba real).
-export function GoogleAuthButton({ onError, beforeStart, disabled, acceptedTerms, intent = "login" }: GoogleAuthButtonProps) {
+export function GoogleAuthButton({
+  onError,
+  beforeStart,
+  disabled,
+  acceptedTerms,
+  intent = "login",
+  avisoAntesDeEmpezar,
+}: GoogleAuthButtonProps) {
   const [loading, setLoading] = useState(false);
   const startGoogleAuth = async () => {
+    if (avisoAntesDeEmpezar) {
+      onError(avisoAntesDeEmpezar);
+      return;
+    }
     setLoading(true);
     onError("");
 

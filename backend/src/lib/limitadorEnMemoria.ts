@@ -1,16 +1,19 @@
 /**
  * Limitador de respaldo, en la memoria de cada instancia.
  *
- * El límite global usa Redis con `skipOnError: true` (server.ts): si Redis no
- * responde, la petición pasa. Es una decisión deliberada —preferimos
- * quedarnos sin límite un rato a devolver 500 en toda la API— pero en
- * `/auth/*` fallar abierto significa probar contraseñas sin freno justo
- * cuando nadie está contando (auditoría del 24-09).
+ * El límite global cuenta en Postgres (lib/limitesDePeticiones.ts) y, si la
+ * BD no responde, decide la cuenta local de cada instancia; además lleva
+ * `skipOnError: true` (lib/arranqueDelServidor.ts): si el almacén fallara, la
+ * petición pasa. Es una decisión deliberada —preferimos quedarnos sin límite
+ * un rato a devolver 500 en toda la API— pero en `/auth/*` fallar abierto
+ * significa probar contraseñas sin freno justo cuando nadie está contando
+ * (auditoría del 24-09).
  *
- * Esto no sustituye al de Redis: se queda por encima, con un techo más alto,
+ * Esto no sustituye al principal: se queda por encima, con un techo más alto,
  * así que en marcha normal no se nota y solo muerde cuando el otro se ha
- * rendido. Al ser por instancia, el límite real se multiplica por el número
- * de instancias de Cloud Run; sigue siendo infinitamente mejor que nada.
+ * quedado corto. Al ser por instancia, el límite real se multiplica por el
+ * número de instancias de Cloud Run; sigue siendo infinitamente mejor que
+ * nada.
  */
 
 type Ventana = { hasta: number; cuenta: number };
