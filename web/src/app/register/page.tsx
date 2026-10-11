@@ -28,8 +28,8 @@ export default function RegisterPage() {
   const casillaTerminos = useRef<HTMLInputElement>(null);
 
   // El aviso queda debajo del formulario, fuera de la vista al pulsar
-  // Facebook: llevar el foco a la casilla lo trae a pantalla con ella.
-  const avisarDesdeFacebook = (mensaje: string) => {
+  // Google o Facebook: llevar el foco a la casilla lo trae a pantalla con ella.
+  const avisarDesdeBotonSocial = (mensaje: string) => {
     setError(mensaje);
     if (mensaje === TERMINOS_PENDIENTES) casillaTerminos.current?.focus();
   };
@@ -91,12 +91,17 @@ export default function RegisterPage() {
 
         <div className="mt-8">
           <div className="space-y-3">
-            <GoogleAuthButton onError={setError} disabled={!acceptedTerms} acceptedTerms={acceptedTerms} intent="register" />
-            {/* Sin bloqueo: se puede pulsar siempre, pero sin la casilla de
-                Términos marcada avisa aquí en vez de ir a Facebook (el
-                backend rechazaría el alta con terms_required). */}
+            {/* Sin bloqueo: los dos se pueden pulsar siempre, pero sin la
+                casilla de Términos marcada avisan aquí en vez de ir a Google
+                o Facebook (el backend rechazaría el alta con terms_required). */}
+            <GoogleAuthButton
+              onError={avisarDesdeBotonSocial}
+              acceptedTerms={acceptedTerms}
+              intent="register"
+              avisoAntesDeEmpezar={acceptedTerms ? undefined : TERMINOS_PENDIENTES}
+            />
             <FacebookAuthButton
-              onError={avisarDesdeFacebook}
+              onError={avisarDesdeBotonSocial}
               acceptedTerms={acceptedTerms}
               intent="register"
               avisoAntesDeEmpezar={acceptedTerms ? undefined : TERMINOS_PENDIENTES}

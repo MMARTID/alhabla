@@ -4,9 +4,24 @@ import userEvent from "@testing-library/user-event";
 import RegisterPage from "@/app/register/page";
 import { api } from "@/lib/api";
 
+// El aviso previo del botón tiene su propio test
+// (tests/components/google-auth-button.test.tsx); aquí basta con que la
+// página se lo pase y reaccione a él.
 vi.mock("@/components/google-auth-button", () => ({
-  GoogleAuthButton: ({ disabled }: { disabled?: boolean }) => (
-    <button type="button" disabled={disabled}>
+  GoogleAuthButton: ({
+    disabled,
+    onError,
+    avisoAntesDeEmpezar,
+  }: {
+    disabled?: boolean;
+    onError: (mensaje: string) => void;
+    avisoAntesDeEmpezar?: string;
+  }) => (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={() => avisoAntesDeEmpezar && onError(avisoAntesDeEmpezar)}
+    >
       Continuar con Google
     </button>
   ),
@@ -50,21 +65,37 @@ describe("RegisterPage", () => {
     location = mockLocation();
   });
 
-  it("el botón de registro y el de Google empiezan deshabilitados hasta aceptar los términos", () => {
+  // Sin bloqueo en Google (igual que Facebook): se puede pulsar siempre.
+  it("el botón de registro empieza deshabilitado hasta aceptar los términos; el de Google no", () => {
     render(<RegisterPage />);
 
     expect(screen.getByRole("button", { name: /registrarse/i })).toBeDisabled();
-    expect(screen.getByRole("button", { name: /continuar con google/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /continuar con google/i })).toBeEnabled();
   });
 
-  it("habilita ambos botones al marcar la casilla de términos", async () => {
+  it("Google sin la casilla de términos avisa y lleva el foco a la casilla en vez de ir a Google", async () => {
+    const user = userEvent.setup();
+    render(<RegisterPage />);
+
+    await user.click(screen.getByRole("button", { name: /continuar con google/i }));
+
+    expect(
+      screen.getByText("Debes aceptar los Términos y Condiciones y la Política de privacidad.")
+    ).toBeInTheDocument();
+    expect(screen.getByRole("checkbox")).toHaveFocus();
+  });
+
+  it("al marcar la casilla de términos se habilita el registro y Google ya no avisa", async () => {
     const user = userEvent.setup();
     render(<RegisterPage />);
 
     await user.click(screen.getByRole("checkbox"));
+    await user.click(screen.getByRole("button", { name: /continuar con google/i }));
 
     expect(screen.getByRole("button", { name: /registrarse/i })).toBeEnabled();
-    expect(screen.getByRole("button", { name: /continuar con google/i })).toBeEnabled();
+    expect(
+      screen.queryByText("Debes aceptar los Términos y Condiciones y la Política de privacidad.")
+    ).not.toBeInTheDocument();
   });
 
   it("no llama a la API si se envía el formulario sin aceptar los términos", async () => {

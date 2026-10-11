@@ -46,6 +46,32 @@ describe("GoogleAuthButton", () => {
     location.restore();
   });
 
+  // Registro sin la casilla de Términos: el botón sigue activo, pero avisa
+  // en vez de ir a Google (el backend rechazaría el alta con terms_required).
+  it("con avisoAntesDeEmpezar avisa y no va a Google", async () => {
+    const location = mockLocationAssign();
+    const user = userEvent.setup();
+    const onError = vi.fn();
+
+    render(
+      <GoogleAuthButton
+        onError={onError}
+        intent="register"
+        avisoAntesDeEmpezar="Debes aceptar los Términos."
+      />
+    );
+    const boton = screen.getByRole("button", { name: /continuar con google/i });
+    expect(boton).toBeEnabled();
+    await user.click(boton);
+
+    expect(onError).toHaveBeenCalledWith("Debes aceptar los Términos.");
+    expect(mockedGetGoogleAuthUrl).not.toHaveBeenCalled();
+    expect(location.assign).not.toHaveBeenCalled();
+    expect(boton).toBeEnabled();
+
+    location.restore();
+  });
+
   it("si no se puede obtener la URL, avisa y deja el botón usable", async () => {
     mockedGetGoogleAuthUrl.mockRejectedValue(new Error("boom"));
     const user = userEvent.setup();
