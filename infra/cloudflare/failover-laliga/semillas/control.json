@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "marca": {
+    "registros": {
+      "alhabla.ai": { "apagadoEn": "2026-10-10T17:00:00.000Z" },
+      "www.alhabla.ai": { "apagadoEn": "2026-10-10T17:00:00.000Z" },
+      "app.alhabla.ai": { "apagadoEn": "2026-10-10T17:00:00.000Z" }
+    },
+    "motivo": "apagado_a_mano_por_el_bloqueo_del_2026-10-10",
+    "origen": "sembrado_a_mano",
+    "ipsBloqueadas": [
+      "188.114.96.5",
+      "188.114.97.5",
+      "2a06:98c1:3120::5",
+      "2a06:98c1:3121::5"
+    ]
+  },
+  "ultimoCambio": {
+    "accion": "apagar",
+    "en": "2026-10-10T17:00:00.000Z",
+    "hostnames": ["alhabla.ai", "www.alhabla.ai", "app.alhabla.ai"]
+  },
+  "limpiasSeguidas": 0,
+  "limpioDesde": null,
+  "limpioHasta": null
+}
