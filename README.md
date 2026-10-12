@@ -41,7 +41,7 @@ también por WhatsApp con el dueño y con sus clientes.
 | App (`frontend/`, app.alhabla.ai) | Next.js 16, React 19, Tailwind CSS, TanStack Query |
 | Web pública (`web/`, alhabla.ai) | Next.js 16, React 19, Tailwind CSS, blog en MDX |
 | Base de datos | PostgreSQL 15 + Prisma |
-| Caché | Redis 7 |
+| Caché | Redis 7 (Memorystore), en retirada: los cerrojos y el límite de peticiones van en Postgres desde el PR #277 |
 | Colas | Cloud Tasks / Cloud Scheduler (jobs HTTP internos, sin BullMQ) |
 | Voz | Telnyx AI Assistants (primario), Retell.ai (respaldo) |
 | WhatsApp | Telnyx (WhatsApp Business Platform de Meta) |
@@ -127,8 +127,12 @@ Backend en Google Cloud Run (`https://api.alhabla.ai`, un solo servicio — los 
 segundo plano corren vía Cloud Tasks/Cloud Scheduler contra ese mismo servicio, no en un
 worker aparte). Dos proyectos en Vercel: `alhabla-frontend` (la app, `app.alhabla.ai`) y
 `alhabla-web` (la web pública, `alhabla.ai`; `www` y toda ruta de la app redirigen con 301).
-DNS en Cloudflare. Ver `AGENTS.md` § Deployment Notes para la arquitectura completa y los
-comandos de despliegue, y `docs/historico/PLAN-APP-DOMINIO.md` para el reparto entre las dos webs.
+`alhabla-api` escala como mucho a 11 instancias (presupuesto de conexiones de Cloud SQL; el deploy
+se para si el máximo es mayor). DNS en Cloudflare, con el Worker `alhabla-failover-laliga`
+(`infra/cloudflare/failover-laliga/`), que cada 2 minutos mira la lista de bloqueos de LaLiga y
+quita o vuelve a poner el proxy de las webs. Ver `AGENTS.md` § Deployment Notes para la
+arquitectura completa y los comandos de despliegue, y `docs/historico/PLAN-APP-DOMINIO.md` para el
+reparto entre las dos webs.
 
 ```mermaid
 graph TD
@@ -137,7 +141,10 @@ graph TD
 
     subgraph CF["Cloudflare — DNS de alhabla.ai"]
         DNS[DNS]
+        WKR[[Worker alhabla-failover-laliga<br/>cron 2 min: proxy on/off<br/>en los bloqueos de LaLiga]]
     end
+
+    WKR -.->|proxied de alhabla.ai, www y app| DNS
 
     U --> DNS
     DNS -->|alhabla.ai| WEB[Vercel · alhabla-web<br/>web pública Next.js]
@@ -149,14 +156,14 @@ graph TD
     APP -->|NEXT_PUBLIC_API_BASE_URL| CR_API
 
     subgraph GCP["Google Cloud Run — europe-west1"]
-        CR_API[alhabla-api<br/>público, autoscaling 0→N]
+        CR_API[alhabla-api<br/>público, autoscaling 0→11]
     end
 
     CTS[[Cloud Tasks / Cloud Scheduler<br/>jobs en segundo plano]]
 
-    subgraph VPC["Infraestructura privada (VPC / conector)"]
-        SQL[(Cloud SQL<br/>Postgres)]
-        REDIS[(Memorystore<br/>Redis, caché)]
+    subgraph VPC["Infraestructura privada (VPC, Direct VPC egress)"]
+        SQL[(Cloud SQL<br/>Postgres, también cerrojos<br/>y límite de peticiones)]
+        REDIS[(Memorystore<br/>Redis, caché; en retirada)]
     end
 
     SM[[Secret Manager]]
@@ -198,6 +205,7 @@ graph TD
 ├── frontend/               # la app (app.alhabla.ai): panel, agenda, llamadas, agente, Gestor, ajustes
 ├── web/                    # la web pública (alhabla.ai): landing, sectores, planes, legal, registro, blog
 │   └── content/blog/       # artículos en MDX
+├── infra/cloudflare/failover-laliga/  # Worker de Cloudflare de los bloqueos de LaLiga (se sube a mano)
 ├── docker-compose.yml
 ├── AGENTS.md               # referencia técnica completa
 ├── PLAN-CANAL-DUENO.md     # el canal de WhatsApp (fases 0-2 hechas)
@@ -282,7 +290,9 @@ Lo que el asistente deje a medias lo completa el Gestor por WhatsApp («empezamo
   conversación o `businessId` del agente), nunca el modelo.
 - El Gestor nunca ejecuta: propone, y solo el botón del dueño ejecuta (propuestas de 24 h,
   reclamo atómico, lock por negocio).
-- Rate limiting global (100 req/min), elevado en webhooks y estricto en auth.
+- Rate limiting global (100 req/min), elevado en webhooks y estricto en auth. Se cuenta en
+  Postgres, entre todas las instancias; si Postgres falla o va lento, decide la cuenta local de
+  cada instancia y nunca da un 500.
 - CORS restringido a `APP_URL`, `WEB_URL` y `EXTRA_ALLOWED_ORIGIN`.
 
 ## Documentación adicional
