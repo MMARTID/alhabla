@@ -450,7 +450,9 @@ export const internalJobsRoutes: FastifyPluginAsync = async (fastify) => {
   );
 
   // Una vez al día (Cloud Scheduler) — plan Telnyx-orquestador §6.
-  // Resincroniza cualquier agente con telnyxSyncError pendiente y avisa por
+  // Crea el assistant de los negocios que no tienen ninguno (y promociona a
+  // Telnyx-primary a los que aún no tienen número, como el registro),
+  // resincroniza cualquier agente con telnyxSyncError pendiente y avisa por
   // email (TELNYX_ALERT_EMAIL) de assistants borrados a mano en Telnyx o de
   // un enrutamiento inconsistente. No mueve tráfico ni cambia connection_id
   // de ningún negocio — eso sigue siendo cosa de telnyx-health-check/Fase 5.

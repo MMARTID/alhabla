@@ -26,7 +26,7 @@ import {
   usaVozMultilingueEnRetell,
 } from "./idiomas/resolver.js";
 import { calendarService } from "../modules/calendar/service.js";
-import { createTelnyxAssistantForAgent } from "./telnyxAgentSync.js";
+import { crearAssistantYPromocionar } from "./telnyxAgentSync.js";
 import { listaDeEsperaDisponible } from "../modules/whatsapp/service.js";
 import { isVoiceTelnyxRolloutEnabled } from "./voiceRollout.js";
 import { resolverTransferenciaAlDueno } from "./transferenciaAlDueno.js";
@@ -627,6 +627,7 @@ export async function createBusinessAgent(args: {
   });
 
   if (orchestrator === "retell") {
+    let agenteDevuelto = agent;
     try {
       const baseUrl = getPublicWebhookBaseUrl();
       const webhookUrl = baseUrl
@@ -661,7 +662,7 @@ export async function createBusinessAgent(args: {
       );
       await publishRetellAgentUpdate(retellAgent.agent_id, retellAgent);
 
-      const syncedAgent = await client.agent.update({
+      agenteDevuelto = await client.agent.update({
         where: { id: agent.id },
         data: {
           retellAgentId: retellAgent.agent_id,
@@ -692,72 +693,6 @@ export async function createBusinessAgent(args: {
               : String(toolsError),
         });
       }
-
-      // Fase 2 del plan Telnyx-orquestador: creación dual del assistant de
-      // fallback caliente. Gateado por VOICE_TELNYX_ROLLOUT (por defecto
-      // "off" = comportamiento actual, solo Retell) y nunca puede impedir
-      // devolver el agente ya creado en Retell — createTelnyxAssistantForAgent
-      // atrapa sus propios errores.
-      //
-      // Auto-promoción a Telnyx-primary (decisión explícita del usuario,
-      // 2026-09-13): el plan original dejaba el cutover como paso manual
-      // aparte (scripts/cutoverToTelnyx.ts) para no cortar tráfico real sin
-      // confirmación. Ahora que Telnyx pasa a ser el orquestador principal
-      // por defecto, un negocio NUEVO y elegible (createTelnyxAssistantForAgent
-      // solo devuelve eligible:true cuando el assistant ya existe de verdad
-      // en Telnyx) se promociona en el momento — sin esto, orchestrator se
-      // quedaría en "retell" para siempre pese a rollout=all, porque nada
-      // más en el código vuelve a tocarlo tras el registro. Retell ya está
-      // creado y sincronizado arriba, así que sigue disponible como fallback
-      // caliente aunque el negocio pase a ser Telnyx-primary. provisionPhoneNumber
-      // (phone/service.ts) lee `orchestrator` en el momento de comprar el
-      // número, así que este flag ya puesto aquí basta para que el número
-      // se conecte al Call Control App correcto más adelante en el onboarding.
-      if (isVoiceTelnyxRolloutEnabled()) {
-        const telnyxResult = await createTelnyxAssistantForAgent({
-          agentId: agent.id,
-          businessId: args.businessId,
-          prismaClient: client,
-        });
-
-        // El assistant ya nace con sus tools de voz (mismo payload que
-        // syncAgentToTelnyx). Antes se creaba solo con `hangup` y hacía falta
-        // una segunda sincronización aquí, porque la de más arriba corre ANTES
-        // de que el assistant exista: sin ella la recepcionista decía «voy a
-        // comprobar la disponibilidad» y la llamada acababa ahí (incidente
-        // real 2026-09-14).
-        await client.business
-          .update({
-            where: { id: args.businessId },
-            data: {
-              telnyxEligibilityStatus: telnyxResult.eligible
-                ? "eligible"
-                : "ineligible",
-              telnyxEligibilityReason: telnyxResult.reason,
-              ...(telnyxResult.eligible
-                ? {
-                    orchestrator: "telnyx",
-                    voiceRoutingTarget: "telnyx",
-                    voiceRoutingChangedAt: new Date(),
-                  }
-                : {}),
-            },
-          })
-          .catch((updateError) => {
-            console.error(
-              "[Agent] No se pudo guardar la elegibilidad Telnyx del negocio:",
-              {
-                businessId: args.businessId,
-                message:
-                  updateError instanceof Error
-                    ? updateError.message
-                    : String(updateError),
-              }
-            );
-          });
-      }
-
-      return syncedAgent;
     } catch (error) {
       console.error("[Agent] No se pudo sincronizar el agente con Retell:", {
         agentId: agent.id,
@@ -767,7 +702,24 @@ export async function createBusinessAgent(args: {
       });
     }
 
-    return agent;
+    // Fase 2 del plan Telnyx-orquestador: el assistant de Telnyx, que hoy
+    // atiende todas las llamadas, con la auto-promoción del negocio a
+    // Telnyx-primary (ver crearAssistantYPromocionar). Va FUERA del try de
+    // Retell, que es solo el respaldo: antes estaba dentro, y si Retell
+    // lanzaba (sin crédito, su API caída) el negocio nuevo se quedaba sin
+    // assistant ni promoción, y el reconciliador diario no lo veía porque
+    // solo miraba agentes que ya tenían uno. Nunca lanza ni impide devolver
+    // el agente. El assistant nace con sus tools de voz: la sincronización
+    // de tools de arriba corre antes de que exista.
+    if (isVoiceTelnyxRolloutEnabled()) {
+      await crearAssistantYPromocionar({
+        agentId: agent.id,
+        businessId: args.businessId,
+        prismaClient: client,
+      });
+    }
+
+    return agenteDevuelto;
   }
 
   return agent;
