@@ -24,3 +24,50 @@ export async function comprobarSalud(comprobaciones: {
   const healthy = criticas.every(([nombre]) => dependencies[nombre] === "ok");
   return { healthy, dependencies };
 }
+
+/**
+ * Comprobación informativa con memoria, por instancia. El uptime check de
+ * Cloud Monitoring pide /health cada 60 s desde 6 regiones (unas 8.600 veces
+ * al día) y cada vez se abrían conexiones TLS nuevas con Telnyx y Retell:
+ * ~30 MB/día de salida a internet y ~17.000 llamadas a sus APIs que no
+ * aportaban nada (issue #281). El resultado se guarda `vidaBienMs` si fue bien
+ * y `vidaMalMs` si falló, para que una caída (y su vuelta) se vea pronto. Lo
+ * que llega con una comprobación en vuelo espera a esa misma. Solo para las
+ * informativas: las críticas se comprueban en cada consulta, porque deciden
+ * el 200/503 y la vuelta atrás del deploy.
+ */
+export function conMemoria(
+  comprobar: () => Promise<unknown>,
+  {
+    vidaBienMs = 60_000,
+    vidaMalMs = 15_000,
+    ahora = () => Date.now(),
+  }: { vidaBienMs?: number; vidaMalMs?: number; ahora?: () => number } = {}
+): () => Promise<void> {
+  let guardado: { hasta: number; error: unknown } | null = null;
+  let enVuelo: Promise<void> | null = null;
+
+  return () => {
+    if (guardado && ahora() < guardado.hasta) {
+      const { error } = guardado;
+      return error === undefined ? Promise.resolve() : Promise.reject(error);
+    }
+    enVuelo ??= comprobar()
+      .then(
+        () => {
+          guardado = { hasta: ahora() + vidaBienMs, error: undefined };
+        },
+        (error: unknown) => {
+          guardado = {
+            hasta: ahora() + vidaMalMs,
+            error: error ?? new Error("comprobación fallida"),
+          };
+          throw guardado.error;
+        }
+      )
+      .finally(() => {
+        enVuelo = null;
+      });
+    return enVuelo;
+  };
+}

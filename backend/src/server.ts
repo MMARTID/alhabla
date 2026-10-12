@@ -31,7 +31,7 @@ import { webhooksTelnyxRoutes } from "./modules/webhooksTelnyx/routes.js";
 import { webhooksRetellRoutes } from "./modules/webhooksRetell/routes.js";
 import { retellAdapter } from "./adapters/retell/RetellAdapter.js";
 import { telnyxAdapter } from "./adapters/telnyx/TelnyxAdapter.js";
-import { comprobarSalud } from "./lib/salud.js";
+import { comprobarSalud, conMemoria } from "./lib/salud.js";
 import { comprobarClaveDeCifrado } from "./lib/cifradoDeCredenciales.js";
 import { origenesPermitidos } from "./lib/urls.js";
 import { confianzaEnProxies } from "./lib/proxyDeConfianza.js";
@@ -177,15 +177,18 @@ async function start() {
     });
 
     // Health check endpoint with dependency probes
+    // Telnyx (orquestador principal) y Retell (respaldo) solo informan (ver
+    // comprobarSalud) y se preguntan como mucho una vez por minuto e
+    // instancia (conMemoria): el uptime check consulta /health sin parar.
+    const comprobarTelnyx = conMemoria(() => telnyxAdapter.checkHealth());
+    const comprobarRetell = conMemoria(() => retellAdapter.checkHealth());
     fastify.get("/health", async (_request, reply) => {
-      // Telnyx (orquestador principal) y Retell (respaldo) solo informan:
-      // ver comprobarSalud.
       const informativas: Record<string, () => Promise<unknown>> = {};
       if (process.env.TELNYX_API_KEY) {
-        informativas.telnyx = () => telnyxAdapter.checkHealth();
+        informativas.telnyx = comprobarTelnyx;
       }
       if (process.env.RETELL_API_KEY) {
-        informativas.retell = () => retellAdapter.checkHealth();
+        informativas.retell = comprobarRetell;
       }
       const { healthy, dependencies } = await comprobarSalud({
         criticas: {
