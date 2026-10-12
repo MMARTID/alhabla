@@ -6,7 +6,8 @@ Los agentes de voz atienden llamadas, consultan horario y disponibilidad, y rese
 en el calendario de Google, Outlook o Apple/iCloud del negocio. Desde septiembre de 2026 hablan
 también por WhatsApp con el dueño (avisos y el Gestor) y con sus clientes.
 
-Backend Fastify 5 + Prisma/PostgreSQL + Redis. Dos webs Next.js 16 App Router (React 19) con Tailwind 3
+Backend Fastify 5 + Prisma/PostgreSQL + Redis (en retirada: los cerrojos de citas y el límite de
+peticiones van en Postgres desde el PR #277; ver AGENTS.md § Corte de Redis a Postgres). Dos webs Next.js 16 App Router (React 19) con Tailwind 3
 (desde el 2026-09-21, `docs/historico/PLAN-APP-DOMINIO.md`): **la app** en `frontend/` (puerto 3001,
 `app.alhabla.ai`, TanStack Query, sesión JWT en `localStorage`) y **la web pública** en `web/`
 (puerto 3002, `alhabla.ai`: landing, sectores, planes, legal, registro de cuenta y blog en MDX,
@@ -21,8 +22,13 @@ BullMQ en un servicio `alhabla-worker` aparte) migraron el 2026-09-03 a Cloud Ta
 Scheduler, que llaman de vuelta a `alhabla-api` — ya no hace falta un servicio siempre
 encendido. Las dos webs en Vercel (proyectos `alhabla-frontend`, root `frontend`, dominio
 `app.alhabla.ai`; y `alhabla-web`, root `web`, dominio `alhabla.ai`). `alhabla.ai` redirige con
-301 toda ruta de la app a `app.alhabla.ai`. Detalle completo, IDs de recursos y comandos reales
-en `AGENTS.md` § Deployment Notes.
+301 toda ruta de la app a `app.alhabla.ai`. `alhabla-api` tiene un **máximo de 11 instancias**:
+es el presupuesto de conexiones de Cloud SQL (`max_connections` 50; 4 por instancia en el peor
+caso), y el deploy se para si alguien lo sube. El DNS está en Cloudflare, y el Worker
+`alhabla-failover-laliga` (`infra/cloudflare/failover-laliga/`) quita y vuelve a poner por sí solo el
+proxy de `alhabla.ai`, `www` y `app` cuando LaLiga hace bloquear las IPs de Cloudflare: no se
+tocan a mano. Detalle completo, IDs de recursos y comandos reales en `AGENTS.md` § Deployment
+Notes.
 
 ## Reglas que no se negocian
 
@@ -129,8 +135,9 @@ backend/
 │   │                 #   webhooksRetell, webhooksTelnyx, whatsapp) con routes.ts; gestor, voiceTools y
 │   │                 #   retellSimulation sin routes.ts (los usan los webhooks y los scripts)
 │   ├── adapters/     # retell, telnyx (voz y números), whatsapp, calendar (Google, Outlook, CalDAV)
-│   ├── lib/          # prisma, redis, cloudTasks, storage, stripe, availability,
-│   │                 #   zohoMail, emailTemplates, businessSchedule, agentBootstrap, managedAgentPrompt
+│   ├── lib/          # prisma, redis, cloudTasks, storage, stripe, availability, cerrojos,
+│   │                 #   limitesDePeticiones, almacenTemporal, salud, zohoMail, emailTemplates,
+│   │                 #   businessSchedule, agentBootstrap, managedAgentPrompt
 │   ├── config/       # voiceAgent.ts (catálogo de voces/LLM/STT)
 │   └── jobs/         # lógica de los jobs (sin framework): processRecording, retryFailedBooking,
 │                     #   sendEmail, sendSms, sendWhatsapp, cleanupZombieCalls, telnyxReconciler,
@@ -142,6 +149,7 @@ backend/
 └── Dockerfile
 frontend/src/{app,components,lib,hooks}/   # la app (app.alhabla.ai)
 web/src/{app,components,lib,hooks}/        # la web pública (alhabla.ai); artículos en web/content/blog/*.mdx
+infra/cloudflare/failover-laliga/          # Worker de Cloudflare de los bloqueos de LaLiga (node --test; se sube a mano)
 ```
 
 Enlaces entre las dos: la app enlaza a la web con `NEXT_PUBLIC_WEB_URL` (`frontend/src/lib/web-url.ts`)

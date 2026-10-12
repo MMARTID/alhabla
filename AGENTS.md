@@ -3224,7 +3224,8 @@ fusionar o descartar una rama, quita su fila de esta tabla.
   projects: `alhabla-frontend` (Root Directory `frontend`, domain `app.alhabla.ai`) and
   `alhabla-web` (Root Directory `web`, domains `alhabla.ai` + `www` → 308 to `alhabla.ai`),
   split on 2026-09-21 (`docs/historico/PLAN-APP-DOMINIO.md`). DNS lives in Cloudflare (proxied CNAMEs to the
-  project's `*.vercel-dns-017.com` target). `alhabla.ai` answers every app route with a 301 to
+  project's `*.vercel-dns-017.com` target; see «Cloudflare failover for LaLiga blocks» below for
+  who turns that proxy off and on). `alhabla.ai` answers every app route with a 301 to
   `app.alhabla.ai` (`web/next.config.mjs`), which is what keeps the Meta template URL buttons
   (`alhabla.ai/ajustes/{{1}}`) and old emails working. Backend URLs: `APP_URL`
   (`https://app.alhabla.ai`), `WEB_URL` (`https://alhabla.ai`), `FRONTEND_URL` kept equal to
@@ -3345,6 +3346,37 @@ and the queues (`gcloud tasks list --queue=<q> --location=europe-west1`), not ju
 **Side effect worth knowing:** the uptime check hits `/health` ~6 times a minute, which
 keeps at least one Cloud Run instance warm most of the time — fewer cold starts for real
 callers, at the cost of a few thousand trivial requests a day.
+
+### Cloudflare failover for LaLiga blocks (Worker `alhabla-failover-laliga`)
+
+- **The problem.** During LaLiga matches Spanish ISPs block Cloudflare IPs by court order
+  (`188.114.96.x`/`97.x`; on Movistar also `2a06:98c1:3120::`/`3121::`). With the proxy on,
+  `alhabla.ai`, `www` and `app` stop loading for many people in Spain. `api.alhabla.ai` is
+  DNS-only (straight to Cloud Run) and is never affected.
+- **What the Worker does.** Code in `infra/cloudflare/failover-laliga/`, whose `README.md` is the
+  full manual (142 tests, run by the CI job «Infra — Worker de LaLiga»). A cron every 2 minutes
+  reads hayahora.futbol's `blocked-any.txt`, the three CNAMEs through the Cloudflare API
+  and our IPs through DoH:
+  - if one of our Cloudflare IPs is blocked and Vercel's are not, it writes a «marca» in KV and
+    sets the three CNAMEs to DNS-only (TTL 60): Vercel serves them directly;
+  - when the list has been clean for 2 runs and 10 minutes and `blocked.dns.hayahora.futbol`
+    (a second channel) confirms it, it turns the proxy back on — only on the records it turned
+    off itself.
+- **In production since 2026-10-11** (`MODO = activo` since 09:20 UTC). First full cycle that
+  night: the block ended at 21:02 and the Worker turned the proxy back on by itself at 21:12:31.
+  Status: `GET https://alhabla-failover-laliga.flat-flower-78e7.workers.dev/estado` (it only
+  reads KV). Logs: Workers & Pages → `alhabla-failover-laliga` → Observability.
+- **Do not toggle the proxy of those three records by hand.** A record changed by hand (its
+  `modified_on` no longer matches the Worker's PATCH) is dropped from the marca
+  (`modificado_a_mano`) and the Worker never turns it back on. One turned on by hand during a
+  block is turned off again once the 10-minute debounce has passed. To pause it, set
+  `MODO = observar` in Variables and Secrets (it keeps deciding and logging, without a single
+  PATCH) or empty its cron.
+- **Secrets and deploys.** `CF_API_TOKEN` (Zone → DNS → Edit on `alhabla.ai` only) is set by the
+  owner in the dashboard, never in git or `wrangler.toml`. KV namespace
+  `a570046b50c6497280e6b53dde6a5dce` (id in `wrangler.toml`; it is not a secret). The Worker
+  is uploaded by hand (`npx wrangler deploy` from its folder, or the Cloudflare API keeping the
+  secret with `keep_bindings`/`inherit`): **merging to `main` deploys nothing.**
 
 ### Propagating a tool-schema or prompt change to existing agents
 
