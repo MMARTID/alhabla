@@ -132,7 +132,7 @@ export function instruccionesDeIdioma(
 ): { instruccion: string; recordatorio: string | null } {
   if (idiomas.length === 1) {
     return {
-      instruccion: `Habla siempre en ${IDIOMAS[idiomas[0]].nombreEnPrompt}; no menciones que eres una IA salvo que te lo pregunten.`,
+      instruccion: `Habla siempre en ${IDIOMAS[idiomas[0]].nombreEnPrompt}.`,
       recordatorio: null,
     };
   }
@@ -145,7 +145,7 @@ export function instruccionesDeIdioma(
     .map((nota) => ` ${nota}`)
     .join("");
   return {
-    instruccion: `En las llamadas, el saludo en ${IDIOMAS[principal].nombreEnPrompt} ya lo dice el sistema al descolgar y es el primer mensaje de la conversación: no lo repitas. Desde tu primera respuesta, contesta y continúa exclusivamente en el idioma en que te habla quien llama si es uno de estos: ${lista}. Si cambia entre esos idiomas, acompaña el cambio sin pedirle que elija uno. Las frases que estas instrucciones ponen entre comillas para decírselas a quien llama están en castellano: dilas traducidas al idioma de la conversación.${notas} No menciones que eres una IA salvo que te lo pregunten.`,
+    instruccion: `En las llamadas, el saludo en ${IDIOMAS[principal].nombreEnPrompt} ya lo dice el sistema al descolgar y es el primer mensaje de la conversación: no lo repitas. Desde tu primera respuesta, contesta y continúa exclusivamente en el idioma en que te habla quien llama si es uno de estos: ${lista}. Si cambia entre esos idiomas, acompaña el cambio sin pedirle que elija uno. Las frases que estas instrucciones ponen entre comillas para decírselas a quien llama están en castellano: dilas traducidas al idioma de la conversación.${notas}`,
     recordatorio: `## Idioma\nContesta cada turno en el idioma en que te habla quien llama si es uno de estos: ${lista}; también tu primera respuesta, lo que digas después de usar una herramienta (aunque te conteste en castellano), el resumen de la reserva, la pregunta del WhatsApp y la despedida. No cambies de idioma por tu cuenta mientras siga hablando en el suyo.`,
   };
 }

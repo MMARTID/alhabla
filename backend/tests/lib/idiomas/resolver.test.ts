@@ -217,7 +217,7 @@ describe("elegirVoz, con voces que el catálogo aún no tiene", () => {
 describe("resolverIdiomas — prompt y saludo", () => {
   it("con principal español, saluda en español y sigue en cualquiera de los siete", () => {
     expect(resolver(["es-ES"]).instruccionDelPrompt).toBe(
-      "En las llamadas, el saludo en español de España ya lo dice el sistema al descolgar y es el primer mensaje de la conversación: no lo repitas. Desde tu primera respuesta, contesta y continúa exclusivamente en el idioma en que te habla quien llama si es uno de estos: español de España, inglés, francés, alemán, italiano, portugués, neerlandés. Si cambia entre esos idiomas, acompaña el cambio sin pedirle que elija uno. Las frases que estas instrucciones ponen entre comillas para decírselas a quien llama están en castellano: dilas traducidas al idioma de la conversación. No menciones que eres una IA salvo que te lo pregunten."
+      "En las llamadas, el saludo en español de España ya lo dice el sistema al descolgar y es el primer mensaje de la conversación: no lo repitas. Desde tu primera respuesta, contesta y continúa exclusivamente en el idioma en que te habla quien llama si es uno de estos: español de España, inglés, francés, alemán, italiano, portugués, neerlandés. Si cambia entre esos idiomas, acompaña el cambio sin pedirle que elija uno. Las frases que estas instrucciones ponen entre comillas para decírselas a quien llama están en castellano: dilas traducidas al idioma de la conversación."
     );
     expect(resolver(["es-ES"]).recordatorioDelPrompt).toBe(
       "## Idioma\nContesta cada turno en el idioma en que te habla quien llama si es uno de estos: español de España, inglés, francés, alemán, italiano, portugués, neerlandés; también tu primera respuesta, lo que digas después de usar una herramienta (aunque te conteste en castellano), el resumen de la reserva, la pregunta del WhatsApp y la despedida. No cambies de idioma por tu cuenta mientras siga hablando en el suyo."
@@ -251,7 +251,7 @@ describe("resolverIdiomas — prompt y saludo", () => {
   it("con un solo idioma (lo que recibe Retell con principal español), «Habla siempre en…» y sin recordatorio", () => {
     expect(instruccionesDeIdioma(["es-ES"], "es-ES")).toEqual({
       instruccion:
-        "Habla siempre en español de España; no menciones que eres una IA salvo que te lo pregunten.",
+        "Habla siempre en español de España.",
       recordatorio: null,
     });
   });
@@ -509,7 +509,7 @@ describe("funcionQueExige", () => {
 describe("resolverIdiomas — el prompt con un principal cooficial", () => {
   it("saluda en catalán, lista los ocho y lleva la nota valenciana y balear", () => {
     expect(resolver([], "ca-ES").instruccionDelPrompt).toBe(
-      "En las llamadas, el saludo en catalán ya lo dice el sistema al descolgar y es el primer mensaje de la conversación: no lo repitas. Desde tu primera respuesta, contesta y continúa exclusivamente en el idioma en que te habla quien llama si es uno de estos: español de España, inglés, francés, catalán, alemán, italiano, portugués, neerlandés. Si cambia entre esos idiomas, acompaña el cambio sin pedirle que elija uno. Las frases que estas instrucciones ponen entre comillas para decírselas a quien llama están en castellano: dilas traducidas al idioma de la conversación. Si quien llama usa formas valencianas o baleares del catalán, adáptate a ellas. No menciones que eres una IA salvo que te lo pregunten."
+      "En las llamadas, el saludo en catalán ya lo dice el sistema al descolgar y es el primer mensaje de la conversación: no lo repitas. Desde tu primera respuesta, contesta y continúa exclusivamente en el idioma en que te habla quien llama si es uno de estos: español de España, inglés, francés, catalán, alemán, italiano, portugués, neerlandés. Si cambia entre esos idiomas, acompaña el cambio sin pedirle que elija uno. Las frases que estas instrucciones ponen entre comillas para decírselas a quien llama están en castellano: dilas traducidas al idioma de la conversación. Si quien llama usa formas valencianas o baleares del catalán, adáptate a ellas."
     );
   });
 });
