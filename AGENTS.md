@@ -3274,7 +3274,7 @@ fusionar o descartar una rama, quita su fila de esta tabla.
 - The `backend/Dockerfile` has 5 stages: `base`, `deps`, `builder`, `runtime`, `development`.
 - Production image runs `node dist/server.js` (compiled output).
 - Development image runs `npx tsx watch backend/src/server.ts` over a volume-mounted source tree.
-- Health check endpoint at `GET /health` probes Postgres, Redis and (when `RETELL_API_KEY` is set) Retell. Returns `200` if all healthy, `503` if degraded.
+- Health check endpoint at `GET /health` probes Postgres and Redis on every request — they alone decide `200`/`503` (and the deploy's automatic rollback). Telnyx (`balance.retrieve`) and Retell (`agent.list`), when their keys are set, are informational only (`lib/salud.ts`, `comprobarSalud`) and are asked **at most once a minute per instance** (`conMemoria`, since 2026-10-11, issue #281): a success is kept 60 s and a failure 15 s, and concurrent requests share one probe. Before that every uptime-check probe (every 60 s from 6 regions, ~8,600 a day) opened fresh TLS connections to both — ~30 MB/day of internet egress and ~17,000 useless provider API calls a day.
 
 ### Local development (Docker Compose)
 
@@ -3318,7 +3318,7 @@ Plan del corte (decidido por el dueño el 2026-10-10, con 72 h de vigilancia ent
 
 Set up on 2026-09-17 after two days of `process-recording` failing every ten seconds
 with `/health` and CI both green: **`/health` only proves Postgres, Redis and Retell
-answer — it says nothing about jobs, queues or 5xx rates.** All four policies notify
+answer — it says nothing about jobs, queues or 5xx rates.** All five policies notify
 the email channel *"Alhabla · avisos de producción (correo)"* (`miguel.zero.admin@gmail.com`,
 same inbox as `TELNYX_ALERT_EMAIL`); change the address in Monitoring › Alerting ›
 Notification channels, not in code.
@@ -3328,12 +3328,13 @@ Notification channels, not in code.
 | **alhabla-api · errores 5xx** | `run.googleapis.com/request_count` with `response_code_class=5xx`, summed over 5 min, **> 10** | The 15–17 Sep loop produced 29–30 per 5 min; a healthy day produces 0. Replayed against that day's data: would have fired continuously until the fix deployed. |
 | **Cloud Tasks · cola que no baja** | `cloudtasks.googleapis.com/queue/depth`, any queue, 5-min mean **> 200 for 15 min** | Queues drain in seconds at current traffic; a queue that grows is a task failing in a loop. Same incident peaked at ~9,000. |
 | **alhabla-api · /health caído** | Uptime check `alhabla-api-health-tJzyQ7cVqx8` (HTTPS `api.alhabla.ai/health` every minute from 6 regions, must contain `"status":"ok"`) failing from **more than one region for 60 s** | One region failing is usually the checker; two is us. |
+| **alhabla-api · cerrojos de citas con errores** | Log match (added 2026-10-12, PR A vigilance): stderr `[Cerrojo]` or `[Compat Redis]`, or `[Purga] No se pudo purgar`, from `alhabla-api`; at most one email per 30 min, auto-close after 30 min | Every `[Cerrojo]` line is an error: a booking, change or cancellation that did not happen (the lock fails closed, never double-books). `[Compat Redis]` errors mean the compatibility Redis is down or slow, which makes every lock fail closed. Kept after the 72 h of PR A vigilance. |
 | **alhabla-api · límite de peticiones solo en local** | Log match (added 2026-10-11, PR A): `textPayload:"no se abre otra hasta"` from `alhabla-api`; at most one email per hour, auto-close after 30 min | Fires when an instance has 2 limiter connections discarded by a timeout in 15 min and stops opening new ones: up to 15 min counting the rate limit locally with Postgres healthy, which `/health` does not see (§ Corte de Redis a Postgres, «Conexión desechada y tope»). |
 
 Resource ids (project `project-84381467-a606-4b71-a6e`): channel
 `notificationChannels/3301523917747931516`, policies `14798085137940900180` (5xx),
 `8824325884392888489` (queue), `14275085039933176867` (uptime),
-`9267553680755852729` (limiter on its local count). List with
+`9267553680755852729` (limiter on its local count), `11485991775861093593` (locks). List with
 `gcloud alpha monitoring policies list` / `gcloud monitoring uptime list-configs`.
 
 **When one fires:** the policy's own documentation (visible in the email) says what to
