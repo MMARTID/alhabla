@@ -9,7 +9,8 @@ const RECORDING_DOWNLOAD_TIMEOUT_MS = 5 * 60_000;
 const MAX_RECORDING_BYTES = 200 * 1024 * 1024;
 const MAX_RECORDING_REDIRECTS = 5;
 
-// Telnyx guarda el audio en S3 bajo `<conexión>/<fecha>/<call_leg_id>-<n>.wav`.
+// Telnyx guarda el audio en S3 bajo `<conexión>/<fecha>/<call_leg_id>-<n>.mp3`
+// (`.wav` en las grabaciones de antes del issue #280).
 // Las grabaciones anteriores a esta versión no tienen `providerLegId` en la
 // fila: el leg se rescata de esa ruta la primera vez y se persiste. Solo
 // UUIDs v1 (tercer grupo empieza por 1), que es lo que emite Telnyx.
