@@ -1645,6 +1645,17 @@ is now a **Cloud Scheduler** job hitting the same kind of endpoint every
      **ignored by the API** (returns an empty list — verified against the live account
      2026-09-17). Only `call_leg_id`/`call_session_id` filters work; the adapter no
      longer exposes a by-call-control-id lookup.
+   - **Aviso de IA y grabación opcional (2026-10-12).** El saludo de cada idioma
+     (`lib/idiomas/catalogo.ts`) dice que es una inteligencia artificial (Reglamento
+     europeo de IA, art. 50: obligatorio desde el 2-8-2026, y Alhabla es el proveedor)
+     y que la llamada se graba, y ofrece no grabarla. Si quien llama lo pide, la
+     recepcionista usa la tool `no_grabar` (Telnyx y Retell) y `lib/grabacionRechazada.ts`
+     anota `Call.grabacionRechazadaAt` y, en Telnyx, intenta `record_stop`. Con la marca,
+     `handleCallRecordingSaved` no crea `Recording` y borra el audio en Telnyx, el webhook
+     de Retell no lo guarda ni lo encola, y este job retira la fila sin subirla si ya
+     estaba en cola. La transcripción, los insights y el informe salen de la
+     conversación del assistant, no del audio, y siguen igual. En el chat de WhatsApp no
+     hay grabación y el aviso de IA lo da la primera respuesta de cada conversación.
 
 2. **`retry-failed-booking`**
    - Retries a `book_appointment` that failed during a live call for a probably-transient reason (`BOOK_APPOINTMENT_FAILED`, `CALENDAR_TIMEOUT`, `CALENDAR_RATE_LIMITED`, or an unclassified error) — enqueued by `capturePendingBookingLead`/`enqueueRetryFailedBooking` in `voiceTools/service.ts`. Not enqueued for `*_RECONNECT_REQUIRED` failures, since retrying doesn't help until the business reconnects the calendar manually.

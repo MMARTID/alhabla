@@ -120,6 +120,19 @@ export async function processRecordingJob(data: ProcessRecordingJob): Promise<vo
       console.log(`[Job] La grabación de ${callId} ya está marcada como irrecuperable`);
       return;
     }
+    if (call.grabacionRechazadaAt) {
+      // Quien llama pidió no grabar después de que la grabación entrase en
+      // la cola (lib/grabacionRechazada.ts): no se sube y se retira para que
+      // retryStuckRecordings no la vuelva a encolar.
+      await prisma.recording.update({
+        where: { id: pendingRecording.id },
+        data: { deletedAt: new Date() },
+      });
+      console.log(
+        `[Job] Grabación de ${callId} descartada sin subir: quien llama pidió no grabar (negocio ${call.businessId})`
+      );
+      return;
+    }
 
     console.log(`[Job] Downloading recording from: ${externalUrl}`);
     let recording: Awaited<ReturnType<typeof downloadRecording>>;

@@ -88,7 +88,7 @@ function instrucciones(nicho: Nicho): string {
 
 Eres la recepcionista virtual de ${nicho.negocio}, una ${nicho.etiqueta}.
 
-Habla siempre en español de España. No menciones que eres una IA salvo que te lo pregunten.
+Habla siempre en español de España. Eres una inteligencia artificial y el saludo ya lo dice: no lo repitas. Si te preguntan si eres una persona o una máquina, di siempre la verdad.
 
 Habla con cercanía y naturalidad, en una o dos frases por turno.
 
@@ -145,7 +145,9 @@ async function main() {
     await client.ai.assistants.update(clon.id, {
       name: `alhabla-demo-${nicho.envVar.replace("TELNYX_DEMO_", "").replace("_ASSISTANT_ID", "").toLowerCase()}`,
       instructions: instrucciones(nicho),
-      greeting: `Hola, gracias por llamar a ${nicho.negocio}. ¿En qué te puedo ayudar?`,
+      // Reglamento europeo de IA, art. 50: dice que es una IA desde el
+      // principio. Sin aviso de grabación: la demo no graba.
+      greeting: `${nicho.negocio}, te atiende su asistente de inteligencia artificial. ¿En qué te ayudo?`,
       // Sin una sola tool: este assistant no puede escribir en ninguna parte.
       tools: [],
       post_conversation_settings: { enabled: false },

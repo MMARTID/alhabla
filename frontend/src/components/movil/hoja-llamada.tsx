@@ -23,6 +23,7 @@ import {
   formatCanalYDuracion,
   formatCurrency,
   formatPhoneLocal,
+  motivoSinGrabacion,
   outcomeLabel,
   outcomeTone,
   sentimentLabel,
@@ -152,7 +153,7 @@ export function HojaLlamada({
           ) : (
             <p className="flex min-h-12 items-center gap-2 text-sm text-muted">
               <Mic className="h-4 w-4 shrink-0" aria-hidden="true" />
-              {esChatDeWhatsapp(call) ? "Chat de WhatsApp: no hay grabación." : "Todavía no hay grabación disponible."}
+              {motivoSinGrabacion(call)}
             </p>
           )
         ) : null

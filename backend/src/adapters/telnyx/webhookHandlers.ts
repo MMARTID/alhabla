@@ -9,6 +9,7 @@ import {
 import { callLabel, errorMessage } from "../../lib/logUtils.js";
 import { selectTelnyxInboundAgent } from "../../modules/phone/telnyxInbound.js";
 import { executeVoiceTool } from "../../modules/voiceTools/service.js";
+import { borrarGrabacionesDeTelnyx } from "../../lib/grabacionRechazada.js";
 import {
   comprobacionDeDesvioReciente,
   leerClientStateDeComprobacion,
@@ -607,10 +608,10 @@ export async function handleCallRecordingSaved(
   try {
     // El evento no trae call_control_id — se resuelve vía la API de
     // grabaciones filtrando por call_leg_id (sí presente en el webhook).
-    const [recording] = await telnyxAiAdapter.listRecordingsByCallLegId(
+    const grabaciones = await telnyxAiAdapter.listRecordingsByCallLegId(
       call_leg_id
     );
-    const callControlId = recording?.callControlId;
+    const callControlId = grabaciones[0]?.callControlId;
     if (!callControlId) {
       console.error(
         `[Telnyx] No se pudo resolver call_control_id para la grabación del leg ${call_leg_id}`
@@ -626,6 +627,17 @@ export async function handleCallRecordingSaved(
         `[Telnyx] ${callLabel(callControlId)} no existía en la base de datos al recibir la grabación`
       );
       return { success: false };
+    }
+
+    // Quien llama pidió que no se grabara (tool no_grabar): ni fila, ni
+    // copia a R2, y el audio se borra en Telnyx (lib/grabacionRechazada.ts).
+    if (dbCall.grabacionRechazadaAt) {
+      await borrarGrabacionesDeTelnyx({
+        grabaciones,
+        businessId: dbCall.businessId,
+        etiqueta: callLabel(callControlId),
+      });
+      return { success: true };
     }
 
     // El leg se guarda porque esta URL caduca a los 10 minutos: si la copia

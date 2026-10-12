@@ -27,6 +27,7 @@ import { cancelarReserva } from "../../../src/modules/bookings/cancelacion.js";
 import { buildCalendarIdempotencyKey } from "../../../src/lib/calendarIdempotency.js";
 import { normalizeVoiceToolDateTime } from "../../../src/lib/voiceDateTime.js";
 import { guardarIntentoDeReservaFallido } from "../../../src/lib/intentoDeReserva.js";
+import { registrarGrabacionRechazada } from "../../../src/lib/grabacionRechazada.js";
 
 vi.mock("../../../src/lib/prisma.js", () => ({
   prisma: {
@@ -138,6 +139,10 @@ vi.mock(
 // La cancelación (BD, evento externo, aviso #4, lista de espera) vive en
 // modules/bookings/cancelacion.ts con sus propios tests; cancel_appointment
 // solo conserva la titularidad por número y delega.
+vi.mock("../../../src/lib/grabacionRechazada.js", () => ({
+  registrarGrabacionRechazada: vi.fn(),
+}));
+
 vi.mock("../../../src/modules/bookings/cancelacion.js", () => ({
   cancelarReserva: vi.fn().mockResolvedValue({ resultado: "cancelada" }),
 }));
@@ -2763,6 +2768,71 @@ describe("executeVoiceTool cancel_appointment", () => {
 
       expect(result.result.success).toBe(false);
       expect(result.result.code).toBe("APPOINTMENT_NOT_FOUND");
+    });
+  });
+});
+
+// El saludo ofrece no grabar la llamada (lib/grabacionRechazada.ts).
+describe("executeVoiceTool no_grabar", () => {
+  const mockedRegistrar = vi.mocked(registrarGrabacionRechazada);
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockedBusinessFindUnique.mockResolvedValue(buildBusiness() as any);
+  });
+
+  it("registra el rechazo con la llamada y el negocio del webhook", async () => {
+    mockedRegistrar.mockResolvedValue("registrado");
+
+    const result = await executeVoiceTool({
+      businessId: "business_123",
+      toolName: "no_grabar",
+      params: { businessId: "otro_negocio" },
+      callLabel: "llamada v3:ctrl_1",
+      callId: "v3:ctrl_1",
+    });
+
+    expect(mockedRegistrar).toHaveBeenCalledWith({
+      callId: "v3:ctrl_1",
+      businessId: "business_123",
+      etiqueta: "llamada v3:ctrl_1",
+    });
+    expect(result).toEqual({
+      success: true,
+      result: {
+        success: true,
+        message:
+          "Hecho: no se guardará la grabación de esta llamada. La transcripción sí.",
+      },
+    });
+  });
+
+  it("si la llamada no existe, se lo dice a la recepcionista sin fallar", async () => {
+    mockedRegistrar.mockResolvedValue("sin_llamada");
+
+    const result = await executeVoiceTool({
+      businessId: "business_123",
+      toolName: "no_grabar",
+      params: {},
+      callId: "v3:ctrl_1",
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.result).toMatchObject({ success: false });
+  });
+
+  it("en el chat de WhatsApp no hay nada que dejar de grabar", async () => {
+    const result = await executeVoiceTool({
+      businessId: "business_123",
+      toolName: "no_grabar",
+      params: {},
+      callId: "whatsapp:chat:conv_1",
+    });
+
+    expect(mockedRegistrar).not.toHaveBeenCalled();
+    expect(result.result).toEqual({
+      success: true,
+      message: "En el chat no se graba nada.",
     });
   });
 });

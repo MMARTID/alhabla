@@ -592,6 +592,10 @@ model Call {
   // (doble escritura) hasta medir la concordancia.
   postCallReport         Json?
   postCallReportAt       DateTime?
+  // Quien llama pidió que no se grabara (el saludo lo ofrece; tool
+  // no_grabar): se intenta parar la grabación en el momento y, cuando llega,
+  // ni se copia a R2 ni se conserva en el proveedor. La transcripción sí.
+  grabacionRechazadaAt   DateTime?
   providerCallId         String?
   providerConversationId String?
   // OJO: en Telnyx, providerCostCents viene del webhook call.cost y SOLO
