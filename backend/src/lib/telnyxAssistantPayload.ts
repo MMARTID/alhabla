@@ -728,9 +728,14 @@ export function buildTelnyxAssistantPayload(
           interrupt_prediction_threshold: 0.4,
         },
     telephonySettings: {
+      // MP3 y no WAV (issue #280): el WAV de Telnyx es PCM sin comprimir
+      // (16 kHz, 16 bits, dos canales: 3,8 MB por minuto) y cada grabación
+      // pasa por Cloud Run al copiarla a R2, que es salida a internet de
+      // pago. Telnyx solo da la URL del formato con el que se grabó. Se
+      // mantienen los dos canales (uno por interlocutor).
       recording_settings: {
         enabled: true,
-        format: "wav",
+        format: "mp3",
         channels: "dual",
         stop_on_conversation_end: true,
       },

@@ -1614,6 +1614,16 @@ is now a **Cloud Scheduler** job hitting the same kind of endpoint every
 1. **`process-recording`**
    - Downloads the call recording from Retell or Telnyx and uploads it to R2.
    - Updates `Recording` with `storageKey` and `storageUrl`.
+   - **Format (2026-10-12, issue #280):** Telnyx assistants record **MP3, two channels**
+     (`recording_settings` in `lib/telnyxAssistantPayload.ts`). Until then they recorded WAV:
+     uncompressed PCM, 16 kHz, 16 bits, dual — 64,000 B/s, ~3.8 MB a minute, ~4 MB per call on
+     average. Telnyx only returns the URL of the format it recorded in (`download_urls` /
+     `recording_urls` had only `wav`). The bytes go through Cloud Run on their way to R2,
+     which is billed internet egress (~0.105 $/GiB from Europe, no free tier), so the format
+     sets that cost and R2 storage. The key was already `recordings/<businessId>/<callId>.mp3`
+     even for WAV; the stored `Content-Type` is whatever Telnyx sends, so older WAV recordings
+     keep playing in the panel. Playback never goes through Cloud Run: the panel gets a signed
+     R2 URL and the browser downloads from R2 (free egress).
    - Cloud Tasks queue `process-recording`: 5 attempts, exponential backoff 1s base.
    - **Expired URLs (2026-09-17):** Telnyx's `recording_urls` are S3 presigned links
      valid for **10 minutes**. If the first attempt misses that window, a plain retry
@@ -1621,7 +1631,7 @@ is now a **Cloud Scheduler** job hitting the same kind of endpoint every
      the job now asks Telnyx for a fresh URL via
      `telnyxAiAdapter.listRecordingsByCallLegId(Recording.providerLegId)` and
      downloads again; rows from before this change have no `providerLegId`, so it is
-     recovered from the S3 path (`…/<call_leg_id>-<n>.wav`) and persisted. If there is
+     recovered from the S3 path (`…/<call_leg_id>-<n>.mp3`, `.wav` before issue #280) and persisted. If there is
      nothing to ask (Retell call, no leg, Telnyx no longer has it) the row is marked
      `processingFailedAt`/`processingError` and the job throws `PermanentJobError`
      (route answers 200, task leaves the queue). 5xx/network errors still propagate so

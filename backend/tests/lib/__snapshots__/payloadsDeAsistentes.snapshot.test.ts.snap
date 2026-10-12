@@ -210,7 +210,7 @@ exports[`payloads de asistentes (instantáneas) > assistant de la recepcionista,
     "recording_settings": {
       "channels": "dual",
       "enabled": true,
-      "format": "wav",
+      "format": "mp3",
       "stop_on_conversation_end": true,
     },
     "send_conversation_message_events": true,
@@ -597,7 +597,7 @@ exports[`payloads de asistentes (instantáneas) > assistant de la recepcionista,
     "recording_settings": {
       "channels": "dual",
       "enabled": true,
-      "format": "wav",
+      "format": "mp3",
       "stop_on_conversation_end": true,
     },
     "send_conversation_message_events": true,
@@ -945,7 +945,7 @@ Si te escriben en catalán, gallego, euskera o inglés, responde en ese idioma; 
 exports[`payloads de asistentes (instantáneas) > el JSON enviado es idéntico byte a byte (hash) 1`] = `
 {
   "gestor": "d42493dfb458dbe1ef8fa7fab6dbf284ec727a79d37293a97bff584963af6abf",
-  "recepcionista": "4ab27f4a816e24c1341c0598bec971badac1254402a358aa6a92f4d3ef0d73ec",
+  "recepcionista": "db39c1dc2eeed2357ab1d275a44d096b9943be26eaf48e2abc93d9b3388b6cac",
 }
 `;
 
