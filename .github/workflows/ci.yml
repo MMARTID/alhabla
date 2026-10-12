@@ -1,7 +1,9 @@
 name: CI
 
 # Gate de calidad: corre en cada PR y en cada push a main, para backend,
-# frontend (la app) y web (la web pública) por separado. No despliega nada —
+# frontend (la app), web (la web pública) y el Worker de Cloudflare de los
+# bloqueos de LaLiga (infra/cloudflare/failover-laliga) por separado. No
+# despliega nada —
 # eso lo hace deploy-backend.yml (solo backend; la app y la web se despliegan
 # solas vía la integración Git de Vercel). Ver AGENTS.md § Deployment Notes
 # para el resto del pipeline.
@@ -179,6 +181,27 @@ jobs:
           else
             echo "El PR no mezcla frontend y backend."
           fi
+
+  worker-laliga:
+    name: Infra — Worker de LaLiga
+    if: github.event.action != 'labeled' && github.event.action != 'unlabeled'
+    runs-on: ubuntu-latest
+    # El Worker que apaga y enciende el proxy de Cloudflare en los bloqueos de
+    # LaLiga. No tiene dependencias: sus tests van con el runner de Node. Este
+    # job no lo despliega; se sube a mano (README de la carpeta).
+    defaults:
+      run:
+        working-directory: infra/cloudflare/failover-laliga
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # La versión de Node vive en .nvmrc, la misma que la imagen de
+          # producción (backend/Dockerfile) y que `engines` en cada package.json.
+          node-version-file: .nvmrc
+
+      - run: node --test
 
   copias-compartidas:
     name: Copias compartidas app/web

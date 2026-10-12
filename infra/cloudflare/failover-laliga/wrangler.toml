@@ -1,0 +1,56 @@
+# Conmutador de failover para los bloqueos de LaLiga (ver README.md).
+#
+# Cada 2 minutos mira si las operadoras bloquean alguna IP de Cloudflare de
+# alhabla.ai; si es así, pasa a DNS-only los CNAME de las webs (Vercel las sirve
+# directamente) y los vuelve a poner proxied cuando acaba el bloqueo.
+#
+# Secreto (no va aquí): CF_API_TOKEN, con permiso Zone → DNS → Edit solo sobre
+# la zona alhabla.ai →  npx wrangler secret put CF_API_TOKEN
+# Opcional: ESTADO_TOKEN, para que GET /estado exija
+# `Authorization: Bearer <token>` →  npx wrangler secret put ESTADO_TOKEN
+#
+# Las variables de [vars] mandan: si se cambian en el panel, el siguiente
+# `wrangler deploy` las vuelve a dejar como aquí (keep_vars = false).
+
+name = "alhabla-failover-laliga"
+main = "src/index.js"
+compatibility_date = "2026-09-01"
+account_id = "2c31c9f09f67b64273a1b41fa1765e42"
+
+# GET /estado se sirve en <nombre>.<subdominio>.workers.dev. No hace falta
+# ninguna ruta en alhabla.ai (y mejor así: la zona es justo lo que conmutamos).
+workers_dev = true
+preview_urls = false
+
+# Se sube tal cual, sin empaquetar: lo desplegado son los dos módulos de src/,
+# byte a byte (src/index.js importa ./conmutador.js).
+no_bundle = true
+
+# OJO: toda clave suelta va ANTES de esta primera tabla; después de [[rules]]
+# TOML la metería dentro de la regla.
+
+[[rules]]
+type = "ESModule"
+globs = ["**/*.js"]
+
+[triggers]
+crons = ["*/2 * * * *"]
+
+[[kv_namespaces]]
+binding = "ESTADO"
+# alhabla-failover-laliga-estado, creado el 11-10-2026 (no es secreto).
+id = "a570046b50c6497280e6b53dde6a5dce"
+
+[vars]
+ZONE_ID = "252ecca77f844b46263852c7699a9421"
+# Solo estos tres CNAME. api.alhabla.ai y dev-api.alhabla.ai están vetados en
+# el código: aunque se añadan aquí, el Worker se niega a arrancar.
+HOSTNAMES = "alhabla.ai,www.alhabla.ai,app.alhabla.ai"
+# "activo" hace los PATCH; "observar" decide y lo registra, sin tocar nada.
+# Para un despliegue de prueba sin tocar este fichero:
+#   npx wrangler deploy --var MODO:observar
+MODO = "activo"
+
+[observability]
+enabled = true
+head_sampling_rate = 1

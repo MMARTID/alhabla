@@ -1,0 +1,13 @@
+{
+  "name": "alhabla-failover-laliga",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Worker de Cloudflare que apaga el proxy de las webs de Alhabla durante los bloqueos de LaLiga y lo vuelve a encender al acabar",
+  "type": "module",
+  "scripts": {
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

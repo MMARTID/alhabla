@@ -1,0 +1,7 @@
+# Copia como .dev.vars para `npx wrangler dev --test-scheduled`.
+# OJO: con un token real, `wrangler dev` habla con la API REAL de Cloudflare.
+# Deja MODO=observar para que en local nunca haga un PATCH.
+CF_API_TOKEN=pon-aqui-un-token-de-solo-lectura-o-el-de-produccion
+MODO=observar
+# Opcional: si existe, GET /estado exige `Authorization: Bearer <valor>`.
+# ESTADO_TOKEN=una-cadena-larga-aleatoria

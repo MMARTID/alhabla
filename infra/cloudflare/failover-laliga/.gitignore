@@ -1,0 +1,6 @@
+# Estado local de wrangler y variables locales (pueden llevar el token).
+.wrangler/
+.dev.vars
+.dev.vars.*
+!.dev.vars.example
+node_modules

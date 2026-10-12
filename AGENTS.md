@@ -3148,6 +3148,10 @@ fusionar o descartar una rama, quita su fila de esta tabla.
     which wins because `tests/integration/setup.ts` loads dotenv **without** `override`. CI uses
     port 5432 where local uses 5433: that 5433 only exists to dodge Homebrew's Postgres, which
     holds `127.0.0.1:5432` on the dev machine and answers `P1010` to these credentials.
+  - The **Infra — Worker de LaLiga** job (added 2026-10-11) runs `node --test` in
+    `infra/cloudflare/failover-laliga`, the Cloudflare Worker that turns the proxy off and on
+    during LaLiga's IP blocks. It has no dependencies and deploys nothing: the Worker is
+    uploaded by hand (that folder's README). Not a required check.
   - The **diff** job (pull requests only, added 2026-09-19) reads the PR's own diff rather than
     the code:
     - **Destructive migrations fail the PR.** `cloudbuild.yaml` applies migrations *before*
