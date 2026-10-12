@@ -473,7 +473,8 @@ describe("buildTelnyxAssistantPayload", () => {
   it("activa grabación dual en MP3 y aplica los límites por defecto de silencio/duración", () => {
     const payload = buildTelnyxAssistantPayload(baseInput);
 
-    // MP3: el WAV pesa 3,8 MB por minuto y sale de Cloud Run al copiarlo a R2.
+    // MP3: el WAV pesa 1,9 MB por minuto (el MP3, 8 veces menos) y sale de
+    // Cloud Run al copiarlo a R2.
     expect(payload.telephonySettings?.recording_settings).toEqual({
       enabled: true,
       format: "mp3",

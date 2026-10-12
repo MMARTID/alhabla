@@ -1615,9 +1615,11 @@ is now a **Cloud Scheduler** job hitting the same kind of endpoint every
    - Downloads the call recording from Retell or Telnyx and uploads it to R2.
    - Updates `Recording` with `storageKey` and `storageUrl`.
    - **Format (2026-10-12, issue #280):** Telnyx assistants record **MP3, two channels**
-     (`recording_settings` in `lib/telnyxAssistantPayload.ts`). Until then they recorded WAV:
-     uncompressed PCM, 16 kHz, 16 bits, dual — 64,000 B/s, ~3.8 MB a minute, ~4 MB per call on
-     average. Telnyx only returns the URL of the format it recorded in (`download_urls` /
+     (`recording_settings` in `lib/telnyxAssistantPayload.ts`). Until then they recorded WAV,
+     uncompressed PCM, 16 bits, dual: in production 8 kHz, **32,000 B/s, ~1.9 MB a minute**
+     (RIFF header and 7 recordings measured on 2026-10-12; dev recorded 16 kHz, 64,000 B/s).
+     Measured on the first production MP3 (2026-10-12, 97.8 s, 391,104 B): **~4,000 B/s
+     (~32 kbps), ~0.24 MB a minute, 8× smaller**, stored as `audio/mpeg`. Telnyx only returns the URL of the format it recorded in (`download_urls` /
      `recording_urls` had only `wav`). The bytes go through Cloud Run on their way to R2,
      which is billed internet egress (~0.105 $/GiB from Europe, no free tier), so the format
      sets that cost and R2 storage. The key was already `recordings/<businessId>/<callId>.mp3`
