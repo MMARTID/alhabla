@@ -445,7 +445,7 @@ describe("syncAgentToRetell — voiceGender", () => {
     const { generalPrompt } = mockedUpdateLlm.mock.calls[0][1] as {
       generalPrompt: string;
     };
-    expect(generalPrompt).toContain("Habla siempre en español de España;");
+    expect(generalPrompt).toContain("Habla siempre en español de España.");
     expect(generalPrompt).not.toContain("## Idioma");
   });
 
@@ -569,7 +569,7 @@ describe("syncAgentToRetell — voiceGender", () => {
     // Retell atiende solo el principal y el español (ajustesParaRetell):
     // con principal español, «Habla siempre en…» y sin el «## Idioma» del
     // final. Fuera del bloque y del idioma, es el mismo prompt.
-    expect(retellPrompt).toContain("Habla siempre en español de España;");
+    expect(retellPrompt).toContain("Habla siempre en español de España.");
     expect(guardado).toContain("## Idioma");
     const sinIdioma = (prompt: string) =>
       prompt

@@ -138,7 +138,10 @@ export function buildTransferInstruction(
 function seccionRol({ settings, idioma }: ContextoDelPrompt): Parrafos {
   return [
     "## Rol",
-    "Eres la recepcionista virtual de {{nombre_negocio}}.",
+    // La regla de identidad va con quién es, no al final de la instrucción de
+    // idioma (instruccionesDeIdioma), donde estuvo hasta el 2026-10-12. Es
+    // donde entrará el aviso de que la recepcionista es una IA.
+    "Eres la recepcionista virtual de {{nombre_negocio}}. No menciones que eres una IA salvo que te lo pregunten.",
     idioma.instruccion,
     TONE_INSTRUCTIONS[settings.tone],
     GOAL_INSTRUCTIONS[settings.primaryGoal],

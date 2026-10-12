@@ -79,6 +79,24 @@ describe("buildManagedAgentPrompt", () => {
     expect(prompt).toContain("corte, barba o ambos");
   });
 
+  // Hasta el 2026-10-12 iba al final de la instrucción de idioma: ahora una
+  // sola vez y con quién es, con los idiomas de Telnyx y con los de Retell.
+  it.each([
+    ["Telnyx (los siete idiomas)", undefined],
+    ["Retell (solo español)", ["es-ES"] as const],
+  ])("dice la regla de la IA una sola vez, en «## Rol»: %s", (_, idiomas) => {
+    const prompt = buildManagedAgentPrompt({
+      businessName: "Barbería Ejemplo",
+      settings: DEFAULT_AGENT_SETTINGS,
+      idiomas,
+    });
+
+    expect(prompt.split("eres una IA")).toHaveLength(2);
+    expect(prompt).toContain(
+      "## Rol\n\nEres la recepcionista virtual de {{nombre_negocio}}. No menciones que eres una IA salvo que te lo pregunten.\n\n"
+    );
+  });
+
   it("incluye los detalles del negocio solo cuando están verificados", () => {
     const conDetalles = buildManagedAgentPrompt({
       businessName: "Barbería Ejemplo",
@@ -534,7 +552,7 @@ describe("buildManagedAgentPrompt — idiomas", () => {
     });
 
     expect(prompt).toContain(
-      "En las llamadas, el saludo en español de España ya lo dice el sistema al descolgar y es el primer mensaje de la conversación: no lo repitas. Desde tu primera respuesta, contesta y continúa exclusivamente en el idioma en que te habla quien llama si es uno de estos: español de España, inglés, francés, alemán, italiano, portugués, neerlandés. Si cambia entre esos idiomas, acompaña el cambio sin pedirle que elija uno. Las frases que estas instrucciones ponen entre comillas para decírselas a quien llama están en castellano: dilas traducidas al idioma de la conversación. No menciones que eres una IA salvo que te lo pregunten."
+      "En las llamadas, el saludo en español de España ya lo dice el sistema al descolgar y es el primer mensaje de la conversación: no lo repitas. Desde tu primera respuesta, contesta y continúa exclusivamente en el idioma en que te habla quien llama si es uno de estos: español de España, inglés, francés, alemán, italiano, portugués, neerlandés. Si cambia entre esos idiomas, acompaña el cambio sin pedirle que elija uno. Las frases que estas instrucciones ponen entre comillas para decírselas a quien llama están en castellano: dilas traducidas al idioma de la conversación."
     );
     expect(prompt).not.toContain("Habla siempre en español de España");
   });
@@ -561,7 +579,7 @@ describe("buildManagedAgentPrompt — idiomas", () => {
     });
 
     expect(prompt).toContain(
-      "Habla siempre en español de España; no menciones que eres una IA salvo que te lo pregunten."
+      "Habla siempre en español de España."
     );
     expect(prompt).not.toContain("## Idioma");
     expect(prompt).not.toContain("ya lo dice el sistema al descolgar");
