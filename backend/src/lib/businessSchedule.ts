@@ -242,8 +242,59 @@ export function checkBusinessHours(
       ? "La cita está completamente dentro del horario del negocio."
       : cerradoPorExcepcion
         ? `El negocio está cerrado ese día${exception?.label ? ` (${exception.label})` : ""}.`
-        : "La cita queda fuera del horario configurado del negocio.",
+        : motivoFueraDeHorario({
+            dia: localStart.day,
+            abiertoEseDia,
+            intervalos: intervalsDelDia,
+            especial: exception,
+            inicio: localStart.time,
+            fin: localEnd.time,
+            terminaOtroDia: localStart.date !== localEnd.date,
+            durationMinutes,
+          }),
   } as const;
+}
+
+const DIA_EN_PLURAL: Record<WeekDay, string> = {
+  monday: "los lunes",
+  tuesday: "los martes",
+  wednesday: "los miércoles",
+  thursday: "los jueves",
+  friday: "los viernes",
+  saturday: "los sábados",
+  sunday: "los domingos",
+};
+
+/**
+ * Por qué una hora queda fuera del horario, con los datos de ese día. Antes
+ * era un genérico «fuera del horario configurado» y la recepcionista se
+ * inventaba el motivo: a una clienta que pidió un lunes a las 18:00 le dijo
+ * que el salón «cierra a las seis», cuando los lunes no abre (13-10-2026).
+ */
+function motivoFueraDeHorario(dato: {
+  dia: WeekDay;
+  abiertoEseDia: boolean;
+  intervalos: { start: string; end: string }[];
+  especial: { label?: string | null } | undefined;
+  inicio: string;
+  fin: string;
+  terminaOtroDia: boolean;
+  durationMinutes: number;
+}): string {
+  if (!dato.abiertoEseDia || dato.intervalos.length === 0) {
+    return `El negocio no abre ${DIA_EN_PLURAL[dato.dia]}.`;
+  }
+  const tramos = dato.intervalos
+    .map((intervalo) => `de ${intervalo.start} a ${intervalo.end}`)
+    .join(" y ");
+  const dia = dato.especial
+    ? `Ese día tiene horario especial${dato.especial.label ? ` (${dato.especial.label})` : ""}`
+    : `Ese día (${WEEKDAY_LABELS_ES[dato.dia].toLowerCase()}) el negocio abre`;
+  if (dato.durationMinutes <= 0) {
+    return `${dia} ${tramos}, y a las ${dato.inicio} está cerrado.`;
+  }
+  const fin = dato.terminaOtroDia ? "el día siguiente" : `a las ${dato.fin}`;
+  return `${dia} ${tramos}, y una cita de ${formatMinutesForHumans(dato.durationMinutes)} que empieza a las ${dato.inicio} terminaría ${fin}: no cabe en ese horario.`;
 }
 
 function formatMinutesForHumans(minutes: number): string {
