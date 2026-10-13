@@ -177,6 +177,31 @@ async function turnosDeHoy(
 }
 
 /**
+ * Un chat reutiliza su fila Call durante 30 días: cada mensaje del cliente
+ * la sube al principio del historial del panel (`ultimaActividadAt`). Sin
+ * esto, la cita que un cliente movía hoy por WhatsApp aparecía con la fecha
+ * de su primer mensaje. Se anota antes de responder, para que también suba el
+ * chat en el que la recepcionista no pudo contestar. Best-effort: si falla,
+ * se atiende igual.
+ */
+async function anotarActividadDelChat(
+  callId: string,
+  businessId: string,
+  from: string
+): Promise<void> {
+  try {
+    await prisma.call.updateMany({
+      where: { callId, businessId },
+      data: { ultimaActividadAt: new Date() },
+    });
+  } catch (error) {
+    console.error(
+      `[WhatsApp] Chat cliente ${businessId}/${from}: no se pudo anotar la actividad del chat ${callId} (el historial lo enseñará con su fecha anterior): ${errorMessage(error)}`
+    );
+  }
+}
+
+/**
  * Conversación vigente del cliente con el negocio: la guardada si tiene
  * menos de 30 días; si no, una nueva en Telnyx (con `call_control_id` en
  * los metadata) y su Call sintética, en una transacción. Devuelve null si
@@ -393,6 +418,9 @@ export async function conversarConRecepcionista(input: {
       agentId: agent.id,
       clientPhone: from,
     });
+    if (conversacion) {
+      await anotarActividadDelChat(conversacion.callId, business.id, from);
+    }
     for (let intento = 0; conversacion && intento < 2; intento++) {
       const content = `${marcadorDeChat({ clientPhone: from, timezone: business.timezone })} ${texto}`;
       const t0 = Date.now();

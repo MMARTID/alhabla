@@ -129,9 +129,11 @@ export async function condicionesDelListado(
     y.push({ voiceProvider: { not: CANAL_WHATSAPP } });
   }
   if (filtros.sentimiento) y.push({ sentiment: filtros.sentimiento });
+  // Por última actividad, como el orden: un chat que el cliente retoma hoy
+  // entra en «hoy» aunque empezara hace días.
   if (filtros.desde || filtros.hasta) {
     y.push({
-      startedAt: {
+      ultimaActividadAt: {
         ...(filtros.desde ? { gte: filtros.desde } : {}),
         ...(filtros.hasta ? { lt: filtros.hasta } : {}),
       },
@@ -145,30 +147,35 @@ export async function condicionesDelListado(
 export function ordenDelListado(
   orden: FiltrosDeLlamadas["orden"]
 ): Prisma.CallOrderByWithRelationInput[] {
-  // El id desempata: con la misma fecha, sin él una fila podía salir en dos
-  // páginas seguidas o en ninguna.
-  if (orden === "antigua") return [{ createdAt: "asc" }, { id: "asc" }];
+  // Por última actividad (Call.ultimaActividadAt): en una llamada es su
+  // inicio y en un chat de WhatsApp su último mensaje, así que el chat que un
+  // cliente retoma días después sube arriba. El id desempata: con la misma
+  // fecha, sin él una fila podía salir en dos páginas seguidas o en ninguna.
+  if (orden === "antigua") {
+    return [{ ultimaActividadAt: "asc" }, { id: "asc" }];
+  }
   if (orden === "mas_larga") {
     return [
       { durationSecs: { sort: "desc", nulls: "last" } },
-      { createdAt: "desc" },
+      { ultimaActividadAt: "desc" },
       { id: "desc" },
     ];
   }
   if (orden === "mas_corta") {
     return [
       { durationSecs: { sort: "asc", nulls: "last" } },
-      { createdAt: "desc" },
+      { ultimaActividadAt: "desc" },
       { id: "desc" },
     ];
   }
-  return [{ createdAt: "desc" }, { id: "desc" }];
+  return [{ ultimaActividadAt: "desc" }, { id: "desc" }];
 }
 
 /**
- * «Hoy» en la cabecera del historial: conversaciones del día (en la zona del
- * negocio), cuántas acabaron con cita viva y la duración media de las
- * llamadas de voz (los chats no tienen duración).
+ * «Hoy» en la cabecera del historial: conversaciones con actividad hoy (en la
+ * zona del negocio; un chat retomado hoy cuenta, igual que en la lista),
+ * cuántas tienen cita viva y la duración media de las llamadas de voz (los
+ * chats no tienen duración).
  */
 export async function resumenDeHoy(businessId: string) {
   const negocio = await prisma.business.findUnique({
@@ -179,7 +186,7 @@ export async function resumenDeHoy(businessId: string) {
   const desde = inicioDelDiaEnZona(timezone);
   const hoy: Prisma.CallWhereInput = {
     businessId,
-    startedAt: { gte: desde },
+    ultimaActividadAt: { gte: desde },
     AND: [SIN_CALLS_DEL_GESTOR],
   };
   const [llamadas, conCita, voz] = await Promise.all([

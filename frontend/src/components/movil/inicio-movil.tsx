@@ -21,7 +21,7 @@ import { AGENT_CONFIGURATION_STEPS } from "@/lib/agent-configuration";
 import { getCalendarState } from "@/lib/calendar-state";
 import { formatPhoneLocal, formatPrice } from "@/lib/format";
 import { claveDeDia, diaDeLaSemana, diaLargo, horaDelNegocio, instanteAntesDelDia, numeroDelDia } from "@/lib/fechas-negocio";
-import { enlaceTel, momentoCorto, motivoDeCitaPendiente } from "@/lib/llamadas";
+import { enlaceTel, momentoCorto, momentoDeActividad, motivoDeCitaPendiente } from "@/lib/llamadas";
 import type { AgendaBooking, Business, OnboardingState, PendingBooking, WeeklyStats } from "@/lib/types";
 import { useAhora } from "@/hooks/use-es-movil";
 import { AvisoFlotante, useAviso } from "@/components/aviso-flotante";
@@ -264,7 +264,7 @@ export function InicioMovil({
               <li key={call.id} className="border-t border-linea">
                 <FilaLlamada
                   call={call}
-                  momento={momentoCorto(call.startedAt, timeZone, hoy)}
+                  momento={momentoCorto(momentoDeActividad(call), timeZone, hoy)}
                   onAbrir={() => setLlamadaAbierta(call.id)}
                 />
               </li>
