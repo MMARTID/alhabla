@@ -6,9 +6,9 @@ describe("Aviso legal", () => {
   it("muestra la fecha de actualización en español", () => {
     render(<AvisoLegalPage />);
 
-    const fecha = screen.getByText("4 de octubre de 2026");
+    const fecha = screen.getByText("13 de octubre de 2026");
     expect(fecha.tagName).toBe("TIME");
-    expect(fecha).toHaveAttribute("datetime", "2026-10-04");
+    expect(fecha).toHaveAttribute("datetime", "2026-10-13");
   });
 
   it("enlaza en el índice cada apartado, con su título y sin anclas rotas", () => {

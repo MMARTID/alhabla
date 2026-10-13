@@ -27,7 +27,7 @@ export default function PrivacidadPage() {
     <LegalPage
       title="Política de privacidad"
       description="Aquí te contamos qué datos tratamos, para qué, quién más interviene y qué puedes exigirnos. Sin cláusulas copiadas: solo lo que el producto hace de verdad."
-      updatedAt="2026-09-23"
+      updatedAt="2026-10-13"
     >
       <LegalSection title="Quién es el responsable">
         <p>
@@ -66,8 +66,8 @@ export default function PrivacidadPage() {
             seguridad y continuidad del servicio.
           </li>
           <li>
-            Procesar la demo y tratar los datos opcionales de un negocio seleccionado: consentimiento, que puedes retirar
-            sin afectar al resto del servicio.
+            Hacer la demo y guardar su transcripción para mejorarla: consentimiento, que das al empezarla y puedes
+            retirar escribiéndonos, sin afectar al resto del servicio.
           </li>
         </ul>
       </LegalSection>
@@ -79,19 +79,19 @@ export default function PrivacidadPage() {
           cualquier momento desde tu navegador.
         </p>
         <p>
-          La demo está configurada para <strong className="font-semibold text-[#0a0a0a]">no grabar audio, no guardar
-          la transcripción y no registrar la conversación</strong>. El texto que ves en pantalla durante la llamada se
-          construye en tu propio navegador y desaparece al cerrar la ventana. La demo no crea ninguna cita real ni
-          queda asociada a ninguna cuenta.
+          En la demo hablas con una inteligencia artificial y{" "}
+          <strong className="font-semibold text-[#0a0a0a]">no grabamos el audio</strong>. La conversación se transcribe
+          en tiempo real, a través de nuestro proveedor de voz, para que la recepcionista te entienda y te responda, y
+          guardamos esa transcripción (solo el texto) para revisar y mejorar las demos. Al pulsar «Empezar demo»
+          aceptas ese uso. La demo no crea ninguna cita real ni queda asociada a ninguna cuenta.
         </p>
         <p>
-          La conversación se procesa a través de nuestro proveedor de voz para poder transcribir y responder en
-          tiempo real. No la usamos para entrenar modelos.
+          No usamos las conversaciones para entrenar modelos. Conservamos la transcripción el tiempo necesario para ese
+          fin; si quieres que borremos la tuya, escribe a privacidad@alhabla.ai indicando cuándo hiciste la demo.
         </p>
         <p>
-          Si seleccionas un negocio y marcas voluntariamente la casilla de consentimiento, podemos conservar sus
-          datos públicos de identificación para evaluar y mejorar las demos y el servicio. Ese uso es opcional, no
-          afecta a la conversación de prueba y puedes retirar tu consentimiento escribiendo a privacidad@alhabla.ai.
+          Si buscas tu negocio, solo usamos su categoría para elegir la recepción que te enseñamos; no guardamos qué
+          negocio elegiste.
         </p>
       </LegalSection>
 
@@ -120,9 +120,10 @@ export default function PrivacidadPage() {
           puedas consultarlas en tu panel, saber qué pidió cada cliente y comprobar que la cita se registró bien.
         </p>
         <p>
-          Como titular del negocio eres responsable de informar a quien llama de que la llamada se está grabando y de
-          contar con base legal para ello. La configuración del agente incluye el mensaje de bienvenida, que es el
-          lugar natural para advertirlo.
+          Al descolgar, la recepcionista dice que es una inteligencia artificial y que la llamada se graba, y ofrece no
+          grabarla: si quien llama lo pide, no se guarda el audio y queda solo la transcripción. No tienes que
+          configurarlo. Como titular del negocio sigues siendo responsable de contar con base legal para tratar los
+          datos de quienes te llaman.
         </p>
         <p>
           Respecto de los datos de las personas que llaman a tu negocio, este determina las finalidades y actúa como

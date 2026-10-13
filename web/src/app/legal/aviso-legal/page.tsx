@@ -30,7 +30,7 @@ export default function AvisoLegalPage() {
     <LegalPage
       title="Aviso legal"
       description="Quién está detrás de Alhabla, en qué condiciones puedes usarlo, qué implica contratar una suscripción y cómo tratamos por tu cuenta los datos de tus clientes."
-      updatedAt="2026-10-04"
+      updatedAt="2026-10-13"
       indice
     >
       <LegalSection id="titularidad" title="Titularidad del sitio">
@@ -78,7 +78,10 @@ export default function AvisoLegalPage() {
         <p>Al usar Alhabla te comprometes a:</p>
         <ul className="list-disc space-y-2 pl-5">
           <li>Que la información que configures sobre tu negocio sea veraz.</li>
-          <li>Informar a quien llama de que la llamada se graba.</li>
+          <li>
+            No pedir a la recepcionista que oculte que es una inteligencia artificial ni que la llamada se graba: lo
+            dice ella al descolgar.
+          </li>
           <li>
             No utilizar el servicio para fines ilícitos ni para comunicaciones comerciales no solicitadas, ya sean
             llamadas o mensajes de WhatsApp.
