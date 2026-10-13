@@ -149,6 +149,79 @@ describe("checkBusinessHours", () => {
   });
 });
 
+describe("checkBusinessHours: el motivo exacto cuando no cabe", () => {
+  // El horario de INFINITY: cerrado lunes y domingo, de martes a viernes de
+  // 9 a 18 y el sábado de 9 a 14. Con el mensaje genérico, a una clienta que
+  // pidió el lunes 26-10 a las 18:00 la recepcionista le dijo que el salón
+  // «cierra a las seis» (13-10-2026).
+  const salon = buildSchedule({
+    monday: { enabled: false, intervals: [] },
+    tuesday: { enabled: true, intervals: [{ start: "09:00", end: "18:00" }] },
+    saturday: { enabled: true, intervals: [{ start: "09:00", end: "14:00" }] },
+    sunday: { enabled: false, intervals: [] },
+  });
+
+  it("un día que no abre lo dice tal cual", () => {
+    // Lunes 26-10-2026 a las 18:00 en Madrid (ya en horario de invierno, +01:00).
+    const result = checkBusinessHours(salon, europeMadrid, "2026-10-26T17:00:00Z", 60);
+    expect(result.success && result.code).toBe("OUTSIDE_BUSINESS_HOURS");
+    expect(result.message).toBe("El negocio no abre los lunes.");
+  });
+
+  it("en un día abierto da el horario y por qué no cabe la cita", () => {
+    const result = checkBusinessHours(salon, europeMadrid, "2026-10-27T17:30:00+01:00", 60);
+    expect(result.message).toBe(
+      "Ese día (martes) el negocio abre de 09:00 a 18:00, y una cita de 1 hora que empieza a las 17:30 terminaría a las 18:30: no cabe en ese horario."
+    );
+  });
+
+  it("con varios tramos los enumera todos", () => {
+    const partido = buildSchedule({
+      wednesday: {
+        enabled: true,
+        intervals: [
+          { start: "09:00", end: "14:00" },
+          { start: "16:00", end: "20:00" },
+        ],
+      },
+    });
+    const result = checkBusinessHours(partido, europeMadrid, "2026-10-28T14:30:00+01:00", 45);
+    expect(result.message).toBe(
+      "Ese día (miércoles) el negocio abre de 09:00 a 14:00 y de 16:00 a 20:00, y una cita de 45 minutos que empieza a las 14:30 terminaría a las 15:15: no cabe en ese horario."
+    );
+  });
+
+  it("un día con horario especial lo nombra", () => {
+    const especial = {
+      ...salon,
+      exceptions: [
+        {
+          date: "2026-12-24",
+          label: "Nochebuena",
+          closed: false,
+          intervals: [{ start: "09:00", end: "14:00" }],
+        },
+      ],
+    };
+    const result = checkBusinessHours(especial, europeMadrid, "2026-12-24T15:00:00+01:00", 60);
+    expect(result.message).toBe(
+      "Ese día tiene horario especial (Nochebuena) de 09:00 a 14:00, y una cita de 1 hora que empieza a las 15:00 terminaría a las 16:00: no cabe en ese horario."
+    );
+  });
+
+  it("sin duración solo dice que a esa hora está cerrado", () => {
+    const result = checkBusinessHours(salon, europeMadrid, "2026-10-27T19:00:00+01:00", 0);
+    expect(result.message).toBe(
+      "Ese día (martes) el negocio abre de 09:00 a 18:00, y a las 19:00 está cerrado."
+    );
+  });
+
+  it("una cita que acabaría al día siguiente lo dice así", () => {
+    const result = checkBusinessHours(salon, europeMadrid, "2026-10-27T23:30:00+01:00", 60);
+    expect(result.message).toContain("terminaría el día siguiente: no cabe en ese horario.");
+  });
+});
+
 describe("checkBookingRestrictions", () => {
   beforeEach(() => {
     vi.useFakeTimers();
