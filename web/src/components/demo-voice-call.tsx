@@ -621,7 +621,7 @@ export function DemoVoiceCall({ open, onClose, onActiveChange, niche }: DemoVoic
               <div className="mt-4 flex gap-2 text-xs leading-5 text-[#71717a]">
                 <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#8b5cf6]" />
                 <p>
-                  El micrófono solo se utiliza durante la demo, y de tu negocio solo usamos su categoría para elegir la recepción que te enseñamos. ·{" "}
+                  Al empezar aceptas que la demo se transcriba: hablarás con una inteligencia artificial, no grabamos el audio y guardamos el texto para mejorarla. El micrófono solo se usa durante la llamada y de tu negocio solo usamos su categoría. ·{" "}
                   <Link href="/legal/privacidad" className="font-medium text-[#27272a] underline underline-offset-2">
                     Privacidad
                   </Link>
