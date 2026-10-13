@@ -835,7 +835,7 @@ describe("idiomas de la recepcionista en el panel", () => {
       voiceLanguage: "ca-ES",
       voz: "Soniox.tts-rt-v2.Sergio",
       familia: "soniox",
-      saludo: "Perruqueria Anna, t'atén una intel·ligència artificial. La trucada s'enregistra; si no vols, digues-m'ho. En què et puc ajudar?",
+      saludo: "Perruqueria Anna, t'atén una intel·ligència artificial. En què et puc ajudar?",
       entradilla:
         "Habla en 8 idiomas: catalán, español, inglés, francés, alemán, italiano, portugués y neerlandés. Saluda en catalán y sigue en el idioma de quien llama.",
     });
@@ -864,7 +864,7 @@ describe("idiomas de la recepcionista en el panel", () => {
     expect(response.json()).toMatchObject({
       languages: idiomasQueHabla("gl-ES"),
       voiceLanguage: "gl-ES",
-      saludo: "Perruquería Ana, atendete unha intelixencia artificial. A chamada grávase; se non queres, dimo. En que te axudo?",
+      saludo: "Perruquería Ana, atendete unha intelixencia artificial. En que te axudo?",
     });
   });
 

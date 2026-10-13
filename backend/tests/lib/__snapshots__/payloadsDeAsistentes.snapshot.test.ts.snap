@@ -2,7 +2,7 @@
 
 exports[`payloads de asistentes (instantáneas) > assistant de la recepcionista con ca-ES como idioma principal 1`] = `
 {
-  "greeting": "Perruqueria Anna, t'atén una intel·ligència artificial. La trucada s'enregistra; si no vols, digues-m'ho. En què et puc ajudar?",
+  "greeting": "Perruqueria Anna, t'atén una intel·ligència artificial. En què et puc ajudar?",
   "interruptionSettings": {
     "start_speaking_plan": {
       "transcription_endpointing_plan": {
@@ -41,7 +41,7 @@ exports[`payloads de asistentes (instantáneas) > assistant de la recepcionista 
 
 exports[`payloads de asistentes (instantáneas) > assistant de la recepcionista con español con una voz elegida que no es la de por defecto (Lara) 1`] = `
 {
-  "greeting": "Perruqueria Anna, te atiende su asistente de inteligencia artificial. La llamada se graba; si no quieres, dímelo. ¿En qué te ayudo?",
+  "greeting": "Perruqueria Anna, te atiende su asistente de inteligencia artificial. ¿En qué te ayudo?",
   "interruptionSettings": {
     "interrupt_prediction_threshold": 0.4,
     "start_speaking_plan": {
@@ -74,7 +74,7 @@ exports[`payloads de asistentes (instantáneas) > assistant de la recepcionista 
 
 exports[`payloads de asistentes (instantáneas) > assistant de la recepcionista con eu-ES como idioma principal 1`] = `
 {
-  "greeting": "Kaixo, Perruqueria Anna. Adimen artifizial bat naiz. Deia grabatu egiten da; nahi ez baduzu, esadazu. Zertan lagun zaitzaket?",
+  "greeting": "Kaixo, Perruqueria Anna. Adimen artifizial bat naiz. Zertan lagun zaitzaket?",
   "interruptionSettings": {
     "start_speaking_plan": {
       "transcription_endpointing_plan": {
@@ -113,7 +113,7 @@ exports[`payloads de asistentes (instantáneas) > assistant de la recepcionista 
 
 exports[`payloads de asistentes (instantáneas) > assistant de la recepcionista con gl-ES como idioma principal 1`] = `
 {
-  "greeting": "Perruqueria Anna, atendete unha intelixencia artificial. A chamada grávase; se non queres, dimo. En que te axudo?",
+  "greeting": "Perruqueria Anna, atendete unha intelixencia artificial. En que te axudo?",
   "interruptionSettings": {
     "start_speaking_plan": {
       "transcription_endpointing_plan": {
@@ -152,7 +152,7 @@ exports[`payloads de asistentes (instantáneas) > assistant de la recepcionista 
 
 exports[`payloads de asistentes (instantáneas) > assistant de la recepcionista con saludo en alemán (su Ultra nativa y flux) 1`] = `
 {
-  "greeting": "Perruqueria Anna, Sie sprechen mit einer künstlichen Intelligenz. Das Gespräch wird aufgezeichnet; wenn Sie das nicht möchten, sagen Sie es mir. Wie kann ich Ihnen helfen?",
+  "greeting": "Perruqueria Anna, Sie sprechen mit einer künstlichen Intelligenz. Wie kann ich Ihnen helfen?",
   "interruptionSettings": {
     "interrupt_prediction_threshold": 0.4,
     "start_speaking_plan": {
@@ -185,6 +185,11 @@ exports[`payloads de asistentes (instantáneas) > assistant de la recepcionista 
 
 exports[`payloads de asistentes (instantáneas) > assistant de la recepcionista, completo con transferencia y palabras clave 1`] = `
 {
+  "dynamicVariables": {
+    "grabacion": "sin_preguntar",
+    "nombre_cliente": "",
+    "ultimo_servicio": "",
+  },
   "fallbackConfig": {
     "model": "moonshotai/Kimi-K2.6",
   },
@@ -209,7 +214,7 @@ exports[`payloads de asistentes (instantáneas) > assistant de la recepcionista,
     "noise_suppression": "disabled",
     "recording_settings": {
       "channels": "dual",
-      "enabled": true,
+      "enabled": false,
       "format": "mp3",
       "stop_on_conversation_end": true,
     },
@@ -439,11 +444,18 @@ exports[`payloads de asistentes (instantáneas) > assistant de la recepcionista,
       "type": "webhook",
       "webhook": {
         "body_parameters": {
-          "properties": {},
-          "required": undefined,
+          "properties": {
+            "acepta": {
+              "description": "true solo si acepta con claridad que se grabe; false si dice que no, duda o no quiere.",
+              "type": "boolean",
+            },
+          },
+          "required": [
+            "acepta",
+          ],
           "type": "object",
         },
-        "description": "Deja de grabar esta llamada: el audio no se guarda y la transcripción sí. Úsala una sola vez, en cuanto quien llama diga que no quiere que se grabe, sin pedirle que lo confirme. No la uses en el chat de WhatsApp.",
+        "description": "Guarda lo que contesta quien llama sobre grabar la llamada. Con acepta true se empieza a grabar y se recuerda para sus próximas llamadas; con false no se graba (o se deja de grabar) y no se guarda el audio; la transcripción sí. Úsala cuando conteste a tu pregunta de grabar o si en cualquier momento dice que no quiere que se grabe. No la uses en el chat de WhatsApp.",
         "headers": [
           {
             "name": "X-Alhabla-Call-Control-Id",
@@ -451,8 +463,8 @@ exports[`payloads de asistentes (instantáneas) > assistant de la recepcionista,
           },
         ],
         "method": "POST",
-        "name": "no_grabar",
-        "url": "https://api.alhabla.test/webhooks/telnyx/tools/no_grabar",
+        "name": "preferencia_de_grabacion",
+        "url": "https://api.alhabla.test/webhooks/telnyx/tools/preferencia_de_grabacion",
       },
     },
     {
@@ -593,6 +605,11 @@ exports[`payloads de asistentes (instantáneas) > assistant de la recepcionista,
 
 exports[`payloads de asistentes (instantáneas) > assistant de la recepcionista, mínimo (sin tools, voz Natural) 1`] = `
 {
+  "dynamicVariables": {
+    "grabacion": "sin_preguntar",
+    "nombre_cliente": "",
+    "ultimo_servicio": "",
+  },
   "fallbackConfig": {
     "model": "moonshotai/Kimi-K2.6",
   },
@@ -617,7 +634,7 @@ exports[`payloads de asistentes (instantáneas) > assistant de la recepcionista,
     "noise_suppression": "disabled",
     "recording_settings": {
       "channels": "dual",
-      "enabled": true,
+      "enabled": false,
       "format": "mp3",
       "stop_on_conversation_end": true,
     },
@@ -966,7 +983,7 @@ Si te escriben en catalán, gallego, euskera o inglés, responde en ese idioma; 
 exports[`payloads de asistentes (instantáneas) > el JSON enviado es idéntico byte a byte (hash) 1`] = `
 {
   "gestor": "d42493dfb458dbe1ef8fa7fab6dbf284ec727a79d37293a97bff584963af6abf",
-  "recepcionista": "bbf523fcf32fb7a85e12e0ff400ee69da3bc618a7d92607637a4774719dbfdaf",
+  "recepcionista": "3ccda1fe20faf619bd1df54b87d2f85e891bf427547a50cc8c08fd5584d847e5",
 }
 `;
 
@@ -1150,7 +1167,7 @@ exports[`payloads de asistentes (instantáneas) > tools de voz de la recepcionis
     "url": "https://api.alhabla.test/webhooks/telnyx/tools/notify_when_available",
   },
   {
-    "description": "Deja de grabar esta llamada: el audio no se guarda y la transcripción sí. Úsala una sola vez, en cuanto quien llama diga que no quiere que se grabe, sin pedirle que lo confirme. No la uses en el chat de WhatsApp.",
+    "description": "Guarda lo que contesta quien llama sobre grabar la llamada. Con acepta true se empieza a grabar y se recuerda para sus próximas llamadas; con false no se graba (o se deja de grabar) y no se guarda el audio; la transcripción sí. Úsala cuando conteste a tu pregunta de grabar o si en cualquier momento dice que no quiere que se grabe. No la uses en el chat de WhatsApp.",
     "headers": [
       {
         "name": "X-Alhabla-Call-Control-Id",
@@ -1158,10 +1175,18 @@ exports[`payloads de asistentes (instantáneas) > tools de voz de la recepcionis
       },
     ],
     "method": "POST",
-    "name": "no_grabar",
-    "properties": {},
+    "name": "preferencia_de_grabacion",
+    "properties": {
+      "acepta": {
+        "description": "true solo si acepta con claridad que se grabe; false si dice que no, duda o no quiere.",
+        "type": "boolean",
+      },
+    },
+    "required": [
+      "acepta",
+    ],
     "timeoutMs": 20000,
-    "url": "https://api.alhabla.test/webhooks/telnyx/tools/no_grabar",
+    "url": "https://api.alhabla.test/webhooks/telnyx/tools/preferencia_de_grabacion",
   },
   {
     "description": "Informe final de la llamada para el negocio. Llámala UNA sola vez, solo cuando la llamada ya ha terminado (post-conversación), nunca durante la conversación. Resume cómo acabó y, si el cliente dejó un recado o pidió que le llamen, inclúyelo en recado.",

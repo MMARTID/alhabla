@@ -27,7 +27,7 @@ import { cancelarReserva } from "../../../src/modules/bookings/cancelacion.js";
 import { buildCalendarIdempotencyKey } from "../../../src/lib/calendarIdempotency.js";
 import { normalizeVoiceToolDateTime } from "../../../src/lib/voiceDateTime.js";
 import { guardarIntentoDeReservaFallido } from "../../../src/lib/intentoDeReserva.js";
-import { registrarGrabacionRechazada } from "../../../src/lib/grabacionRechazada.js";
+import { guardarPreferenciaDeGrabacion } from "../../../src/lib/grabacion.js";
 
 vi.mock("../../../src/lib/prisma.js", () => ({
   prisma: {
@@ -139,8 +139,8 @@ vi.mock(
 // La cancelación (BD, evento externo, aviso #4, lista de espera) vive en
 // modules/bookings/cancelacion.ts con sus propios tests; cancel_appointment
 // solo conserva la titularidad por número y delega.
-vi.mock("../../../src/lib/grabacionRechazada.js", () => ({
-  registrarGrabacionRechazada: vi.fn(),
+vi.mock("../../../src/lib/grabacion.js", () => ({
+  guardarPreferenciaDeGrabacion: vi.fn(),
 }));
 
 vi.mock("../../../src/modules/bookings/cancelacion.js", () => ({
@@ -2772,29 +2772,31 @@ describe("executeVoiceTool cancel_appointment", () => {
   });
 });
 
-// El saludo ofrece no grabar la llamada (lib/grabacionRechazada.ts).
-describe("executeVoiceTool no_grabar", () => {
-  const mockedRegistrar = vi.mocked(registrarGrabacionRechazada);
+// Grabación con permiso (lib/grabacion.ts): la recepcionista lo pregunta
+// mientras comprueba el primer servicio.
+describe("executeVoiceTool preferencia_de_grabacion", () => {
+  const mockedGuardar = vi.mocked(guardarPreferenciaDeGrabacion);
 
   beforeEach(() => {
     vi.clearAllMocks();
     mockedBusinessFindUnique.mockResolvedValue(buildBusiness() as any);
   });
 
-  it("registra el rechazo con la llamada y el negocio del webhook", async () => {
-    mockedRegistrar.mockResolvedValue("registrado");
+  it("con su sí, lo guarda con la llamada y el negocio del webhook", async () => {
+    mockedGuardar.mockResolvedValue("aceptada");
 
     const result = await executeVoiceTool({
       businessId: "business_123",
-      toolName: "no_grabar",
-      params: { businessId: "otro_negocio" },
+      toolName: "preferencia_de_grabacion",
+      params: { acepta: true, businessId: "otro_negocio" },
       callLabel: "llamada v3:ctrl_1",
       callId: "v3:ctrl_1",
     });
 
-    expect(mockedRegistrar).toHaveBeenCalledWith({
+    expect(mockedGuardar).toHaveBeenCalledWith({
       callId: "v3:ctrl_1",
       businessId: "business_123",
+      acepta: true,
       etiqueta: "llamada v3:ctrl_1",
     });
     expect(result).toEqual({
@@ -2802,13 +2804,28 @@ describe("executeVoiceTool no_grabar", () => {
       result: {
         success: true,
         message:
-          "Hecho: no se guardará la grabación de esta llamada. La transcripción sí.",
+          "Hecho: se graba desde ahora, y sus próximas llamadas también. Dale las gracias en pocas palabras y sigue con lo que había pedido.",
       },
     });
   });
 
-  it("si la llamada no existe, se lo dice a la recepcionista sin fallar", async () => {
-    mockedRegistrar.mockResolvedValue("sin_llamada");
+  it("solo un true explícito es un sí", async () => {
+    mockedGuardar.mockResolvedValue("rechazada");
+
+    await executeVoiceTool({
+      businessId: "business_123",
+      toolName: "preferencia_de_grabacion",
+      params: { acepta: "sí" },
+      callId: "v3:ctrl_1",
+    });
+
+    expect(mockedGuardar).toHaveBeenCalledWith(
+      expect.objectContaining({ acepta: false })
+    );
+  });
+
+  it("la tool de antes, no_grabar, es un no", async () => {
+    mockedGuardar.mockResolvedValue("rechazada");
 
     const result = await executeVoiceTool({
       businessId: "business_123",
@@ -2817,19 +2834,35 @@ describe("executeVoiceTool no_grabar", () => {
       callId: "v3:ctrl_1",
     });
 
+    expect(mockedGuardar).toHaveBeenCalledWith(
+      expect.objectContaining({ acepta: false })
+    );
+    expect(result.result).toMatchObject({ success: true });
+  });
+
+  it("si la llamada no existe, se lo dice a la recepcionista sin fallar", async () => {
+    mockedGuardar.mockResolvedValue("sin_llamada");
+
+    const result = await executeVoiceTool({
+      businessId: "business_123",
+      toolName: "preferencia_de_grabacion",
+      params: { acepta: true },
+      callId: "v3:ctrl_1",
+    });
+
     expect(result.success).toBe(true);
     expect(result.result).toMatchObject({ success: false });
   });
 
-  it("en el chat de WhatsApp no hay nada que dejar de grabar", async () => {
+  it("en el chat de WhatsApp no hay nada que grabar", async () => {
     const result = await executeVoiceTool({
       businessId: "business_123",
-      toolName: "no_grabar",
-      params: {},
+      toolName: "preferencia_de_grabacion",
+      params: { acepta: true },
       callId: "whatsapp:chat:conv_1",
     });
 
-    expect(mockedRegistrar).not.toHaveBeenCalled();
+    expect(mockedGuardar).not.toHaveBeenCalled();
     expect(result.result).toEqual({
       success: true,
       message: "En el chat no se graba nada.",

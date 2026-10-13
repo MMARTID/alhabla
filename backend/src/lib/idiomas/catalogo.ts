@@ -92,6 +92,38 @@ export interface VozDelCatalogo {
   habla: "todos" | readonly CodigoDeIdioma[];
 }
 
+/** Texto que cambia con el género de la voz que atiende, o el mismo para
+ * las dos. */
+export type TextoConGenero = string | Readonly<Record<GeneroDeVoz, string>>;
+
+/**
+ * Las piezas del saludo de un idioma: `{negocio}`, `{nombre}` y `{servicio}`
+ * se sustituyen al componerlo. Todas dicen «inteligencia artificial» con esas
+ * palabras: el Reglamento europeo de IA (art. 50, desde el 2-8-2026) pide
+ * avisar al principio de cada llamada y «asistente» a secas no basta. Fuera
+ * del español se evita el género con giros neutros («una intelligence
+ * artificielle»); en español va con el de la voz. Ver
+ * lib/contextoDeLlamada.ts.
+ */
+export interface PartesDelSaludo {
+  /** A quien llama por primera vez o no se conoce. */
+  presentacion: string;
+  /** La primera semana desde la primera llamada del negocio. */
+  presentacionNueva: TextoConGenero;
+  /** A quien ya reservó con ese teléfono: con su nombre. */
+  presentacionAlCliente: TextoConGenero;
+  /** Solo si ese cliente aceptó que se graben sus llamadas: se graba desde
+   * que se descuelga y puede decir que no. */
+  avisoDeGrabacion: string;
+  /** Cierre del saludo a quien no se conoce. */
+  pregunta: string;
+  /** Cierre del saludo a un cliente, con su último servicio. */
+  repetir: string;
+  /** Cierre del saludo a un cliente sin nombrar el servicio (fisioterapia,
+   * estética…: puede ser un dato de salud y el teléfono, de otra persona). */
+  repetirLoDeLaUltimaVez: string;
+}
+
 export interface IdiomaDelCatalogo {
   /** ISO 639-1: pistas de Soniox y `voice_settings.language`. */
   iso: string;
@@ -99,13 +131,9 @@ export interface IdiomaDelCatalogo {
   nombreEnPrompt: string;
   /** Cómo lo ve el dueño en el panel. */
   etiqueta: string;
-  /** Saludo al descolgar cuando saluda en este idioma; `{negocio}` es el
-   * nombre del negocio. Desde el 2026-10-12 dice que es una inteligencia
-   * artificial (Reglamento europeo de IA, art. 50: «asistente» a secas no
-   * basta) y que la llamada se graba, y ofrece no grabarla
-   * (lib/grabacionRechazada.ts). Sin género: la voz puede ser de mujer o de
-   * hombre. */
-  saludo: string;
+  /** Las piezas del saludo al descolgar cuando saluda en este idioma
+   * (componerSaludo y componerSaludoDeLlamada). */
+  saludo: PartesDelSaludo;
   /** Pista de cada motor de transcripción de Telnyx, o null si no lo
    * entiende. flux es el rápido (fin de turno anticipado); Soniox entiende
    * todos. */
@@ -189,8 +217,27 @@ export const IDIOMAS: Record<CodigoDeIdioma, IdiomaDelCatalogo> = {
     iso: "es",
     nombreEnPrompt: "español de España",
     etiqueta: "Español",
-    saludo:
-      "{negocio}, te atiende su asistente de inteligencia artificial. La llamada se graba; si no quieres, dímelo. ¿En qué te ayudo?",
+    saludo: {
+      presentacion:
+        "{negocio}, te atiende su asistente de inteligencia artificial.",
+      presentacionNueva: {
+        femenina:
+          "{negocio}, te atiende su nueva asistente de inteligencia artificial.",
+        masculina:
+          "{negocio}, te atiende su nuevo asistente de inteligencia artificial.",
+      },
+      presentacionAlCliente: {
+        femenina:
+          "Hola, {nombre}, soy la asistente de inteligencia artificial de {negocio}.",
+        masculina:
+          "Hola, {nombre}, soy el asistente de inteligencia artificial de {negocio}.",
+      },
+      avisoDeGrabacion: "La llamada se graba; si prefieres que no, dímelo.",
+      pregunta: "¿En qué te ayudo?",
+      repetir: "¿Quieres repetir {servicio} o prefieres algo nuevo?",
+      repetirLoDeLaUltimaVez:
+        "¿Quieres repetir lo de la última vez o prefieres algo nuevo?",
+    },
     transcripcion: { flux: "es", soniox: "es" },
     retell: { locale: "es-ES", vozMultilingue: false },
     cooficial: false,
@@ -200,8 +247,20 @@ export const IDIOMAS: Record<CodigoDeIdioma, IdiomaDelCatalogo> = {
     iso: "en",
     nombreEnPrompt: "inglés",
     etiqueta: "Inglés",
-    saludo:
-      "{negocio}, you're speaking with an artificial intelligence assistant. This call is recorded; if you'd rather it wasn't, just tell me. How can I help?",
+    saludo: {
+      presentacion:
+        "{negocio}, you're speaking with an artificial intelligence assistant.",
+      presentacionNueva:
+        "{negocio}, you're speaking with a new artificial intelligence assistant.",
+      presentacionAlCliente:
+        "Hi {nombre}, this is the artificial intelligence assistant at {negocio}.",
+      avisoDeGrabacion:
+        "This call is recorded; if you'd rather it wasn't, just tell me.",
+      pregunta: "How can I help?",
+      repetir: "Would you like {servicio} again, or something new?",
+      repetirLoDeLaUltimaVez:
+        "Would you like the same as last time, or something new?",
+    },
     transcripcion: { flux: "en", soniox: "en" },
     retell: { locale: "en-GB", vozMultilingue: false },
     cooficial: false,
@@ -211,8 +270,20 @@ export const IDIOMAS: Record<CodigoDeIdioma, IdiomaDelCatalogo> = {
     iso: "fr",
     nombreEnPrompt: "francés",
     etiqueta: "Francés",
-    saludo:
-      "{negocio}, vous êtes en ligne avec une intelligence artificielle. L'appel est enregistré ; si vous ne le souhaitez pas, dites-le-moi. Comment puis-je vous aider ?",
+    saludo: {
+      presentacion:
+        "{negocio}, vous êtes en ligne avec une intelligence artificielle.",
+      presentacionNueva:
+        "{negocio}, vous êtes en ligne avec une nouvelle intelligence artificielle.",
+      presentacionAlCliente:
+        "Bonjour {nombre}, ici l'intelligence artificielle de {negocio}.",
+      avisoDeGrabacion:
+        "L'appel est enregistré ; si vous ne le souhaitez pas, dites-le-moi.",
+      pregunta: "Comment puis-je vous aider ?",
+      repetir: "Vous souhaitez reprendre {servicio}, ou autre chose ?",
+      repetirLoDeLaUltimaVez:
+        "Vous souhaitez la même chose que la dernière fois, ou autre chose ?",
+    },
     transcripcion: { flux: "fr", soniox: "fr" },
     retell: { locale: "fr-FR", vozMultilingue: false },
     cooficial: false,
@@ -222,8 +293,18 @@ export const IDIOMAS: Record<CodigoDeIdioma, IdiomaDelCatalogo> = {
     iso: "ca",
     nombreEnPrompt: "catalán",
     etiqueta: "Catalán",
-    saludo:
-      "{negocio}, t'atén una intel·ligència artificial. La trucada s'enregistra; si no vols, digues-m'ho. En què et puc ajudar?",
+    saludo: {
+      presentacion: "{negocio}, t'atén una intel·ligència artificial.",
+      presentacionNueva:
+        "{negocio}, t'atén una nova intel·ligència artificial.",
+      presentacionAlCliente:
+        "Hola, {nombre}, sóc la intel·ligència artificial de {negocio}.",
+      avisoDeGrabacion: "La trucada s'enregistra; si no vols, digues-m'ho.",
+      pregunta: "En què et puc ajudar?",
+      repetir: "Vols repetir {servicio} o prefereixes una altra cosa?",
+      repetirLoDeLaUltimaVez:
+        "Vols repetir el de l'última vegada o prefereixes una altra cosa?",
+    },
     transcripcion: { flux: null, soniox: "ca" },
     retell: { locale: "ca-ES", vozMultilingue: true },
     cooficial: true,
@@ -242,8 +323,17 @@ export const IDIOMAS: Record<CodigoDeIdioma, IdiomaDelCatalogo> = {
     nombreEnPrompt: "euskera",
     etiqueta: "Euskera",
     // Sin «llamar a»: el nombre del negocio iría declinado.
-    saludo:
-      "Kaixo, {negocio}. Adimen artifizial bat naiz. Deia grabatu egiten da; nahi ez baduzu, esadazu. Zertan lagun zaitzaket?",
+    saludo: {
+      presentacion: "Kaixo, {negocio}. Adimen artifizial bat naiz.",
+      presentacionNueva: "Kaixo, {negocio}. Adimen artifizial berri bat naiz.",
+      presentacionAlCliente:
+        "Kaixo, {nombre}. Hemen {negocio}, adimen artifizial bat naiz.",
+      avisoDeGrabacion: "Deia grabatu egiten da; nahi ez baduzu, esadazu.",
+      pregunta: "Zertan lagun zaitzaket?",
+      repetir: "{servicio} berriro nahi duzu, ala beste zerbait?",
+      repetirLoDeLaUltimaVez:
+        "Azken aldikoa berriro nahi duzu, ala beste zerbait?",
+    },
     transcripcion: { flux: null, soniox: "eu" },
     retell: { locale: null, vozMultilingue: false },
     cooficial: true,
@@ -253,8 +343,18 @@ export const IDIOMAS: Record<CodigoDeIdioma, IdiomaDelCatalogo> = {
     iso: "gl",
     nombreEnPrompt: "gallego",
     etiqueta: "Gallego",
-    saludo:
-      "{negocio}, atendete unha intelixencia artificial. A chamada grávase; se non queres, dimo. En que te axudo?",
+    saludo: {
+      presentacion: "{negocio}, atendete unha intelixencia artificial.",
+      presentacionNueva:
+        "{negocio}, atendete unha nova intelixencia artificial.",
+      presentacionAlCliente:
+        "Ola, {nombre}, son a intelixencia artificial de {negocio}.",
+      avisoDeGrabacion: "A chamada grávase; se non queres, dimo.",
+      pregunta: "En que te axudo?",
+      repetir: "Queres repetir {servicio} ou prefires outra cousa?",
+      repetirLoDeLaUltimaVez:
+        "Queres repetir o da última vez ou prefires outra cousa?",
+    },
     transcripcion: { flux: null, soniox: "gl" },
     // Retell admite gl-ES. Su voz Cartesia estaba sin verificar en gallego;
     // desde el 2026-10-05, con una cooficial va la cadena multilingüe
@@ -267,8 +367,20 @@ export const IDIOMAS: Record<CodigoDeIdioma, IdiomaDelCatalogo> = {
     iso: "de",
     nombreEnPrompt: "alemán",
     etiqueta: "Alemán",
-    saludo:
-      "{negocio}, Sie sprechen mit einer künstlichen Intelligenz. Das Gespräch wird aufgezeichnet; wenn Sie das nicht möchten, sagen Sie es mir. Wie kann ich Ihnen helfen?",
+    saludo: {
+      presentacion:
+        "{negocio}, Sie sprechen mit einer künstlichen Intelligenz.",
+      presentacionNueva:
+        "{negocio}, Sie sprechen mit einer neuen künstlichen Intelligenz.",
+      presentacionAlCliente:
+        "Hallo {nombre}, hier ist die künstliche Intelligenz von {negocio}.",
+      avisoDeGrabacion:
+        "Das Gespräch wird aufgezeichnet; wenn Sie das nicht möchten, sagen Sie es mir.",
+      pregunta: "Wie kann ich Ihnen helfen?",
+      repetir: "Möchten Sie wieder {servicio} oder etwas anderes?",
+      repetirLoDeLaUltimaVez:
+        "Möchten Sie dasselbe wie beim letzten Mal oder etwas anderes?",
+    },
     transcripcion: { flux: "de", soniox: "de" },
     retell: { locale: "de-DE", vozMultilingue: false },
     cooficial: false,
@@ -278,8 +390,19 @@ export const IDIOMAS: Record<CodigoDeIdioma, IdiomaDelCatalogo> = {
     iso: "it",
     nombreEnPrompt: "italiano",
     etiqueta: "Italiano",
-    saludo:
-      "{negocio}, sta parlando con un'intelligenza artificiale. La chiamata viene registrata; se non vuole, me lo dica. Come posso aiutarla?",
+    saludo: {
+      presentacion: "{negocio}, sta parlando con un'intelligenza artificiale.",
+      presentacionNueva:
+        "{negocio}, sta parlando con una nuova intelligenza artificiale.",
+      presentacionAlCliente:
+        "Buongiorno {nombre}, sono l'intelligenza artificiale di {negocio}.",
+      avisoDeGrabacion:
+        "La chiamata viene registrata; se non vuole, me lo dica.",
+      pregunta: "Come posso aiutarla?",
+      repetir: "Vuole ripetere {servicio} o preferisce qualcos'altro?",
+      repetirLoDeLaUltimaVez:
+        "Vuole ripetere come l'ultima volta o preferisce qualcos'altro?",
+    },
     transcripcion: { flux: "it", soniox: "it" },
     retell: { locale: "it-IT", vozMultilingue: false },
     cooficial: false,
@@ -291,8 +414,18 @@ export const IDIOMAS: Record<CodigoDeIdioma, IdiomaDelCatalogo> = {
     etiqueta: "Portugués",
     // «Obrigado/a» concuerda con quien habla, y la voz puede ser de mujer o
     // de hombre: un saludo sin él vale para las dos.
-    saludo:
-      "{negocio}, está a falar com uma inteligência artificial. A chamada é gravada; se não quiser, diga-me. Em que posso ajudar?",
+    saludo: {
+      presentacion: "{negocio}, está a falar com uma inteligência artificial.",
+      presentacionNueva:
+        "{negocio}, está a falar com uma nova inteligência artificial.",
+      presentacionAlCliente:
+        "Olá {nombre}, fala a inteligência artificial de {negocio}.",
+      avisoDeGrabacion: "A chamada é gravada; se não quiser, diga-me.",
+      pregunta: "Em que posso ajudar?",
+      repetir: "Quer repetir {servicio} ou prefere outra coisa?",
+      repetirLoDeLaUltimaVez:
+        "Quer repetir o da última vez ou prefere outra coisa?",
+    },
     transcripcion: { flux: "pt", soniox: "pt" },
     retell: { locale: "pt-PT", vozMultilingue: false },
     cooficial: false,
@@ -302,8 +435,19 @@ export const IDIOMAS: Record<CodigoDeIdioma, IdiomaDelCatalogo> = {
     iso: "nl",
     nombreEnPrompt: "neerlandés",
     etiqueta: "Neerlandés",
-    saludo:
-      "{negocio}, u spreekt met een kunstmatige intelligentie. Het gesprek wordt opgenomen; als u dat niet wilt, zeg het me dan. Waarmee kan ik u helpen?",
+    saludo: {
+      presentacion: "{negocio}, u spreekt met een kunstmatige intelligentie.",
+      presentacionNueva:
+        "{negocio}, u spreekt met een nieuwe kunstmatige intelligentie.",
+      presentacionAlCliente:
+        "Hallo {nombre}, u spreekt met de kunstmatige intelligentie van {negocio}.",
+      avisoDeGrabacion:
+        "Het gesprek wordt opgenomen; als u dat niet wilt, zeg het me dan.",
+      pregunta: "Waarmee kan ik u helpen?",
+      repetir: "Wilt u weer {servicio} of liever iets anders?",
+      repetirLoDeLaUltimaVez:
+        "Wilt u hetzelfde als de vorige keer of liever iets anders?",
+    },
     transcripcion: { flux: "nl", soniox: "nl" },
     retell: { locale: "nl-NL", vozMultilingue: false },
     cooficial: false,
@@ -433,9 +577,65 @@ export function esVozDelCatalogo(id: unknown): id is string {
   return typeof id === "string" && IDS_DEL_CATALOGO.has(id);
 }
 
+function rellenar(texto: string, valores: Record<string, string>): string {
+  return Object.entries(valores).reduce(
+    (resultado, [clave, valor]) => resultado.split(`{${clave}}`).join(valor),
+    texto
+  );
+}
+
+function conGenero(texto: TextoConGenero, genero: GeneroDeVoz): string {
+  return typeof texto === "string" ? texto : texto[genero];
+}
+
+/**
+ * El saludo fijo del assistant: a quien no se conoce y sin grabar. Es el que
+ * queda guardado en Telnyx y el `begin_message` de Retell; en cada llamada
+ * de Telnyx el backend manda el suyo (componerSaludoDeLlamada).
+ */
 export function componerSaludo(
   codigo: CodigoDeIdioma,
   negocio: string
 ): string {
-  return IDIOMAS[codigo].saludo.split("{negocio}").join(negocio);
+  const partes = IDIOMAS[codigo].saludo;
+  return rellenar(`${partes.presentacion} ${partes.pregunta}`, { negocio });
+}
+
+/**
+ * El saludo de una llamada concreta (lib/contextoDeLlamada.ts): con el
+ * nombre de quien ya reservó y su último servicio (o «lo de la última vez»),
+ * «nueva» la primera semana, y el aviso de grabación solo si ese cliente
+ * aceptó que se graben sus llamadas.
+ */
+export function componerSaludoDeLlamada(
+  codigo: CodigoDeIdioma,
+  entrada: {
+    negocio: string;
+    genero: GeneroDeVoz;
+    primeraSemana: boolean;
+    cliente: { nombre: string; servicio: string | null } | null;
+    grabando: boolean;
+  }
+): string {
+  const partes = IDIOMAS[codigo].saludo;
+  const piezas = entrada.cliente
+    ? [
+        conGenero(partes.presentacionAlCliente, entrada.genero),
+        entrada.grabando ? partes.avisoDeGrabacion : null,
+        entrada.cliente.servicio
+          ? partes.repetir
+          : partes.repetirLoDeLaUltimaVez,
+      ]
+    : [
+        entrada.primeraSemana
+          ? conGenero(partes.presentacionNueva, entrada.genero)
+          : partes.presentacion,
+        entrada.grabando ? partes.avisoDeGrabacion : null,
+        partes.pregunta,
+      ];
+  return rellenar(piezas.filter(Boolean).join(" "), {
+    negocio: entrada.negocio,
+    nombre: entrada.cliente?.nombre ?? "",
+    servicio: entrada.cliente?.servicio ?? "",
+  });
 }

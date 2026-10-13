@@ -206,7 +206,7 @@ describe("createTelnyxAssistantForAgent", () => {
     expect(mockedListVoices).toHaveBeenCalledWith("soniox");
     expect(mockedCreateAssistant.mock.calls[0][0]).toMatchObject({
       greeting:
-        "Peluquería Ejemplo, t'atén una intel·ligència artificial. La trucada s'enregistra; si no vols, digues-m'ho. En què et puc ajudar?",
+        "Peluquería Ejemplo, t'atén una intel·ligència artificial. En què et puc ajudar?",
       voiceSettings: { voice: "Soniox.tts-rt-v2.Marta", language: "ca" },
       // Desde el 2026-10-05 con catalán habla ocho idiomas; Soniox lleva
       // las pistas del catalán y del español (con las ocho iba peor).
@@ -246,7 +246,7 @@ describe("createTelnyxAssistantForAgent", () => {
 
     const payload = mockedCreateAssistant.mock.calls[0][0];
     expect(payload.greeting).toBe(
-      "Peluquería Ejemplo, t'atén una intel·ligència artificial. La trucada s'enregistra; si no vols, digues-m'ho. En què et puc ajudar?"
+      "Peluquería Ejemplo, t'atén una intel·ligència artificial. En què et puc ajudar?"
     );
     expect(payload.voiceSettings).toMatchObject({
       voice: "Soniox.tts-rt-v2.Marta",
@@ -285,7 +285,7 @@ describe("createTelnyxAssistantForAgent", () => {
     expect(result.eligible).toBe(true);
     const payload = mockedCreateAssistant.mock.calls[0][0];
     expect(payload.greeting).toBe(
-      "Peluquería Ejemplo, Sie sprechen mit einer künstlichen Intelligenz. Das Gespräch wird aufgezeichnet; wenn Sie das nicht möchten, sagen Sie es mir. Wie kann ich Ihnen helfen?"
+      "Peluquería Ejemplo, Sie sprechen mit einer künstlichen Intelligenz. Wie kann ich Ihnen helfen?"
     );
     expect(payload.voiceSettings).toMatchObject({
       voice: "Telnyx.Ultra.38aabb6a-f52b-4fb0-a3d1-988518f4dc06",

@@ -36,6 +36,24 @@ export interface ContextoDelPrompt {
   transferenciaAlDueno?: TransferenciaAlDueno | null;
 }
 
+/** Variables del prompt que dependen de quien llama: las pone el backend
+ * al contestar cada llamada (lib/contextoDeLlamada.ts). */
+export interface VariablesDeLaLlamada {
+  [variable: string]: string;
+  /** Nombre de su última reserva con ese teléfono; vacío si no se conoce. */
+  nombre_cliente: string;
+  /** Servicios de esa reserva; vacío si no se conoce. */
+  ultimo_servicio: string;
+  /** Si deja grabar sus llamadas (lib/grabacion.ts). */
+  grabacion: "aceptada" | "rechazada" | "sin_preguntar";
+}
+
+/** Los valores de quien no se conoce: el assistant los guarda por defecto
+ * para el chat de WhatsApp y para una llamada en la que no se pudo mirar
+ * nada. */
+export const VARIABLES_DE_LA_LLAMADA_POR_DEFECTO: Readonly<VariablesDeLaLlamada> =
+  { nombre_cliente: "", ultimo_servicio: "", grabacion: "sin_preguntar" };
+
 type Parrafos = Array<string | null>;
 type Seccion = (contexto: ContextoDelPrompt) => Parrafos;
 
@@ -162,13 +180,28 @@ function seccionConversacion(): Parrafos {
   ];
 }
 
+function seccionCliente(): Parrafos {
+  return [
+    // Lo resuelve el backend antes de descolgar (lib/contextoDeLlamada.ts)
+    // y el saludo ya lo usa: el nombre siempre; el servicio, salvo en
+    // fisioterapia, estética y otros (decisión del usuario del 2026-10-13).
+    "## Cliente",
+    "Nombre de su última reserva con este teléfono: {{nombre_cliente}}. Su último servicio: {{ultimo_servicio}}. Si están vacíos, no le conoces: atiéndele como a cualquiera.",
+    "Si hay nombre, el saludo ya le ha llamado por él y le ha preguntado si quiere repetir: si dice que sí, ese es el servicio y ese es su nombre, no se los vuelvas a pedir. Si el saludo no nombró el servicio, no lo digas tú hasta que diga que quiere repetir. Si dice que no es esa persona, discúlpate y pídele el nombre como a cualquier cliente.",
+  ];
+}
+
 function seccionGrabacion(): Parrafos {
   return [
-    // El saludo dice que la llamada se graba y ofrece no hacerlo; sin más
-    // explicaciones legales salvo que pregunten (decisión del usuario del
-    // 2026-10-12: cumplir sin agobiar). Ver lib/grabacionRechazada.ts.
+    // Grabación con permiso (decisiones del usuario del 12 y 13-10-2026,
+    // lib/grabacion.ts): se pregunta mientras se comprueba el primer
+    // servicio, con la respuesta de get_catalog ya en la mano, para que la
+    // respuesta del servicio no salga encima de la del cliente. Sin
+    // explicaciones legales salvo que pregunten.
     "## Grabación",
-    "El saludo avisa de que la llamada se graba. Si quien llama dice en cualquier momento que no quiere que se grabe, llama a no_grabar en ese mismo turno y dile en una frase que de acuerdo, que no se guardará la grabación; después sigue con lo que necesitaba. No le pidas que lo confirme ni vuelvas a sacar el tema.",
+    "La llamada solo se graba si quien llama lo acepta; la transcripción se guarda siempre. Si deja grabar sus llamadas: {{grabacion}}.",
+    "Si es sin_preguntar, pregúntaselo una sola vez mientras compruebas el primer servicio que te pida: en cuanto get_catalog te responda, no contestes todavía a lo que preguntó y di solo «Mientras lo compruebo, ¿te importa que grabe la llamada para mejorar el servicio?». Con su respuesta, llama a preferencia_de_grabacion (acepta true solo si dice que sí con claridad) y después contesta a lo que había preguntado con lo que te dio get_catalog. Si no llega a pedir ningún servicio, no lo preguntes.",
+    "Si es aceptada, el saludo ya ha avisado de que se graba: no lo preguntes. Si es rechazada, no saques el tema. En cualquier caso, si dice que no quiere que se grabe, llama a preferencia_de_grabacion con acepta false en ese mismo turno y dile en una frase que de acuerdo.",
     "Si pregunta qué se hace con sus datos, dile que {{nombre_negocio}} los usa solo para gestionar sus citas y que puede pedirle que se los enseñe o los borre.",
   ];
 }
@@ -320,7 +353,7 @@ function seccionChat({ ocultarNumero }: ContextoDelPrompt): Parrafos {
     // En el chat no hay saludo del sistema: el aviso de que es una IA lo da
     // la primera respuesta de cada conversación (art. 50 del Reglamento de
     // IA, como en las llamadas).
-    "En el chat no hay saludo del sistema: en tu primera respuesta de la conversación di, en una frase corta, que le atiende la recepcionista virtual de {{nombre_negocio}}, una inteligencia artificial. En el chat no se graba nada: no uses no_grabar.",
+    "En el chat no hay saludo del sistema: en tu primera respuesta de la conversación di, en una frase corta, que le atiende la recepcionista virtual de {{nombre_negocio}}, una inteligencia artificial. En el chat no se graba nada: no preguntes por grabar ni uses preferencia_de_grabacion.",
     "En el chat no uses end_call ni hables de colgar, de audio, de que te oye o de que lo que escribes se lee en voz alta. Puedes escribir dos o tres líneas cortas y una lista breve si ayuda a elegir; sigue sin emojis ni símbolos. No preguntes si puedes enviarle la confirmación por WhatsApp: ya está escribiendo por WhatsApp, así que usa smsConsent: true y, si book_appointment devuelve mensajeCliente = \"whatsapp\", dile que le llega la confirmación por aquí mismo.",
     `Si el cliente dice que ha pulsado Cambiar en el recordatorio de una cita, busca la cita con find_my_appointment, confírmasela, pregúntale qué día y hora quiere, comprueba la disponibilidad y, con su confirmación explícita, cancélala y reserva la nueva (el flujo normal de cambiar). Si prefiere hablar con alguien, ${
       ocultarNumero
@@ -363,6 +396,7 @@ function seccionIdioma({ idioma }: ContextoDelPrompt): Parrafos {
 export const SECCIONES_DEL_PROMPT: readonly Seccion[] = [
   seccionRol,
   seccionConversacion,
+  seccionCliente,
   seccionGrabacion,
   seccionCatalogo,
   seccionLimites,

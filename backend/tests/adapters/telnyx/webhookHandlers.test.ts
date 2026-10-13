@@ -11,7 +11,8 @@ import {
   handleTelnyxToolInvocation,
 } from "../../../src/adapters/telnyx/webhookHandlers.js";
 import { prisma } from "../../../src/lib/prisma.js";
-import { borrarGrabacionesDeTelnyx } from "../../../src/lib/grabacionRechazada.js";
+import { borrarGrabacionesDeTelnyx } from "../../../src/lib/grabacion.js";
+import { resolverContextoDeLlamada } from "../../../src/lib/contextoDeLlamada.js";
 import { telnyxAiAdapter } from "../../../src/adapters/telnyx/TelnyxAiAdapter.js";
 import {
   enqueueRecordingJob,
@@ -58,8 +59,12 @@ vi.mock("../../../src/lib/cloudTasks.js", () => ({
   enqueueUsageReportJob: vi.fn(),
 }));
 
-vi.mock("../../../src/lib/grabacionRechazada.js", () => ({
+vi.mock("../../../src/lib/grabacion.js", () => ({
   borrarGrabacionesDeTelnyx: vi.fn(),
+}));
+
+vi.mock("../../../src/lib/contextoDeLlamada.js", () => ({
+  resolverContextoDeLlamada: vi.fn(),
 }));
 
 vi.mock("../../../src/modules/voiceTools/service.js", () => ({
@@ -117,6 +122,24 @@ const mockedListRecordingsByCallLegId = vi.mocked(
 const mockedExecuteVoiceTool = vi.mocked(executeVoiceTool);
 const mockedEnqueueRecordingJob = vi.mocked(enqueueRecordingJob);
 const mockedBorrarGrabacionesDeTelnyx = vi.mocked(borrarGrabacionesDeTelnyx);
+const mockedResolverContexto = vi.mocked(resolverContextoDeLlamada);
+
+/** Lo que el contexto devuelve por defecto en estos tests: quien no se
+ * conoce, sin grabar. */
+const CONTEXTO = {
+  saludo: "Negocio, te atiende su asistente de inteligencia artificial. ¿En qué te ayudo?",
+  grabar: false,
+  variables: {
+    nombre_cliente: "",
+    ultimo_servicio: "",
+    grabacion: "sin_preguntar" as const,
+  },
+};
+const CONTESTAR_CON_CONTEXTO = {
+  greeting: CONTEXTO.saludo,
+  dynamicVariables: CONTEXTO.variables,
+  grabar: false,
+};
 const mockedEnqueueUsageReportJob = vi.mocked(enqueueUsageReportJob);
 const mockedComprobacionReciente = vi.mocked(comprobacionDeDesvioReciente);
 const mockedRegistrarRecibida = vi.mocked(
@@ -129,6 +152,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mockedMarcarPataSinCall.mockResolvedValue(undefined);
   mockedMotivoDePataSinCall.mockResolvedValue(null);
+  mockedResolverContexto.mockResolvedValue(CONTEXTO);
 });
 
 describe("extractTelnyxEventEnvelope", () => {
@@ -187,7 +211,8 @@ describe("handleCallInitiated", () => {
     );
     expect(mockedAnswerCallWithAssistant).toHaveBeenCalledWith(
       "call_ctrl_1",
-      "assistant_1"
+      "assistant_1",
+      CONTESTAR_CON_CONTEXTO
     );
     expect(mockedHangupCall).not.toHaveBeenCalled();
     expect(mockedStartNoiseSuppression).toHaveBeenCalledWith("call_ctrl_1");
@@ -208,7 +233,85 @@ describe("handleCallInitiated", () => {
     expect(result).toEqual({ success: true });
     expect(mockedAnswerCallWithAssistant).toHaveBeenCalledWith(
       "call_ctrl_1",
-      "assistant_1"
+      "assistant_1",
+      CONTESTAR_CON_CONTEXTO
+    );
+  });
+
+  // Lo resuelve lib/contextoDeLlamada.ts antes de guardar la Call: el
+  // saludo y las variables de quien llama, y grabar desde que se contesta
+  // si ya lo aceptó.
+  it("contesta con el saludo, las variables y la grabación del cliente que ya lo aceptó", async () => {
+    const negocio = {
+      id: "biz1",
+      name: "Peluquería Ana",
+      agentSettings: {},
+      businessType: "peluqueria",
+      callsSuspendedAt: null,
+      paymentFailureSuspensionAt: null,
+      agents: [{ id: "agent1", telnyxAssistantId: "assistant_1" }],
+    };
+    mockedBusinessFindUnique.mockResolvedValue(negocio as any);
+    mockedCallUpsert.mockResolvedValue({} as any);
+    const conocido = {
+      saludo: "Hola, Lucía, soy la asistente de inteligencia artificial de Peluquería Ana. La llamada se graba; si prefieres que no, dímelo. ¿Quieres repetir Corte o prefieres algo nuevo?",
+      grabar: true,
+      variables: {
+        nombre_cliente: "Lucía",
+        ultimo_servicio: "Corte",
+        grabacion: "aceptada" as const,
+      },
+    };
+    mockedResolverContexto.mockResolvedValue(conocido);
+
+    await handleCallInitiated(basePayload);
+
+    expect(mockedResolverContexto).toHaveBeenCalledWith({
+      business: negocio,
+      telefono: "+34600000000",
+    });
+    expect(mockedCallUpsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({ grabacionPermitida: true }),
+      })
+    );
+    expect(mockedAnswerCallWithAssistant).toHaveBeenCalledWith(
+      "call_ctrl_1",
+      "assistant_1",
+      {
+        greeting: conocido.saludo,
+        dynamicVariables: conocido.variables,
+        grabar: true,
+      }
+    );
+  });
+
+  it("si no se puede saber quién llama, contesta con el saludo del assistant y sin grabar", async () => {
+    mockedBusinessFindUnique.mockResolvedValue({
+      id: "biz1",
+      callsSuspendedAt: null,
+      paymentFailureSuspensionAt: null,
+      agents: [{ id: "agent1", telnyxAssistantId: "assistant_1" }],
+    } as any);
+    mockedCallUpsert.mockResolvedValue({} as any);
+    mockedResolverContexto.mockRejectedValue(new Error("BD caída"));
+    const errorLog = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const result = await handleCallInitiated(basePayload);
+
+    expect(result).toEqual({ success: true });
+    expect(mockedCallUpsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({ grabacionPermitida: false }),
+      })
+    );
+    expect(mockedAnswerCallWithAssistant).toHaveBeenCalledWith(
+      "call_ctrl_1",
+      "assistant_1",
+      {}
+    );
+    expect(errorLog).toHaveBeenCalledWith(
+      expect.stringMatching(/no se pudo saber quién llama \(negocio biz1\).*BD caída/)
     );
   });
 
@@ -948,7 +1051,8 @@ describe("«Comprobar desvío» en los webhooks de Telnyx", () => {
     expect(iniciada).toEqual({ success: true });
     expect(mockedAnswerCallWithAssistant).toHaveBeenCalledWith(
       "call_ctrl_in",
-      "assistant_1"
+      "assistant_1",
+      CONTESTAR_CON_CONTEXTO
     );
     expect(mockedRegistrarRecibida).not.toHaveBeenCalled();
 
@@ -1087,7 +1191,8 @@ describe("«Comprobar desvío» en los webhooks de Telnyx", () => {
     expect(mockedRegistrarRecibida).not.toHaveBeenCalled();
     expect(mockedAnswerCallWithAssistant).toHaveBeenCalledWith(
       "call_ctrl_in",
-      "assistant_1"
+      "assistant_1",
+      CONTESTAR_CON_CONTEXTO
     );
   });
 

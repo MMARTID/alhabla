@@ -96,7 +96,9 @@ export async function webhooksRetellRoutes(fastify: FastifyInstance) {
       },
     },
   }, async (request, reply) => {
-    const payload = request.body as { call_inbound?: { to_number?: string } };
+    const payload = request.body as {
+      call_inbound?: { to_number?: string; from_number?: string };
+    };
     const toNumber = payload.call_inbound?.to_number;
 
     if (!toNumber) {
@@ -143,7 +145,11 @@ export async function webhooksRetellRoutes(fastify: FastifyInstance) {
         return reply.status(200).send({ call_inbound: { reject: true } });
       }
 
-      const dynamicVariables = await buildInboundCallDynamicVariables(business.id);
+      const dynamicVariables = await buildInboundCallDynamicVariables(
+        business.id,
+        prisma,
+        payload.call_inbound?.from_number ?? null
+      );
       return reply.status(200).send({
         call_inbound: {
           override_agent_id: retellAgentId,

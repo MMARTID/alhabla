@@ -1645,17 +1645,18 @@ is now a **Cloud Scheduler** job hitting the same kind of endpoint every
      **ignored by the API** (returns an empty list — verified against the live account
      2026-09-17). Only `call_leg_id`/`call_session_id` filters work; the adapter no
      longer exposes a by-call-control-id lookup.
-   - **Aviso de IA y grabación opcional (2026-10-12).** El saludo de cada idioma
-     (`lib/idiomas/catalogo.ts`) dice que es una inteligencia artificial (Reglamento
-     europeo de IA, art. 50: obligatorio desde el 2-8-2026, y Alhabla es el proveedor)
-     y que la llamada se graba, y ofrece no grabarla. Si quien llama lo pide, la
-     recepcionista usa la tool `no_grabar` (Telnyx y Retell) y `lib/grabacionRechazada.ts`
-     anota `Call.grabacionRechazadaAt` y, en Telnyx, intenta `record_stop`. Con la marca,
-     `handleCallRecordingSaved` no crea `Recording` y borra el audio en Telnyx, el webhook
-     de Retell no lo guarda ni lo encola, y este job retira la fila sin subirla si ya
-     estaba en cola. La transcripción, los insights y el informe salen de la
-     conversación del assistant, no del audio, y siguen igual. En el chat de WhatsApp no
-     hay grabación y el aviso de IA lo da la primera respuesta de cada conversación.
+   - **Aviso de IA, saludo por cliente y grabación con permiso (2026-10-12/13).**
+     - **Saludo y aviso de IA.** Al entrar la llamada, `lib/contextoDeLlamada.ts` mira tres cosas: si ese teléfono ya reservó en el negocio (nombre y último servicio, sacados de `Booking`), si deja grabar (`ClienteDelNegocio`) y si el negocio está en su primera semana desde su primera llamada. Con eso `handleCallInitiated` contesta con `answer`, pasando el saludo de esa llamada (`assistant.greeting`) y las variables del prompt (`nombre_cliente`, `ultimo_servicio`, `grabacion`). El assistant guarda unos valores por defecto para el chat.
+       - Las piezas del saludo están en `lib/idiomas/catalogo.ts` (10 idiomas). Todas dicen «inteligencia artificial» (Reglamento europeo de IA, art. 50; Alhabla es el proveedor).
+       - En fisioterapia, estética y «otro», el saludo no nombra el servicio anterior.
+     - **Grabación con permiso.** El assistant no graba por su cuenta (`recording_settings.enabled: false`).
+       - Si el cliente ya aceptó, se graba desde que se contesta (`record: "record-from-answer"`, MP3 dual) y el saludo lo avisa.
+       - Si no se le ha preguntado, la recepcionista se lo pregunta mientras comprueba el primer servicio (con la respuesta de `get_catalog` ya en la mano). Con su sí, la tool `preferencia_de_grabacion` (`lib/grabacion.ts`) guarda el permiso y hace `record_start`.
+       - Si dice que no, en cualquier momento, se marca `Call.grabacionRechazadaAt` y se hace `record_stop`. Entonces `handleCallRecordingSaved` no crea `Recording` y borra el audio en Telnyx, y este job retira la fila si ya estaba en cola.
+       - `Call.grabacionPermitida` dice si se grababa al contestar, y el panel explica por qué no hay audio.
+     - **Retell** graba siempre por su cuenta y no deja empezar ni parar a mitad de llamada, así que su audio no se guarda nunca.
+     - **Lo que no depende del audio.** La transcripción, los insights y el informe salen de la conversación del assistant, así que se guardan siempre.
+     - **Chat de WhatsApp.** No se graba, y el aviso de IA lo da la primera respuesta de cada conversación.
 
 2. **`retry-failed-booking`**
    - Retries a `book_appointment` that failed during a live call for a probably-transient reason (`BOOK_APPOINTMENT_FAILED`, `CALENDAR_TIMEOUT`, `CALENDAR_RATE_LIMITED`, or an unclassified error) — enqueued by `capturePendingBookingLead`/`enqueueRetryFailedBooking` in `voiceTools/service.ts`. Not enqueued for `*_RECONNECT_REQUIRED` failures, since retrying doesn't help until the business reconnects the calendar manually.

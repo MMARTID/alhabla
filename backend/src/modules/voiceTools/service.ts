@@ -47,7 +47,7 @@ import {
   normalizeVoiceToolDateTime,
 } from "../../lib/voiceDateTime.js";
 import { errorMessage } from "../../lib/logUtils.js";
-import { registrarGrabacionRechazada } from "../../lib/grabacionRechazada.js";
+import { guardarPreferenciaDeGrabacion } from "../../lib/grabacion.js";
 import { pendingBookingAlertEmail } from "../../lib/emailTemplates.js";
 import {
   enqueueEmailJob,
@@ -2480,12 +2480,15 @@ async function registrarIntentoFallido(
 }
 
 /**
- * Quien llama no quiere que se grabe la llamada (el saludo se lo ofrece):
- * lib/grabacionRechazada.ts. Siempre 200: un reintento del assistant no
- * aporta nada. En el chat no hay grabación.
+ * Lo que contesta quien llama sobre grabar la llamada (lib/grabacion.ts):
+ * con su sí se empieza a grabar en ese momento y se recuerda para sus
+ * próximas llamadas; con su no se para y se descarta lo grabado. Siempre
+ * 200: un reintento del assistant no aporta nada. En el chat no hay
+ * grabación.
  */
-async function executeNoGrabar(
+async function executePreferenciaDeGrabacion(
   business: BusinessVoiceConfig,
+  acepta: boolean,
   callLabel: string,
   callId: string | undefined
 ): Promise<ResultadoDeTool> {
@@ -2495,35 +2498,30 @@ async function executeNoGrabar(
       result: { success: true, message: "En el chat no se graba nada." },
     };
   }
+  if (!callId) {
+    console.error(
+      `[VoiceTools] ${callLabel} preferencia_de_grabacion sin callId (negocio ${business.id}): no se guarda`
+    );
+  }
   const resultado = callId
-    ? await registrarGrabacionRechazada({
+    ? await guardarPreferenciaDeGrabacion({
         callId,
         businessId: business.id,
+        acepta,
         etiqueta: callLabel,
       })
     : "sin_llamada";
-  if (resultado === "sin_llamada") {
-    if (!callId) {
-      console.error(
-        `[VoiceTools] ${callLabel} no_grabar sin callId (negocio ${business.id}): la grabación se guardará`
-      );
-    }
-    return {
-      success: true,
-      result: {
-        success: false,
-        message:
-          "No se pudo desactivar la grabación. Dile que lo sientes y que puede pedirle al negocio que la borre.",
-      },
-    };
-  }
+  const mensajes: Record<typeof resultado, string> = {
+    aceptada:
+      "Hecho: se graba desde ahora, y sus próximas llamadas también. Dale las gracias en pocas palabras y sigue con lo que había pedido.",
+    rechazada:
+      "Hecho: no se graba; la transcripción sí. Dile que de acuerdo en pocas palabras y sigue con lo que había pedido.",
+    sin_llamada:
+      "No se pudo guardar. Sigue con lo que había pedido sin comentarlo.",
+  };
   return {
     success: true,
-    result: {
-      success: true,
-      message:
-        "Hecho: no se guardará la grabación de esta llamada. La transcripción sí.",
-    },
+    result: { success: resultado !== "sin_llamada", message: mensajes[resultado] },
   };
 }
 
@@ -2565,8 +2563,17 @@ export async function executeVoiceTool(
       return executeCancelAppointment(business, params, callLabel, callId);
     case "notify_when_available":
       return executeNotifyWhenAvailable(business, params, callLabel, callId);
+    case "preferencia_de_grabacion":
+      return executePreferenciaDeGrabacion(
+        business,
+        params.acepta === true,
+        callLabel,
+        callId
+      );
+    // La tool de antes de la grabación con permiso (13-10-2026): la siguen
+    // teniendo los assistants hasta que el despliegue los sincroniza.
     case "no_grabar":
-      return executeNoGrabar(business, callLabel, callId);
+      return executePreferenciaDeGrabacion(business, false, callLabel, callId);
     case "informar_al_negocio": {
       // Post-conversación (PLAN-CANAL-DUENO.md § 10): siempre 200, para que
       // el assistant no reintente y duplique el recado.

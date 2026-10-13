@@ -655,6 +655,9 @@ export type Call = {
   /** El cliente pidió en la llamada que no se grabara: no hay audio, solo
    * la transcripción. */
   grabacionRechazadaAt?: string | null;
+  /** ¿Se grababa al contestar? Solo si el cliente lo había aceptado; si lo
+   * acepta durante la llamada, se graba desde ese momento. */
+  grabacionPermitida?: boolean | null;
   startedAt: string;
   endedAt: string | null;
   /** Lo que ordena el historial: el inicio en las llamadas y el último

@@ -605,18 +605,25 @@ export class CalendarService {
         timeout_ms: 20000,
       },
       {
-        // El saludo dice que la llamada se graba y ofrece no hacerlo
-        // (lib/grabacionRechazada.ts). Retell no deja pararla a mitad de
-        // llamada: el audio se descarta cuando llega.
-        name: "no_grabar",
+        // Grabación con permiso (lib/grabacion.ts). Retell no deja empezar
+        // ni parar a mitad de llamada y su audio no se guarda; el permiso
+        // vale para las próximas llamadas por Telnyx.
+        name: "preferencia_de_grabacion",
         description:
-          "Deja de grabar esta llamada: el audio no se guarda y la transcripción sí. Úsala una sola vez, en cuanto quien llama diga que no quiere que se grabe, sin pedirle que lo confirme. No la uses en el chat de WhatsApp.",
-        url: `${toolBaseUrl}/no_grabar`,
+          "Guarda lo que contesta quien llama sobre grabar la llamada. Con acepta true se empieza a grabar y se recuerda para sus próximas llamadas; con false no se graba (o se deja de grabar) y no se guarda el audio; la transcripción sí. Úsala cuando conteste a tu pregunta de grabar o si en cualquier momento dice que no quiere que se grabe. No la uses en el chat de WhatsApp.",
+        url: `${toolBaseUrl}/preferencia_de_grabacion`,
         method: "POST",
         args_at_root: false,
         parameters: {
           type: "object",
-          properties: {},
+          properties: {
+            acepta: {
+              type: "boolean",
+              description:
+                "true solo si acepta con claridad que se grabe; false si dice que no, duda o no quiere.",
+            },
+          },
+          required: ["acepta"],
         },
         speak_during_execution: false,
         speak_after_execution: true,

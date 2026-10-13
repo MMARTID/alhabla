@@ -116,14 +116,16 @@ export default function PrivacidadPage() {
         <p>
           Esto es importante y conviene que lo sepas antes de contratar, porque afecta a las personas que llaman a tu
           negocio: las llamadas que atiende tu recepcionista virtual{" "}
-          <strong className="font-semibold text-[#0a0a0a]">se graban, se transcriben y se clasifican</strong> para que
-          puedas consultarlas en tu panel, saber qué pidió cada cliente y comprobar que la cita se registró bien.
+          <strong className="font-semibold text-[#0a0a0a]">se transcriben y se clasifican</strong> para que puedas
+          consultarlas en tu panel, saber qué pidió cada cliente y comprobar que la cita se registró bien, y{" "}
+          <strong className="font-semibold text-[#0a0a0a]">solo se graban si quien llama da permiso</strong>.
         </p>
         <p>
-          Al descolgar, la recepcionista dice que es una inteligencia artificial y que la llamada se graba, y ofrece no
-          grabarla: si quien llama lo pide, no se guarda el audio y queda solo la transcripción. No tienes que
-          configurarlo. Como titular del negocio sigues siendo responsable de contar con base legal para tratar los
-          datos de quienes te llaman.
+          Al descolgar, la recepcionista dice que es una inteligencia artificial. Cuando un cliente pide un servicio por
+          primera vez, le pregunta si puede grabar la llamada; si acepta, se graban también sus llamadas siguientes,
+          avisándole al descolgar, y puede retirar el permiso en cualquier momento. Si conoce al cliente por una
+          reserva anterior, le saluda por su nombre. No tienes que configurarlo. Como titular del negocio sigues siendo
+          responsable de contar con base legal para tratar los datos de quienes te llaman.
         </p>
         <p>
           Respecto de los datos de las personas que llaman a tu negocio, este determina las finalidades y actúa como

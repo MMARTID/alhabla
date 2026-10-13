@@ -6,6 +6,7 @@ import type {
 } from "../adapters/telnyx/TelnyxAiAdapter.js";
 import type { TranscriptionSettings } from "telnyx/resources/ai/assistants/assistants.js";
 import { resolveManagedPromptTimezone } from "./managedAgentPrompt.js";
+import { VARIABLES_DE_LA_LLAMADA_POR_DEFECTO } from "./seccionesDelPrompt.js";
 import type { PerfilDeIdiomas } from "./idiomas/resolver.js";
 
 /**
@@ -315,12 +316,19 @@ export function buildTelnyxVoiceTools(
       required: ["startDateTime", "durationMinutes"],
     },
     {
-      // El saludo dice que la llamada se graba y ofrece no hacerlo
-      // (lib/grabacionRechazada.ts).
-      name: "no_grabar",
+      // Grabación con permiso (lib/grabacion.ts): la recepcionista lo
+      // pregunta mientras comprueba el primer servicio.
+      name: "preferencia_de_grabacion",
       description:
-        "Deja de grabar esta llamada: el audio no se guarda y la transcripción sí. Úsala una sola vez, en cuanto quien llama diga que no quiere que se grabe, sin pedirle que lo confirme. No la uses en el chat de WhatsApp.",
-      properties: {},
+        "Guarda lo que contesta quien llama sobre grabar la llamada. Con acepta true se empieza a grabar y se recuerda para sus próximas llamadas; con false no se graba (o se deja de grabar) y no se guarda el audio; la transcripción sí. Úsala cuando conteste a tu pregunta de grabar o si en cualquier momento dice que no quiere que se grabe. No la uses en el chat de WhatsApp.",
+      properties: {
+        acepta: {
+          type: "boolean",
+          description:
+            "true solo si acepta con claridad que se grabe; false si dice que no, duda o no quiere.",
+        },
+      },
+      required: ["acepta"],
     },
     buildInformarAlNegocioTool(),
   ]);
@@ -742,8 +750,12 @@ export function buildTelnyxAssistantPayload(
       // grabación pasa por Cloud Run al copiarla a R2, que es salida a
       // internet de pago. Telnyx solo da la URL del formato con el que se grabó. Se
       // mantienen los dos canales (uno por interlocutor).
+      // Grabación con permiso (13-10-2026, lib/grabacion.ts): el assistant
+      // no graba por su cuenta. Se graba por llamada, con `record` al
+      // contestar (cliente que ya lo aceptó) o `record_start` cuando lo
+      // acepta, en el mismo formato.
       recording_settings: {
-        enabled: true,
+        enabled: false,
         format: "mp3",
         channels: "dual",
         stop_on_conversation_end: true,
@@ -782,6 +794,10 @@ export function buildTelnyxAssistantPayload(
     // Post-conversación (PLAN-CANAL-DUENO.md § 10): el assistant vuelve a
     // ejecutarse tras colgar para llamar a informar_al_negocio.
     postConversationSettings: { enabled: true },
+    // Lo de quien llama lo manda el backend en cada llamada
+    // (lib/contextoDeLlamada.ts); estos valores quedan para el chat y para
+    // una llamada en la que no se pudo mirar nada.
+    dynamicVariables: { ...VARIABLES_DE_LA_LLAMADA_POR_DEFECTO },
     tools,
   };
 }
