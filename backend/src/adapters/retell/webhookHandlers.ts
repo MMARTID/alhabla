@@ -367,7 +367,10 @@ export async function handleCallEnded(
         });
       }
 
-      if (data.recording_url) {
+      // Quien llama pidió que no se grabara (tool no_grabar): el audio no se
+      // guarda ni se copia (lib/grabacionRechazada.ts). Retell no deja
+      // borrar solo la grabación; la retiene sus 30 días de retención.
+      if (data.recording_url && !updatedCall.grabacionRechazadaAt) {
         await tx.recording.upsert({
           where: { callId: updatedCall.id },
           create: {
@@ -383,7 +386,11 @@ export async function handleCallEnded(
       return updatedCall;
     });
 
-    if (data.recording_url) {
+    if (data.recording_url && result.grabacionRechazadaAt) {
+      console.log(
+        `[Retell] ${callLabel(call_id)}: grabación descartada, quien llama pidió no grabar (negocio ${result.businessId})`
+      );
+    } else if (data.recording_url) {
       try {
         await enqueueRecordingJob(
           {
@@ -443,7 +450,7 @@ export async function handleCallAnalyzed(
   try {
     let dbCall = await prisma.call.findUnique({
       where: { callId: call_id },
-      select: { id: true, businessId: true },
+      select: { id: true, businessId: true, grabacionRechazadaAt: true },
     });
 
     if (!dbCall) {
@@ -472,7 +479,7 @@ export async function handleCallAnalyzed(
           agentId: agent?.id || null,
           status: "COMPLETED",
         },
-        select: { id: true, businessId: true },
+        select: { id: true, businessId: true, grabacionRechazadaAt: true },
       });
     }
 
@@ -512,7 +519,7 @@ export async function handleCallAnalyzed(
         });
       }
 
-      if (data.recording_url) {
+      if (data.recording_url && !dbCall.grabacionRechazadaAt) {
         await tx.recording.upsert({
           where: { callId: dbCall.id },
           create: {

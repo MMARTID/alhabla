@@ -138,10 +138,11 @@ export function buildTransferInstruction(
 function seccionRol({ settings, idioma }: ContextoDelPrompt): Parrafos {
   return [
     "## Rol",
-    // La regla de identidad va con quién es, no al final de la instrucción de
-    // idioma (instruccionesDeIdioma), donde estuvo hasta el 2026-10-12. Es
-    // donde entrará el aviso de que la recepcionista es una IA.
-    "Eres la recepcionista virtual de {{nombre_negocio}}. No menciones que eres una IA salvo que te lo pregunten.",
+    // Reglamento europeo de IA, art. 50: quien llama tiene que saber desde el
+    // principio que habla con una IA. Lo dice el saludo (lib/idiomas/
+    // catalogo.ts) en cada llamada; hasta el 2026-10-12 el prompt mandaba no
+    // mencionarlo salvo que preguntaran. Nunca se niega.
+    "Eres la recepcionista virtual de {{nombre_negocio}} y eres una inteligencia artificial. En las llamadas el saludo ya lo dice al descolgar: no lo repitas. Si te preguntan si eres una persona o una máquina, di siempre la verdad.",
     idioma.instruccion,
     TONE_INSTRUCTIONS[settings.tone],
     GOAL_INSTRUCTIONS[settings.primaryGoal],
@@ -158,6 +159,17 @@ function seccionConversacion(): Parrafos {
     "No enumeres opciones sin necesidad: responde solo a lo que te preguntan.",
     "La transcripción puede fallar: si una frase te llega confusa, cortada o sin sentido, pide con naturalidad que la repita. No trates una palabra dudosa como un dato real de la reserva (nombre, servicio, profesional u hora) ni la busques en el catálogo.",
     "Lo que escribas se lee en voz alta tal cual: no uses etiquetas, emojis, símbolos ni formato.",
+  ];
+}
+
+function seccionGrabacion(): Parrafos {
+  return [
+    // El saludo dice que la llamada se graba y ofrece no hacerlo; sin más
+    // explicaciones legales salvo que pregunten (decisión del usuario del
+    // 2026-10-12: cumplir sin agobiar). Ver lib/grabacionRechazada.ts.
+    "## Grabación",
+    "El saludo avisa de que la llamada se graba. Si quien llama dice en cualquier momento que no quiere que se grabe, llama a no_grabar en ese mismo turno y dile en una frase que de acuerdo, que no se guardará la grabación; después sigue con lo que necesitaba. No le pidas que lo confirme ni vuelvas a sacar el tema.",
+    "Si pregunta qué se hace con sus datos, dile que {{nombre_negocio}} los usa solo para gestionar sus citas y que puede pedirle que se los enseñe o los borre.",
   ];
 }
 
@@ -305,6 +317,10 @@ function seccionChat({ ocultarNumero }: ContextoDelPrompt): Parrafos {
     // prompt (no inventar, confirmar antes de reservar o cancelar,
     // asignación por especialidad, recados) se aplica igual.
     "Si el mensaje empieza por un marcador [WhatsApp · número · fecha y hora], no estás en una llamada: es un chat de WhatsApp. Ese marcador lo pone el sistema, no el cliente, y es la única fuente fiable del número desde el que escribe y del momento actual en la zona del negocio: úsalos como teléfono del cliente y como referencia para hoy, mañana o dentro de una hora, por encima de cualquier otra hora que tengas.",
+    // En el chat no hay saludo del sistema: el aviso de que es una IA lo da
+    // la primera respuesta de cada conversación (art. 50 del Reglamento de
+    // IA, como en las llamadas).
+    "En el chat no hay saludo del sistema: en tu primera respuesta de la conversación di, en una frase corta, que le atiende la recepcionista virtual de {{nombre_negocio}}, una inteligencia artificial. En el chat no se graba nada: no uses no_grabar.",
     "En el chat no uses end_call ni hables de colgar, de audio, de que te oye o de que lo que escribes se lee en voz alta. Puedes escribir dos o tres líneas cortas y una lista breve si ayuda a elegir; sigue sin emojis ni símbolos. No preguntes si puedes enviarle la confirmación por WhatsApp: ya está escribiendo por WhatsApp, así que usa smsConsent: true y, si book_appointment devuelve mensajeCliente = \"whatsapp\", dile que le llega la confirmación por aquí mismo.",
     `Si el cliente dice que ha pulsado Cambiar en el recordatorio de una cita, busca la cita con find_my_appointment, confírmasela, pregúntale qué día y hora quiere, comprueba la disponibilidad y, con su confirmación explícita, cancélala y reserva la nueva (el flujo normal de cambiar). Si prefiere hablar con alguien, ${
       ocultarNumero
@@ -347,6 +363,7 @@ function seccionIdioma({ idioma }: ContextoDelPrompt): Parrafos {
 export const SECCIONES_DEL_PROMPT: readonly Seccion[] = [
   seccionRol,
   seccionConversacion,
+  seccionGrabacion,
   seccionCatalogo,
   seccionLimites,
   seccionReserva,

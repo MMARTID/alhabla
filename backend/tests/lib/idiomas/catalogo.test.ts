@@ -12,6 +12,7 @@ import {
   hablaIdioma,
   idiomasQueHabla,
   puedeSerPrincipal,
+  type CodigoDeIdioma,
   type ProveedorDeVoz,
 } from "../../../src/lib/idiomas/catalogo.js";
 import {
@@ -117,18 +118,18 @@ describe("catálogo de idiomas", () => {
     }
   });
 
-  it("los saludos y los nombres de los idiomas de siempre siguen byte a byte", () => {
+  it("los saludos de siempre, con el aviso de IA y de grabación, y los nombres de los idiomas siguen byte a byte", () => {
     expect(componerSaludo("es-ES", "Peluquería Ana")).toBe(
-      "Hola, gracias por llamar a Peluquería Ana. ¿En qué te puedo ayudar?"
+      "Peluquería Ana, te atiende su asistente de inteligencia artificial. La llamada se graba; si no quieres, dímelo. ¿En qué te ayudo?"
     );
     expect(componerSaludo("ca-ES", "Perruqueria Anna")).toBe(
-      "Hola, gràcies per trucar a Perruqueria Anna. En què et puc ajudar?"
+      "Perruqueria Anna, t'atén una intel·ligència artificial. La trucada s'enregistra; si no vols, digues-m'ho. En què et puc ajudar?"
     );
     expect(componerSaludo("eu-ES", "Ana ile-apaindegia")).toBe(
-      "Kaixo, Ana ile-apaindegia. Zertan lagun zaitzaket?"
+      "Kaixo, Ana ile-apaindegia. Adimen artifizial bat naiz. Deia grabatu egiten da; nahi ez baduzu, esadazu. Zertan lagun zaitzaket?"
     );
     expect(componerSaludo("gl-ES", "Perruquería Ana")).toBe(
-      "Ola, grazas por chamar a Perruquería Ana. En que te podo axudar?"
+      "Perruquería Ana, atendete unha intelixencia artificial. A chamada grávase; se non queres, dimo. En que te axudo?"
     );
     expect(
       CODIGOS_DE_IDIOMA.slice(0, 6).map(
@@ -288,5 +289,30 @@ describe("catálogo de idiomas — voces Ultra y mercado de España", () => {
     });
     expect(familiaDeVoces("es-ES").familia).toBe("ultra");
     expect(familiaDeVoces("en-GB").voces).toBe(IDIOMAS["en-GB"].voces);
+  });
+});
+
+// Reglamento europeo de IA, art. 50 (desde el 2026-10-12): el saludo de cada
+// idioma dice que es una inteligencia artificial, con esas palabras, y que
+// la llamada se graba (lib/grabacionRechazada.ts).
+describe("catálogo de idiomas — aviso de IA y de grabación en el saludo", () => {
+  const AVISO: Record<CodigoDeIdioma, { ia: string; grabacion: string }> = {
+    "es-ES": { ia: "inteligencia artificial", grabacion: "se graba" },
+    "en-GB": { ia: "artificial intelligence", grabacion: "recorded" },
+    "fr-FR": { ia: "intelligence artificielle", grabacion: "enregistré" },
+    "ca-ES": { ia: "intel·ligència artificial", grabacion: "s'enregistra" },
+    "eu-ES": { ia: "Adimen artifizial", grabacion: "grabatu" },
+    "gl-ES": { ia: "intelixencia artificial", grabacion: "grávase" },
+    "de-DE": { ia: "künstlichen Intelligenz", grabacion: "aufgezeichnet" },
+    "it-IT": { ia: "intelligenza artificiale", grabacion: "registrata" },
+    "pt-PT": { ia: "inteligência artificial", grabacion: "gravada" },
+    "nl-NL": { ia: "kunstmatige intelligentie", grabacion: "opgenomen" },
+  };
+
+  it.each(CODIGOS_DE_IDIOMA)("%s: con el nombre del negocio, la IA y la grabación", (codigo) => {
+    const saludo = componerSaludo(codigo, "Negocio de prueba");
+    expect(saludo).toContain("Negocio de prueba");
+    expect(saludo).toContain(AVISO[codigo].ia);
+    expect(saludo).toContain(AVISO[codigo].grabacion);
   });
 });

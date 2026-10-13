@@ -60,7 +60,7 @@ const CASOS: Caso[] = [
       transcripcion: "deepgram/flux",
       idiomaDeTranscripcion: "multi",
       saludo:
-        "Hola, gracias por llamar a Verificación de idiomas. ¿En qué te puedo ayudar?",
+        "Verificación de idiomas, te atiende su asistente de inteligencia artificial. La llamada se graba; si no quieres, dímelo. ¿En qué te ayudo?",
     },
   },
   {
@@ -73,7 +73,7 @@ const CASOS: Caso[] = [
       idiomaDeTranscripcion: "auto",
       pistas: PISTAS_CON_CATALAN,
       saludo:
-        "Hola, gràcies per trucar a Verificación de idiomas. En què et puc ajudar?",
+        "Verificación de idiomas, t'atén una intel·ligència artificial. La trucada s'enregistra; si no vols, digues-m'ho. En què et puc ajudar?",
     },
   },
   { nombre: "Euskera principal", voiceLanguage: "eu-ES" },
@@ -105,7 +105,7 @@ const CASOS: Caso[] = [
       transcripcion: "deepgram/flux",
       idiomaDeTranscripcion: "multi",
       saludo:
-        "Hallo, vielen Dank für Ihren Anruf bei Verificación de idiomas. Wie kann ich Ihnen helfen?",
+        "Verificación de idiomas, Sie sprechen mit einer künstlichen Intelligenz. Das Gespräch wird aufgezeichnet; wenn Sie das nicht möchten, sagen Sie es mir. Wie kann ich Ihnen helfen?",
     },
   },
   {
@@ -117,7 +117,7 @@ const CASOS: Caso[] = [
       transcripcion: "deepgram/flux",
       idiomaDeTranscripcion: "multi",
       saludo:
-        "Hola, gracias por llamar a Verificación de idiomas. ¿En qué te puedo ayudar?",
+        "Verificación de idiomas, te atiende su asistente de inteligencia artificial. La llamada se graba; si no quieres, dímelo. ¿En qué te ayudo?",
     },
   },
 ];

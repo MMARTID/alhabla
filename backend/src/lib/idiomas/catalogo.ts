@@ -100,7 +100,11 @@ export interface IdiomaDelCatalogo {
   /** Cómo lo ve el dueño en el panel. */
   etiqueta: string;
   /** Saludo al descolgar cuando saluda en este idioma; `{negocio}` es el
-   * nombre del negocio. */
+   * nombre del negocio. Desde el 2026-10-12 dice que es una inteligencia
+   * artificial (Reglamento europeo de IA, art. 50: «asistente» a secas no
+   * basta) y que la llamada se graba, y ofrece no grabarla
+   * (lib/grabacionRechazada.ts). Sin género: la voz puede ser de mujer o de
+   * hombre. */
   saludo: string;
   /** Pista de cada motor de transcripción de Telnyx, o null si no lo
    * entiende. flux es el rápido (fin de turno anticipado); Soniox entiende
@@ -185,7 +189,8 @@ export const IDIOMAS: Record<CodigoDeIdioma, IdiomaDelCatalogo> = {
     iso: "es",
     nombreEnPrompt: "español de España",
     etiqueta: "Español",
-    saludo: "Hola, gracias por llamar a {negocio}. ¿En qué te puedo ayudar?",
+    saludo:
+      "{negocio}, te atiende su asistente de inteligencia artificial. La llamada se graba; si no quieres, dímelo. ¿En qué te ayudo?",
     transcripcion: { flux: "es", soniox: "es" },
     retell: { locale: "es-ES", vozMultilingue: false },
     cooficial: false,
@@ -195,7 +200,8 @@ export const IDIOMAS: Record<CodigoDeIdioma, IdiomaDelCatalogo> = {
     iso: "en",
     nombreEnPrompt: "inglés",
     etiqueta: "Inglés",
-    saludo: "Hello, thank you for calling {negocio}. How can I help you?",
+    saludo:
+      "{negocio}, you're speaking with an artificial intelligence assistant. This call is recorded; if you'd rather it wasn't, just tell me. How can I help?",
     transcripcion: { flux: "en", soniox: "en" },
     retell: { locale: "en-GB", vozMultilingue: false },
     cooficial: false,
@@ -206,7 +212,7 @@ export const IDIOMAS: Record<CodigoDeIdioma, IdiomaDelCatalogo> = {
     nombreEnPrompt: "francés",
     etiqueta: "Francés",
     saludo:
-      "Bonjour, merci d'avoir appelé {negocio}. Comment puis-je vous aider ?",
+      "{negocio}, vous êtes en ligne avec une intelligence artificielle. L'appel est enregistré ; si vous ne le souhaitez pas, dites-le-moi. Comment puis-je vous aider ?",
     transcripcion: { flux: "fr", soniox: "fr" },
     retell: { locale: "fr-FR", vozMultilingue: false },
     cooficial: false,
@@ -216,7 +222,8 @@ export const IDIOMAS: Record<CodigoDeIdioma, IdiomaDelCatalogo> = {
     iso: "ca",
     nombreEnPrompt: "catalán",
     etiqueta: "Catalán",
-    saludo: "Hola, gràcies per trucar a {negocio}. En què et puc ajudar?",
+    saludo:
+      "{negocio}, t'atén una intel·ligència artificial. La trucada s'enregistra; si no vols, digues-m'ho. En què et puc ajudar?",
     transcripcion: { flux: null, soniox: "ca" },
     retell: { locale: "ca-ES", vozMultilingue: true },
     cooficial: true,
@@ -235,7 +242,8 @@ export const IDIOMAS: Record<CodigoDeIdioma, IdiomaDelCatalogo> = {
     nombreEnPrompt: "euskera",
     etiqueta: "Euskera",
     // Sin «llamar a»: el nombre del negocio iría declinado.
-    saludo: "Kaixo, {negocio}. Zertan lagun zaitzaket?",
+    saludo:
+      "Kaixo, {negocio}. Adimen artifizial bat naiz. Deia grabatu egiten da; nahi ez baduzu, esadazu. Zertan lagun zaitzaket?",
     transcripcion: { flux: null, soniox: "eu" },
     retell: { locale: null, vozMultilingue: false },
     cooficial: true,
@@ -245,7 +253,8 @@ export const IDIOMAS: Record<CodigoDeIdioma, IdiomaDelCatalogo> = {
     iso: "gl",
     nombreEnPrompt: "gallego",
     etiqueta: "Gallego",
-    saludo: "Ola, grazas por chamar a {negocio}. En que te podo axudar?",
+    saludo:
+      "{negocio}, atendete unha intelixencia artificial. A chamada grávase; se non queres, dimo. En que te axudo?",
     transcripcion: { flux: null, soniox: "gl" },
     // Retell admite gl-ES. Su voz Cartesia estaba sin verificar en gallego;
     // desde el 2026-10-05, con una cooficial va la cadena multilingüe
@@ -259,7 +268,7 @@ export const IDIOMAS: Record<CodigoDeIdioma, IdiomaDelCatalogo> = {
     nombreEnPrompt: "alemán",
     etiqueta: "Alemán",
     saludo:
-      "Hallo, vielen Dank für Ihren Anruf bei {negocio}. Wie kann ich Ihnen helfen?",
+      "{negocio}, Sie sprechen mit einer künstlichen Intelligenz. Das Gespräch wird aufgezeichnet; wenn Sie das nicht möchten, sagen Sie es mir. Wie kann ich Ihnen helfen?",
     transcripcion: { flux: "de", soniox: "de" },
     retell: { locale: "de-DE", vozMultilingue: false },
     cooficial: false,
@@ -270,7 +279,7 @@ export const IDIOMAS: Record<CodigoDeIdioma, IdiomaDelCatalogo> = {
     nombreEnPrompt: "italiano",
     etiqueta: "Italiano",
     saludo:
-      "Buongiorno, grazie per aver chiamato {negocio}. Come posso aiutarla?",
+      "{negocio}, sta parlando con un'intelligenza artificiale. La chiamata viene registrata; se non vuole, me lo dica. Come posso aiutarla?",
     transcripcion: { flux: "it", soniox: "it" },
     retell: { locale: "it-IT", vozMultilingue: false },
     cooficial: false,
@@ -282,7 +291,8 @@ export const IDIOMAS: Record<CodigoDeIdioma, IdiomaDelCatalogo> = {
     etiqueta: "Portugués",
     // «Obrigado/a» concuerda con quien habla, y la voz puede ser de mujer o
     // de hombre: un saludo sin él vale para las dos.
-    saludo: "Olá, está a falar com {negocio}. Em que posso ajudar?",
+    saludo:
+      "{negocio}, está a falar com uma inteligência artificial. A chamada é gravada; se não quiser, diga-me. Em que posso ajudar?",
     transcripcion: { flux: "pt", soniox: "pt" },
     retell: { locale: "pt-PT", vozMultilingue: false },
     cooficial: false,
@@ -293,7 +303,7 @@ export const IDIOMAS: Record<CodigoDeIdioma, IdiomaDelCatalogo> = {
     nombreEnPrompt: "neerlandés",
     etiqueta: "Neerlandés",
     saludo:
-      "Hallo, bedankt voor het bellen naar {negocio}. Waarmee kan ik u helpen?",
+      "{negocio}, u spreekt met een kunstmatige intelligentie. Het gesprek wordt opgenomen; als u dat niet wilt, zeg het me dan. Waarmee kan ik u helpen?",
     transcripcion: { flux: "nl", soniox: "nl" },
     retell: { locale: "nl-NL", vozMultilingue: false },
     cooficial: false,

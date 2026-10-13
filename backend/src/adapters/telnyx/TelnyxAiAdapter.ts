@@ -796,6 +796,27 @@ export class TelnyxAiAdapter {
     return recordings;
   }
 
+  /**
+   * Para la grabación de una llamada en curso (`record_stop` de Call
+   * Control) cuando quien llama pide que no se grabe (tool no_grabar). Lo
+   * grabado hasta ese momento llega igualmente en `call.recording.saved`, y
+   * ahí se descarta. La grabación la arranca el assistant
+   * (`recording_settings`), no un `record_start` nuestro: que este comando
+   * también la pare no está documentado, así que quien lo llama no depende
+   * de ello.
+   */
+  async stopRecording(callControlId: string): Promise<void> {
+    const client = getTelnyxClient();
+    await client.calls.actions.stopRecording(callControlId, {});
+  }
+
+  /** Borra una grabación en Telnyx (la de una llamada que no se podía
+   * grabar). */
+  async deleteRecording(recordingId: string): Promise<void> {
+    const client = getTelnyxClient();
+    await client.recordings.delete(recordingId);
+  }
+
   // ---------------------------------------------------------------------
   // Voces — fuente de verdad para qué voz usar por negocio (ver plan §3):
   // la sincronización elige la primera voz Telnyx-hosted disponible para el

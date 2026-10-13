@@ -243,7 +243,7 @@ describe("vistaPreviaDeIdiomas", () => {
       requiereParaElegirVoz: ELEGIR_ENTRE_29,
       entradilla: HABLA_EN_ESPANOL,
       saludo:
-        "Hola, gracias por llamar a Peluquería Ana. ¿En qué te puedo ayudar?",
+        "Peluquería Ana, te atiende su asistente de inteligencia artificial. La llamada se graba; si no quieres, dímelo. ¿En qué te ayudo?",
       avisos: [AVISO_SIN_COOFICIALES],
     });
   });
@@ -287,7 +287,7 @@ describe("vistaPreviaDeIdiomas", () => {
       familia: "soniox",
       entradilla: HABLA_EN_CATALAN,
       saludo:
-        "Hola, gràcies per trucar a Perruqueria Anna. En què et puc ajudar?",
+        "Perruqueria Anna, t'atén una intel·ligència artificial. La trucada s'enregistra; si no vols, digues-m'ho. En què et puc ajudar?",
     });
     expect(vista.voces.map((voz) => voz.nombre)).toEqual(["Marta", "Sergio"]);
     expect(vista.voces[0].muestra).toBe("/voces/ca/marta.mp3");

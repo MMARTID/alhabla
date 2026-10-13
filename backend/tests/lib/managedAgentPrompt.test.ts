@@ -74,26 +74,44 @@ describe("buildManagedAgentPrompt", () => {
     });
 
     expect(prompt).toContain(
-      "Eres la recepcionista virtual de {{nombre_negocio}}."
+      "Eres la recepcionista virtual de {{nombre_negocio}} y eres una inteligencia artificial."
     );
     expect(prompt).toContain("corte, barba o ambos");
   });
 
-  // Hasta el 2026-10-12 iba al final de la instrucción de idioma: ahora una
-  // sola vez y con quién es, con los idiomas de Telnyx y con los de Retell.
+  // Reglamento europeo de IA, art. 50: hasta el 2026-10-12 mandaba no
+  // mencionarlo salvo que preguntaran. Con los idiomas de Telnyx y con los
+  // de Retell, una sola vez y con quién es.
   it.each([
     ["Telnyx (los siete idiomas)", undefined],
     ["Retell (solo español)", ["es-ES"] as const],
-  ])("dice la regla de la IA una sola vez, en «## Rol»: %s", (_, idiomas) => {
+  ])("dice que es una inteligencia artificial y nunca lo niega, en «## Rol»: %s", (_, idiomas) => {
     const prompt = buildManagedAgentPrompt({
       businessName: "Barbería Ejemplo",
       settings: DEFAULT_AGENT_SETTINGS,
       idiomas,
     });
 
-    expect(prompt.split("eres una IA")).toHaveLength(2);
     expect(prompt).toContain(
-      "## Rol\n\nEres la recepcionista virtual de {{nombre_negocio}}. No menciones que eres una IA salvo que te lo pregunten.\n\n"
+      "## Rol\n\nEres la recepcionista virtual de {{nombre_negocio}} y eres una inteligencia artificial. En las llamadas el saludo ya lo dice al descolgar: no lo repitas. Si te preguntan si eres una persona o una máquina, di siempre la verdad.\n\n"
+    );
+    expect(prompt).not.toContain("No menciones que eres una IA");
+  });
+
+  // El saludo ofrece no grabar (lib/grabacionRechazada.ts); en el chat no
+  // hay grabación y el aviso de IA lo da la primera respuesta.
+  it("explica cuándo usar no_grabar en las llamadas, y en el chat avisa de la IA sin usarla", () => {
+    const prompt = buildManagedAgentPrompt({
+      businessName: "Barbería Ejemplo",
+      settings: DEFAULT_AGENT_SETTINGS,
+    });
+
+    expect(prompt).toContain("## Grabación");
+    expect(prompt).toContain(
+      "llama a no_grabar en ese mismo turno y dile en una frase que de acuerdo, que no se guardará la grabación"
+    );
+    expect(prompt).toContain(
+      "en tu primera respuesta de la conversación di, en una frase corta, que le atiende la recepcionista virtual de {{nombre_negocio}}, una inteligencia artificial. En el chat no se graba nada: no uses no_grabar."
     );
   });
 

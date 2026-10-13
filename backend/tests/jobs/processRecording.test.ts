@@ -54,6 +54,28 @@ describe("processRecordingJob", () => {
     expect(mockedRecordingUpdate).not.toHaveBeenCalled();
   });
 
+  // Quien llama pidió no grabar cuando la grabación ya estaba en la cola
+  // (lib/grabacionRechazada.ts): ni descarga ni subida, y se retira para que
+  // retryStuckRecordings no la vuelva a encolar.
+  it("no sube la grabación de una llamada en la que pidieron no grabar", async () => {
+    mockedCallFindUnique.mockResolvedValue({
+      id: "call_1",
+      businessId: "biz_1",
+      grabacionRechazadaAt: new Date("2026-10-12T16:00:00Z"),
+    } as any);
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(processRecordingJob(payload)).resolves.toBeUndefined();
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(mockedUploadRecording).not.toHaveBeenCalled();
+    expect(mockedRecordingUpdate).toHaveBeenCalledWith({
+      where: { id: "rec_1" },
+      data: { deletedAt: expect.any(Date) },
+    });
+  });
+
   it("descarga la grabación, la sube a storage y actualiza la BD", async () => {
     mockedCallFindUnique.mockResolvedValue({ id: "call_1", businessId: "biz_1" } as any);
     vi.stubGlobal(

@@ -3,6 +3,7 @@ import {
   formatCurrency,
   formatDate,
   formatDuration,
+  motivoSinGrabacion,
   statusLabel,
   outcomeLabel,
   outcomeTone,
@@ -89,5 +90,28 @@ describe("sentimentLabel / sentimentTone", () => {
     expect(sentimentTone("POSITIVE")).toBe("success");
     expect(sentimentTone("NEGATIVE")).toBe("warning");
     expect(sentimentTone("NEUTRAL")).toBe("neutral");
+  });
+});
+
+describe("motivoSinGrabacion", () => {
+  it("un chat de WhatsApp no se graba", () => {
+    expect(motivoSinGrabacion({ voiceProvider: "whatsapp" })).toBe(
+      "Chat de WhatsApp: no hay grabación."
+    );
+  });
+
+  it("dice que el cliente pidió no grabar la llamada", () => {
+    expect(
+      motivoSinGrabacion({
+        voiceProvider: "telnyx",
+        grabacionRechazadaAt: "2026-10-12T16:00:00.000Z",
+      })
+    ).toBe("El cliente pidió que no se grabara la llamada. Queda la transcripción.");
+  });
+
+  it("si no, la grabación todavía no ha llegado", () => {
+    expect(motivoSinGrabacion({ voiceProvider: "telnyx" })).toBe(
+      "Todavía no hay grabación disponible."
+    );
   });
 });

@@ -41,6 +41,7 @@ const mockedCallUpdateMany = vi.mocked(prisma.call.updateMany);
 const mockedCallCreate = vi.mocked(prisma.call.create);
 const mockedCallUpdate = vi.mocked(prisma.call.update);
 const mockedTranscriptUpsert = vi.mocked(prisma.transcript.upsert);
+const mockedRecordingUpsert = vi.mocked(prisma.recording.upsert);
 const mockedEnqueueRecordingJob = vi.mocked(enqueueRecordingJob);
 const mockedEnqueueUsageReportJob = vi.mocked(enqueueUsageReportJob);
 
@@ -207,6 +208,37 @@ describe("Retell webhook handlers", () => {
       );
     });
 
+    // Quien llama pidió no grabar (tool no_grabar): Retell no deja pararla
+    // ni borrar solo el audio, así que no se guarda ni se copia a R2.
+    it("no guarda ni encola la grabación si quien llama pidió no grabar", async () => {
+      mockedCallFindUnique.mockResolvedValue({
+        id: "call_123",
+        businessId: "business_123",
+        agentId: "agent_123",
+      } as any);
+      mockedCallUpsert.mockResolvedValue({
+        id: "call_123",
+        businessId: "business_123",
+        grabacionRechazadaAt: new Date("2026-10-12T16:00:00Z"),
+      } as any);
+
+      const result = await handleCallEnded({
+        event_type: "call_ended",
+        data: {
+          call_id: "retell_call_123",
+          agent_id: "retell_agent_123",
+          duration_ms: 23362,
+          recording_url: "https://example.com/recording.mp3",
+          transcript: "Agent: Hola\nUser: No me grabéis",
+        },
+      });
+
+      expect(result.success).toBe(true);
+      expect(mockedTranscriptUpsert).toHaveBeenCalled();
+      expect(mockedRecordingUpsert).not.toHaveBeenCalled();
+      expect(mockedEnqueueRecordingJob).not.toHaveBeenCalled();
+    });
+
     it("recupera el negocio si la llamada no existía", async () => {
       mockedCallFindUnique.mockResolvedValue(null as any);
       mockedAgentFindFirst.mockResolvedValue({
@@ -258,6 +290,28 @@ describe("Retell webhook handlers", () => {
         })
       );
       expect(mockedCallUpdate).not.toHaveBeenCalled();
+    });
+
+    it("no guarda la grabación del análisis si quien llama pidió no grabar", async () => {
+      mockedCallFindUnique.mockResolvedValue({
+        id: "call_123",
+        businessId: "business_123",
+        grabacionRechazadaAt: new Date("2026-10-12T16:00:00Z"),
+      } as any);
+
+      const result = await handleCallAnalyzed({
+        event_type: "call_analyzed",
+        data: {
+          call_id: "retell_call_123",
+          agent_id: "retell_agent_123",
+          transcript: "Transcripción final",
+          recording_url: "https://example.com/recording.mp3",
+        },
+      });
+
+      expect(result.success).toBe(true);
+      expect(mockedTranscriptUpsert).toHaveBeenCalled();
+      expect(mockedRecordingUpsert).not.toHaveBeenCalled();
     });
 
     it("guarda el sentimiento cuando call_analysis.user_sentiment viene informado", async () => {

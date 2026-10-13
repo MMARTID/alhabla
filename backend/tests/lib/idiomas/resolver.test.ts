@@ -267,7 +267,7 @@ describe("resolverIdiomas — prompt y saludo", () => {
   it("saluda en el idioma principal", () => {
     expect(
       saludoDelNegocio(resolver(["es-ES", "gl-ES"], "gl-ES"), "Perruquería Ana")
-    ).toBe("Ola, grazas por chamar a Perruquería Ana. En que te podo axudar?");
+    ).toBe("Perruquería Ana, atendete unha intelixencia artificial. A chamada grávase; se non queres, dimo. En que te axudo?");
   });
 });
 
@@ -358,7 +358,7 @@ describe("resolverIdiomas — principal y lengua cooficial", () => {
     expect(perfil.transcripcion).toEqual({ motor: "flux", idioma: "multi" });
     expect(perfil.cambios).toEqual([]);
     expect(saludoDelNegocio(perfil, "Salon Anna")).toBe(
-      "Hallo, vielen Dank für Ihren Anruf bei Salon Anna. Wie kann ich Ihnen helfen?"
+      "Salon Anna, Sie sprechen mit einer künstlichen Intelligenz. Das Gespräch wird aufgezeichnet; wenn Sie das nicht möchten, sagen Sie es mir. Wie kann ich Ihnen helfen?"
     );
   });
 
