@@ -47,6 +47,13 @@ export function telefonoParaDevolver(call: Pick<Call, "fromNumber" | "recado">) 
   return call.recado?.telefono ?? call.fromNumber ?? null;
 }
 
+/** El momento por el que se ordena y se agrupa una fila del historial: la
+ * última actividad (en un chat retomado, su último mensaje) o, si la
+ * respuesta no la trae, el inicio. */
+export function momentoDeActividad(call: Pick<Call, "startedAt" | "ultimaActividadAt">) {
+  return call.ultimaActividadAt ?? call.startedAt;
+}
+
 /** «09:03», «Ayer 20:12» o «29 sep 11:30», en la zona del negocio. */
 export function momentoCorto(iso: string, timeZone: string, hoy: string) {
   const clave = claveDeDia(iso, timeZone);

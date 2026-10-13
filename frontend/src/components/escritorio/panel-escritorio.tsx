@@ -10,7 +10,7 @@ import { formatPhoneLocal, formatPrice } from "@/lib/format";
 import { claveDeDia, diaLargo, horaDelNegocio, instanteAntesDelDia, sumarDias } from "@/lib/fechas-negocio";
 import { horarioDelNegocio, importeDeCitas, rangoDeHoras, tramosDelDia } from "@/lib/agenda-escritorio";
 import { getCalendarState } from "@/lib/calendar-state";
-import { momentoCorto } from "@/lib/llamadas";
+import { momentoCorto, momentoDeActividad } from "@/lib/llamadas";
 import type { AgendaBooking, Business } from "@/lib/types";
 import { useAhora } from "@/hooks/use-es-movil";
 import { AvisoFlotante, useAviso } from "@/components/aviso-flotante";
@@ -271,7 +271,7 @@ export function PanelEscritorio({
                     <li key={call.id} className="border-t border-linea">
                       <FilaLlamada
                         call={call}
-                        momento={momentoCorto(call.startedAt, timeZone, hoy)}
+                        momento={momentoCorto(momentoDeActividad(call), timeZone, hoy)}
                         onAbrir={() => router.push(`/llamadas?llamada=${encodeURIComponent(call.id)}`)}
                       />
                     </li>

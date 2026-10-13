@@ -654,6 +654,10 @@ export type Call = {
   voiceProvider: string;
   startedAt: string;
   endedAt: string | null;
+  /** Lo que ordena el historial: el inicio en las llamadas y el último
+   * mensaje en los chats de WhatsApp, que siguen en la misma fila días
+   * después. Opcional mientras convivan respuestas sin el campo. */
+  ultimaActividadAt?: string;
   createdAt: string;
   updatedAt: string;
   transcript?: Transcript | null;

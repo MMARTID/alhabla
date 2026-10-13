@@ -605,6 +605,13 @@ model Call {
   providerCostBreakdown  Json?
   startedAt              DateTime              @default(now())
   endedAt                DateTime?
+  // Última actividad de la conversación, la que ordena y filtra el historial
+  // del panel: en las llamadas de voz es su inicio, y en los chats de
+  // WhatsApp el último mensaje del cliente. Un chat reutiliza su fila días
+  // después (ClientConversation), y con startedAt la reserva que un cliente
+  // movía hoy por WhatsApp quedaba enterrada en la fecha de su primer mensaje.
+  // No vale updatedAt: la purga de textos antiguos también la cambia.
+  ultimaActividadAt      DateTime              @default(now())
   createdAt              DateTime              @default(now())
   updatedAt              DateTime              @updatedAt
   agent                  Agent?                @relation(fields: [agentId], references: [id])
@@ -618,6 +625,7 @@ model Call {
 
   @@unique([voiceProvider, providerCallId])
   @@index([businessId])
+  @@index([businessId, ultimaActividadAt])
   @@index([agentId])
   // Compuestos que sirven a las consultas reales: el listado del panel ordena
   // por createdAt dentro del negocio, y analítica, facturación, resumen

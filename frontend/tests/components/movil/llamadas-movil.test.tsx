@@ -127,6 +127,26 @@ describe("LlamadasMovil", () => {
     expect(mockedGetLlamadas).toHaveBeenLastCalledWith({ filtro: "todas", orden: "reciente", limit: 20, offset: 2 });
   });
 
+  it("un chat retomado sale en el día de su último mensaje, no en el del primero", async () => {
+    mockedGetLlamadas.mockResolvedValueOnce({
+      ...PAGINA,
+      data: [
+        llamada({
+          id: "chat",
+          voiceProvider: "whatsapp",
+          durationSecs: null,
+          startedAt: "2026-09-20T09:00:00Z",
+          ultimaActividadAt: "2026-09-29T09:10:00Z",
+        }),
+      ],
+    });
+    conCliente(<LlamadasMovil />);
+
+    expect(await screen.findByRole("heading", { name: "Martes, 29 de septiembre" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: /20 de septiembre/ })).not.toBeInTheDocument();
+    expect(screen.getByText(/11:10/)).toBeInTheDocument();
+  });
+
   it("la hoja de filtros cambia canal y ánimo, y exporta a CSV lo filtrado", async () => {
     busqueda = "filtro=con_cita";
     mockedGetLlamadas.mockResolvedValue({ ...PAGINA, data: [llamada()] });

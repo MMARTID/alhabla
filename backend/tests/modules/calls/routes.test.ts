@@ -631,7 +631,8 @@ describe("GET /business/me/calls — filtros del historial de escritorio", () =>
       { OR: [{ booking: { is: null } }, { booking: { is: { isCancelled: true } } }] },
       { voiceProvider: { not: "whatsapp" } },
       { sentiment: "NEGATIVE" },
-      { startedAt: { gte: new Date(desde), lt: new Date(hasta) } },
+      // Por última actividad, como el orden: un chat retomado hoy entra en «hoy».
+      { ultimaActividadAt: { gte: new Date(desde), lt: new Date(hasta) } },
       {
         OR: expect.arrayContaining([
           { summary: { contains: "612 34", mode: "insensitive" } },
@@ -663,11 +664,19 @@ describe("GET /business/me/calls — filtros del historial de escritorio", () =>
     expect(JSON.stringify(busqueda)).not.toContain("fromNumber");
   });
 
+  it("por defecto ordena por la última actividad: un chat retomado hoy sube arriba", async () => {
+    await fastify.inject({ method: "GET", url: "/business/me/calls" });
+    expect((mockedCallFindMany.mock.calls[0][0] as any).orderBy).toEqual([
+      { ultimaActividadAt: "desc" },
+      { id: "desc" },
+    ]);
+  });
+
   it("ordena por duración con las llamadas sin duración al final y desempata por id", async () => {
     await fastify.inject({ method: "GET", url: "/business/me/calls?orden=mas_larga" });
     expect((mockedCallFindMany.mock.calls[0][0] as any).orderBy).toEqual([
       { durationSecs: { sort: "desc", nulls: "last" } },
-      { createdAt: "desc" },
+      { ultimaActividadAt: "desc" },
       { id: "desc" },
     ]);
   });
@@ -698,7 +707,7 @@ describe("GET /business/me/calls — filtros del historial de escritorio", () =>
     expect(media.AND).toEqual([SIN_GESTOR]);
     // Medianoche en Madrid es 22:00 o 23:00 UTC del día anterior.
     expect(["22:00:00", "23:00:00"]).toContain(
-      media.startedAt.gte.toISOString().slice(11, 19)
+      media.ultimaActividadAt.gte.toISOString().slice(11, 19)
     );
   });
 

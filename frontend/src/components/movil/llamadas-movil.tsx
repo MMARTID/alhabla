@@ -28,6 +28,7 @@ import { HojaLlamada } from "@/components/movil/hoja-llamada";
 import { CuerpoDeHoja, HojaInferior } from "@/components/movil/hoja-inferior";
 import { BotonDeBuscar } from "@/components/movil/buscador-movil";
 import { VacioMovil } from "@/components/movil/piezas";
+import { momentoDeActividad } from "@/lib/llamadas";
 
 const POR_PAGINA = 20;
 const CONTEO_DE: Partial<Record<FiltrosDeLlamadas["filtro"], "todas" | "conCita" | "porDevolver">> = {
@@ -218,8 +219,10 @@ export function LlamadasMovil() {
         <>
           <ul className="-mx-4">
             {llamadas.map((call, indice) => {
-              const dia = claveDeDia(call.startedAt, timeZone);
-              const nuevoDia = indice === 0 || claveDeDia(llamadas[indice - 1].startedAt, timeZone) !== dia;
+              // Por última actividad, como el orden de la lista: un chat retomado
+              // hoy sale bajo «Hoy», no bajo el día de su primer mensaje.
+              const dia = claveDeDia(momentoDeActividad(call), timeZone);
+              const nuevoDia = indice === 0 || claveDeDia(momentoDeActividad(llamadas[indice - 1]), timeZone) !== dia;
               return (
                 <li key={call.id}>
                   {nuevoDia ? (
@@ -230,7 +233,7 @@ export function LlamadasMovil() {
                   <div className="border-t border-linea">
                     <FilaLlamada
                       call={call}
-                      momento={`${horaDelNegocio(call.startedAt, timeZone)} · ${formatCanalYDuracion(call)}`}
+                      momento={`${horaDelNegocio(momentoDeActividad(call), timeZone)} · ${formatCanalYDuracion(call)}`}
                       onAbrir={() => actualizar({ llamada: call.id })}
                       deslizable
                       accionVisible={conAccion === call.id}
