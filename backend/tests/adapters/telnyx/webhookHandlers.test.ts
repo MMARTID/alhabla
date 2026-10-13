@@ -11,6 +11,7 @@ import {
   handleTelnyxToolInvocation,
 } from "../../../src/adapters/telnyx/webhookHandlers.js";
 import { prisma } from "../../../src/lib/prisma.js";
+import { borrarGrabacionesDeTelnyx } from "../../../src/lib/grabacionRechazada.js";
 import { telnyxAiAdapter } from "../../../src/adapters/telnyx/TelnyxAiAdapter.js";
 import {
   enqueueRecordingJob,
@@ -55,6 +56,10 @@ vi.mock("../../../src/adapters/telnyx/TelnyxAiAdapter.js", () => ({
 vi.mock("../../../src/lib/cloudTasks.js", () => ({
   enqueueRecordingJob: vi.fn(),
   enqueueUsageReportJob: vi.fn(),
+}));
+
+vi.mock("../../../src/lib/grabacionRechazada.js", () => ({
+  borrarGrabacionesDeTelnyx: vi.fn(),
 }));
 
 vi.mock("../../../src/modules/voiceTools/service.js", () => ({
@@ -111,6 +116,7 @@ const mockedListRecordingsByCallLegId = vi.mocked(
 );
 const mockedExecuteVoiceTool = vi.mocked(executeVoiceTool);
 const mockedEnqueueRecordingJob = vi.mocked(enqueueRecordingJob);
+const mockedBorrarGrabacionesDeTelnyx = vi.mocked(borrarGrabacionesDeTelnyx);
 const mockedEnqueueUsageReportJob = vi.mocked(enqueueUsageReportJob);
 const mockedComprobacionReciente = vi.mocked(comprobacionDeDesvioReciente);
 const mockedRegistrarRecibida = vi.mocked(
@@ -479,6 +485,41 @@ describe("handleCallRecordingSaved", () => {
       },
       "process-recording-call_db_1"
     );
+  });
+
+  // Quien llama pidió no grabar (tool no_grabar): ni fila ni copia a R2, y
+  // las grabaciones del leg se borran en Telnyx.
+  it("descarta la grabación si quien llama pidió no grabar", async () => {
+    const grabaciones = [
+      { id: "rec_1", callControlId: "call_ctrl_1" },
+      { id: "rec_2", callControlId: "call_ctrl_1" },
+    ];
+    mockedListRecordingsByCallLegId.mockResolvedValue(grabaciones);
+    mockedCallFindUnique.mockResolvedValue({
+      id: "call_db_1",
+      businessId: "biz1",
+      grabacionRechazadaAt: new Date("2026-10-12T16:00:00Z"),
+    } as any);
+
+    const result = await handleCallRecordingSaved({
+      data: {
+        id: "evt_4",
+        event_type: "call.recording.saved",
+        payload: {
+          call_leg_id: "leg_1",
+          recording_urls: { mp3: "https://example.com/a.mp3" },
+        },
+      },
+    });
+
+    expect(result).toEqual({ success: true });
+    expect(mockedRecordingUpsert).not.toHaveBeenCalled();
+    expect(mockedEnqueueRecordingJob).not.toHaveBeenCalled();
+    expect(mockedBorrarGrabacionesDeTelnyx).toHaveBeenCalledWith({
+      grabaciones,
+      businessId: "biz1",
+      etiqueta: expect.stringContaining("call_ctrl_1"),
+    });
   });
 
   it("devuelve false si no hay URL de grabación utilizable", async () => {

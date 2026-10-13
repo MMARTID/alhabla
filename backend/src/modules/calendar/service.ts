@@ -605,6 +605,24 @@ export class CalendarService {
         timeout_ms: 20000,
       },
       {
+        // El saludo dice que la llamada se graba y ofrece no hacerlo
+        // (lib/grabacionRechazada.ts). Retell no deja pararla a mitad de
+        // llamada: el audio se descarta cuando llega.
+        name: "no_grabar",
+        description:
+          "Deja de grabar esta llamada: el audio no se guarda y la transcripción sí. Úsala una sola vez, en cuanto quien llama diga que no quiere que se grabe, sin pedirle que lo confirme. No la uses en el chat de WhatsApp.",
+        url: `${toolBaseUrl}/no_grabar`,
+        method: "POST",
+        args_at_root: false,
+        parameters: {
+          type: "object",
+          properties: {},
+        },
+        speak_during_execution: false,
+        speak_after_execution: true,
+        timeout_ms: 20000,
+      },
+      {
         // Sin esta tool el agente no tiene ninguna forma de colgar: tras
         // despedirse sigue contestando indefinidamente y la llamada solo
         // termina cuando cuelga el cliente o se agota max_call_duration_ms,

@@ -393,7 +393,7 @@ describe("syncAgentToRetell — voiceGender", () => {
       "retell_llm_1",
       expect.objectContaining({
         beginMessage:
-          "Hallo, vielen Dank für Ihren Anruf bei Salon Anna. Wie kann ich Ihnen helfen?",
+          "Salon Anna, Sie sprechen mit einer künstlichen Intelligenz. Das Gespräch wird aufgezeichnet; wenn Sie das nicht möchten, sagen Sie es mir. Wie kann ich Ihnen helfen?",
       })
     );
     expect(mockedUpdateAgent).toHaveBeenCalledWith(
@@ -477,7 +477,7 @@ describe("syncAgentToRetell — voiceGender", () => {
       "retell_llm_1",
       expect.objectContaining({
         beginMessage:
-          "Hola, gràcies per trucar a Perruqueria Anna. En què et puc ajudar?",
+          "Perruqueria Anna, t'atén una intel·ligència artificial. La trucada s'enregistra; si no vols, digues-m'ho. En què et puc ajudar?",
       })
     );
     expect(mockedUpdateAgent).toHaveBeenCalledWith(
@@ -918,22 +918,22 @@ describe("createBusinessAgent — creación dual Telnyx (Fase 2 del plan Telnyx-
 describe("componerSaludo", () => {
   it("saluda en el idioma principal", () => {
     expect(componerSaludo("es-ES", "Peluquería Ana")).toBe(
-      "Hola, gracias por llamar a Peluquería Ana. ¿En qué te puedo ayudar?"
+      "Peluquería Ana, te atiende su asistente de inteligencia artificial. La llamada se graba; si no quieres, dímelo. ¿En qué te ayudo?"
     );
     expect(componerSaludo("en-GB", "Ana's Salon")).toBe(
-      "Hello, thank you for calling Ana's Salon. How can I help you?"
+      "Ana's Salon, you're speaking with an artificial intelligence assistant. This call is recorded; if you'd rather it wasn't, just tell me. How can I help?"
     );
     expect(componerSaludo("fr-FR", "Salon Anne")).toBe(
-      "Bonjour, merci d'avoir appelé Salon Anne. Comment puis-je vous aider ?"
+      "Salon Anne, vous êtes en ligne avec une intelligence artificielle. L'appel est enregistré ; si vous ne le souhaitez pas, dites-le-moi. Comment puis-je vous aider ?"
     );
     expect(componerSaludo("ca-ES", "Perruqueria Anna")).toBe(
-      "Hola, gràcies per trucar a Perruqueria Anna. En què et puc ajudar?"
+      "Perruqueria Anna, t'atén una intel·ligència artificial. La trucada s'enregistra; si no vols, digues-m'ho. En què et puc ajudar?"
     );
     expect(componerSaludo("eu-ES", "Ana ile-apaindegia")).toBe(
-      "Kaixo, Ana ile-apaindegia. Zertan lagun zaitzaket?"
+      "Kaixo, Ana ile-apaindegia. Adimen artifizial bat naiz. Deia grabatu egiten da; nahi ez baduzu, esadazu. Zertan lagun zaitzaket?"
     );
     expect(componerSaludo("gl-ES", "Perruquería Ana")).toBe(
-      "Ola, grazas por chamar a Perruquería Ana. En que te podo axudar?"
+      "Perruquería Ana, atendete unha intelixencia artificial. A chamada grávase; se non queres, dimo. En que te axudo?"
     );
   });
 });

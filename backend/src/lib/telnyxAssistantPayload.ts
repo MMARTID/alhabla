@@ -314,6 +314,14 @@ export function buildTelnyxVoiceTools(
       },
       required: ["startDateTime", "durationMinutes"],
     },
+    {
+      // El saludo dice que la llamada se graba y ofrece no hacerlo
+      // (lib/grabacionRechazada.ts).
+      name: "no_grabar",
+      description:
+        "Deja de grabar esta llamada: el audio no se guarda y la transcripción sí. Úsala una sola vez, en cuanto quien llama diga que no quiere que se grabe, sin pedirle que lo confirme. No la uses en el chat de WhatsApp.",
+      properties: {},
+    },
     buildInformarAlNegocioTool(),
   ]);
 }

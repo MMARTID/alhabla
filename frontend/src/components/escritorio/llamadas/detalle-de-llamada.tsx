@@ -3,7 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Check, Copy, LoaderCircle, Mic, Phone } from "lucide-react";
 import { getCall } from "@/lib/api";
-import { esChatDeWhatsapp, formatCanalYDuracion, formatPhoneLocal, statusLabel } from "@/lib/format";
+import { esChatDeWhatsapp, formatCanalYDuracion, formatPhoneLocal, motivoSinGrabacion, statusLabel } from "@/lib/format";
 import { claveDeDia, etiquetaDeDia, horaDelNegocio } from "@/lib/fechas-negocio";
 import { enlaceTel, resultadoDeLlamada, telefonoParaDevolver } from "@/lib/llamadas";
 import { SectionErrorState } from "@/components/section-card";
@@ -125,7 +125,7 @@ export function DetalleDeLlamada({
         ) : (
           <p className="flex min-h-10 items-center gap-2 text-sm text-muted">
             <Mic className="h-4 w-4 shrink-0" aria-hidden="true" />
-            {esChatDeWhatsapp(call) ? "Chat de WhatsApp: no hay grabación." : "Todavía no hay grabación disponible."}
+            {motivoSinGrabacion(call)}
           </p>
         )}
       </div>

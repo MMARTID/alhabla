@@ -652,8 +652,15 @@ export type Call = {
   costCents: number | null;
   /** "telnyx" | "retell" para llamadas; "whatsapp" para chats con la recepcionista. */
   voiceProvider: string;
+  /** El cliente pidió en la llamada que no se grabara: no hay audio, solo
+   * la transcripción. */
+  grabacionRechazadaAt?: string | null;
   startedAt: string;
   endedAt: string | null;
+  /** Lo que ordena el historial: el inicio en las llamadas y el último
+   * mensaje en los chats de WhatsApp, que siguen en la misma fila días
+   * después. Opcional mientras convivan respuestas sin el campo. */
+  ultimaActividadAt?: string;
   createdAt: string;
   updatedAt: string;
   transcript?: Transcript | null;

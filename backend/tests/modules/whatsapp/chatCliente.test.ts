@@ -30,7 +30,7 @@ vi.mock("../../../src/lib/prisma.js", () => {
         update: vi.fn(),
         upsert: tx.clientConversation.upsert,
       },
-      call: { create: tx.call.create },
+      call: { create: tx.call.create, updateMany: vi.fn() },
       sentMessage: { count: vi.fn(), updateMany: vi.fn() },
       $transaction: vi.fn(async (fn: (t: typeof tx) => Promise<unknown>) =>
         fn(tx)
@@ -293,6 +293,7 @@ describe("conversarConRecepcionista", () => {
       startedAt: new Date(),
     } as never);
     mockedConvUpdate.mockResolvedValue({} as never);
+    vi.mocked(prisma.call.updateMany).mockResolvedValue({ count: 1 } as never);
     redis.incr.mockResolvedValue(1);
     redis.expire.mockResolvedValue(1);
     mockedAcquire.mockResolvedValue("token");
@@ -400,6 +401,51 @@ describe("conversarConRecepcionista", () => {
       "lock:whatsapp:chat:biz_1:+34600123456",
       "token"
     );
+  });
+
+  it("cada mensaje sube el chat al principio del historial (última actividad), antes de responder", async () => {
+    let actividadAntesDeResponder = false;
+    mockedChat.mockImplementationOnce(async () => {
+      actividadAntesDeResponder =
+        vi.mocked(prisma.call.updateMany).mock.calls.length === 1;
+      return "Te lo cambio al martes.";
+    });
+    const message = entrante();
+    await conversarConRecepcionista({
+      message,
+      businessId: "biz_1",
+      texto: message.text!,
+    });
+
+    expect(prisma.call.updateMany).toHaveBeenCalledTimes(1);
+    const [{ where, data }] = vi.mocked(prisma.call.updateMany).mock
+      .calls[0] as any;
+    expect(where).toEqual({ callId: "whatsapp:chat:conv_1", businessId: "biz_1" });
+    expect(data.ultimaActividadAt).toBeInstanceOf(Date);
+    expect(actividadAntesDeResponder).toBe(true);
+  });
+
+  it("si no se puede anotar la actividad, el chat se atiende igual y lo dice en el log", async () => {
+    vi.mocked(prisma.call.updateMany).mockRejectedValueOnce(new Error("BD caída"));
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const message = entrante();
+    const resultado = await conversarConRecepcionista({
+      message,
+      businessId: "biz_1",
+      texto: message.text!,
+    });
+
+    expect(resultado).toEqual({
+      atendido: true,
+      resultado: { handler: "chat:cliente" },
+    });
+    expect(mockedChat).toHaveBeenCalledTimes(1);
+    expect(
+      error.mock.calls.some(([linea]) =>
+        String(linea).includes("no se pudo anotar la actividad del chat whatsapp:chat:conv_1")
+      )
+    ).toBe(true);
+    error.mockRestore();
   });
 
   it("el turno 21 del día responde el límite (una vez al día) sin llamar al assistant", async () => {

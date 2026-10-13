@@ -24,7 +24,7 @@ import { CANALES, PERIODOS, RESULTADOS, SENTIMIENTOS, consultaDeFiltros, descarg
 import { useBusquedaConRetraso } from "@/hooks/use-busqueda-con-retraso";
 import { esChatDeWhatsapp, formatPhoneLocal, formatPrice, sentimentLabel } from "@/lib/format";
 import { claveDeDia } from "@/lib/fechas-negocio";
-import { momentoCorto, resultadoDeLlamada } from "@/lib/llamadas";
+import { momentoCorto, momentoDeActividad, resultadoDeLlamada } from "@/lib/llamadas";
 import type { Business, Call, OrdenDeLlamadas } from "@/lib/types";
 import { AvisoFlotante, useAviso } from "@/components/aviso-flotante";
 import { SectionErrorState } from "@/components/section-card";
@@ -447,7 +447,7 @@ function FilaDeLlamada({
         <span className="block truncate font-semibold tabular-nums text-tinta">{formatPhoneLocal(llamada.fromNumber) ?? "Número oculto"}</span>
         {nombre ? <span className="block truncate text-xs text-muted">{nombre}</span> : null}
       </span>
-      <span role="cell" className="tabular-nums text-apagado">{momentoCorto(llamada.startedAt, timeZone, hoy)}</span>
+      <span role="cell" className="tabular-nums text-apagado">{momentoCorto(momentoDeActividad(llamada), timeZone, hoy)}</span>
       <span role="cell" className="flex items-center gap-1.5 text-apagado">
         {chat ? <MessageCircle className="h-4 w-4 text-morado" aria-hidden="true" /> : <PhoneCall className="h-4 w-4 text-morado" aria-hidden="true" />}
         {chat ? "WhatsApp" : "Voz"}

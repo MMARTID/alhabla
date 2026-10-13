@@ -47,6 +47,7 @@ import {
   normalizeVoiceToolDateTime,
 } from "../../lib/voiceDateTime.js";
 import { errorMessage } from "../../lib/logUtils.js";
+import { registrarGrabacionRechazada } from "../../lib/grabacionRechazada.js";
 import { pendingBookingAlertEmail } from "../../lib/emailTemplates.js";
 import {
   enqueueEmailJob,
@@ -2478,6 +2479,54 @@ async function registrarIntentoFallido(
   });
 }
 
+/**
+ * Quien llama no quiere que se grabe la llamada (el saludo se lo ofrece):
+ * lib/grabacionRechazada.ts. Siempre 200: un reintento del assistant no
+ * aporta nada. En el chat no hay grabación.
+ */
+async function executeNoGrabar(
+  business: BusinessVoiceConfig,
+  callLabel: string,
+  callId: string | undefined
+): Promise<ResultadoDeTool> {
+  if (callId && canalDeLaTool(callId) === "client_chat") {
+    return {
+      success: true,
+      result: { success: true, message: "En el chat no se graba nada." },
+    };
+  }
+  const resultado = callId
+    ? await registrarGrabacionRechazada({
+        callId,
+        businessId: business.id,
+        etiqueta: callLabel,
+      })
+    : "sin_llamada";
+  if (resultado === "sin_llamada") {
+    if (!callId) {
+      console.error(
+        `[VoiceTools] ${callLabel} no_grabar sin callId (negocio ${business.id}): la grabación se guardará`
+      );
+    }
+    return {
+      success: true,
+      result: {
+        success: false,
+        message:
+          "No se pudo desactivar la grabación. Dile que lo sientes y que puede pedirle al negocio que la borre.",
+      },
+    };
+  }
+  return {
+    success: true,
+    result: {
+      success: true,
+      message:
+        "Hecho: no se guardará la grabación de esta llamada. La transcripción sí.",
+    },
+  };
+}
+
 export async function executeVoiceTool(
   input: ExecuteVoiceToolInput
 ): Promise<ResultadoDeTool> {
@@ -2516,6 +2565,8 @@ export async function executeVoiceTool(
       return executeCancelAppointment(business, params, callLabel, callId);
     case "notify_when_available":
       return executeNotifyWhenAvailable(business, params, callLabel, callId);
+    case "no_grabar":
+      return executeNoGrabar(business, callLabel, callId);
     case "informar_al_negocio": {
       // Post-conversación (PLAN-CANAL-DUENO.md § 10): siempre 200, para que
       // el assistant no reintente y duplique el recado.
