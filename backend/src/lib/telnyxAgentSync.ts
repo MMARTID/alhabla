@@ -222,9 +222,10 @@ function datosDeSincronizacion(
  * con una recepcionista incapaz de reservar (incidente real 2026-09-14).
  *
  * Nunca lanza: un fallo aquí no debe impedir que `createBusinessAgent()`
- * devuelva el agente ya creado en Retell. Lo llaman `createBusinessAgent()`
- * y el backfill (`scripts/backfillTelnyxAssistants.ts`); para agentes que
- * ya tienen assistant usa `syncAgentToTelnyx`.
+ * devuelva el agente. Lo llaman `crearAssistantYPromocionar()` (registro y
+ * reconciliador) y el backfill (`scripts/backfillTelnyxAssistants.ts`), que
+ * no toca el enrutamiento; para agentes que ya tienen assistant usa
+ * `syncAgentToTelnyx`.
  */
 export async function createTelnyxAssistantForAgent(args: {
   agentId: string;
@@ -280,6 +281,113 @@ export async function createTelnyxAssistantForAgent(args: {
       message,
     });
     return { eligible: false, reason: message };
+  }
+}
+
+/** Qué pasó con el `orchestrator` del negocio al crear su assistant. */
+export type PromocionATelnyx =
+  /** Pasa ahora a Telnyx-primary. */
+  | "hecha"
+  /** Ya era Telnyx-primary. */
+  | "ya_estaba"
+  /** Tiene número conectado según el orquestador anterior: moverlo es el
+   * cutover (scripts/cutoverToTelnyx.ts), no un cambio de flag. */
+  | "falta_cutover";
+
+export interface AssistantNuevoDelNegocio {
+  eligible: boolean;
+  reason: string | null;
+  /** null si no hay assistant o no se pudo guardar el negocio. */
+  promocion: PromocionATelnyx | null;
+}
+
+/**
+ * Crea el assistant Telnyx de un agente y lo apunta en el negocio: su
+ * elegibilidad y la auto-promoción a Telnyx-primary (decisión del usuario,
+ * 2026-09-13). Solo se promociona cuando el assistant existe de verdad
+ * (`eligible`) y el negocio aún no tiene número: `provisionPhoneNumber`
+ * (phone/service.ts) conecta el número al Call Control App o al SIP de
+ * Retell según `orchestrator` en el momento de comprarlo, así que basta el
+ * flag; con un número ya conectado, el flag y su connection_id quedarían
+ * desalineados.
+ *
+ * Nunca lanza, y lo que no sale se loguea con negocio, agente y motivo: un
+ * negocio sin assistant no tiene quien conteste en Telnyx, el orquestador
+ * de todas las llamadas. Lo llaman `createBusinessAgent()` y el
+ * reconciliador diario (jobs/telnyxReconciler.ts).
+ */
+export async function crearAssistantYPromocionar(args: {
+  agentId: string;
+  businessId: string;
+  prismaClient?: typeof prisma;
+}): Promise<AssistantNuevoDelNegocio> {
+  const client = args.prismaClient ?? prisma;
+  const { eligible, reason } = await createTelnyxAssistantForAgent(args);
+
+  if (!eligible) {
+    console.error("[Agent] El negocio se queda sin assistant Telnyx:", {
+      businessId: args.businessId,
+      agentId: args.agentId,
+      motivo: reason,
+    });
+  }
+
+  try {
+    const negocio = eligible
+      ? await client.business.findUnique({
+          where: { id: args.businessId },
+          select: {
+            orchestrator: true,
+            telnyxPhoneNumber: true,
+            telnyxPhoneNumberId: true,
+            telnyxPendingPhoneNumber: true,
+            telnyxNumberOrderId: true,
+          },
+        })
+      : null;
+    const promocion: PromocionATelnyx | null = !negocio
+      ? null
+      : negocio.orchestrator === "telnyx"
+        ? "ya_estaba"
+        : negocio.telnyxPhoneNumber ||
+            negocio.telnyxPhoneNumberId ||
+            negocio.telnyxPendingPhoneNumber ||
+            negocio.telnyxNumberOrderId
+          ? "falta_cutover"
+          : "hecha";
+
+    await client.business.update({
+      where: { id: args.businessId },
+      data: {
+        telnyxEligibilityStatus: eligible ? "eligible" : "ineligible",
+        telnyxEligibilityReason: reason,
+        ...(promocion === "hecha"
+          ? {
+              orchestrator: "telnyx",
+              voiceRoutingTarget: "telnyx",
+              voiceRoutingChangedAt: new Date(),
+            }
+          : {}),
+      },
+    });
+
+    if (promocion === "falta_cutover") {
+      console.error(
+        "[Agent] Assistant Telnyx creado, pero el negocio ya tiene número: falta el cutover (scripts/cutoverToTelnyx.ts)",
+        { businessId: args.businessId, agentId: args.agentId }
+      );
+    }
+    return { eligible, reason, promocion };
+  } catch (error) {
+    console.error(
+      "[Agent] No se pudo guardar la elegibilidad Telnyx del negocio:",
+      {
+        businessId: args.businessId,
+        agentId: args.agentId,
+        message: error instanceof Error ? error.message : String(error),
+      }
+    );
+    return { eligible, reason, promocion: null };
   }
 }
 

@@ -1,11 +1,16 @@
 import { prisma } from "../lib/prisma.js";
 import { telnyxAiAdapter } from "../adapters/telnyx/TelnyxAiAdapter.js";
-import { syncAgentToTelnyx } from "../lib/telnyxAgentSync.js";
+import {
+  crearAssistantYPromocionar,
+  syncAgentToTelnyx,
+} from "../lib/telnyxAgentSync.js";
 import { sendZohoMail } from "../lib/zohoMail.js";
 import { errorMessage } from "../lib/logUtils.js";
 import { buildTelnyxAssistantName } from "../lib/telnyxAssistantPayload.js";
 import { refrescarPlantillasConClave } from "../modules/whatsapp/service.js";
 import { sincronizarGestor } from "../lib/gestorSync.js";
+import { isVoiceTelnyxRolloutEnabled } from "../lib/voiceRollout.js";
+import { acquireLock, releaseLock } from "../lib/bookingLock.js";
 
 /**
  * Reconciliador diario Telnyx (docs/historico/PLAN-TELNYX-ORQUESTADOR.md Fase 6:
@@ -28,6 +33,8 @@ import { sincronizarGestor } from "../lib/gestorSync.js";
  *   3. El estado de enrutamiento (`orchestrator`/`voiceRoutingTarget`/
  *      `telnyxPhoneNumberId`) de cada negocio en Telnyx es internamente
  *      consistente.
+ * Y antes de todo eso repara lo que ninguna de las tres ve: un negocio sin
+ * ningún agente activo con assistant (ver crearAssistantsQueFaltan).
  */
 export interface TelnyxReconcilerResult {
   agentsChecked: number;
@@ -36,10 +43,31 @@ export interface TelnyxReconcilerResult {
   assistantsWithUnexpectedName: string[];
   businessesWithSyncError: string[];
   businessesWithRoutingInconsistency: string[];
+  /** Assistants creados porque el negocio no tenía ninguno, con lo que pasó
+   * con su enrutamiento. */
+  assistantsCreados: string[];
+  /** Negocios que siguen sin assistant tras intentarlo, con el motivo. */
+  assistantsSinCrear: string[];
 }
 
 /** Tope de agentes por pasada del reconciliador. */
 const MAX_AGENTES_POR_PASADA = 200;
+
+/** Tope de assistants nuevos por pasada: cada uno es una creación en Telnyx
+ * (varios segundos). Los que no entren se crean en la siguiente. */
+const MAX_ASSISTANTS_NUEVOS_POR_PASADA = 20;
+
+/** Un agente más reciente que esto puede estar a medio crear:
+ * `createBusinessAgent` lo guarda en la BD antes de crear Retell y Telnyx, y
+ * si el reconciliador (el deploy también lo lanza) creara el assistant a la
+ * vez, el negocio acabaría con dos. */
+const MARGEN_DE_CREACION_MS = 15 * 60 * 1000;
+
+/** Cerrojo por negocio contra dos pasadas solapadas (p. ej. un reintento de
+ * Cloud Scheduler mientras la primera sigue viva). Holgado: con el timeout y
+ * los reintentos del SDK, una creación lenta pasa de 2 min, y un cerrojo
+ * caducado a mitad dejaría a la otra pasada crear un segundo assistant. */
+const CERROJO_DE_CREACION_MS = 5 * 60 * 1000;
 
 export async function telnyxReconcilerJob(): Promise<TelnyxReconcilerResult> {
   const result: TelnyxReconcilerResult = {
@@ -49,6 +77,8 @@ export async function telnyxReconcilerJob(): Promise<TelnyxReconcilerResult> {
     assistantsWithUnexpectedName: [],
     businessesWithSyncError: [],
     businessesWithRoutingInconsistency: [],
+    assistantsCreados: [],
+    assistantsSinCrear: [],
   };
 
   // Barrido diario de plantillas de WhatsApp (PR 4): pone al día el estado
@@ -75,6 +105,17 @@ export async function telnyxReconcilerJob(): Promise<TelnyxReconcilerResult> {
   } catch (error) {
     console.error(
       `[TelnyxReconciler] sincronizarGestor inesperado: ${errorMessage(error)}`
+    );
+  }
+
+  // Antes de la revisión de abajo, para que los assistants recién creados
+  // entren ya en ella (getAssistant confirma que existen). Nunca aborta la
+  // reconciliación.
+  try {
+    await crearAssistantsQueFaltan(result);
+  } catch (error) {
+    console.error(
+      `[TelnyxReconciler] crearAssistantsQueFaltan inesperado: ${errorMessage(error)}`
     );
   }
 
@@ -197,8 +238,111 @@ export async function telnyxReconcilerJob(): Promise<TelnyxReconcilerResult> {
   return result;
 }
 
+/**
+ * Un negocio sin ningún agente activo con assistant no tiene quien conteste
+ * en Telnyx, el orquestador de todas las llamadas, y el resto del
+ * reconciliador no lo ve: solo revisa agentes que ya tienen uno. Pasa cuando
+ * `createBusinessAgent` no pudo crearlo (Telnyx caído, sin voz compatible
+ * ese día) o, hasta octubre de 2026, cuando Retell fallaba antes. Se crea el
+ * del primer agente activo —el mismo que elige selectTelnyxInboundAgent
+ * (phone/telnyxInbound.ts) para atender— y, si el negocio aún no tiene
+ * número, se promociona a Telnyx-primary como en el registro
+ * (crearAssistantYPromocionar). Hace el trabajo de
+ * scripts/backfillTelnyxAssistants.ts sin esperar a nadie.
+ */
+async function crearAssistantsQueFaltan(
+  result: TelnyxReconcilerResult
+): Promise<void> {
+  if (!isVoiceTelnyxRolloutEnabled()) return;
+
+  const agenteActivo = { active: true, deletedAt: null };
+  const negocios = await prisma.business.findMany({
+    where: {
+      agents: {
+        some: {
+          ...agenteActivo,
+          createdAt: { lt: new Date(Date.now() - MARGEN_DE_CREACION_MS) },
+        },
+        none: { ...agenteActivo, telnyxAssistantId: { not: null } },
+      },
+    },
+    select: {
+      id: true,
+      agents: {
+        where: agenteActivo,
+        orderBy: { createdAt: "asc" },
+        take: 1,
+        select: { id: true },
+      },
+    },
+    orderBy: { createdAt: "asc" },
+    take: MAX_ASSISTANTS_NUEVOS_POR_PASADA,
+  });
+
+  for (const negocio of negocios) {
+    const agente = negocio.agents[0];
+    if (!agente) continue;
+    const etiqueta = `${negocio.id}/${agente.id}`;
+
+    const claveDelCerrojo = `telnyx_assistant_nuevo:${negocio.id}`;
+    const token = await acquireLock(claveDelCerrojo, CERROJO_DE_CREACION_MS, 0);
+    if (!token) {
+      console.warn(
+        `[TelnyxReconciler] ${etiqueta}: otra pasada está creando su assistant, se deja para ella`
+      );
+      continue;
+    }
+
+    try {
+      // Releído dentro del cerrojo: otra pasada pudo crearlo entre la
+      // consulta de arriba y ahora.
+      const actual = await prisma.agent.findUnique({
+        where: { id: agente.id },
+        select: { telnyxAssistantId: true },
+      });
+      if (actual?.telnyxAssistantId) continue;
+
+      console.warn(
+        `[TelnyxReconciler] ${etiqueta}: el negocio no tiene assistant Telnyx, se crea`
+      );
+      const creado = await crearAssistantYPromocionar({
+        agentId: agente.id,
+        businessId: negocio.id,
+      });
+      if (!creado.eligible) {
+        // crearAssistantYPromocionar ya lo ha logueado con el motivo.
+        result.assistantsSinCrear.push(
+          `${etiqueta}: ${creado.reason ?? "motivo desconocido"}`
+        );
+        continue;
+      }
+      result.assistantsCreados.push(
+        `${etiqueta}: ${DESCRIPCION_DE_LA_PROMOCION[creado.promocion ?? "sin_guardar"]}`
+      );
+    } catch (error) {
+      console.error(
+        `[TelnyxReconciler] ${etiqueta}: no se pudo crear el assistant: ${errorMessage(error)}`
+      );
+      result.assistantsSinCrear.push(`${etiqueta}: ${errorMessage(error)}`);
+    } finally {
+      await releaseLock(claveDelCerrojo, token);
+    }
+  }
+}
+
+const DESCRIPCION_DE_LA_PROMOCION = {
+  hecha: "creado y promocionado a Telnyx-primary",
+  ya_estaba: "creado (ya era Telnyx-primary)",
+  falta_cutover:
+    "creado, pero ya tiene número: falta el cutover (scripts/cutoverToTelnyx.ts)",
+  sin_guardar:
+    "creado, pero no se pudo guardar la elegibilidad ni la promoción del negocio",
+} as const;
+
 function hasFindings(result: TelnyxReconcilerResult): boolean {
   return (
+    result.assistantsCreados.length > 0 ||
+    result.assistantsSinCrear.length > 0 ||
     result.assistantsMissingOnTelnyx.length > 0 ||
     result.assistantsWithUnexpectedName.length > 0 ||
     result.businessesWithSyncError.length > 0 ||
@@ -232,6 +376,8 @@ async function maybeSendAlert(result: TelnyxReconcilerResult): Promise<void> {
   }
 
   const rows = [
+    section("Assistants creados porque faltaban", result.assistantsCreados),
+    section("Negocios que siguen sin assistant", result.assistantsSinCrear),
     section("Assistants inexistentes en Telnyx", result.assistantsMissingOnTelnyx),
     section("Assistants con nombre inesperado", result.assistantsWithUnexpectedName),
     section("Negocios con error de sincronización", result.businessesWithSyncError),

@@ -5,6 +5,11 @@
  * tenga uno, SIN cambiar orchestrator/voiceRoutingTarget ni el connection_id
  * del número — eso es el cutover de la Fase 5, un paso aparte y deliberado.
  *
+ * Desde el 2026-10-12 el reconciliador diario (jobs/telnyxReconciler.ts) crea
+ * solo el assistant de los negocios que no tienen ninguno, y además los
+ * promociona a Telnyx-primary si aún no tienen número; este script queda
+ * para forzarlo a mano sin tocar el enrutamiento.
+ *
  * Uso:
  *   npx tsx scripts/backfillTelnyxAssistants.ts --business <id> [--business <id> ...]
  *   npx tsx scripts/backfillTelnyxAssistants.ts --dry-run --business <id>

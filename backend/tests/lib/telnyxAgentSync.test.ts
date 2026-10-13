@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
+  crearAssistantYPromocionar,
   createTelnyxAssistantForAgent,
   promptManualConSuRegla,
   syncAgentToTelnyx,
@@ -11,7 +12,7 @@ import { listaDeEsperaDisponible } from "../../src/modules/whatsapp/service.js";
 
 vi.mock("../../src/lib/prisma.js", () => ({
   prisma: {
-    business: { findUnique: vi.fn() },
+    business: { findUnique: vi.fn(), update: vi.fn() },
     service: { findMany: vi.fn() },
     professional: { findMany: vi.fn() },
     agent: { findMany: vi.fn(), findUnique: vi.fn(), update: vi.fn() },
@@ -33,6 +34,7 @@ vi.mock("../../src/modules/whatsapp/service.js", () => ({
 }));
 
 const mockedBusinessFindUnique = vi.mocked(prisma.business.findUnique);
+const mockedBusinessUpdate = vi.mocked(prisma.business.update);
 const mockedServiceFindMany = vi.mocked(prisma.service.findMany);
 const mockedProfessionalFindMany = vi.mocked(prisma.professional.findMany);
 const mockedAgentFindMany = vi.mocked(prisma.agent.findMany);
@@ -472,6 +474,166 @@ describe("createTelnyxAssistantForAgent", () => {
       reason: "Agente no encontrado.",
     });
     expect(mockedCreateAssistant).not.toHaveBeenCalled();
+  });
+});
+
+describe("crearAssistantYPromocionar", () => {
+  const SIN_NUMERO = {
+    orchestrator: "retell",
+    telnyxPhoneNumber: null,
+    telnyxPhoneNumberId: null,
+    telnyxPendingPhoneNumber: null,
+    telnyxNumberOrderId: null,
+  };
+
+  beforeEach(() => {
+    mockedCreateAssistant.mockResolvedValue({
+      id: "assistant_1",
+      name: "alhabla-biz1-agent1",
+      instructions: "i",
+    });
+    mockedBusinessUpdate.mockResolvedValue({} as any);
+  });
+
+  /** Primera lectura: la configuración del assistant; segunda: el
+   * orquestador y el número, para decidir la promoción. */
+  function negocioConEnrutamiento(enrutamiento: Record<string, unknown>) {
+    mockedBusinessFindUnique
+      .mockResolvedValueOnce(BASE_BUSINESS as any)
+      .mockResolvedValueOnce(enrutamiento as any);
+  }
+
+  it("crea el assistant y promociona a Telnyx-primary un negocio sin número", async () => {
+    negocioConEnrutamiento(SIN_NUMERO);
+
+    const result = await crearAssistantYPromocionar({
+      agentId: "agent1",
+      businessId: "biz1",
+    });
+
+    expect(result).toEqual({
+      eligible: true,
+      reason: null,
+      promocion: "hecha",
+    });
+    expect(mockedBusinessUpdate).toHaveBeenCalledWith({
+      where: { id: "biz1" },
+      data: {
+        telnyxEligibilityStatus: "eligible",
+        telnyxEligibilityReason: null,
+        orchestrator: "telnyx",
+        voiceRoutingTarget: "telnyx",
+        voiceRoutingChangedAt: expect.any(Date),
+      },
+    });
+  });
+
+  it("no vuelve a promocionar un negocio que ya es Telnyx-primary", async () => {
+    negocioConEnrutamiento({ ...SIN_NUMERO, orchestrator: "telnyx" });
+
+    const result = await crearAssistantYPromocionar({
+      agentId: "agent1",
+      businessId: "biz1",
+    });
+
+    expect(result.promocion).toBe("ya_estaba");
+    expect(mockedBusinessUpdate).toHaveBeenCalledWith({
+      where: { id: "biz1" },
+      data: {
+        telnyxEligibilityStatus: "eligible",
+        telnyxEligibilityReason: null,
+      },
+    });
+  });
+
+  // Con número ya conectado (al SIP de Retell, porque se compró con
+  // orchestrator=retell), cambiar solo el flag lo dejaría desalineado con el
+  // connection_id del número: eso es el cutover.
+  it.each([
+    ["telnyxPhoneNumber", "+34930000001"],
+    ["telnyxPhoneNumberId", "pn_1"],
+    ["telnyxPendingPhoneNumber", "+34930000001"],
+    ["telnyxNumberOrderId", "order_1"],
+  ])(
+    "con %s no cambia el orquestador y avisa de que falta el cutover",
+    async (campo, valor) => {
+      negocioConEnrutamiento({ ...SIN_NUMERO, [campo]: valor });
+      const errorSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => undefined);
+
+      const result = await crearAssistantYPromocionar({
+        agentId: "agent1",
+        businessId: "biz1",
+      });
+
+      expect(result.promocion).toBe("falta_cutover");
+      expect(mockedCreateAssistant).toHaveBeenCalledTimes(1);
+      expect(mockedBusinessUpdate).toHaveBeenCalledWith({
+        where: { id: "biz1" },
+        data: {
+          telnyxEligibilityStatus: "eligible",
+          telnyxEligibilityReason: null,
+        },
+      });
+      expect(errorSpy).toHaveBeenCalledWith(
+        expect.stringContaining("falta el cutover"),
+        { businessId: "biz1", agentId: "agent1" }
+      );
+      errorSpy.mockRestore();
+    }
+  );
+
+  it("si no hay assistant, guarda el motivo en el negocio y lo loguea con negocio, agente y motivo", async () => {
+    mockedBusinessFindUnique.mockResolvedValue(BASE_BUSINESS as any);
+    mockedListVoices.mockResolvedValue([]);
+    const errorSpy = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+
+    const result = await crearAssistantYPromocionar({
+      agentId: "agent1",
+      businessId: "biz1",
+    });
+
+    expect(result.eligible).toBe(false);
+    expect(result.promocion).toBeNull();
+    expect(mockedBusinessUpdate).toHaveBeenCalledWith({
+      where: { id: "biz1" },
+      data: {
+        telnyxEligibilityStatus: "ineligible",
+        telnyxEligibilityReason: expect.stringMatching(/Sin voz Telnyx/),
+      },
+    });
+    expect(errorSpy).toHaveBeenCalledWith(
+      "[Agent] El negocio se queda sin assistant Telnyx:",
+      {
+        businessId: "biz1",
+        agentId: "agent1",
+        motivo: expect.stringMatching(/Sin voz Telnyx/),
+      }
+    );
+    errorSpy.mockRestore();
+  });
+
+  it("no lanza si falla la escritura del negocio: el assistant ya existe y queda en el log", async () => {
+    negocioConEnrutamiento(SIN_NUMERO);
+    mockedBusinessUpdate.mockRejectedValue(new Error("Postgres caído"));
+    const errorSpy = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+
+    const result = await crearAssistantYPromocionar({
+      agentId: "agent1",
+      businessId: "biz1",
+    });
+
+    expect(result).toEqual({ eligible: true, reason: null, promocion: null });
+    expect(errorSpy).toHaveBeenCalledWith(
+      "[Agent] No se pudo guardar la elegibilidad Telnyx del negocio:",
+      { businessId: "biz1", agentId: "agent1", message: "Postgres caído" }
+    );
+    errorSpy.mockRestore();
   });
 });
 

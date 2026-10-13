@@ -787,6 +787,93 @@ describe("createBusinessAgent — creación dual Telnyx (Fase 2 del plan Telnyx-
     });
   });
 
+  // Regresión: la creación del assistant iba dentro del try de Retell, y si
+  // Retell lanzaba (sin crédito, su API caída) el negocio nuevo se quedaba
+  // sin assistant de Telnyx —el orquestador que atiende todas las llamadas—
+  // y sin promocionar.
+  it.each([
+    ["createLlm", () => mockedCreateLlm],
+    ["createAgent", () => mockedCreateAgent],
+  ])(
+    "crea el assistant Telnyx y promociona el negocio aunque Retell lance en %s",
+    async (_paso, mockDelPaso) => {
+      process.env.VOICE_TELNYX_ROLLOUT = "all";
+      mockDelPaso().mockRejectedValue(new Error("Retell sin crédito"));
+      const errorSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => undefined);
+
+      const result = await createBusinessAgent({
+        businessId: "biz_new",
+        name: "Nuevo negocio",
+      });
+
+      expect(result).toEqual(expect.objectContaining({ id: "agent_db_1" }));
+      expect(mockedAgentUpdate).not.toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ retellAgentId: expect.anything() }),
+        })
+      );
+      expect(mockedTelnyxCreateAssistant).toHaveBeenCalledTimes(1);
+      expect(mockedAgentUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: "agent_db_1" },
+          data: expect.objectContaining({
+            telnyxAssistantId: "telnyx_assistant_1",
+          }),
+        })
+      );
+      expect(mockedBusinessUpdate).toHaveBeenCalledWith({
+        where: { id: "biz_new" },
+        data: {
+          telnyxEligibilityStatus: "eligible",
+          telnyxEligibilityReason: null,
+          orchestrator: "telnyx",
+          voiceRoutingTarget: "telnyx",
+          voiceRoutingChangedAt: expect.any(Date),
+        },
+      });
+      // El fallo de Retell queda en el log con negocio, agente y motivo.
+      expect(errorSpy).toHaveBeenCalledWith(
+        "[Agent] No se pudo sincronizar el agente con Retell:",
+        expect.objectContaining({
+          agentId: "agent_db_1",
+          businessId: "biz_new",
+          message: "Retell sin crédito",
+        })
+      );
+      errorSpy.mockRestore();
+    }
+  );
+
+  it("si fallan Retell y Telnyx, devuelve el agente y deja el motivo en el negocio y en el log", async () => {
+    process.env.VOICE_TELNYX_ROLLOUT = "all";
+    mockedCreateLlm.mockRejectedValue(new Error("Retell sin crédito"));
+    mockedTelnyxCreateAssistant.mockRejectedValue(new Error("Telnyx down"));
+    const errorSpy = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+
+    const result = await createBusinessAgent({
+      businessId: "biz_new",
+      name: "Nuevo negocio",
+    });
+
+    expect(result).toEqual(expect.objectContaining({ id: "agent_db_1" }));
+    expect(mockedBusinessUpdate).toHaveBeenCalledWith({
+      where: { id: "biz_new" },
+      data: {
+        telnyxEligibilityStatus: "ineligible",
+        telnyxEligibilityReason: "Telnyx down",
+      },
+    });
+    expect(errorSpy).toHaveBeenCalledWith(
+      "[Agent] El negocio se queda sin assistant Telnyx:",
+      { businessId: "biz_new", agentId: "agent_db_1", motivo: "Telnyx down" }
+    );
+    errorSpy.mockRestore();
+  });
+
   it("marca el negocio como no elegible (sin llamar a Telnyx) si no hay voz compatible", async () => {
     process.env.VOICE_TELNYX_ROLLOUT = "all";
     mockedTelnyxListVoices.mockResolvedValue([]);
