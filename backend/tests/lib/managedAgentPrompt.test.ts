@@ -810,6 +810,12 @@ describe("buildManagedAgentPrompt — profesionales y especialidades", () => {
   it("deja decir en positivo con quién queda la cita cuando es especialista", () => {
     expect(prompt).toContain("assignedProfessional");
     expect(prompt).toContain("isSpecialist");
+    // Sin ejemplo literal que copiar: dijo «especialista en color» de un
+    // corte de pelo.
+    expect(prompt).toContain(
+      "especialista en el servicio que ha pedido, nombrándolo como en el catálogo"
+    );
+    expect(prompt).not.toContain("especialista en color");
   });
 });
 

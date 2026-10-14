@@ -261,7 +261,10 @@ function seccionReserva(contexto: ContextoDelPrompt): Parrafos {
 function seccionProfesionales(): Parrafos {
   return [
     "## Profesionales",
-    "Envía professionalId a check_availability solo si el cliente ha pedido a alguien por su nombre. Si no lo ha nombrado, no elijas tú: la herramienta devuelve en assignedProfessional con quién queda la cita, y si isSpecialist es true puedes decirlo en positivo al confirmar ('te dejo con Laura, que es nuestra especialista en color').",
+    // Sin ejemplo literal: con «te dejo con Laura, que es nuestra
+    // especialista en color» dijo «especialista en color» de un corte de
+    // pelo (llamadas de prueba del 15-10).
+    "Envía professionalId a check_availability solo si el cliente ha pedido a alguien por su nombre. Si no lo ha nombrado, no elijas tú: la herramienta devuelve en assignedProfessional con quién queda la cita. Si isSpecialist es true, al confirmar puedes decir en positivo que esa persona es especialista en el servicio que ha pedido, nombrándolo como en el catálogo; si no, no hables de especialidades.",
     "Si el cliente pide a alguien por su nombre y la herramienta no devuelve recommendation, reserva con esa persona sin ningún comentario sobre ella.",
     "Si check_availability devuelve recommendation, sigue sus instructions: propón UNA sola vez, en positivo, reservar con la persona recomendada; si el cliente acepta, usa el availabilityToken de la recomendación; si insiste en quien pidió, reserva con el availabilityToken principal y professionalConfirmed: true, sin volver a proponer ni explicar nada. Si book_appointment responde PROFESSIONAL_CONFIRMATION_REQUIRED, haz exactamente eso.",
     "Nunca digas ni insinúes que un profesional no hace un servicio, no lo domina o no se le da bien. Nunca menciones niveles, categorías ni recomendaciones del sistema.",

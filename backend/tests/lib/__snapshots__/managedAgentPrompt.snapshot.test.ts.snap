@@ -75,7 +75,7 @@ Antes de reservar, resume servicio, día, hora y nombre y pide confirmación exp
 
 ## Profesionales
 
-Envía professionalId a check_availability solo si el cliente ha pedido a alguien por su nombre. Si no lo ha nombrado, no elijas tú: la herramienta devuelve en assignedProfessional con quién queda la cita, y si isSpecialist es true puedes decirlo en positivo al confirmar ('te dejo con Laura, que es nuestra especialista en color').
+Envía professionalId a check_availability solo si el cliente ha pedido a alguien por su nombre. Si no lo ha nombrado, no elijas tú: la herramienta devuelve en assignedProfessional con quién queda la cita. Si isSpecialist es true, al confirmar puedes decir en positivo que esa persona es especialista en el servicio que ha pedido, nombrándolo como en el catálogo; si no, no hables de especialidades.
 
 Si el cliente pide a alguien por su nombre y la herramienta no devuelve recommendation, reserva con esa persona sin ningún comentario sobre ella.
 
@@ -222,7 +222,7 @@ Antes de reservar, resume servicio, día, hora y nombre y pide confirmación exp
 
 ## Profesionales
 
-Envía professionalId a check_availability solo si el cliente ha pedido a alguien por su nombre. Si no lo ha nombrado, no elijas tú: la herramienta devuelve en assignedProfessional con quién queda la cita, y si isSpecialist es true puedes decirlo en positivo al confirmar ('te dejo con Laura, que es nuestra especialista en color').
+Envía professionalId a check_availability solo si el cliente ha pedido a alguien por su nombre. Si no lo ha nombrado, no elijas tú: la herramienta devuelve en assignedProfessional con quién queda la cita. Si isSpecialist es true, al confirmar puedes decir en positivo que esa persona es especialista en el servicio que ha pedido, nombrándolo como en el catálogo; si no, no hables de especialidades.
 
 Si el cliente pide a alguien por su nombre y la herramienta no devuelve recommendation, reserva con esa persona sin ningún comentario sobre ella.
 
@@ -360,7 +360,7 @@ Antes de reservar, resume servicio, día, hora y nombre y pide confirmación exp
 
 ## Profesionales
 
-Envía professionalId a check_availability solo si el cliente ha pedido a alguien por su nombre. Si no lo ha nombrado, no elijas tú: la herramienta devuelve en assignedProfessional con quién queda la cita, y si isSpecialist es true puedes decirlo en positivo al confirmar ('te dejo con Laura, que es nuestra especialista en color').
+Envía professionalId a check_availability solo si el cliente ha pedido a alguien por su nombre. Si no lo ha nombrado, no elijas tú: la herramienta devuelve en assignedProfessional con quién queda la cita. Si isSpecialist es true, al confirmar puedes decir en positivo que esa persona es especialista en el servicio que ha pedido, nombrándolo como en el catálogo; si no, no hables de especialidades.
 
 Si el cliente pide a alguien por su nombre y la herramienta no devuelve recommendation, reserva con esa persona sin ningún comentario sobre ella.
 
@@ -498,7 +498,7 @@ Antes de reservar, resume servicio, día, hora y nombre y pide confirmación exp
 
 ## Profesionales
 
-Envía professionalId a check_availability solo si el cliente ha pedido a alguien por su nombre. Si no lo ha nombrado, no elijas tú: la herramienta devuelve en assignedProfessional con quién queda la cita, y si isSpecialist es true puedes decirlo en positivo al confirmar ('te dejo con Laura, que es nuestra especialista en color').
+Envía professionalId a check_availability solo si el cliente ha pedido a alguien por su nombre. Si no lo ha nombrado, no elijas tú: la herramienta devuelve en assignedProfessional con quién queda la cita. Si isSpecialist es true, al confirmar puedes decir en positivo que esa persona es especialista en el servicio que ha pedido, nombrándolo como en el catálogo; si no, no hables de especialidades.
 
 Si el cliente pide a alguien por su nombre y la herramienta no devuelve recommendation, reserva con esa persona sin ningún comentario sobre ella.
 
@@ -638,7 +638,7 @@ Antes de reservar, resume servicio, día, hora y nombre y pide confirmación exp
 
 ## Profesionales
 
-Envía professionalId a check_availability solo si el cliente ha pedido a alguien por su nombre. Si no lo ha nombrado, no elijas tú: la herramienta devuelve en assignedProfessional con quién queda la cita, y si isSpecialist es true puedes decirlo en positivo al confirmar ('te dejo con Laura, que es nuestra especialista en color').
+Envía professionalId a check_availability solo si el cliente ha pedido a alguien por su nombre. Si no lo ha nombrado, no elijas tú: la herramienta devuelve en assignedProfessional con quién queda la cita. Si isSpecialist es true, al confirmar puedes decir en positivo que esa persona es especialista en el servicio que ha pedido, nombrándolo como en el catálogo; si no, no hables de especialidades.
 
 Si el cliente pide a alguien por su nombre y la herramienta no devuelve recommendation, reserva con esa persona sin ningún comentario sobre ella.
 
@@ -784,7 +784,7 @@ Antes de reservar, resume servicio, día, hora y nombre y pide confirmación exp
 
 ## Profesionales
 
-Envía professionalId a check_availability solo si el cliente ha pedido a alguien por su nombre. Si no lo ha nombrado, no elijas tú: la herramienta devuelve en assignedProfessional con quién queda la cita, y si isSpecialist es true puedes decirlo en positivo al confirmar ('te dejo con Laura, que es nuestra especialista en color').
+Envía professionalId a check_availability solo si el cliente ha pedido a alguien por su nombre. Si no lo ha nombrado, no elijas tú: la herramienta devuelve en assignedProfessional con quién queda la cita. Si isSpecialist es true, al confirmar puedes decir en positivo que esa persona es especialista en el servicio que ha pedido, nombrándolo como en el catálogo; si no, no hables de especialidades.
 
 Si el cliente pide a alguien por su nombre y la herramienta no devuelve recommendation, reserva con esa persona sin ningún comentario sobre ella.
 
@@ -922,7 +922,7 @@ Antes de reservar, resume servicio, día, hora y nombre y pide confirmación exp
 
 ## Profesionales
 
-Envía professionalId a check_availability solo si el cliente ha pedido a alguien por su nombre. Si no lo ha nombrado, no elijas tú: la herramienta devuelve en assignedProfessional con quién queda la cita, y si isSpecialist es true puedes decirlo en positivo al confirmar ('te dejo con Laura, que es nuestra especialista en color').
+Envía professionalId a check_availability solo si el cliente ha pedido a alguien por su nombre. Si no lo ha nombrado, no elijas tú: la herramienta devuelve en assignedProfessional con quién queda la cita. Si isSpecialist es true, al confirmar puedes decir en positivo que esa persona es especialista en el servicio que ha pedido, nombrándolo como en el catálogo; si no, no hables de especialidades.
 
 Si el cliente pide a alguien por su nombre y la herramienta no devuelve recommendation, reserva con esa persona sin ningún comentario sobre ella.
 
