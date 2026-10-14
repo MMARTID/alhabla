@@ -657,6 +657,32 @@ describe("PATCH /business/me (móvil del dueño para WhatsApp)", () => {
     );
   });
 
+  // La cooficial que habla sale del código postal (lib/idiomas/zona.ts):
+  // una dirección en otra zona cambia el assistant.
+  it("una dirección en otra zona de lengua cooficial resincroniza el prompt", async () => {
+    mockedBusinessFindUnique.mockResolvedValue({
+      name: "Peluquería Ana",
+      address: "Calle Mayor 1, 28013 Madrid, Spain",
+      businessDetails: "Peluquería Ana",
+      agentSettings: null,
+    } as any);
+
+    const mismaZona = await patch({
+      address: "Calle de Alcalá 20, 28014 Madrid, Spain",
+    });
+    expect(mismaZona.statusCode).toBe(200);
+    expect(mockedSyncTelnyx).not.toHaveBeenCalled();
+
+    const otraZona = await patch({
+      address: "Av. Rei en Jaume, 231, 08440 Cardedeu, Barcelona, Spain",
+    });
+    expect(otraZona.statusCode).toBe(200);
+    expect(mockedSyncTelnyx).toHaveBeenCalledWith("biz_1");
+    const updateData = mockedBusinessUpdate.mock.calls.at(-1)![0]
+      .data as Record<string, unknown>;
+    expect(updateData.systemPrompt).toContain("catalán");
+  });
+
   it("si solo cambia el nombre no se toca el móvil", async () => {
     const response = await patch({ name: "Peluquería Nueva" });
     expect(response.statusCode).toBe(200);

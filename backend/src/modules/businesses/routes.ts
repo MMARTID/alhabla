@@ -24,6 +24,7 @@ import {
   catalogoConCamposDelPanelAnterior,
   vistaPreviaDeIdiomas,
 } from "../../lib/idiomas/panel.js";
+import { cooficialDeLaZona } from "../../lib/idiomas/zona.js";
 import {
   funcionQueExige,
   resolverIdiomas,
@@ -432,7 +433,7 @@ export async function businessesRoutes(fastify: FastifyInstance) {
         const data = VistaPreviaDeIdiomasSchema.parse(request.body);
         const business = await prisma.business.findUnique({
           where: { id: request.user!.businessId },
-          select: { name: true },
+          select: { name: true, address: true, businessDetails: true },
         });
         if (!business) {
           return reply.status(404).send({ error: "Negocio no encontrado" });
@@ -446,6 +447,7 @@ export async function businessesRoutes(fastify: FastifyInstance) {
                 : IDIOMA_OBLIGATORIO,
               voiceGender: data.voiceGender,
               voz: data.voz,
+              zona: cooficialDeLaZona(business),
             },
             business.name
           )
@@ -567,6 +569,23 @@ export async function businessesRoutes(fastify: FastifyInstance) {
           },
         });
 
+        // Una dirección nueva solo resincroniza si cambia la cooficial que
+        // habla (lib/idiomas/zona.ts); con businessDetails se resincroniza
+        // igualmente.
+        let cambiaLaZona = false;
+        if (data.address !== undefined && data.businessDetails === undefined) {
+          const actual = await prisma.business.findUnique({
+            where: { id: request.user!.businessId },
+            select: { address: true, businessDetails: true },
+          });
+          cambiaLaZona =
+            cooficialDeLaZona(actual ?? {}) !==
+            cooficialDeLaZona({
+              address: data.address,
+              businessDetails: actual?.businessDetails,
+            });
+        }
+
         const cambiaLaTransferencia =
           data.customerLineType !== undefined ||
           data.phone !== undefined ||
@@ -588,13 +607,15 @@ export async function businessesRoutes(fastify: FastifyInstance) {
           // La transferencia al dueño (fase 4) depende de la línea de
           // clientes y del móvil del dueño: cambiarlos registra o quita la
           // tool `transfer` y su bloque del prompt.
-          cambiaLaTransferencia;
+          cambiaLaTransferencia ||
+          cambiaLaZona;
 
         if (shouldResyncPrompt) {
           const currentBusiness = await prisma.business.findUnique({
             where: { id: request.user!.businessId },
             select: {
               name: true,
+              address: true,
               businessDetails: true,
               agentSettings: true,
               timezone: true,
@@ -607,10 +628,24 @@ export async function businessesRoutes(fastify: FastifyInstance) {
             },
           });
           const settings = data.agentSettings ?? currentBusiness?.agentSettings;
+          const businessDetails =
+            data.businessDetails ?? currentBusiness?.businessDetails;
           const agentPrompt = buildManagedAgentPrompt({
             businessName: data.name ?? currentBusiness?.name ?? "el negocio",
-            businessDetails: data.businessDetails ?? currentBusiness?.businessDetails,
+            businessDetails,
             settings,
+            // Con la cooficial de su zona, como el que sincroniza
+            // telnyxAgentSync.ts.
+            idiomas: resolverIdiomas({
+              ...parseAgentSettings(settings),
+              zona: cooficialDeLaZona({
+                address:
+                  data.address !== undefined
+                    ? data.address
+                    : currentBusiness?.address,
+                businessDetails,
+              }),
+            }).idiomas,
             timezone: data.timezone ?? currentBusiness?.timezone,
             listaDeEspera: await listaDeEsperaDisponible(),
             ocultarNumeroDelNegocio:

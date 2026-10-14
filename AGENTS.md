@@ -2581,6 +2581,30 @@ listas de idiomas ni decide por su cuenta:
       instrucción nueva, 13 de 13 primeras respuestas en el idioma del cliente y ningún saludo
       repetido: inglés, francés, alemán, italiano, portugués, castellano y catalán, con principal
       español y catalán.
+  - **La cooficial de la zona** (`zona.ts`, decisión del usuario del 15-10): un negocio que
+    saluda en una lengua Ultra y está donde una lengua es cooficial también la habla.
+    `cooficialDeLaZona` la saca de la provincia del código postal de `Business.address` y, si no
+    lo lleva, del de `businessDetails` (la bienvenida lo rellena con la dirección de Places).
+    Provincias: catalán 08, 17, 25, 43, 07, 03, 12 y 46 (toda la Comunitat Valenciana, también sus
+    comarcas castellanohablantes); euskera 01, 20 y 48 (Navarra no); gallego 15, 27, 32 y 36. Los
+    números de Telnyx se compran todos en Barcelona: su prefijo no sirve.
+    - Con zona (`AjustesDeIdioma.zona`), `resolverIdiomas` suma la cooficial a los idiomas (ocho,
+      también en el prompt), pasa la transcripción a Soniox con las pistas del español, el
+      principal y la cooficial, deja la voz Ultra del principal y da `cooficialDeLaZona`: Marta o
+      Sergio, del género de la voz que atiende.
+    - `telnyxAssistantPayload.ts` (`flujoDeLaCooficial`) le pone un `conversation_flow` de dos
+      nodos: «inicial» y el de la cooficial, que **solo cambia la voz** (Soniox en esa lengua).
+      Las aristas son `llm` (en voz, tools `transition__a_cooficial` y `transition__a_inicial`; en
+      el chat no hay y contesta directamente). Sin zona, `conversationFlow: null`, que borra un
+      flujo anterior al actualizar (al crear no se manda).
+    - Es la variante S del laboratorio con llamadas reales del 15-10: catalán perfecto y los
+      mensajes del cliente guardados, con un segundo más de espera en los turnos con consulta
+      (3,7–3,9 s frente a 2,2–2,6). Descartadas: flux con un nodo que cambia a Soniox (Telnyx deja
+      de guardar los mensajes del cliente y flux solo detectó el catalán una vez) y dos assistants
+      con traspaso (flux transcribió el catalán como italiano y nunca hubo traspaso).
+    - El panel lo dice en la vista previa, pero su `languages` va sin la cooficial: se guarda, y
+      una cooficial ahí pasaría a ser el principal. Cambiar la dirección resincroniza solo si
+      cambia la cooficial.
   - **Para Retell, el respaldo:** `ajustesParaRetell` deja el principal y el español, no los siete
     u ocho de Telnyx (sin los que Retell no tiene: con euskera de principal, solo español). Es lo
     que ya recibía antes del 05-10 y está validado contra su API: con principal español, el

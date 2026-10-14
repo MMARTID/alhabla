@@ -183,8 +183,110 @@ exports[`payloads de asistentes (instantáneas) > assistant de la recepcionista 
 }
 `;
 
+exports[`payloads de asistentes (instantáneas) > assistant de la recepcionista que saluda en español en Cataluña 1`] = `
+{
+  "conversationFlow": {
+    "edges": [
+      {
+        "condition": {
+          "prompt": "Quien llama habla catalán (aunque la transcripción llegue con errores) o pide hablar en catalán.",
+          "type": "llm",
+        },
+        "id": "a_cooficial",
+        "start_node_id": "inicial",
+        "target": {
+          "node_id": "cooficial",
+          "type": "node",
+        },
+      },
+      {
+        "condition": {
+          "prompt": "Quien llama habla inglés, francés, alemán, italiano, portugués o neerlandés.",
+          "type": "llm",
+        },
+        "id": "a_inicial",
+        "start_node_id": "cooficial",
+        "target": {
+          "node_id": "inicial",
+          "type": "node",
+        },
+      },
+    ],
+    "nodes": [
+      {
+        "id": "inicial",
+        "instructions": "## Idioma en este paso
+
+Si quien llama habla en catalán (aunque sea una sola frase o un saludo, mezclado con castellano, o aunque la transcripción llegue con errores, con palabras en catalán mal reconocidas) o pide que le atiendas en catalán, llama a la herramienta transition__a_cooficial en ese mismo turno, sin decir nada antes: la respuesta la darás en catalán justo después. No le digas que le pasas con nadie. Usa transition__a_cooficial solo para eso: nunca para consultar el catálogo, la disponibilidad, dejar un recado ni colgar, que tienen sus propias herramientas. Si no tienes esa herramienta (en el chat no está), no digas que no puedes cambiar de idioma: contéstale directamente en catalán. Contesta solo en el idioma en que te habla, sin repetir la respuesta en otro: si vienes del paso en catalán porque ha cambiado de idioma, contesta solo en el suyo.",
+        "instructions_mode": "append",
+        "name": "Inicial",
+        "shared_tool_ids": [],
+        "tools_mode": "append",
+        "type": "prompt",
+      },
+      {
+        "id": "cooficial",
+        "instructions": "## Idioma en este paso
+
+Desde ahora habla en catalán con naturalidad; no repitas el saludo ni el aviso de IA ya dados, pero si es tu primera frase en catalán di brevemente, en catalán, que eres una inteligencia artificial. Si quien llama vuelve a hablarte en castellano, contéstale en castellano. Si habla en inglés, francés, alemán, italiano, portugués o neerlandés, llama a la herramienta transition__a_inicial en ese mismo turno, sin decir nada antes, y contéstale después solo en su idioma. Usa transition__a_inicial solo para eso.",
+        "instructions_mode": "append",
+        "name": "En catalán",
+        "shared_tool_ids": [],
+        "tools_mode": "append",
+        "type": "prompt",
+        "voice_settings": {
+          "background_audio": {
+            "type": "predefined_media",
+            "value": "office",
+            "volume": 0.2,
+          },
+          "expressive_mode": false,
+          "language": "ca",
+          "voice": "Soniox.tts-rt-v2.Marta",
+        },
+      },
+    ],
+    "start_node_id": "inicial",
+  },
+  "greeting": "Peluquería Ana, te atiende su asistente de inteligencia artificial. ¿En qué te ayudo?",
+  "interruptionSettings": {
+    "start_speaking_plan": {
+      "transcription_endpointing_plan": {
+        "on_no_punctuation_seconds": 0.5,
+        "on_number_seconds": 0.5,
+        "on_punctuation_seconds": 0.1,
+      },
+      "wait_seconds": 0.1,
+    },
+  },
+  "transcription": {
+    "language": "auto",
+    "model": "soniox/stt-rt-v5",
+    "settings": {
+      "context": "Corte,Laura",
+      "enable_endpoint_detection": true,
+      "language_hints": [
+        "es",
+        "ca",
+      ],
+      "max_endpoint_delay_ms": 500,
+    },
+  },
+  "voiceSettings": {
+    "background_audio": {
+      "type": "predefined_media",
+      "value": "office",
+      "volume": 0.2,
+    },
+    "expressive_mode": true,
+    "voice": "Telnyx.Ultra.538a8872-3799-4df5-b373-b78493b766c6",
+  },
+}
+`;
+
 exports[`payloads de asistentes (instantáneas) > assistant de la recepcionista, completo con transferencia y palabras clave 1`] = `
 {
+  "conversationFlow": null,
   "dynamicVariables": {
     "nombre_cliente": "",
     "ultimo_servicio": "",
@@ -604,6 +706,7 @@ exports[`payloads de asistentes (instantáneas) > assistant de la recepcionista,
 
 exports[`payloads de asistentes (instantáneas) > assistant de la recepcionista, mínimo (sin tools, voz Natural) 1`] = `
 {
+  "conversationFlow": null,
   "dynamicVariables": {
     "nombre_cliente": "",
     "ultimo_servicio": "",
@@ -981,7 +1084,7 @@ Si te escriben en catalán, gallego, euskera o inglés, responde en ese idioma; 
 exports[`payloads de asistentes (instantáneas) > el JSON enviado es idéntico byte a byte (hash) 1`] = `
 {
   "gestor": "d42493dfb458dbe1ef8fa7fab6dbf284ec727a79d37293a97bff584963af6abf",
-  "recepcionista": "6b588e4a7aae4fa44c8c559d40e4baf56d2729a013b20f8414ed02024f2ddac8",
+  "recepcionista": "658d26f292f3794709448c28ba8b21b4bdffb008952d65b9673456242f0d3ae1",
 }
 `;
 

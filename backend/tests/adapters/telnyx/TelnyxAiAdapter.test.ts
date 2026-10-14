@@ -164,9 +164,58 @@ describe("TelnyxAiAdapter", () => {
         start_speaking_plan: { wait_seconds: 0.1 },
       });
     });
+    // La cooficial de la zona (telnyxAssistantPayload.ts): al crear, sin
+    // flujo no hay nada que mandar.
+    it("manda conversation_flow solo si hay flujo", async () => {
+      mockAssistantsCreate.mockResolvedValue({
+        id: "assistant_123",
+        name: "n",
+        instructions: "i",
+      });
+      const flujo = {
+        start_node_id: "inicial",
+        nodes: [{ id: "inicial", instructions: "x" }],
+      };
+
+      await adapter.createAssistant({
+        name: "n",
+        instructions: "i",
+        conversationFlow: flujo,
+      });
+      await adapter.createAssistant({
+        name: "n",
+        instructions: "i",
+        conversationFlow: null,
+      });
+
+      expect(mockAssistantsCreate.mock.calls[0][0].conversation_flow).toEqual(
+        flujo
+      );
+      expect(mockAssistantsCreate.mock.calls[1][0].conversation_flow).toBeUndefined();
+    });
   });
 
   describe("updateAssistant", () => {
+    // Telnyx trata el flujo entero: null lo borra (negocio que deja la zona)
+    // y sin el campo se queda el que hubiera.
+    it("conversation_flow: null lo borra; sin el campo no se toca", async () => {
+      mockAssistantsUpdate.mockResolvedValue({
+        id: "assistant_123",
+        name: "n",
+        instructions: "i",
+      });
+
+      await adapter.updateAssistant("assistant_123", { conversationFlow: null });
+      expect(mockAssistantsUpdate).toHaveBeenLastCalledWith("assistant_123", {
+        conversation_flow: null,
+      });
+
+      await adapter.updateAssistant("assistant_123", { name: "n" });
+      expect(mockAssistantsUpdate.mock.lastCall![1]).not.toHaveProperty(
+        "conversation_flow"
+      );
+    });
+
     it("solo envía los campos indicados", async () => {
       mockAssistantsUpdate.mockResolvedValue({
         id: "assistant_123",

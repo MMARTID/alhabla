@@ -16,6 +16,7 @@ import {
 import { resolveTelnyxEligibility } from "./telnyxEligibility.js";
 import { isBusinessType, type BusinessType } from "./businessType.js";
 import { resolverIdiomas, saludoDelNegocio } from "./idiomas/resolver.js";
+import { cooficialDeLaZona } from "./idiomas/zona.js";
 import { listaDeEsperaDisponible } from "../modules/whatsapp/service.js";
 import { resolverTransferenciaAlDueno } from "./transferenciaAlDueno.js";
 import type { CreateTelnyxAssistantInput } from "../adapters/telnyx/TelnyxAiAdapter.js";
@@ -40,6 +41,8 @@ async function loadManagedAssistantConfig(
     select: {
       name: true,
       timezone: true,
+      // La cooficial de la zona sale del código postal (lib/idiomas/zona.ts).
+      address: true,
       businessDetails: true,
       businessType: true,
       agentSettings: true,
@@ -61,6 +64,12 @@ async function loadManagedAssistantConfig(
     ? business.businessType
     : "other";
   const agentSettings = parseAgentSettings(business.agentSettings);
+  // Los idiomas de la recepcionista con la cooficial de donde está el
+  // negocio: el prompt y el payload, de la misma resolución.
+  const idiomas = resolverIdiomas({
+    ...agentSettings,
+    zona: cooficialDeLaZona(business),
+  });
   // La misma resolución decide el bloque del prompt Y la tool: nunca uno
   // sin el otro.
   const transferenciaAlDueno = resolverTransferenciaAlDueno(
@@ -78,11 +87,13 @@ async function loadManagedAssistantConfig(
     listaDeEspera: await listaDeEsperaDisponible(),
     ocultarNumeroDelNegocio: business.hideOwnerNumberFromClients,
     transferenciaAlDueno,
+    idiomas: idiomas.idiomas,
   });
 
   return {
     business,
     agentSettings,
+    idiomas,
     systemPrompt,
     transferenciaAlDueno: transferenciaAlDueno.activa
       ? { from: transferenciaAlDueno.origen!, to: transferenciaAlDueno.destino! }
@@ -171,7 +182,7 @@ function construirPayloadDeRecepcionista(args: {
   palabrasClave: string[];
 }): CreateTelnyxAssistantInput {
   const { config } = args;
-  const idiomas = resolverIdiomas(config.agentSettings);
+  const { idiomas } = config;
   return buildTelnyxAssistantPayload({
     businessId: args.businessId,
     agentId: args.agent.id,

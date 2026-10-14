@@ -29,6 +29,20 @@ export interface AjustesDeIdioma {
   voiceGender: GeneroDeVoz;
   /** La voz que eligió el dueño; sin ella, la de su género. */
   voz?: string;
+  /** La lengua cooficial de donde está el negocio (cooficialDeLaZona, en
+   * lib/idiomas/zona.ts). Solo cuenta con un principal que no lo es. */
+  zona?: CodigoDeIdioma | null;
+}
+
+/** La lengua cooficial de la zona que habla un negocio que saluda en otra:
+ * contesta en ella con su voz, que cambia solo en un nodo del
+ * conversation_flow (telnyxAssistantPayload.ts). */
+export interface CooficialDeLaZona {
+  idioma: CodigoDeIdioma;
+  /** La de su familia (Marta o Sergio) del género de la voz que atiende. */
+  voz: VozDelCatalogo;
+  /** `voice_settings.language` de esa voz. */
+  iso: string;
 }
 
 export type TranscripcionResuelta =
@@ -44,6 +58,8 @@ export interface PerfilDeIdiomas {
   principal: CodigoDeIdioma;
   /** El principal si es una lengua cooficial, o null. */
   cooficial: CodigoDeIdioma | null;
+  /** La cooficial de la zona si el principal no es cooficial, o null. */
+  cooficialDeLaZona: CooficialDeLaZona | null;
   /** De dónde sale la voz: las de Soniox de un principal cooficial o, si
    * no, las Ultra nativas del principal (familiaDeVoces). */
   familia: FamiliaDeVoces;
@@ -75,12 +91,13 @@ export interface PerfilDeIdiomas {
  * Transcripción más rápida que entiende todos los idiomas que habla:
  * deepgram/flux (fin de turno nativo y anticipado) si los entiende todos, con
  * su pista si es uno o `multi` si son varios (con un principal Ultra, los
- * siete de ULTRA_HABLA). Si no (un principal cooficial), Soniox con dos
- * pistas, la del principal y la del obligatorio, en orden canónico: con las
- * de los ocho que habla, el error de palabra se duplicó (9,5 % frente a
- * 4,7 %, tandas A3 y A4 del laboratorio, 2026-10-05) sin contestar antes, y
- * arrastraba palabras a otros idiomas («metxes» → «metges», «tints» →
- * «teen»). Que con dos entienda el inglés u otros idiomas no está medido.
+ * siete de ULTRA_HABLA). Si no (un principal cooficial, o la cooficial de su
+ * zona), Soniox con las pistas del obligatorio, el principal y la cooficial,
+ * en orden canónico: con las de los ocho que habla, el error de palabra se
+ * duplicó (9,5 % frente a 4,7 %, tandas A3 y A4 del laboratorio,
+ * 2026-10-05) sin contestar antes, y arrastraba palabras a otros idiomas
+ * («metxes» → «metges», «tints» → «teen»). Con [es, ca] entendió bien el
+ * inglés en las llamadas del 15-10 (variante S).
  */
 function resolverTranscripcion(
   idiomas: readonly CodigoDeIdioma[],
@@ -97,9 +114,11 @@ function resolverTranscripcion(
   }
   return {
     motor: "soniox",
-    pistas: ordenarIdiomas([IDIOMA_OBLIGATORIO, principal]).map(
-      (idioma) => IDIOMAS[idioma].transcripcion.soniox
-    ),
+    pistas: ordenarIdiomas([
+      IDIOMA_OBLIGATORIO,
+      principal,
+      ...idiomas.filter(esCooficial),
+    ]).map((idioma) => IDIOMAS[idioma].transcripcion.soniox),
   };
 }
 
@@ -200,27 +219,58 @@ export function elegirVoz(
   };
 }
 
+/**
+ * La cooficial de la zona que habla un negocio con un principal que no lo
+ * es, con la voz de su familia del mismo género que la que atiende. Con un
+ * principal cooficial ya la habla toda la llamada.
+ */
+function resolverCooficialDeLaZona(
+  zona: CodigoDeIdioma | null | undefined,
+  principal: CodigoDeIdioma,
+  genero: GeneroDeVoz
+): CooficialDeLaZona | null {
+  if (!zona || !esCooficial(zona) || esCooficial(principal)) return null;
+  const { voz } = elegirVoz(
+    familiaDeVoces(zona).voces,
+    [zona],
+    genero,
+    undefined
+  );
+  return { idioma: zona, voz, iso: IDIOMAS[zona].iso };
+}
+
 export function resolverIdiomas(ajustes: AjustesDeIdioma): PerfilDeIdiomas {
   const { languages, voiceLanguage, cambios } = normalizarIdiomas(ajustes);
   const familia = familiaDeVoces(voiceLanguage);
+  // Las voces del principal no hablan la cooficial de la zona: se eligen
+  // por los idiomas del principal y la cooficial va con su propia voz.
   const { voz, alternativas, cambio } = elegirVoz(
     familia.voces,
     languages,
     ajustes.voiceGender,
     ajustes.voz
   );
-  const instrucciones = instruccionesDeIdioma(languages, voiceLanguage);
+  const deLaZona = resolverCooficialDeLaZona(
+    ajustes.zona,
+    voiceLanguage,
+    voz.genero
+  );
+  const idiomas = deLaZona
+    ? ordenarIdiomas([...languages, deLaZona.idioma])
+    : languages;
+  const instrucciones = instruccionesDeIdioma(idiomas, voiceLanguage);
   return {
-    idiomas: languages,
+    idiomas,
     principal: voiceLanguage,
     cooficial: esCooficial(voiceLanguage) ? voiceLanguage : null,
+    cooficialDeLaZona: deLaZona,
     familia: familia.familia,
     genero: voz.genero,
     voz,
     voces: vocesQueHablan(familia.voces, languages),
     alternativas,
     isoDeLaVoz: IDIOMAS[voiceLanguage].iso,
-    transcripcion: resolverTranscripcion(languages, voiceLanguage),
+    transcripcion: resolverTranscripcion(idiomas, voiceLanguage),
     instruccionDelPrompt: instrucciones.instruccion,
     recordatorioDelPrompt: instrucciones.recordatorio,
     cambios: cambio ? [...cambios, cambio] : cambios,

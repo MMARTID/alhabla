@@ -4,6 +4,7 @@ import type {
   AssistantCreateParams,
   AssistantTool,
   AssistantUpdateParams,
+  ConversationFlowReq,
   HangupTool,
   InferenceEmbedding,
   InferenceEmbeddingInterruptionSettings,
@@ -97,7 +98,13 @@ export interface CreateTelnyxAssistantInput {
   /** Valores por defecto de las variables del prompt (`{{nombre}}`): los usa
    * Telnyx cuando la llamada (o el chat) no trae los suyos. */
   dynamicVariables?: Record<string, string>;
+  /** Nodos y aristas del assistant (la cooficial de la zona,
+   * telnyxAssistantPayload.ts). Telnyx lo trata entero: al actualizar,
+   * `null` lo borra y sin el campo se queda el que hubiera. */
+  conversationFlow?: ConversationFlowReq | null;
 }
+
+export type { ConversationFlowReq };
 
 export interface TelnyxAssistant {
   id: string;
@@ -131,6 +138,8 @@ function toAssistantCreatePayload(
     enabled_features: input.enabledFeatures ?? ["telephony"],
     post_conversation_settings: input.postConversationSettings,
     dynamic_variables: input.dynamicVariables,
+    // Al crear no hay flujo que borrar: null es lo mismo que no mandarlo.
+    conversation_flow: input.conversationFlow ?? undefined,
   };
 }
 
@@ -273,6 +282,10 @@ export class TelnyxAiAdapter {
       payload.post_conversation_settings = input.postConversationSettings;
     if (input.dynamicVariables !== undefined)
       payload.dynamic_variables = input.dynamicVariables;
+    // null borra el flujo (documentación de workflows de Telnyx, y
+    // comprobado en vivo el 2026-10-15); el SDK no lo declara.
+    if (input.conversationFlow !== undefined)
+      payload.conversation_flow = input.conversationFlow;
 
     const response = await client.ai.assistants.update(
       assistantId,

@@ -298,6 +298,71 @@ describe("createTelnyxAssistantForAgent", () => {
     });
   });
 
+  // La cooficial de donde está el negocio (lib/idiomas/zona.ts, decisión
+  // del 2026-10-15): con el código postal de Cardedeu, Soniox entiende el
+  // catalán desde el principio, atiende la voz Ultra del principal y un nodo
+  // cambia a Marta.
+  it("en Cataluña y saludando en español: Soniox con catalán, la voz Ultra, el nodo de Marta y el catalán en el prompt", async () => {
+    mockedBusinessFindUnique.mockResolvedValue({
+      ...BASE_BUSINESS,
+      address: "Calle Anselm Clavé, 14",
+      businessDetails:
+        "INFINITY Hair Salon\nAv. Rei en Jaume, 231, 08440 Cardedeu, Barcelona, Spain",
+      agentSettings: DEFAULT_AGENT_SETTINGS,
+    } as any);
+    mockedCreateAssistant.mockResolvedValue({
+      id: "assistant_1",
+      name: "alhabla-biz1-agent1",
+      instructions: "i",
+    });
+
+    const result = await createTelnyxAssistantForAgent({
+      agentId: "agent1",
+      businessId: "biz1",
+    });
+
+    expect(result.eligible).toBe(true);
+    const payload = mockedCreateAssistant.mock.calls[0][0];
+    expect(payload.greeting).toBe(
+      "Peluquería Ejemplo, te atiende su asistente de inteligencia artificial. ¿En qué te ayudo?"
+    );
+    expect(payload.voiceSettings).toMatchObject({
+      voice: "Telnyx.Ultra.isabel",
+      expressive_mode: true,
+    });
+    expect(payload.transcription).toMatchObject({
+      model: "soniox/stt-rt-v5",
+      settings: { language_hints: ["es", "ca"] },
+    });
+    expect(payload.conversationFlow?.nodes[1]).toMatchObject({
+      id: "cooficial",
+      voice_settings: { voice: "Soniox.tts-rt-v2.Marta", language: "ca" },
+    });
+    expect(payload.instructions).toContain("catalán");
+    expect(mockedAgentUpdate.mock.calls[0][0].data.systemPrompt).toContain(
+      "catalán"
+    );
+  });
+
+  it("fuera de una zona cooficial, sin nodo (null para borrar uno anterior)", async () => {
+    mockedBusinessFindUnique.mockResolvedValue({
+      ...BASE_BUSINESS,
+      address: "Calle Mayor 1, 28013 Madrid, Spain",
+      agentSettings: DEFAULT_AGENT_SETTINGS,
+    } as any);
+    mockedCreateAssistant.mockResolvedValue({
+      id: "assistant_1",
+      name: "alhabla-biz1-agent1",
+      instructions: "i",
+    });
+
+    await createTelnyxAssistantForAgent({ agentId: "agent1", businessId: "biz1" });
+
+    const payload = mockedCreateAssistant.mock.calls[0][0];
+    expect(payload.conversationFlow).toBeNull();
+    expect(payload.transcription).toMatchObject({ model: "deepgram/flux" });
+  });
+
   it("no lanza si Telnyx falla al crear — devuelve el motivo en vez de propagar el error", async () => {
     mockedBusinessFindUnique.mockResolvedValue(BASE_BUSINESS as any);
     mockedCreateAssistant.mockRejectedValue(new Error("Telnyx 500"));

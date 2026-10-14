@@ -295,6 +295,25 @@ describe("vistaPreviaDeIdiomas", () => {
     expect(vista.avisos).toEqual([AVISO_ESPERA_CATALAN, AVISO_VOCES_CATALAN]);
   });
 
+  // La cooficial de donde está el negocio (lib/idiomas/zona.ts): la dice y
+  // avisa de la espera, pero `languages` va sin ella, porque se guarda y
+  // una cooficial entre ellos pasaría a ser el principal.
+  it("español en Cataluña: habla también catalán con Marta, avisa de la espera y no la guarda en languages", () => {
+    const vista = vistaPreviaDeIdiomas(
+      { voiceLanguage: "es-ES", voiceGender: "femenina", zona: "ca-ES" },
+      "Peluquería Ana"
+    );
+
+    expect(vista.languages).toEqual(idiomasQueHabla("es-ES"));
+    expect(vista.voz).toBe("Telnyx.Ultra.538a8872-3799-4df5-b373-b78493b766c6");
+    expect(vista.entradilla).toBe(
+      "Habla en 8 idiomas: español, inglés, francés, catalán, alemán, italiano, portugués y neerlandés. Saluda en español y sigue en el idioma de quien llama."
+    );
+    expect(vista.avisos).toEqual([
+      "Como el negocio está donde el catalán es lengua oficial, también lo entiende y, si le hablan en catalán, contesta en catalán con la voz de Marta. A cambio tarda algo más en contestar: alrededor de un segundo más cuando consulta la agenda.",
+    ]);
+  });
+
   // Antes el inglés como principal era un legado que ya no se ofrecía.
   it("saludo en inglés: sus voces británicas y avisa de que también saluda en inglés a los de aquí", () => {
     const vista = vistaPreviaDeIdiomas(

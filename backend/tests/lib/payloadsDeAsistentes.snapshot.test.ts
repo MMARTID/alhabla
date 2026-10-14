@@ -132,6 +132,34 @@ describe("payloads de asistentes (instantáneas)", () => {
     });
   }
 
+  // La cooficial de la zona (lib/idiomas/zona.ts, 2026-10-15): Soniox desde
+  // el principio con la voz Ultra del principal y un nodo que cambia a
+  // Marta.
+  it("assistant de la recepcionista que saluda en español en Cataluña", () => {
+    const idiomas = resolverIdiomas({
+      voiceLanguage: "es-ES",
+      voiceGender: "femenina",
+      zona: "ca-ES",
+    });
+    const payload = buildTelnyxAssistantPayload({
+      businessId: "neg_1",
+      agentId: "ag_1",
+      businessName: "Peluquería Ana",
+      instructions: "Eres la recepcionista de {{nombre_negocio}}.",
+      greeting: saludoDelNegocio(idiomas, "Peluquería Ana"),
+      idiomas,
+      voice: idiomas.voz.id,
+      boostedKeywords: ["Corte", "Laura"],
+    });
+    expect({
+      greeting: payload.greeting,
+      voiceSettings: payload.voiceSettings,
+      transcription: payload.transcription,
+      interruptionSettings: payload.interruptionSettings,
+      conversationFlow: payload.conversationFlow,
+    }).toMatchSnapshot();
+  });
+
   it("elegir la voz de por defecto (Blanca, Marcos, o Marta con catalán) no cambia el payload", () => {
     const payload = (ajustes: Parameters<typeof resolverIdiomas>[0]) => {
       const idiomas = resolverIdiomas(ajustes);

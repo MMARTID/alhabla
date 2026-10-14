@@ -211,8 +211,9 @@ export function buildManagedAgentPrompt(input: {
    * nada, como en Retell, que no tiene la tool) no se menciona. */
   transferenciaAlDueno?: TransferenciaAlDueno | null;
   /** Los idiomas que atiende si no son todos los de su principal: los de
-   * Retell, el respaldo (ajustesParaRetell en lib/idiomas/resolver.ts). Sin
-   * ellos, los que habla con su principal. */
+   * Retell, el respaldo (ajustesParaRetell en lib/idiomas/resolver.ts), o
+   * los de su principal con la cooficial de su zona (lib/idiomas/zona.ts).
+   * Sin ellos, los que habla con su principal. */
   idiomas?: readonly CodigoDeIdioma[];
 }) {
   const settings = parseAgentSettings(input.settings);

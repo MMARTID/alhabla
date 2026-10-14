@@ -91,6 +91,83 @@ describe("resolverIdiomas — voz y transcripción", () => {
   });
 });
 
+// La cooficial de donde está el negocio (lib/idiomas/zona.ts, decisión del
+// 2026-10-15): Soniox desde el principio y la voz Ultra del principal; la
+// cooficial la contesta Marta o Sergio en un nodo del conversation_flow.
+describe("resolverIdiomas — la cooficial de la zona", () => {
+  const conZona = (
+    zona: CodigoDeIdioma | null,
+    voiceLanguage: CodigoDeIdioma = "es-ES",
+    voiceGender: GeneroDeVoz = "femenina"
+  ) => resolverIdiomas({ voiceLanguage, voiceGender, zona });
+
+  it("principal español en Cataluña: habla ocho, atiende Blanca y Soniox entiende español y catalán", () => {
+    const perfil = conZona("ca-ES");
+    expect(perfil.voz.nombre).toBe("Blanca");
+    expect(perfil.familia).toBe("ultra");
+    expect(perfil.idiomas).toEqual([
+      "es-ES",
+      "en-GB",
+      "fr-FR",
+      "ca-ES",
+      "de-DE",
+      "it-IT",
+      "pt-PT",
+      "nl-NL",
+    ]);
+    expect(perfil.transcripcion).toEqual({
+      motor: "soniox",
+      pistas: ["es", "ca"],
+    });
+    expect(perfil.cooficialDeLaZona).toEqual({
+      idioma: "ca-ES",
+      voz: expect.objectContaining({ nombre: "Marta" }),
+      iso: "ca",
+    });
+    // Las voces que se eligen siguen siendo las del principal.
+    expect(perfil.voces.every((voz) => voz.proveedor === "telnyx")).toBe(true);
+    expect(perfil.instruccionDelPrompt).toContain("catalán");
+    expect(perfil.recordatorioDelPrompt).toContain("catalán");
+  });
+
+  it("con voz de hombre, Sergio; en Galicia y Euskadi, su lengua", () => {
+    expect(conZona("gl-ES", "es-ES", "masculina").cooficialDeLaZona).toEqual({
+      idioma: "gl-ES",
+      voz: expect.objectContaining({ nombre: "Sergio" }),
+      iso: "gl",
+    });
+    expect(conZona("eu-ES").transcripcion).toEqual({
+      motor: "soniox",
+      pistas: ["es", "eu"],
+    });
+  });
+
+  it("con otro principal Ultra, también su pista", () => {
+    expect(conZona("ca-ES", "en-GB").transcripcion).toEqual({
+      motor: "soniox",
+      pistas: ["es", "en", "ca"],
+    });
+  });
+
+  it("con un principal cooficial ya la habla toda la llamada: sin nodo", () => {
+    const perfil = conZona("ca-ES", "ca-ES");
+    expect(perfil.cooficialDeLaZona).toBeNull();
+    expect(perfil.transcripcion).toEqual({
+      motor: "soniox",
+      pistas: ["es", "ca"],
+    });
+    // Un principal cooficial distinto del de la zona tampoco suma otra.
+    expect(conZona("eu-ES", "ca-ES").idiomas).not.toContain("eu-ES");
+  });
+
+  it("fuera de una zona cooficial, como siempre", () => {
+    const perfil = conZona(null);
+    expect(perfil.cooficialDeLaZona).toBeNull();
+    expect(perfil.idiomas).toEqual([...ULTRA_HABLA]);
+    expect(perfil.transcripcion).toEqual({ motor: "flux", idioma: "multi" });
+  });
+});
+
 describe("resolverIdiomas — normalización", () => {
   // Las reglas anteriores dejaban saludar en castellano con catalán activo;
   // un JSON que quede así atiende en la cooficial, como hacía (la migración
