@@ -433,11 +433,18 @@ checkout PRINCIPAL aunque se lance desde un worktree (`git rev-parse --git-commo
 | `consultar_bd_dev` | SQL contra `botbook` (Postgres de Docker, `localhost:5433`) | Transacción `READ ONLY` + protocolo extendido (una sola sentencia); se niega si `DATABASE_URL` no es local o lleva `?host=` |
 | `consultar_bd_prod` | SQL contra Cloud SQL `alhabla-db` / `alhabla` por Cloud SQL Auth Proxy (`--gcloud-auth`, lo arranca el MCP) | Rol `alhabla_lectura`: solo `pg_read_all_data`, `default_transaction_read_only`, `statement_timeout` 30 s y `CONNECTION LIMIT 2` (presupuesto de conexiones de Cloud SQL); contraseña en Secret Manager `DB_LECTURA_PASSWORD`. Más la misma transacción READ ONLY |
 | `generar_jwt_dev` | JWT de un usuario de dev (por email o negocio), mismo payload que `createToken` (`tv` = `tokenVersion`) | Solo con el `JWT_SECRET` y la BD de dev |
-| `simular_webhook_telnyx` | POST firmado Ed25519 a `/webhooks/telnyx…` de `backend-sim` (:3010). Con `businessId` crea o reutiliza una fila de `calls` `sim-mcp-<negocio>-<teléfono>` y pone `x-alhabla-call-control-id` | Solo localhost y rutas `/webhooks/telnyx`; firma con `TELNYX_PRIVATE_KEY_SIMULACION`, que ningún otro backend acepta |
-| `simular_webhook_retell` | POST con `x-retell-signature` (HMAC con la `RETELL_API_KEY` de dev) a `/webhooks/retell…` de `backend-dev` (:3000) | Solo localhost y rutas `/webhooks/retell` |
+| `simular_webhook_telnyx` | POST firmado Ed25519 a `/webhooks/telnyx…` de `backend-sim` (:3010). Con `businessId` crea una fila de `calls` NUEVA (`sim-mcp-<uuid>`) y pone `x-alhabla-call-control-id`; para seguir la misma conversación se pasa su `callControlId` (una cita por llamada: `bookings.callId` es único) | Solo localhost y la ruta YA RESUELTA dentro de `/webhooks/telnyx` (un `../` no sale); firma con `TELNYX_PRIVATE_KEY_SIMULACION`, que ningún otro backend acepta |
+| `simular_webhook_retell` | POST con `x-retell-signature` (HMAC con la `RETELL_API_KEY` de dev) a `/webhooks/retell…` de `backend-dev` (:3000) | Solo localhost y la ruta resuelta dentro de `/webhooks/retell` |
+| `borrar_llamadas_simuladas` | Borra las `sim-mcp-…` (de un negocio o de todas) para que no salgan en el historial del panel | Conserva y devuelve las que tienen una cita viva con evento en el calendario: borrarla dejaría el evento huérfano |
 
 Las tools simuladas se ejecutan de verdad: `book_appointment` reserva en el calendario real del
-negocio de dev y los avisos de WhatsApp salen. Las claves de simulación se generan con
+negocio de dev. Lo que **no** sale desde `backend-sim` son los WhatsApp, SMS y correos:
+`ENVIOS_SIMULADOS=1` (`src/lib/enviosSimulados.ts`, comprobado en `WhatsAppAdapter.send`,
+`TelnyxAdapter.sendSms` y `sendZohoMail`) los registra en el log como `ENVÍO SIMULADO` y no los
+manda; en producción se ignora aunque esté puesto. `simular_webhook_retell` va al backend de dev,
+que sí envía. Antes de firmar, las dos herramientas de webhooks comprueban que hay backend
+escuchando y, si no, dicen cómo levantarlo. Las consultas leen las columnas `timestamp` sin zona
+de Prisma como UTC (`mcp/pg.ts`); `pg` las tomaba por hora local y desplazaba todas las horas. Las claves de simulación se generan con
 `cd backend && npx tsx mcp/generarClavesDeSimulacion.ts` y van al `.env` de la raíz. La
 verificación de firmas del backend no se toca: el MCP firma como el proveedor.
 

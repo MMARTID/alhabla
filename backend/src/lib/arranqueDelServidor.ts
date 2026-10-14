@@ -3,6 +3,7 @@ import rateLimit from "@fastify/rate-limit";
 import { initStorage } from "./storage.js";
 import { conectarRedisDeCompatibilidad } from "./redisDeCompatibilidad.js";
 import { AlmacenDeLimites } from "./limitesDePeticiones.js";
+import { enviosSimulados } from "./enviosSimulados.js";
 
 /**
  * Piezas del arranque de server.ts que deciden cómo se excluyen los cerrojos
@@ -22,6 +23,15 @@ import { AlmacenDeLimites } from "./limitesDePeticiones.js";
  * quedan en «solo Postgres» (lib/redisDeCompatibilidad.ts).
  */
 export async function iniciarServiciosExternos(): Promise<void> {
+  if (enviosSimulados()) {
+    console.warn(
+      "[Server] ENVIOS_SIMULADOS=1: los WhatsApp, SMS y correos NO salen, solo se registran en el log (backend-sim)"
+    );
+  } else if (process.env.ENVIOS_SIMULADOS === "1") {
+    console.error(
+      "[Server] ENVIOS_SIMULADOS=1 está puesto en producción y se ignora: los envíos salen con normalidad"
+    );
+  }
   initStorage();
   await conectarRedisDeCompatibilidad();
 }

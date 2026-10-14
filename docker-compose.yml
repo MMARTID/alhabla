@@ -80,6 +80,7 @@ services:
       RETELL_SIP_TRUNK_AUTH_USERNAME: ${RETELL_SIP_TRUNK_AUTH_USERNAME}
       RETELL_SIP_TRUNK_AUTH_PASSWORD: ${RETELL_SIP_TRUNK_AUTH_PASSWORD}
       TELNYX_PUBLIC_KEY: ${TELNYX_PUBLIC_KEY}
+      ENVIOS_SIMULADOS: ${ENVIOS_SIMULADOS:-}
       VOICE_TELNYX_ROLLOUT: ${VOICE_TELNYX_ROLLOUT:-off}
       TELNYX_CALL_CONTROL_APP_ID: ${TELNYX_CALL_CONTROL_APP_ID}
       TELNYX_STATUS_COMPONENT_IDS: ${TELNYX_STATUS_COMPONENT_IDS}
@@ -210,6 +211,7 @@ services:
       RETELL_SIP_TRUNK_AUTH_USERNAME: ${RETELL_SIP_TRUNK_AUTH_USERNAME}
       RETELL_SIP_TRUNK_AUTH_PASSWORD: ${RETELL_SIP_TRUNK_AUTH_PASSWORD}
       TELNYX_PUBLIC_KEY: ${TELNYX_PUBLIC_KEY}
+      ENVIOS_SIMULADOS: ${ENVIOS_SIMULADOS:-}
       VOICE_TELNYX_ROLLOUT: ${VOICE_TELNYX_ROLLOUT:-off}
       TELNYX_CALL_CONTROL_APP_ID: ${TELNYX_CALL_CONTROL_APP_ID}
       TELNYX_STATUS_COMPONENT_IDS: ${TELNYX_STATUS_COMPONENT_IDS}
@@ -252,7 +254,8 @@ services:
   # Ed25519 generada en local en vez de en la de Telnyx: es el destino de los
   # webhooks de Telnyx firmados por el MCP de desarrollo (backend/mcp/). El
   # backend de dev (:3000) sigue aceptando solo los de Telnyx, así que las
-  # llamadas reales contra dev no cambian. Se levanta con
+  # llamadas reales contra dev no cambian. Con ENVIOS_SIMULADOS no manda
+  # WhatsApp, SMS ni correos. Se levanta con
   # scripts/backend-sim.sh (también desde un worktree).
   backend-sim:
     extends:
@@ -265,6 +268,9 @@ services:
         condition: service_healthy
     environment:
       TELNYX_PUBLIC_KEY: ${TELNYX_PUBLIC_KEY_SIMULACION}
+      # Los WhatsApp, SMS y correos de las tools simuladas no salen
+      # (src/lib/enviosSimulados.ts); las citas sí van al calendario.
+      ENVIOS_SIMULADOS: "1"
     ports: !override
       - "3010:3000"
     profiles: !override

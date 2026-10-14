@@ -1,5 +1,10 @@
 import Telnyx, { toFile } from "telnyx";
+import { randomUUID } from "node:crypto";
 import { getTelnyxClient, getTelnyxWhatsappClient } from "../../lib/telnyx.js";
+import {
+  enviosSimulados,
+  registrarEnvioSimulado,
+} from "../../lib/enviosSimulados.js";
 
 /** Modelo multilingüe (catalán incluido) de Telnyx Inference — sin pasar
  * `language` a propósito: forzarlo a "es" degradaría la transcripción de
@@ -205,6 +210,15 @@ export class WhatsAppAdapter {
   ): Promise<WhatsAppSendResult> {
     const config = this.requireConfig();
     const from = message.from ?? config.fromNumber;
+
+    if (enviosSimulados()) {
+      registrarEnvioSimulado(
+        "WhatsApp",
+        message.to,
+        `desde=${from} ${describe}: ${JSON.stringify(content)}`
+      );
+      return { messageId: `simulado-${randomUUID()}`, status: "simulado" };
+    }
 
     try {
       const response = await getTelnyxClient().messages.whatsapp({

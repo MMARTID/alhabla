@@ -1,24 +1,29 @@
 import { randomUUID } from "node:crypto";
-import pg from "pg";
+import pg from "./pg.js";
 
 /**
- * `/webhooks/telnyx/tools/:toolName` resuelve el negocio SOLO por la cabecera
- * `x-alhabla-call-control-id` → fila de `calls` (sin fila, 404). Para probar
- * una tool sin llamar de verdad hace falta una fila de ese negocio: esta la
- * crea, o reutiliza la que ya exista para el mismo negocio y teléfono.
+ * Llamadas simuladas en la BD de dev (la URL ya viene comprobada como local
+ * por entorno.ts). Son las únicas escrituras del MCP.
  *
- * Es la única escritura del MCP, y solo en la BD de dev (la URL ya viene
- * comprobada como local por entorno.ts). El `callId` empieza por `sim-mcp-`
- * para reconocerlas y borrarlas a mano.
+ * `/webhooks/telnyx/tools/:toolName` resuelve el negocio SOLO por la cabecera
+ * `x-alhabla-call-control-id` → fila de `calls` (sin fila, 404), así que
+ * probar una tool sin llamar de verdad exige una fila de ese negocio.
+ *
+ * Una por conversación, nunca reutilizada entre pruebas: `bookings.callId`
+ * es único (una cita por llamada), y una llamada simulada compartida hacía
+ * fallar el segundo `book_appointment`. Para seguir la MISMA conversación
+ * (check_availability y luego book_appointment) se pasa su callId.
+ *
+ * El `callId` empieza por `sim-mcp-` para reconocerlas y borrarlas.
  */
-export async function llamadaSimulada(
+export const PREFIJO_DE_LLAMADA_SIMULADA = "sim-mcp-";
+
+export async function crearLlamadaSimulada(
   urlDeBdDeDev: string,
   businessId: string,
   telefonoCliente?: string
-): Promise<{ callId: string; creada: boolean }> {
-  const sufijo = telefonoCliente ? telefonoCliente.replace(/\D/g, "") : "anonimo";
-  const callId = `sim-mcp-${businessId}-${sufijo}`;
-
+): Promise<string> {
+  const callId = `${PREFIJO_DE_LLAMADA_SIMULADA}${randomUUID()}`;
   const cliente = new pg.Client({ connectionString: urlDeBdDeDev });
   await cliente.connect();
   try {
@@ -29,14 +34,79 @@ export async function llamadaSimulada(
     if (negocio.rowCount === 0) {
       throw new Error(`[MCP] No existe el negocio ${businessId} en la BD de dev`);
     }
-
-    const insercion = await cliente.query(
+    await cliente.query(
       `INSERT INTO calls (id, "businessId", "callId", "fromNumber", "voiceProvider", "updatedAt")
-       VALUES ($1, $2, $3, $4, 'telnyx', now())
-       ON CONFLICT ("callId") DO NOTHING`,
+       VALUES ($1, $2, $3, $4, 'telnyx', now())`,
       [`sim_${randomUUID()}`, businessId, callId, telefonoCliente ?? null]
     );
-    return { callId, creada: insercion.rowCount === 1 };
+    return callId;
+  } finally {
+    await cliente.end();
+  }
+}
+
+export type CitaConservada = {
+  callId: string;
+  bookingId: string;
+  programedAt: string;
+};
+
+/**
+ * Borra las llamadas simuladas (y en cascada sus transcripciones, citas…)
+ * para que no se mezclen con las reales en el historial del panel de dev.
+ *
+ * Se CONSERVAN las que tienen una cita viva que llegó al calendario
+ * (`externalEventId` y sin cancelar): borrar la fila dejaría el evento
+ * huérfano en el calendario real del negocio. Se devuelven para cancelarlas
+ * antes (cancel_appointment simulada o desde el panel) y volver a limpiar.
+ */
+export async function borrarLlamadasSimuladas(
+  urlDeBdDeDev: string,
+  businessId?: string
+): Promise<{ borradas: number; conservadas: CitaConservada[] }> {
+  const cliente = new pg.Client({ connectionString: urlDeBdDeDev });
+  await cliente.connect();
+  try {
+    await cliente.query("BEGIN");
+    const conservadas = await cliente.query<{
+      callId: string;
+      bookingId: string;
+      programedAt: Date;
+    }>(
+      `SELECT c."callId", b.id AS "bookingId", b."programedAt"
+         FROM calls c
+         JOIN bookings b ON b."callId" = c.id
+        WHERE c."callId" LIKE $1
+          AND ($2::text IS NULL OR c."businessId" = $2)
+          AND b."isCancelled" = false
+          AND b."externalEventId" IS NOT NULL
+        ORDER BY b."programedAt"`,
+      [`${PREFIJO_DE_LLAMADA_SIMULADA}%`, businessId ?? null]
+    );
+    const borradas = await cliente.query(
+      `DELETE FROM calls c
+        WHERE c."callId" LIKE $1
+          AND ($2::text IS NULL OR c."businessId" = $2)
+          AND NOT EXISTS (
+            SELECT 1 FROM bookings b
+             WHERE b."callId" = c.id
+               AND b."isCancelled" = false
+               AND b."externalEventId" IS NOT NULL
+          )`,
+      [`${PREFIJO_DE_LLAMADA_SIMULADA}%`, businessId ?? null]
+    );
+    await cliente.query("COMMIT");
+    return {
+      borradas: borradas.rowCount ?? 0,
+      conservadas: conservadas.rows.map((fila) => ({
+        callId: fila.callId,
+        bookingId: fila.bookingId,
+        programedAt: fila.programedAt.toISOString(),
+      })),
+    };
+  } catch (error) {
+    await cliente.query("ROLLBACK").catch(() => undefined);
+    throw error;
   } finally {
     await cliente.end();
   }
