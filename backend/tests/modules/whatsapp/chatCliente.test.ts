@@ -1,7 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import type { InboundMessage } from "@prisma/client";
 import { prisma } from "../../../src/lib/prisma.js";
-import { getRedis } from "../../../src/lib/redis.js";
+import {
+  almacenEnMemoria,
+  reiniciarAlmacenEnMemoria,
+} from "../../helpers/almacenEnMemoria.js";
 import { acquireLock, releaseLock } from "../../../src/lib/bookingLock.js";
 import { reclamarEnvio } from "../../../src/lib/messageIdempotency.js";
 import { enviarTexto } from "../../../src/modules/whatsapp/service.js";
@@ -38,10 +41,11 @@ vi.mock("../../../src/lib/prisma.js", () => {
     },
   };
 });
-vi.mock("../../../src/lib/redis.js", () => {
-  const redis = { incr: vi.fn(), expire: vi.fn() };
-  return { getRedis: () => redis };
-});
+// Los turnos del día se cuentan en el almacén temporal de Postgres: aquí,
+// su versión en memoria.
+vi.mock("../../../src/lib/almacenTemporal.js", async () =>
+  (await import("../../helpers/almacenEnMemoria.js")).almacenEnMemoria
+);
 vi.mock("../../../src/lib/bookingLock.js", () => ({
   acquireLock: vi.fn(),
   releaseLock: vi.fn(),
@@ -71,10 +75,6 @@ const mockedAcquire = vi.mocked(acquireLock);
 const mockedRelease = vi.mocked(releaseLock);
 const mockedCrear = vi.mocked(telnyxAiAdapter.createConversation);
 const mockedChat = vi.mocked(telnyxAiAdapter.chatWithAssistant);
-const redis = getRedis() as unknown as {
-  incr: ReturnType<typeof vi.fn>;
-  expire: ReturnType<typeof vi.fn>;
-};
 
 const MOVIL = "+34600123456";
 const NEGOCIO = {
@@ -294,8 +294,7 @@ describe("conversarConRecepcionista", () => {
     } as never);
     mockedConvUpdate.mockResolvedValue({} as never);
     vi.mocked(prisma.call.updateMany).mockResolvedValue({ count: 1 } as never);
-    redis.incr.mockResolvedValue(1);
-    redis.expire.mockResolvedValue(1);
+    reiniciarAlmacenEnMemoria();
     mockedAcquire.mockResolvedValue("token");
     mockedSentCount.mockResolvedValue(0);
     mockedReclamar.mockResolvedValue(true);
@@ -449,7 +448,9 @@ describe("conversarConRecepcionista", () => {
   });
 
   it("el turno 21 del día responde el límite (una vez al día) sin llamar al assistant", async () => {
-    redis.incr.mockResolvedValueOnce(TURNOS_POR_CLIENTE_Y_DIA + 1);
+    almacenEnMemoria.incrementarContador.mockResolvedValueOnce(
+      TURNOS_POR_CLIENTE_Y_DIA + 1
+    );
     const resultado = await conversarConRecepcionista({
       message: entrante(),
       businessId: "biz_1",

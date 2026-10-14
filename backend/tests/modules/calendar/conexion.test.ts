@@ -1,7 +1,10 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../../src/lib/prisma.js";
-import { getRedis } from "../../../src/lib/redis.js";
+import {
+  almacenEnMemoria,
+  reiniciarAlmacenEnMemoria,
+} from "../../helpers/almacenEnMemoria.js";
 import {
   actualizarCalendarioDeConexion,
   camposDeCalendarioParaElPanel,
@@ -45,15 +48,16 @@ vi.mock("../../../src/modules/whatsapp/alertas.js", () => ({
     .fn()
     .mockResolvedValue({ via: "interactivo" }),
 }));
-vi.mock("../../../src/lib/redis.js", () => ({
-  getRedis: vi.fn(),
-}));
+// La caché de voz vive en el almacén temporal de Postgres: aquí, su
+// versión en memoria, para mirar la clave exacta que se borra.
+vi.mock("../../../src/lib/almacenTemporal.js", async () =>
+  (await import("../../helpers/almacenEnMemoria.js")).almacenEnMemoria
+);
 
 const mockedBusinessUpdate = vi.mocked(prisma.business.update);
 const mockedConnectionUpdateMany = vi.mocked(
   prisma.calendarConnection.updateMany
 );
-const mockedGetRedis = vi.mocked(getRedis);
 
 describe("SELECT_CONEXION_DE_CALENDARIO", () => {
   it("lee id, proveedor activo y la relación con las columnas que usa el resolver", () => {
@@ -497,13 +501,12 @@ describe("origenDeCalendario", () => {
 });
 
 describe("marcarCalendarioDesconectado", () => {
-  let del: ReturnType<typeof vi.fn>;
+  const del = almacenEnMemoria.borrarClave;
   let warnSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    del = vi.fn().mockResolvedValue(1);
-    mockedGetRedis.mockReturnValue({ del } as any);
+    reiniciarAlmacenEnMemoria();
     mockedConnectionUpdateMany.mockResolvedValue({ count: 1 });
     warnSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
   });
@@ -612,8 +615,8 @@ describe("marcarCalendarioDesconectado", () => {
     expect(mensaje).toContain("motivo=token caducado");
   });
 
-  it("no lanza si Redis falla", async () => {
-    del.mockRejectedValue(new Error("redis caído"));
+  it("no lanza si el almacén falla", async () => {
+    del.mockRejectedValue(new Error("Postgres caído"));
     const errorSpy = vi
       .spyOn(console, "error")
       .mockImplementation(() => undefined);
@@ -626,12 +629,11 @@ describe("marcarCalendarioDesconectado", () => {
 });
 
 describe("guardarConexionDeCalendario", () => {
-  let del: ReturnType<typeof vi.fn>;
+  const del = almacenEnMemoria.borrarClave;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    del = vi.fn().mockResolvedValue(1);
-    mockedGetRedis.mockReturnValue({ del } as any);
+    reiniciarAlmacenEnMemoria();
     mockedBusinessUpdate.mockResolvedValue({ id: "biz_1" } as any);
   });
 

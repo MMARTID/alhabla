@@ -3,19 +3,18 @@ import {
   claveDeCacheDeVoz,
   invalidarCacheDeVoz,
 } from "../../src/lib/voiceConfigCache.js";
-import { getRedis } from "../../src/lib/redis.js";
+import { borrarClave } from "../../src/lib/almacenTemporal.js";
 
-vi.mock("../../src/lib/redis.js", () => ({
-  getRedis: vi.fn(),
+vi.mock("../../src/lib/almacenTemporal.js", () => ({
+  borrarClave: vi.fn(),
 }));
 
 describe("invalidarCacheDeVoz", () => {
-  const del = vi.fn();
+  const del = vi.mocked(borrarClave);
   let consoleError: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
-    del.mockReset().mockResolvedValue(1);
-    vi.mocked(getRedis).mockReturnValue({ del } as never);
+    del.mockReset().mockResolvedValue(undefined);
     consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
   });
 
@@ -33,7 +32,7 @@ describe("invalidarCacheDeVoz", () => {
   });
 
   it("si el borrado falla no lanza y lo registra con el negocio, firmado [Calendar] por defecto", async () => {
-    const fallo = new Error("Redis caído");
+    const fallo = new Error("Postgres caído");
     del.mockRejectedValue(fallo);
 
     await expect(invalidarCacheDeVoz("biz_1")).resolves.toBeUndefined();
@@ -45,7 +44,7 @@ describe("invalidarCacheDeVoz", () => {
   });
 
   it("firma el log con el prefijo del módulo que la llama", async () => {
-    const fallo = new Error("Redis caído");
+    const fallo = new Error("Postgres caído");
     del.mockRejectedValue(fallo);
 
     await invalidarCacheDeVoz("biz_1", "[Phone]");
@@ -56,9 +55,9 @@ describe("invalidarCacheDeVoz", () => {
     );
   });
 
-  it("tampoco lanza si Redis no está inicializado", async () => {
-    vi.mocked(getRedis).mockImplementation(() => {
-      throw new Error("Redis no inicializado");
+  it("tampoco lanza si el almacén falla al instante", async () => {
+    del.mockImplementation(() => {
+      throw new Error("Prisma sin conectar");
     });
 
     await expect(

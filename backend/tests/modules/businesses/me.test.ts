@@ -25,7 +25,6 @@ vi.mock("../../../src/lib/prisma.js", () => ({
 }));
 
 // Dependencias que el módulo arrastra al importarse pero que esta ruta no usa.
-vi.mock("../../../src/lib/redis.js", () => ({ getRedis: vi.fn() }));
 vi.mock("../../../src/modules/calendar/service.js", () => ({
   calendarService: {},
 }));

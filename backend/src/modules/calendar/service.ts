@@ -7,7 +7,7 @@
 // dependa de las columnas google*/outlook* de Business va en ./conexion.ts.
 import { randomBytes } from "node:crypto";
 import { prisma } from "../../lib/prisma.js";
-import { getRedis } from "../../lib/redis.js";
+import { consumirClave, guardarClave } from "../../lib/almacenTemporal.js";
 import {
   retellAdapter,
   type RetellTool,
@@ -73,12 +73,12 @@ export type {
 // defensa contra que alguien complete SU PROPIO código de autorización con
 // el `state` (antes, businessId en claro) de OTRO negocio, sustituyendo su
 // calendario conectado por el del atacante. Se genera un token opaco de un
-// solo uso, ligado al businessId en Redis, y se consume (getdel) en el
-// callback — un `state` reutilizado, caducado o inventado no resuelve a
-// ningún negocio.
+// solo uso, ligado al businessId en el almacén temporal, y se consume (se
+// lee y se borra de una vez) en el callback — un `state` reutilizado,
+// caducado o inventado no resuelve a ningún negocio.
 const CALENDAR_OAUTH_STATE_TTL_SECONDS = 10 * 60;
 
-function calendarOAuthStateRedisKey(
+function claveDelStateDeCalendario(
   provider: "google" | "microsoft",
   state: string
 ): string {
@@ -90,11 +90,11 @@ async function createCalendarOAuthState(
   businessId: string
 ): Promise<string> {
   const state = randomBytes(32).toString("base64url");
-  await getRedis().set(
-    calendarOAuthStateRedisKey(provider, state),
+  await guardarClave(
+    claveDelStateDeCalendario(provider, state),
     businessId,
-    "EX",
-    CALENDAR_OAUTH_STATE_TTL_SECONDS
+    CALENDAR_OAUTH_STATE_TTL_SECONDS * 1000,
+    { businessId }
   );
   return state;
 }
@@ -103,7 +103,7 @@ async function consumeCalendarOAuthState(
   provider: "google" | "microsoft",
   state: string
 ): Promise<string | null> {
-  return getRedis().getdel(calendarOAuthStateRedisKey(provider, state));
+  return consumirClave(claveDelStateDeCalendario(provider, state));
 }
 
 /** Las operaciones reciben la conexión ya resuelta por conexion.ts: los

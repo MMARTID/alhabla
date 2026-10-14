@@ -1,7 +1,10 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { prisma } from "../../../src/lib/prisma.js";
 import { reclamarEnvio } from "../../../src/lib/messageIdempotency.js";
-import { getRedis } from "../../../src/lib/redis.js";
+import {
+  almacenEnMemoria,
+  reiniciarAlmacenEnMemoria,
+} from "../../helpers/almacenEnMemoria.js";
 import { bajaVigente } from "../../../src/modules/whatsapp/bajas.js";
 import {
   enviarBotones,
@@ -39,9 +42,13 @@ vi.mock("../../../src/lib/prisma.js", () => ({
 vi.mock("../../../src/lib/messageIdempotency.js", () => ({
   reclamarEnvio: vi.fn(),
 }));
-vi.mock("../../../src/lib/redis.js", () => ({
-  getRedis: vi.fn(),
-}));
+// El tope por hora cuenta en el almacén temporal de Postgres: aquí, su
+// versión en memoria.
+vi.mock(
+  "../../../src/lib/almacenTemporal.js",
+  async () =>
+    (await import("../../helpers/almacenEnMemoria.js")).almacenEnMemoria
+);
 vi.mock("../../../src/modules/whatsapp/bajas.js", () => ({
   bajaVigente: vi.fn(),
 }));
@@ -59,7 +66,6 @@ const mockedLeadUpdate = vi.mocked(prisma.lead.update);
 const mockedBookingFindMany = vi.mocked(prisma.booking.findMany);
 const mockedServiceFindMany = vi.mocked(prisma.service.findMany);
 const mockedReclamar = vi.mocked(reclamarEnvio);
-const mockedRedis = vi.mocked(getRedis);
 const mockedBaja = vi.mocked(bajaVigente);
 const mockedBotones = vi.mocked(enviarBotones);
 const mockedCta = vi.mocked(enviarCtaUrl);
@@ -116,11 +122,7 @@ beforeEach(() => {
   });
   mockedSentUpdateMany.mockResolvedValue({ count: 1 });
   mockedLeadUpdate.mockResolvedValue({} as never);
-  const redis = {
-    incr: vi.fn().mockResolvedValue(1),
-    expire: vi.fn().mockResolvedValue(1),
-  };
-  mockedRedis.mockReturnValue(redis as never);
+  reiniciarAlmacenEnMemoria();
 });
 
 describe("helpers de formato", () => {
@@ -144,6 +146,14 @@ describe("helpers de formato", () => {
       "la conexión con tu calendario estaba caducada"
     );
     expect(motivoDeFallo("lo que sea")).toBe("tu calendario no respondió");
+    // Los códigos del cerrojo que escribe voiceTools: ni uno ni otro es
+    // culpa del calendario.
+    expect(motivoDeFallo("BOOKING_LOCK_TIMEOUT")).toBe(
+      "otra reserva estaba entrando a la vez"
+    );
+    expect(motivoDeFallo("BOOKING_LOCK_ERROR")).toBe(
+      "tuvimos un fallo técnico momentáneo"
+    );
     expect(preferenciasDeAvisos(null)).toEqual({});
     expect(preferenciasDeAvisos({ avisoPorReserva: false })).toEqual({
       avisoPorReserva: false,
@@ -381,8 +391,16 @@ describe("avisarCitaPendiente", () => {
   });
 
   it("tope de cinco avisos por negocio y hora: el sexto no sale por WhatsApp", async () => {
-    const redis = { incr: vi.fn().mockResolvedValue(6), expire: vi.fn() };
-    mockedRedis.mockReturnValue(redis as never);
+    for (let i = 0; i < 5; i++) {
+      await avisarCitaPendiente(PENDIENTE);
+    }
+    expect(mockedBotones).toHaveBeenCalledTimes(5);
+    expect(almacenEnMemoria.incrementarContador).toHaveBeenLastCalledWith(
+      expect.stringMatching(/^whatsapp:cita_pendiente:/),
+      3_600_000
+    );
+    mockedBotones.mockClear();
+    mockedLeadUpdate.mockClear();
 
     expect(await avisarCitaPendiente(PENDIENTE)).toEqual({
       via: "ninguna",

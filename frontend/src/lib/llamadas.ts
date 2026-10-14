@@ -91,5 +91,8 @@ export function motivoDeCitaPendiente(failureCode: string | null): string {
   if (failureCode === "BOOKING_LOCK_TIMEOUT") {
     return "Había otra reserva en curso para la misma hora.";
   }
+  if (failureCode === "BOOKING_LOCK_ERROR") {
+    return "Un fallo técnico momentáneo nuestro impidió guardarla durante la llamada.";
+  }
   return "No se pudo guardar en la agenda durante la llamada.";
 }

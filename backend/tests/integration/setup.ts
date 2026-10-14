@@ -1,5 +1,4 @@
 import { config } from "dotenv";
-import { initRedis } from "../../src/lib/redis.js";
 import { conectarRedisDeCompatibilidad } from "../../src/lib/redisDeCompatibilidad.js";
 import { comprobarEntornoDeTest } from "./helpers/entornoDeTest.js";
 
@@ -9,10 +8,6 @@ import { comprobarEntornoDeTest } from "./helpers/entornoDeTest.js";
 config({ path: ".env.test" });
 comprobarEntornoDeTest();
 process.env.CALENDAR_CREDENTIALS_KEY ??= Buffer.alloc(32, 7).toString("base64");
-
-// voiceTools/service.ts (y otros) usan getRedis(), que exige que
-// initRedis() se haya llamado antes en el proceso.
-initRedis();
 
 // La suite corre en modo compatibilidad, como producción mientras exista
 // REDIS_URL: cada cerrojo se toma en Postgres y en Redis (/1). Los tests que

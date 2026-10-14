@@ -1,7 +1,18 @@
 import { randomBytes } from "node:crypto";
 import { z } from "zod";
 import { prisma } from "../../lib/prisma.js";
-import { getRedis } from "../../lib/redis.js";
+import {
+  borrarClave,
+  fijarCampo,
+  fijarCampoSiNoExiste,
+  guardarCampos,
+  guardarClave,
+  guardarClaveSiNoExiste,
+  incrementarContador,
+  leerCampos,
+  leerClave,
+  leerContador,
+} from "../../lib/almacenTemporal.js";
 import { errorMessage } from "../../lib/logUtils.js";
 import {
   esLineaDeClientesEspanola,
@@ -19,8 +30,9 @@ import { telnyxAiAdapter } from "../../adapters/telnyx/TelnyxAiAdapter.js";
  * guarda ninguna Call. Si la pata saliente termina sin que haya entrado
  * nada, la comprobación es un `fallo` con el motivo que Telnyx nos dé.
  *
- * Todo el estado vive en Redis (no hace falta tabla): la comprobación dura
- * segundos y el panel la consulta por polling. Solo queda en Postgres el
+ * Todo el estado vive en el almacén temporal (`claves_temporales` y
+ * `contadores`, sin tabla propia): la comprobación dura segundos y el panel
+ * la consulta por polling. Solo queda en Postgres el
  * resultado que importa, `OnboardingState.forwardingCheckedAt`.
  *
  * Los dos webhooks que resuelven la comprobación (la entrante desviada y el
@@ -30,9 +42,10 @@ import { telnyxAiAdapter } from "../../adapters/telnyx/TelnyxAiAdapter.js";
  *
  * - La comprobación se guarda ANTES de originar la llamada: con desvío
  *   «todas» la entrante puede llegar antes de que `dial()` devuelva.
- * - Cada comprobación es un hash de Redis y cada webhook escribe SOLO su
- *   campo: el `fallo` del colgado se escribe con HSETNX (no pisa nada) y el
- *   `ok` de la entrada con HSET (pisa un fallo previo). Con un JSON entero se
+ * - Cada comprobación es un objeto de campos (como un hash) y cada webhook
+ *   escribe SOLO su campo, en una sola sentencia: el `fallo` del colgado con
+ *   `fijarCampoSiNoExiste` (no pisa nada) y el `ok` de la entrada con
+ *   `fijarCampo` (pisa un fallo previo). Reescribiendo el objeto entero se
  *   perdería el `ok` si el colgado leyera antes y escribiera después.
  * - El puntero «última comprobación del negocio» (`ultima`) no se borra al
  *   fallar: caduca con el TTL. Es lo único que enlaza la entrante (que no
@@ -168,7 +181,7 @@ function claveDeLimite(businessId: string): string {
 }
 
 /** Resultado y fecha van juntos en un solo campo para escribirlos de una
- * vez (HSET/HSETNX): nunca se ve un resultado sin su fecha. */
+ * vez: nunca se ve un resultado sin su fecha. */
 const ResolucionSchema = z.object({
   resultado: z.union([
     z.object({ estado: z.literal("ok") }),
@@ -181,24 +194,26 @@ function codificarResolucion(resultado: ResultadoDeComprobacion): string {
   return JSON.stringify({ resultado, resueltaAt: new Date().toISOString() });
 }
 
-/** Deja el hash con los campos fijos y el TTL; los demás los ponen los
- * webhooks, cada uno el suyo. */
+/** Deja la comprobación con los campos fijos y el TTL; los demás los ponen
+ * los webhooks, cada uno el suyo. */
 async function crearComprobacion(check: ComprobacionDeDesvio): Promise<void> {
-  const redis = getRedis();
-  const clave = claveDeComprobacion(check.id);
-  await redis.hset(clave, {
-    id: check.id,
-    businessId: check.businessId,
-    linea: check.linea,
-    startedAt: check.startedAt,
-  });
-  await redis.expire(clave, COMPROBACION_TTL_SEGUNDOS);
+  await guardarCampos(
+    claveDeComprobacion(check.id),
+    {
+      id: check.id,
+      businessId: check.businessId,
+      linea: check.linea,
+      startedAt: check.startedAt,
+    },
+    COMPROBACION_TTL_SEGUNDOS * 1000,
+    { businessId: check.businessId }
+  );
 }
 
 async function leerComprobacion(
   id: string
 ): Promise<ComprobacionDeDesvio | null> {
-  const campos = await getRedis().hgetall(claveDeComprobacion(id));
+  const campos = (await leerCampos(claveDeComprobacion(id))) ?? {};
   if (!campos.id || !campos.businessId || !campos.linea || !campos.startedAt) {
     return null;
   }
@@ -223,11 +238,11 @@ async function leerComprobacion(
   };
 }
 
-/** Libera el turno del negocio. Si Redis falla, el dueño vería «ya hay una
+/** Libera el turno del negocio. Si el almacén falla, el dueño vería «ya hay una
  * comprobación en marcha» hasta que caduque el TTL: se dice en el log. */
 async function liberarTurno(businessId: string): Promise<void> {
   try {
-    await getRedis().del(claveDeNegocio(businessId));
+    await borrarClave(claveDeNegocio(businessId));
   } catch (error) {
     console.error(
       `[Desvío] Negocio ${businessId}: no se pudo liberar el turno de comprobación (quedará ocupado hasta ${COMPROBACION_TTL_SEGUNDOS} s): ${errorMessage(error)}`
@@ -317,19 +332,17 @@ export async function iniciarComprobacionDeDesvio(
     );
   }
 
-  const redis = getRedis();
   const id = randomBytes(16).toString("hex");
 
-  // Una sola comprobación en curso por negocio: la clave se reserva con NX y
-  // se libera al resolverse (o caduca sola con el TTL).
-  const reservada = await redis.set(
+  // Una sola comprobación en curso por negocio: la clave se reserva solo si
+  // no hay otra viva y se libera al resolverse (o caduca sola con el TTL).
+  const reservada = await guardarClaveSiNoExiste(
     claveDeNegocio(businessId),
     id,
-    "EX",
-    COMPROBACION_TTL_SEGUNDOS,
-    "NX"
+    COMPROBACION_TTL_SEGUNDOS * 1000,
+    { businessId }
   );
-  if (reservada !== "OK") {
+  if (!reservada) {
     throw new ComprobacionDeDesvioError(
       "comprobacion_en_curso",
       "Ya hay una comprobación en marcha; espera a que termine"
@@ -338,7 +351,7 @@ export async function iniciarComprobacionDeDesvio(
 
   let guardada = false;
   try {
-    const usadas = Number((await redis.get(claveDeLimite(businessId))) ?? 0);
+    const usadas = await leerContador(claveDeLimite(businessId));
     if (usadas >= LIMITE_DE_COMPROBACIONES_POR_HORA) {
       throw new ComprobacionDeDesvioError(
         "limite_alcanzado",
@@ -359,11 +372,11 @@ export async function iniciarComprobacionDeDesvio(
     // Antes de marcar: con desvío «todas» la llamada vuelve a entrar en el
     // acto y su webhook puede llegar antes de que `dial()` devuelva.
     await crearComprobacion(check);
-    await redis.set(
+    await guardarClave(
       claveDeUltima(businessId),
       id,
-      "EX",
-      COMPROBACION_TTL_SEGUNDOS
+      COMPROBACION_TTL_SEGUNDOS * 1000,
+      { businessId }
     );
     guardada = true;
 
@@ -389,13 +402,10 @@ export async function iniciarComprobacionDeDesvio(
     }
 
     // Solo cuentan las llamadas que de verdad salieron.
-    const contador = await redis.incr(claveDeLimite(businessId));
-    if (contador === 1) {
-      await redis.expire(claveDeLimite(businessId), 3600);
-    }
+    await incrementarContador(claveDeLimite(businessId), 3_600_000);
 
     // Un solo campo: no pisa un `ok` que haya llegado mientras marcaba.
-    await redis.hset(claveDeComprobacion(id), "callControlId", callControlId);
+    await fijarCampo(claveDeComprobacion(id), "callControlId", callControlId);
     check.callControlId = callControlId;
     console.log(
       `[Desvío] Negocio ${businessId}: comprobación ${id} en marcha, ${numeroDeAlhabla} llama a ${linea} (${callControlId})`
@@ -405,12 +415,12 @@ export async function iniciarComprobacionDeDesvio(
     // Nada de lo que se guardó sirve sin llamada: se retira para que ninguna
     // entrante posterior se atribuya a una comprobación que no salió.
     if (guardada) {
-      await redis.del(claveDeComprobacion(id)).catch((e: unknown) => {
+      await borrarClave(claveDeComprobacion(id)).catch((e: unknown) => {
         console.error(
           `[Desvío] Negocio ${businessId}: no se pudo borrar la comprobación ${id} que no llegó a salir: ${errorMessage(e)}`
         );
       });
-      await redis.del(claveDeUltima(businessId)).catch((e: unknown) => {
+      await borrarClave(claveDeUltima(businessId)).catch((e: unknown) => {
         console.error(
           `[Desvío] Negocio ${businessId}: no se pudo borrar el puntero a la comprobación ${id} que no llegó a salir: ${errorMessage(e)}`
         );
@@ -430,7 +440,7 @@ export async function iniciarComprobacionDeDesvio(
 export async function comprobacionDeDesvioReciente(
   businessId: string
 ): Promise<string | null> {
-  const id = await getRedis().get(claveDeUltima(businessId));
+  const id = await leerClave(claveDeUltima(businessId));
   const check = id ? await leerComprobacion(id) : null;
   if (!check) return null;
   const edadMs = Date.now() - new Date(check.startedAt).getTime();
@@ -478,8 +488,7 @@ export async function registrarLlamadaDeComprobacionRecibida(
     data: { forwardingConfirmedAt: ahora },
   });
 
-  const redis = getRedis();
-  const id = await redis.get(claveDeUltima(businessId));
+  const id = await leerClave(claveDeUltima(businessId));
   const check = id ? await leerComprobacion(id) : null;
   if (!check) {
     console.warn(
@@ -488,7 +497,7 @@ export async function registrarLlamadaDeComprobacionRecibida(
     return null;
   }
 
-  await redis.hset(
+  await fijarCampo(
     claveDeComprobacion(check.id),
     "resolucion",
     codificarResolucion({ estado: "ok" })
@@ -512,7 +521,7 @@ export async function registrarSalienteContestada(
   const check = await leerComprobacion(checkId);
   if (!check) return null;
   if (!check.contestada) {
-    await getRedis().hset(claveDeComprobacion(checkId), "contestada", "1");
+    await fijarCampo(claveDeComprobacion(checkId), "contestada", "1");
     check.contestada = true;
   }
   return check;
@@ -540,7 +549,7 @@ export function motivoDeFalloPorColgado(input: {
  * La pata saliente ha terminado. Si la comprobación sigue sin resultado es
  * que la llamada nunca volvió a entrar por el número de Alhabla: fallo, con
  * el motivo que se pueda deducir. Un `ok` ya registrado no se toca, ni
- * siquiera si llega entre la lectura y la escritura (HSETNX).
+ * siquiera si llega entre la lectura y la escritura (`fijarCampoSiNoExiste`).
  */
 export async function registrarSalienteColgada(
   checkId: string,
@@ -554,13 +563,13 @@ export async function registrarSalienteColgada(
     contestada: check.contestada,
     hangupCause,
   });
-  const escrito = await getRedis().hsetnx(
+  const escrito = await fijarCampoSiNoExiste(
     claveDeComprobacion(checkId),
     "resolucion",
     codificarResolucion({ estado: "fallo", motivo })
   );
   await liberarTurno(check.businessId);
-  if (escrito === 1) {
+  if (escrito) {
     console.log(
       `[Desvío] Negocio ${check.businessId}: comprobación ${check.id} fallida (${motivo}, hangup_cause=${hangupCause ?? "no indicado"})`
     );

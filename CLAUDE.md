@@ -6,8 +6,9 @@ Los agentes de voz atienden llamadas, consultan horario y disponibilidad, y rese
 en el calendario de Google, Outlook o Apple/iCloud del negocio. Desde septiembre de 2026 hablan
 también por WhatsApp con el dueño (avisos y el Gestor) y con sus clientes.
 
-Backend Fastify 5 + Prisma/PostgreSQL + Redis (en retirada: los cerrojos de citas y el límite de
-peticiones van en Postgres desde el PR #277; ver AGENTS.md § Corte de Redis a Postgres). Dos webs Next.js 16 App Router (React 19) con Tailwind 3
+Backend Fastify 5 + Prisma/PostgreSQL (el estado temporal también: cerrojos, límite de peticiones,
+cachés y claves de un solo uso; Redis solo queda como espejo de los cerrojos mientras exista
+`REDIS_URL`, ver AGENTS.md § Corte de Redis a Postgres). Dos webs Next.js 16 App Router (React 19) con Tailwind 3
 (desde el 2026-09-21, `docs/historico/PLAN-APP-DOMINIO.md`): **la app** en `frontend/` (puerto 3001,
 `app.alhabla.ai`, TanStack Query, sesión JWT en `localStorage`) y **la web pública** en `web/`
 (puerto 3002, `alhabla.ai`: landing, sectores, planes, legal, registro de cuenta y blog en MDX,
@@ -135,8 +136,8 @@ backend/
 │   │                 #   webhooksRetell, webhooksTelnyx, whatsapp) con routes.ts; gestor, voiceTools y
 │   │                 #   retellSimulation sin routes.ts (los usan los webhooks y los scripts)
 │   ├── adapters/     # retell, telnyx (voz y números), whatsapp, calendar (Google, Outlook, CalDAV)
-│   ├── lib/          # prisma, redis, cloudTasks, storage, stripe, availability, cerrojos,
-│   │                 #   limitesDePeticiones, almacenTemporal, salud, zohoMail, emailTemplates,
+│   ├── lib/          # prisma, almacenTemporal, cerrojos, limitesDePeticiones, cloudTasks,
+│   │                 #   storage, stripe, availability, salud, zohoMail, emailTemplates,
 │   │                 #   businessSchedule, agentBootstrap, managedAgentPrompt
 │   ├── config/       # voiceAgent.ts (catálogo de voces/LLM/STT)
 │   └── jobs/         # lógica de los jobs (sin framework): processRecording, retryFailedBooking,

@@ -13,8 +13,9 @@ import { errorMessage } from "./logUtils.js";
  * cerrado). La única bandera es `REDIS_URL`: sin ella, todo va solo por
  * Postgres.
  *
- * Cliente propio y distinto del de lib/redis.ts, con opciones que no dejan
- * comandos colgados ni en cola:
+ * Es el único cliente de Redis que queda (el general, lib/redis.ts, se borró
+ * con el PR B, cuando nada más lo usaba), con opciones que no dejan comandos
+ * colgados ni en cola:
  * - `enableOfflineQueue: false` y `maxRetriesPerRequest: 0`: un comando que
  *   se envía sin conexión falla en el acto, no espera a que reconecte.
  * - `commandTimeout: 1000`: un Redis lento no alarga la sección crítica; si
@@ -27,7 +28,7 @@ import { errorMessage } from "./logUtils.js";
  *   las siguientes en milisegundos).
  *
  * Sin cola offline, un corte breve (el cliente reconecta en 200-600 ms, por
- * su retryStrategy) ya no lo absorbe el cliente, como en lib/redis.ts, sino
+ * su retryStrategy) ya no lo absorbe el cliente, como en el antiguo, sino
  * los llamadores: adquirirCerrojo reintenta dentro de su presupuesto
  * (lib/cerrojos.ts) y un compare-and-delete que no pudo salir se vuelve a
  * mandar en cuanto el cliente está listo otra vez (soltarEnRedisAntiguo).
@@ -119,6 +120,15 @@ function esRespuestaDeError(err: unknown): boolean {
 /** `true` si el cliente de compatibilidad puede enviar ya (estado `ready`). */
 export function redisDeCompatibilidadListo(): boolean {
   return cliente?.status === "ready";
+}
+
+/** Para /health: un PING por este cliente, el que decide si se puede coger
+ * un cerrojo mientras haya `REDIS_URL` (sin él, las reservas fallan
+ * cerradas). Sin cliente, null: Redis ya no es una dependencia. Sin cola
+ * offline, un cliente que no está listo falla en el acto. */
+export function pingDeRedisDeCompatibilidad(): (() => Promise<string>) | null {
+  const actual = cliente;
+  return actual ? () => actual.ping() : null;
 }
 
 /** `true` solo si `conectarRedisDeCompatibilidad()` creó el cliente (hay

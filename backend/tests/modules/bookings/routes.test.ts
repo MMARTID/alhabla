@@ -2,7 +2,6 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import Fastify from "fastify";
 import { bookingSettingsRoutes } from "../../../src/modules/bookings/routes.js";
 import { prisma } from "../../../src/lib/prisma.js";
-import { getRedis } from "../../../src/lib/redis.js";
 import { syncAgentToRetell } from "../../../src/lib/agentBootstrap.js";
 import { invalidarCacheDeVoz } from "../../../src/lib/voiceConfigCache.js";
 
@@ -71,23 +70,8 @@ vi.mock("../../../src/lib/agentBootstrap.js", () => ({
   syncAgentToRetell: vi.fn(),
 }));
 
-const { mockRedis } = vi.hoisted(() => ({
-  mockRedis: {
-    del: vi.fn().mockResolvedValue(1),
-    pipeline: vi.fn(() => ({
-      del: vi.fn(),
-      exec: vi.fn().mockResolvedValue([]),
-    })),
-  },
-}));
-
-vi.mock("../../../src/lib/redis.js", () => ({
-  getRedis: () => mockRedis,
-}));
-
 // La invalidación de la caché de voz se comprueba por su función, no por la
-// clave de Redis: así el test sigue valiendo cuando esa caché cambie de
-// almacén (plan de corte de Redis, fase 0).
+// clave del almacén.
 vi.mock("../../../src/lib/voiceConfigCache.js", () => ({
   invalidarCacheDeVoz: vi.fn().mockResolvedValue(undefined),
 }));
@@ -102,7 +86,6 @@ describe("PATCH /bookings/ (capacidad) — invalidación de caché (hallazgo #16
 
   beforeEach(async () => {
     vi.clearAllMocks();
-    mockRedis.del.mockResolvedValue(1);
     fastify = Fastify();
     fastify.decorate("authenticate", async (request: any) => {
       request.user = { businessId: "biz_1" };
@@ -215,7 +198,6 @@ describe("POST /professionals — límite de profesionales por plan", () => {
 
   beforeEach(async () => {
     vi.clearAllMocks();
-    mockRedis.del.mockResolvedValue(1);
     fastify = Fastify();
     fastify.decorate("authenticate", async (request: any) => {
       request.user = { businessId: "biz_1" };
@@ -346,7 +328,6 @@ describe("profesionales — niveles por servicio", () => {
 
   beforeEach(async () => {
     vi.clearAllMocks();
-    mockRedis.del.mockResolvedValue(1);
     mockedGetBookingSettingsBusinessFindUnique.mockResolvedValue({ plan: "pro", stripePriceId: null } as any);
     mockedProfessionalCount.mockResolvedValue(0);
     fastify = Fastify();

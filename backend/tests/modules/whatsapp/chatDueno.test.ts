@@ -1,7 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import type { InboundMessage } from "@prisma/client";
 import { prisma } from "../../../src/lib/prisma.js";
-import { getRedis } from "../../../src/lib/redis.js";
+import {
+  almacenEnMemoria,
+  clavesVivas,
+  reiniciarAlmacenEnMemoria,
+} from "../../helpers/almacenEnMemoria.js";
 import { acquireLock, releaseLock } from "../../../src/lib/bookingLock.js";
 import { reclamarEnvio } from "../../../src/lib/messageIdempotency.js";
 import {
@@ -33,16 +37,11 @@ vi.mock("../../../src/lib/prisma.js", () => ({
     ownerPendingAction: { findUnique: vi.fn() },
   },
 }));
-vi.mock("../../../src/lib/redis.js", () => {
-  const redis = {
-    incr: vi.fn(),
-    expire: vi.fn(),
-    get: vi.fn(),
-    set: vi.fn(),
-    del: vi.fn(),
-  };
-  return { getRedis: () => redis };
-});
+// El turno en curso, la propuesta y los turnos del día van al almacén
+// temporal de Postgres: aquí, su versión en memoria.
+vi.mock("../../../src/lib/almacenTemporal.js", async () =>
+  (await import("../../helpers/almacenEnMemoria.js")).almacenEnMemoria
+);
 vi.mock("../../../src/lib/bookingLock.js", () => ({
   acquireLock: vi.fn(),
   releaseLock: vi.fn(),
@@ -76,10 +75,18 @@ const mockedCrear = vi.mocked(telnyxAiAdapter.createConversation);
 const mockedActualizar = vi.mocked(telnyxAiAdapter.updateConversation);
 const mockedAnadir = vi.mocked(telnyxAiAdapter.addConversationMessage);
 const mockedChat = vi.mocked(telnyxAiAdapter.chatWithAssistant);
-const redis = getRedis() as unknown as Record<
-  "incr" | "expire" | "get" | "set" | "del",
-  ReturnType<typeof vi.fn>
->;
+/** Lo que hace `proponer_accion` (gestor/tools.ts) mientras el assistant
+ * piensa: anotar la propuesta del turno. */
+function elGestorPropone(accionId: string, respuesta: string) {
+  mockedChat.mockImplementationOnce(async () => {
+    await almacenEnMemoria.guardarClave(
+      claveDePropuesta("biz_1"),
+      accionId,
+      180_000
+    );
+    return respuesta as never;
+  });
+}
 
 const MOVIL = "+34692000000";
 const AHORA = new Date("2026-09-20T15:00:00.000Z");
@@ -293,11 +300,7 @@ describe("conversarConGestor", () => {
     process.env.TELNYX_GESTOR_ASSISTANT_ID = "assistant-gestor";
     mockedBizFindUnique.mockResolvedValue(NEGOCIO as never);
     mockedBizUpdate.mockResolvedValue({} as never);
-    redis.incr.mockResolvedValue(1);
-    redis.expire.mockResolvedValue(1);
-    redis.get.mockResolvedValue(null);
-    redis.set.mockResolvedValue("OK");
-    redis.del.mockResolvedValue(1);
+    reiniciarAlmacenEnMemoria();
     mockedAcquire.mockResolvedValue("token");
     mockedSentCount.mockResolvedValue(0);
     mockedReclamar.mockResolvedValue(true);
@@ -376,7 +379,7 @@ describe("conversarConGestor", () => {
     expect(mockedChat).not.toHaveBeenCalled();
   });
 
-  it("un turno normal: anota el turno en Redis, manda marcador + texto, responde el texto tal cual y libera el lock", async () => {
+  it("un turno normal: anota el turno, manda marcador + texto, responde el texto tal cual y libera el lock", async () => {
     const message = entrante();
     const r = await conversarConGestor({
       message,
@@ -385,11 +388,11 @@ describe("conversarConGestor", () => {
     });
 
     expect(r).toEqual({ atendido: true, resultado: { handler: "chat:dueno" } });
-    expect(redis.set).toHaveBeenCalledWith(
+    expect(almacenEnMemoria.guardarClave).toHaveBeenCalledWith(
       claveDelTurno("biz_1"),
       JSON.stringify({ inboundMessageId: "in_1", conversationId: "conv_1" }),
-      "EX",
-      180
+      180_000,
+      { businessId: "biz_1" }
     );
     const [assistantId, turno] = mockedChat.mock.calls[0]!;
     expect(assistantId).toBe("assistant-gestor");
@@ -410,7 +413,8 @@ describe("conversarConGestor", () => {
     expect(cuerpoTexto()).toBe("Mañana no tienes citas.");
     expect(cuerpoTexto()).not.toMatch(/beta/i);
     expect(mockedEnviarBotones).not.toHaveBeenCalled();
-    expect(redis.del).toHaveBeenCalledWith(claveDelTurno("biz_1"));
+    // Al acabar no queda ni el turno ni una propuesta.
+    expect(clavesVivas()).toEqual([]);
     expect(mockedRelease).toHaveBeenCalledWith(
       "lock:whatsapp:chat:dueno:biz_1",
       "token"
@@ -418,14 +422,12 @@ describe("conversarConGestor", () => {
   });
 
   it("si el LLM propuso una acción en el turno, la respuesta sale con los botones Confirmar/Cancelar", async () => {
-    redis.get.mockImplementation(async (clave: string) =>
-      clave === claveDePropuesta("biz_1") ? "acc_7" : null
-    );
     // Lo que el backend comprobó que se va a hacer (registrarPropuesta).
     vi.mocked(prisma.ownerPendingAction.findUnique).mockResolvedValueOnce({
       resumen: "Dar por resuelta la cita pendiente de Elena del lunes 14 de septiembre a las 17:00.",
     } as never);
-    mockedChat.mockResolvedValueOnce(
+    elGestorPropone(
+      "acc_7",
       "Si confirmas, doy por resuelta la cita pendiente de Elena."
     );
 
@@ -460,7 +462,9 @@ describe("conversarConGestor", () => {
   });
 
   it("el turno 61 del día responde el límite sin llamar al Gestor", async () => {
-    redis.incr.mockResolvedValueOnce(TURNOS_POR_DUENO_Y_DIA + 1);
+    almacenEnMemoria.incrementarContador.mockResolvedValueOnce(
+      TURNOS_POR_DUENO_Y_DIA + 1
+    );
     const r = await conversarConGestor({
       message: entrante(),
       businessId: "biz_1",
@@ -536,11 +540,7 @@ describe("continuarTrasAccion (turno de seguimiento tras un botón)", () => {
     process.env.TELNYX_OWNER_CHAT_ENABLED = "true";
     process.env.TELNYX_GESTOR_ASSISTANT_ID = "assistant-gestor";
     mockedBizFindUnique.mockResolvedValue(NEGOCIO as never);
-    redis.incr.mockResolvedValue(1);
-    redis.expire.mockResolvedValue(1);
-    redis.get.mockResolvedValue(null);
-    redis.set.mockResolvedValue("OK");
-    redis.del.mockResolvedValue(1);
+    reiniciarAlmacenEnMemoria();
     mockedAcquire.mockResolvedValue("token");
     mockedSentCount.mockResolvedValue(0);
     mockedReclamar.mockResolvedValue(true);
@@ -600,13 +600,11 @@ describe("continuarTrasAccion (turno de seguimiento tras un botón)", () => {
   });
 
   it("una propuesta con respuesta larga manda el texto y aparte los botones con el resumen", async () => {
-    redis.get.mockImplementation(async (clave: string) =>
-      clave === claveDePropuesta("biz_1") ? "acc_7" : null
-    );
     vi.mocked(prisma.ownerPendingAction.findUnique).mockResolvedValue({
       resumen: "Doy de alta 15 servicios.",
     } as never);
-    mockedChat.mockResolvedValueOnce(
+    elGestorPropone(
+      "acc_7",
       "Si confirmas, daré de alta: " +
         "- Servicio con nombre largo, 30 minutos, 15 euros\n".repeat(30)
     );

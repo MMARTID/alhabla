@@ -1,6 +1,11 @@
 import type { InboundMessage } from "@prisma/client";
 import { prisma } from "../../lib/prisma.js";
-import { getRedis } from "../../lib/redis.js";
+import {
+  borrarClave,
+  consumirClave,
+  guardarClave,
+  incrementarContador,
+} from "../../lib/almacenTemporal.js";
 import { errorMessage } from "../../lib/logUtils.js";
 import { acquireLock, releaseLock } from "../../lib/bookingLock.js";
 import { servicioSuspendidoPorPago } from "../../lib/planFeatures.js";
@@ -150,11 +155,7 @@ async function turnosDeHoy(
 ): Promise<number> {
   try {
     const clave = claveDelDia(businessId, timezone);
-    const turnos = await getRedis().incr(clave);
-    if (turnos === 1) {
-      await getRedis().expire(clave, 2 * 24 * 60 * 60);
-    }
-    return turnos;
+    return await incrementarContador(clave, 2 * 24 * 60 * 60 * 1000);
   } catch (error) {
     console.error(
       `[WhatsApp] Chat dueño ${businessId}: no se pudo contar el turno del día; se atiende: ${errorMessage(error)}`
@@ -272,14 +273,13 @@ async function anotarTurno(
   turno: { inboundMessageId: string; conversationId: string }
 ): Promise<void> {
   try {
-    const redis = getRedis();
-    await redis.set(
+    await guardarClave(
       claveDelTurno(businessId),
       JSON.stringify(turno),
-      "EX",
-      TTL_TURNO_SEGUNDOS
+      TTL_TURNO_SEGUNDOS * 1000,
+      { businessId }
     );
-    await redis.del(claveDePropuesta(businessId));
+    await borrarClave(claveDePropuesta(businessId));
   } catch (error) {
     console.error(
       `[WhatsApp] Chat dueño ${businessId}: no se pudo anotar el turno en curso (proponer_accion quedará sin botones): ${errorMessage(error)}`
@@ -290,10 +290,8 @@ async function anotarTurno(
 /** Propuesta registrada por `proponer_accion` en este turno, si la hubo. */
 async function propuestaDelTurno(businessId: string): Promise<string | null> {
   try {
-    const redis = getRedis();
-    const accionId = await redis.get(claveDePropuesta(businessId));
-    await redis.del(claveDePropuesta(businessId));
-    await redis.del(claveDelTurno(businessId));
+    const accionId = await consumirClave(claveDePropuesta(businessId));
+    await borrarClave(claveDelTurno(businessId));
     return accionId;
   } catch (error) {
     console.error(

@@ -2,7 +2,12 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { filaDeConexion } from "../../helpers/conexionDeCalendario.js";
 import { executeVoiceTool } from "../../../src/modules/voiceTools/service.js";
 import { prisma } from "../../../src/lib/prisma.js";
-import { getRedis } from "../../../src/lib/redis.js";
+import {
+  almacenEnMemoria,
+  clavesVivas,
+  entradaDelAlmacen,
+  reiniciarAlmacenEnMemoria,
+} from "../../helpers/almacenEnMemoria.js";
 import {
   checkBookingRestrictions,
   checkBusinessHours,
@@ -15,7 +20,7 @@ import {
   enqueueWhatsappJob,
 } from "../../../src/lib/cloudTasks.js";
 import {
-  acquireBookingLock,
+  adquirirCerrojoDeReserva,
   releaseBookingLock,
 } from "../../../src/lib/bookingLock.js";
 import {
@@ -49,26 +54,25 @@ vi.mock("../../../src/lib/prisma.js", () => ({
   },
 }));
 
-vi.mock("../../../src/lib/redis.js", () => ({
-  getRedis: vi.fn(() => ({
-    get: vi.fn().mockResolvedValue(null),
-    // El cerrojo de reserva ya no pasa por aquí: va por el mock de
-    // lib/bookingLock.js de abajo. Este "OK" es para el resto de escrituras
-    // del módulo: el SET NX de pending_booking_alert (que así sale a la
-    // primera), el draft del token de disponibilidad y la caché de voz.
-    set: vi.fn().mockResolvedValue("OK"),
-    del: vi.fn(),
-    eval: vi.fn().mockResolvedValue(1),
-  })),
-}));
+// Los drafts del token de disponibilidad, la caché de voz y el aviso único
+// de reserva pendiente van al almacén temporal de Postgres: aquí, su versión
+// en memoria, vacía al empezar cada test (el cerrojo de reserva va aparte,
+// por el mock de lib/bookingLock.js de abajo).
+vi.mock("../../../src/lib/almacenTemporal.js", async () =>
+  (await import("../../helpers/almacenEnMemoria.js")).almacenEnMemoria
+);
+beforeEach(() => reiniciarAlmacenEnMemoria());
 
-// El cerrojo de reserva se mockea por su interfaz (token o null), no por el
-// SET NX de Redis: así estos tests siguen valiendo cuando el cerrojo cambie
-// de almacén (plan de corte de Redis). Por defecto se consigue siempre; los
-// tests de «agenda ocupada» lo ponen a null. El resto del módulo es el real.
+// El cerrojo de reserva se mockea por su interfaz (adquirido con token,
+// ocupado o error), no por su almacén. Por defecto se consigue siempre; los
+// tests de «agenda ocupada» lo ponen ocupado o en error. El resto del módulo
+// es el real.
 vi.mock("../../../src/lib/bookingLock.js", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../../src/lib/bookingLock.js")>()),
-  acquireBookingLock: vi.fn(async () => "token"),
+  adquirirCerrojoDeReserva: vi.fn(async () => ({
+    estado: "adquirido" as const,
+    token: "token",
+  })),
   releaseBookingLock: vi.fn(async () => undefined),
 }));
 
@@ -514,7 +518,7 @@ describe("executeVoiceTool book_appointment — vinculación a la llamada correc
 // reserva del mismo negocio tiene la agenda, no se reserva a ciegas; se
 // guarda la cita pendiente, se encola el reintento y se le dice al cliente.
 describe("executeVoiceTool book_appointment — agenda ocupada por otra reserva", () => {
-  const mockedAcquireBookingLock = vi.mocked(acquireBookingLock);
+  const mockedAdquirirCerrojo = vi.mocked(adquirirCerrojoDeReserva);
   const mockedReleaseBookingLock = vi.mocked(releaseBookingLock);
   const mockedEnqueueRetryBookingJob = vi.mocked(enqueueRetryBookingJob);
 
@@ -556,13 +560,13 @@ describe("executeVoiceTool book_appointment — agenda ocupada por otra reserva"
   });
 
   it("sin el cerrojo guarda la cita pendiente con BOOKING_LOCK_TIMEOUT, encola el reintento y avisa al cliente", async () => {
-    mockedAcquireBookingLock.mockResolvedValueOnce(null);
+    mockedAdquirirCerrojo.mockResolvedValueOnce({ estado: "ocupado" });
 
     const result = await executeVoiceTool(
       buildBookAppointmentInput({ callId: "call_vapi_1" })
     );
 
-    expect(mockedAcquireBookingLock).toHaveBeenCalledWith("business_123");
+    expect(mockedAdquirirCerrojo).toHaveBeenCalledWith("business_123");
     expect(result.success).toBe(true);
     expect(result.result).toEqual({
       success: false,
@@ -601,8 +605,45 @@ describe("executeVoiceTool book_appointment — agenda ocupada por otra reserva"
     );
   });
 
+  it("si el almacén del cerrojo falla, no dice que haya otra reserva: BOOKING_LOCK_ERROR, cita pendiente y reintento", async () => {
+    mockedAdquirirCerrojo.mockResolvedValueOnce({
+      estado: "error",
+      motivo: "Postgres no respondió",
+    });
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+    const result = await executeVoiceTool(
+      buildBookAppointmentInput({ callId: "call_vapi_1" })
+    );
+
+    expect(result.result).toEqual({
+      success: false,
+      code: "BOOKING_LOCK_ERROR",
+      message:
+        "Ahora mismo no puedo dejar la cita confirmada en la agenda. He tomado nota de tus datos y te confirmaremos en breve.",
+    });
+    expect(mockedLeadCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          data: expect.objectContaining({ failureCode: "BOOKING_LOCK_ERROR" }),
+        }),
+      })
+    );
+    expect(mockedEnqueueRetryBookingJob).toHaveBeenCalledWith(
+      { leadId: "lead_1" },
+      "retry-failed-booking-lead_1"
+    );
+    expect(mockedBookAppointment).not.toHaveBeenCalled();
+    expect(mockedReleaseBookingLock).not.toHaveBeenCalled();
+    // El log dice qué falló, con el negocio.
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining("business_123: el almacén falló (Postgres no respondió)")
+    );
+    warn.mockRestore();
+  });
+
   it("sin el cerrojo no mira la disponibilidad, no toca el calendario ni guarda la reserva", async () => {
-    mockedAcquireBookingLock.mockResolvedValueOnce(null);
+    mockedAdquirirCerrojo.mockResolvedValueOnce({ estado: "ocupado" });
 
     await executeVoiceTool(
       buildBookAppointmentInput({ callId: "call_vapi_1" })
@@ -618,7 +659,10 @@ describe("executeVoiceTool book_appointment — agenda ocupada por otra reserva"
   });
 
   it("con el cerrojo reserva y lo suelta con su propio token", async () => {
-    mockedAcquireBookingLock.mockResolvedValueOnce("token-propio");
+    mockedAdquirirCerrojo.mockResolvedValueOnce({
+      estado: "adquirido",
+      token: "token-propio",
+    });
 
     const result = await executeVoiceTool(
       buildBookAppointmentInput({ callId: "call_vapi_1" })
@@ -813,22 +857,9 @@ describe("executeVoiceTool check_availability — restricciones de reserva del n
   // checkBookingRestrictions real con el reloj fijado, para probar lo que
   // de verdad oye el agente.
   const AHORA = new Date("2026-08-25T14:00:00Z"); // 16:00 en Madrid
-  const redisStore = new Map<string, string>();
-  const redisMock = {
-    get: vi.fn(async (key: string) => redisStore.get(key) ?? null),
-    set: vi.fn(async (key: string, value: string) => {
-      redisStore.set(key, value);
-      return "OK";
-    }),
-    del: vi.fn(),
-    eval: vi.fn().mockResolvedValue(1),
-  };
-  const fabricaOriginal = vi.mocked(getRedis).getMockImplementation();
 
   function draftsGuardados() {
-    return [...redisStore.keys()].filter((key) =>
-      key.startsWith("availability_draft:")
-    );
+    return clavesVivas().filter((key) => key.startsWith("availability_draft:"));
   }
 
   function comprobar(params: Record<string, unknown>) {
@@ -844,8 +875,6 @@ describe("executeVoiceTool check_availability — restricciones de reserva del n
     vi.clearAllMocks();
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(AHORA);
-    redisStore.clear();
-    vi.mocked(getRedis).mockImplementation(() => redisMock as any);
     const real = await vi.importActual<
       typeof import("../../../src/lib/businessSchedule.js")
     >("../../../src/lib/businessSchedule.js");
@@ -876,8 +905,6 @@ describe("executeVoiceTool check_availability — restricciones de reserva del n
     mockedCheckBookingRestrictions.mockImplementation(() => ({
       success: true,
     }));
-    if (fabricaOriginal)
-      vi.mocked(getRedis).mockImplementation(fabricaOriginal);
   });
 
   it.each([
@@ -1055,24 +1082,11 @@ describe("executeVoiceTool book_appointment — reservar el hueco alternativo de
     },
     exceptions: [],
   };
-  const redisStore = new Map<string, string>();
-  const redisMock = {
-    get: vi.fn(async (key: string) => redisStore.get(key) ?? null),
-    set: vi.fn(async (key: string, value: string) => {
-      redisStore.set(key, value);
-      return "OK";
-    }),
-    del: vi.fn(),
-    eval: vi.fn().mockResolvedValue(1),
-  };
-  const fabricaOriginal = vi.mocked(getRedis).getMockImplementation();
 
   beforeEach(async () => {
     vi.clearAllMocks();
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(AHORA);
-    redisStore.clear();
-    vi.mocked(getRedis).mockImplementation(() => redisMock as any);
     const real = await vi.importActual<
       typeof import("../../../src/lib/businessSchedule.js")
     >("../../../src/lib/businessSchedule.js");
@@ -1104,8 +1118,6 @@ describe("executeVoiceTool book_appointment — reservar el hueco alternativo de
     // vi.clearAllMocks no vacía la cola de mockResolvedValueOnce: si un test
     // falla antes de consumirla, la respuesta sobrante contamina al siguiente.
     mockedCheckAvailability.mockReset();
-    if (fabricaOriginal)
-      vi.mocked(getRedis).mockImplementation(fabricaOriginal);
   });
 
   it("reserva a la hora que se propuso al cliente, no dos horas antes", async () => {
@@ -1190,7 +1202,7 @@ describe("executeVoiceTool book_appointment — reservar el hueco alternativo de
       comprobacion.result.suggestedNextSlot;
 
     // El cliente tarda más de 5 minutos en decidirse: el token caduca.
-    redisStore.clear();
+    reiniciarAlmacenEnMemoria();
     const conToken = await executeVoiceTool({
       businessId: "business_123",
       toolName: "book_appointment",
@@ -2360,8 +2372,6 @@ describe("executeVoiceTool book_appointment — estado de la suscripción (halla
 describe("executeVoiceTool book_appointment — apunta el intento fallido para el informe", () => {
   // Si la recepcionista escala por fallo técnico sin recado, el informe
   // final crea uno con esto (revisarEscaladaSinRecado en recados.ts).
-  const fabricaOriginal = vi.mocked(getRedis).getMockImplementation();
-
   beforeEach(() => {
     vi.clearAllMocks();
     mockedBusinessFindUnique.mockResolvedValue(buildBusiness() as any);
@@ -2373,10 +2383,6 @@ describe("executeVoiceTool book_appointment — apunta el intento fallido para e
     } as any);
     mockedProfessionalFindFirst.mockResolvedValue({ id: "professional_123" } as any);
     mockedServiceFindMany.mockResolvedValue([]);
-  });
-
-  afterEach(() => {
-    if (fabricaOriginal) vi.mocked(getRedis).mockImplementation(fabricaOriginal);
   });
 
   it("guarda el nombre, la hora normalizada y el código cuando la reserva falla", async () => {
@@ -2402,16 +2408,10 @@ describe("executeVoiceTool book_appointment — apunta el intento fallido para e
       professionalId: "professional_123",
       professionalRequested: false,
     };
-    vi.mocked(getRedis).mockImplementation(
-      () =>
-        ({
-          get: vi.fn(async (key: string) =>
-            key.startsWith("availability_draft:") ? JSON.stringify(draft) : null
-          ),
-          set: vi.fn().mockResolvedValue("OK"),
-          del: vi.fn(),
-          eval: vi.fn().mockResolvedValue(1),
-        }) as any
+    await almacenEnMemoria.guardarClave(
+      "availability_draft:token_1",
+      JSON.stringify(draft),
+      5 * 60 * 1000
     );
 
     await executeVoiceTool({
@@ -3114,34 +3114,22 @@ describe("executeVoiceTool notify_when_available", () => {
 // devuelve una recomendación con su propio token y book_appointment frena
 // UNA vez hasta que el cliente acepte a la persona propuesta o insista.
 describe("executeVoiceTool — recomendación de profesional", () => {
-  const redisStore = new Map<string, string>();
-  const redisMock = {
-    get: vi.fn(async (key: string) => redisStore.get(key) ?? null),
-    set: vi.fn(async (key: string, value: string) => {
-      redisStore.set(key, value);
-      return "OK";
-    }),
-    del: vi.fn(async (key: string) => {
-      redisStore.delete(key);
-      return 1;
-    }),
-    eval: vi.fn().mockResolvedValue(1),
-  };
-  const fabricaOriginal = vi.mocked(getRedis).getMockImplementation();
 
   function draftsGuardados() {
-    return [...redisStore.entries()]
-      .filter(([key]) => key.startsWith("availability_draft:"))
-      .map(([key, value]) => ({
+    return clavesVivas()
+      .filter((key) => key.startsWith("availability_draft:"))
+      .map((key) => ({
         token: key.replace("availability_draft:", ""),
-        ...JSON.parse(value),
+        ...JSON.parse(entradaDelAlmacen(key)!.valor as string),
       }));
+  }
+
+  function guardarDraft(clave: string, valor: string) {
+    return almacenEnMemoria.guardarClave(clave, valor, 5 * 60 * 1000);
   }
 
   beforeEach(() => {
     vi.clearAllMocks();
-    redisStore.clear();
-    vi.mocked(getRedis).mockImplementation(() => redisMock as any);
     mockedBusinessFindUnique.mockResolvedValue(buildBusiness() as any);
     mockedGetBusyIntervals.mockResolvedValue({
       intervals: [],
@@ -3165,11 +3153,6 @@ describe("executeVoiceTool — recomendación de profesional", () => {
       businessId: "business_123",
     } as any);
     mockedBookingFindUnique.mockResolvedValue(null);
-  });
-
-  afterEach(() => {
-    if (fabricaOriginal)
-      vi.mocked(getRedis).mockImplementation(fabricaOriginal);
   });
 
   const disponibleConRecomendacion = {
@@ -3337,7 +3320,7 @@ describe("executeVoiceTool — recomendación de profesional", () => {
   });
 
   it("book_appointment frena una vez si hubo recomendación y el cliente no ha insistido", async () => {
-    redisStore.set(
+    await guardarDraft(
       "availability_draft:token-marta",
       JSON.stringify({
         businessId: "business_123",
@@ -3375,7 +3358,7 @@ describe("executeVoiceTool — recomendación de profesional", () => {
   });
 
   it("con professionalConfirmed reserva con la persona pedida como filtro duro", async () => {
-    redisStore.set(
+    await guardarDraft(
       "availability_draft:token-marta",
       JSON.stringify({
         businessId: "business_123",
@@ -3418,7 +3401,7 @@ describe("executeVoiceTool — recomendación de profesional", () => {
   });
 
   it("el token de la persona recomendada reserva sin frenar: el cliente la aceptó", async () => {
-    redisStore.set(
+    await guardarDraft(
       "availability_draft:token-laura",
       JSON.stringify({
         businessId: "business_123",
@@ -3500,34 +3483,26 @@ describe("executeVoiceTool informar_al_negocio (post-conversación)", () => {
 
 // El borrado de una entrada rota de voice_config (calendario sin confirmar)
 // pasa por invalidarCacheDeVoz: se mira con lib/voiceConfigCache.js real
-// sobre el Redis mockeado, para probar la clave exacta que se borra.
+// sobre el almacén en memoria, para probar la clave exacta que se borra.
 describe("executeVoiceTool — entrada de la caché de voz con el calendario sin confirmar", () => {
-  const redisMock = {
-    get: vi.fn(),
-    set: vi.fn().mockResolvedValue("OK"),
-    del: vi.fn(),
-    eval: vi.fn().mockResolvedValue(1),
-  };
-  const fabricaOriginal = vi.mocked(getRedis).getMockImplementation();
   // Lo que había en la caché: el negocio sin ninguna conexión de calendario
   // confirmada (como tras un fallo de OAuth a medias).
   const entradaRota = JSON.stringify(
     buildBusiness({ calendarConnections: [] })
   );
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
-    redisMock.get.mockResolvedValue(entradaRota);
-    redisMock.del.mockResolvedValue(1);
-    vi.mocked(getRedis).mockImplementation(() => redisMock as never);
+    await almacenEnMemoria.guardarClave(
+      "voice_config:business_123",
+      entradaRota,
+      60 * 60 * 1000
+    );
+    // Lo sembrado no cuenta como escritura del módulo.
+    almacenEnMemoria.guardarClave.mockClear();
     mockedBusinessFindUnique.mockResolvedValue(buildBusiness() as never);
     mockedServiceFindMany.mockResolvedValue([] as never);
     mockedProfessionalFindMany.mockResolvedValue([] as never);
-  });
-
-  afterEach(() => {
-    if (fabricaOriginal)
-      vi.mocked(getRedis).mockImplementation(fabricaOriginal);
   });
 
   it("se borra voice_config:<negocio> y la configuración se relee de la BD", async () => {
@@ -3538,25 +3513,29 @@ describe("executeVoiceTool — entrada de la caché de voz con el calendario sin
     });
 
     expect(result.success).toBe(true);
-    expect(redisMock.get).toHaveBeenCalledWith("voice_config:business_123");
-    expect(redisMock.del).toHaveBeenCalledTimes(1);
-    expect(redisMock.del).toHaveBeenCalledWith("voice_config:business_123");
+    expect(almacenEnMemoria.leerClave).toHaveBeenCalledWith(
+      "voice_config:business_123"
+    );
+    expect(almacenEnMemoria.borrarClave).toHaveBeenCalledTimes(1);
+    expect(almacenEnMemoria.borrarClave).toHaveBeenCalledWith(
+      "voice_config:business_123"
+    );
     expect(mockedBusinessFindUnique).toHaveBeenCalledWith(
       expect.objectContaining({ where: { id: "business_123" } })
     );
     // Se borra antes de releer, y lo releído (con el calendario bueno) es lo
     // que se vuelve a cachear.
-    expect(redisMock.del.mock.invocationCallOrder[0]).toBeLessThan(
+    expect(almacenEnMemoria.borrarClave.mock.invocationCallOrder[0]).toBeLessThan(
       mockedBusinessFindUnique.mock.invocationCallOrder[0]
     );
-    const [clave, valor] = redisMock.set.mock.calls[0];
+    const [clave, valor] = almacenEnMemoria.guardarClave.mock.calls[0];
     expect(clave).toBe("voice_config:business_123");
     expect(JSON.parse(valor as string).calendarConnections).toHaveLength(1);
   });
 
   it("si el borrado falla no lanza, relee de la BD y lo registra con el negocio", async () => {
-    const fallo = new Error("Redis caído");
-    redisMock.del.mockRejectedValue(fallo);
+    const fallo = new Error("Postgres caído");
+    almacenEnMemoria.borrarClave.mockRejectedValue(fallo);
     const errorSpy = vi
       .spyOn(console, "error")
       .mockImplementation(() => undefined);

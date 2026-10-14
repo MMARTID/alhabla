@@ -3,7 +3,7 @@ import type { WhatsAppButton } from "../../adapters/whatsapp/WhatsAppAdapter.js"
 import { prisma } from "../../lib/prisma.js";
 import { errorMessage } from "../../lib/logUtils.js";
 import { reclamarEnvio } from "../../lib/messageIdempotency.js";
-import { getRedis } from "../../lib/redis.js";
+import { incrementarContador } from "../../lib/almacenTemporal.js";
 import { timezoneOffsetMinutes } from "../../lib/voiceDateTime.js";
 import { bajaVigente } from "./bajas.js";
 import { nombreParaWhatsapp, puedeRecibirAvisos } from "./altaDueno.js";
@@ -425,9 +425,15 @@ export function motivoDeFallo(failureCode: string | null | undefined): string {
     case "calendar_not_connected":
     case "CALENDAR_NOT_CONNECTED":
       return "no tienes ningún calendario conectado";
+    // BOOKING_LOCK_TIMEOUT es el que escribe voiceTools; los dos primeros
+    // no los escribe nadie (antes este aviso decía «tu calendario no
+    // respondió» cuando la causa era otra reserva).
     case "booking_lock":
     case "BOOKING_LOCK":
+    case "BOOKING_LOCK_TIMEOUT":
       return "otra reserva estaba entrando a la vez";
+    case "BOOKING_LOCK_ERROR":
+      return "tuvimos un fallo técnico momentáneo";
     default:
       return "tu calendario no respondió";
   }
@@ -447,10 +453,7 @@ export async function avisarCitaPendiente(input: {
   // Tope por negocio y hora: con el calendario caído, cinco avisos bastan.
   try {
     const clave = `whatsapp:cita_pendiente:${input.businessId}:${Math.floor(Date.now() / 3_600_000)}`;
-    const enEstaHora = await getRedis().incr(clave);
-    if (enEstaHora === 1) {
-      await getRedis().expire(clave, 3_600);
-    }
+    const enEstaHora = await incrementarContador(clave, 3_600_000);
     if (enEstaHora > TOPE_CITAS_PENDIENTES_POR_HORA) {
       console.log(
         `[WhatsApp] Aviso cita_pendiente del negocio ${input.businessId} omitido: ${enEstaHora - 1} en la última hora`

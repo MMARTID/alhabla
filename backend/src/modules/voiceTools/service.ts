@@ -1,6 +1,10 @@
 import { prisma } from "../../lib/prisma.js";
 import { randomUUID } from "node:crypto";
-import { getRedis } from "../../lib/redis.js";
+import {
+  guardarClave,
+  guardarClaveSiNoExiste,
+  leerClave,
+} from "../../lib/almacenTemporal.js";
 import { nombreParaElCliente } from "../../lib/nombreProfesional.js";
 import { enlazarReservaModificada } from "../bookings/reservaModificada.js";
 import {
@@ -77,7 +81,7 @@ import {
   resolvePlanId,
 } from "../../lib/planFeatures.js";
 import {
-  acquireBookingLock,
+  adquirirCerrojoDeReserva,
   releaseBookingLock,
 } from "../../lib/bookingLock.js";
 import { buildCalendarIdempotencyKey } from "../../lib/calendarIdempotency.js";
@@ -175,11 +179,11 @@ function availabilityDraftKey(token: string): string {
 
 async function createAvailabilityDraft(draft: AvailabilityDraft): Promise<string> {
   const token = randomUUID();
-  await getRedis().set(
+  await guardarClave(
     availabilityDraftKey(token),
     JSON.stringify(draft),
-    "EX",
-    AVAILABILITY_TOKEN_TTL_SECONDS
+    AVAILABILITY_TOKEN_TTL_SECONDS * 1000,
+    { businessId: draft.businessId }
   );
   return token;
 }
@@ -190,7 +194,7 @@ async function readAvailabilityDraft(
   callId?: string
 ): Promise<AvailabilityDraft | null> {
   try {
-    const raw = await getRedis().get(availabilityDraftKey(token));
+    const raw = await leerClave(availabilityDraftKey(token));
     if (!raw) return null;
     const draft = JSON.parse(raw) as AvailabilityDraft;
     if (
@@ -290,11 +294,8 @@ function telefonoParaClientes(
 async function getCachedVoiceConfig(
   businessId: string
 ): Promise<BusinessVoiceConfig | null> {
-  const redis = getRedis();
-  const redisKey = claveDeCacheDeVoz(businessId);
-
   try {
-    const cachedConfigStr = await redis.get(redisKey);
+    const cachedConfigStr = await leerClave(claveDeCacheDeVoz(businessId));
     if (cachedConfigStr) {
       const parsed = JSON.parse(cachedConfigStr) as BusinessVoiceConfig;
       // Token presente y flag === true: una entrada cacheada con el
@@ -322,13 +323,12 @@ async function setCachedVoiceConfig(
   businessId: string,
   config: BusinessVoiceConfig
 ): Promise<void> {
-  const redis = getRedis();
   try {
-    await redis.set(
+    await guardarClave(
       claveDeCacheDeVoz(businessId),
       JSON.stringify(config),
-      "EX",
-      3600
+      3600 * 1000,
+      { businessId }
     );
   } catch (err) {
     console.error(
@@ -992,8 +992,10 @@ async function avisarDeReservaPendiente(args: {
 }): Promise<void> {
   try {
     const clave = `pending_booking_alert:${args.businessId}`;
-    const primero = await getRedis().set(clave, "1", "EX", 3600, "NX");
-    if (primero !== "OK") {
+    const primero = await guardarClaveSiNoExiste(clave, "1", 3600 * 1000, {
+      businessId: args.businessId,
+    });
+    if (!primero) {
       return;
     }
 
@@ -1597,10 +1599,19 @@ async function executeBookAppointment(
     // en acquireBookingLock. Si no se consigue el lock a tiempo, se trata
     // igual que cualquier otro fallo transitorio: se guarda el lead y se
     // reintenta en segundo plano, en vez de arriesgar una doble reserva.
-    const bookingLockToken = await acquireBookingLock(business.id);
-    if (!bookingLockToken) {
+    // Ocupado (otra reserva del negocio entrando) y error (el almacén no
+    // respondió; el log con el motivo lo deja lib/cerrojos.ts) se cuentan
+    // distinto al cliente y al dueño.
+    const cerrojo = await adquirirCerrojoDeReserva(business.id);
+    if (cerrojo.estado !== "adquirido") {
+      const ocupado = cerrojo.estado === "ocupado";
+      const codigoDelCerrojo = ocupado
+        ? "BOOKING_LOCK_TIMEOUT"
+        : "BOOKING_LOCK_ERROR";
       console.warn(
-        `[VoiceTools] ${callLabel} no pudo adquirir el lock de reserva de ${business.id} a tiempo`
+        ocupado
+          ? `[VoiceTools] ${callLabel} no pudo adquirir el lock de reserva de ${business.id} a tiempo: otra reserva lo tenía`
+          : `[VoiceTools] ${callLabel} no pudo adquirir el lock de reserva de ${business.id}: el almacén falló (${cerrojo.motivo})`
       );
       const leadId = await capturePendingBookingLead({
         resolvedCall: call,
@@ -1612,7 +1623,7 @@ async function executeBookAppointment(
         durationMinutes: effectiveDuration,
         serviceIds: verifiedServiceIds,
         professionalId: verifiedProfessionalId,
-        failureCode: "BOOKING_LOCK_TIMEOUT",
+        failureCode: codigoDelCerrojo,
         callLabel,
       });
       if (leadId) {
@@ -1622,12 +1633,14 @@ async function executeBookAppointment(
         success: true,
         result: {
           success: false,
-          code: "BOOKING_LOCK_TIMEOUT",
-          message:
-            "Hay otra reserva de este negocio en curso justo ahora. He tomado nota de tus datos y te confirmaremos en breve.",
+          code: codigoDelCerrojo,
+          message: ocupado
+            ? "Hay otra reserva de este negocio en curso justo ahora. He tomado nota de tus datos y te confirmaremos en breve."
+            : "Ahora mismo no puedo dejar la cita confirmada en la agenda. He tomado nota de tus datos y te confirmaremos en breve.",
         },
       };
     }
+    const bookingLockToken = cerrojo.token;
 
     try {
       // La reserva que esta llamada ya tenga se lee ANTES de comprobar

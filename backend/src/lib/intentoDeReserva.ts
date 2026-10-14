@@ -1,12 +1,13 @@
-import { getRedis } from "./redis.js";
+import { guardarClave, leerClave } from "./almacenTemporal.js";
 import { errorMessage } from "./logUtils.js";
 
 /**
  * El último book_appointment que falló en una llamada, para que el informe
  * final pueda convertirlo en recado si la recepcionista escala por fallo
  * técnico sin dejar uno (ver recadoPorFalloTecnico en
- * modules/whatsapp/recados.ts). Vive en Redis y no en la BD porque solo hace
- * falta hasta que llega el informe, segundos después de colgar.
+ * modules/whatsapp/recados.ts). Es estado temporal (`claves_temporales`, con
+ * caducidad; antes en Redis): solo hace falta hasta que llega el informe,
+ * segundos después de colgar.
  */
 export interface IntentoDeReservaFallido {
   clientName: string | null;
@@ -25,17 +26,16 @@ function intentoKey(callControlId: string): string {
   return `intento_reserva_fallido:${callControlId}`;
 }
 
-/** Best-effort: si Redis falla, el recado saldrá sin nombre ni hora. */
+/** Best-effort: si el almacén falla, el recado saldrá sin nombre ni hora. */
 export async function guardarIntentoDeReservaFallido(
   callControlId: string,
   intento: IntentoDeReservaFallido
 ): Promise<void> {
   try {
-    await getRedis().set(
+    await guardarClave(
       intentoKey(callControlId),
       JSON.stringify(intento),
-      "EX",
-      INTENTO_TTL_SECONDS
+      INTENTO_TTL_SECONDS * 1000
     );
   } catch (error) {
     console.error(
@@ -48,7 +48,7 @@ export async function leerIntentoDeReservaFallido(
   callControlId: string
 ): Promise<IntentoDeReservaFallido | null> {
   try {
-    const raw = await getRedis().get(intentoKey(callControlId));
+    const raw = await leerClave(intentoKey(callControlId));
     return raw ? (JSON.parse(raw) as IntentoDeReservaFallido) : null;
   } catch (error) {
     console.error(
