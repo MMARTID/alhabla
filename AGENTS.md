@@ -2492,9 +2492,11 @@ property of the Retell **Agent** object, not the LLM — unrelated to `updateLlm
 #### Idiomas de atención y voz en Telnyx (desde 2026-10-02)
 
 **Desde el 05-10 el dueño solo elige el idioma principal y la voz** (decisión del usuario: «nos
-hemos complicado»). El principal manda: en él saluda, de él sale la voz y con él habla los siete
-idiomas de las voces Ultra (`ULTRA_HABLA`: español, inglés, francés, alemán, italiano, portugués y
-neerlandés) y, si es catalán, euskera o gallego, también esa lengua (ocho). No hay casillas de
+hemos complicado»). El principal manda: en él saluda, de él sale la voz y con él habla los ocho
+idiomas de las voces Ultra (`ULTRA_HABLA`: español, inglés, francés, alemán, italiano, portugués,
+neerlandés y, desde el 14-10, ruso) y, si es catalán, euskera o gallego, también esa lengua (nueve).
+El ruso no tiene voces propias, así que no puede ser principal; su saludo sirve para saludar en ruso
+a quien ya llamó hablándolo. No hay casillas de
 idiomas: `languages` se guarda derivado del principal para que todo lo que lo lee siga igual. El
 panel dice «Habla en 7 idiomas: … Saluda en español y sigue en el idioma de quien llama.»
 
@@ -2509,7 +2511,7 @@ listas de idiomas ni decide por su cuenta:
   - **Cada voz:** id de Telnyx, proveedor (`telnyx` = Ultra o `soniox`; Azure y MiniMax se
     retiraron el 05-10), nombre visible (único en su idioma), género, `descripcion` en español
     (2–5 palabras), `recomendada` (de atención al cliente) y qué idiomas habla (`habla`: toda Ultra
-    habla `ULTRA_HABLA` = es, en, fr, de, it, pt, nl; Soniox, «todos»). Por género, la primera es
+    habla `ULTRA_HABLA` = es, en, fr, de, it, pt, nl, ru; Soniox, «todos»). Por género, la primera es
     la de por defecto; luego las recomendadas y luego el resto. `descripcion` y `recomendada` no
     entran en el payload.
   - **Voces Ultra:** las de español, inglés, francés, alemán, italiano, portugués y neerlandés salen
@@ -2522,7 +2524,7 @@ listas de idiomas ni decide por su cuenta:
     francés 33 (Léa/Laurent), alemán 33 (Alina/Lukas), italiano 13 (Sofia/Marco), portugués 7
     (Beatriz/Paulo) y neerlandés 11 (Anneliese/Stijn). Las cooficiales tienen Marta y Sergio de
     Soniox.
-  - **`idiomasQueHabla(principal)`:** los siete de `ULTRA_HABLA` y, si el principal es una
+  - **`idiomasQueHabla(principal)`:** los ocho de `ULTRA_HABLA` y, si el principal es una
     cooficial, también ella, en orden canónico. Es lo que se guarda en `languages`.
   - **`familiaDeVoces(principal)`:** con un principal cooficial, sus voces (Soniox); si no, sus
     Ultra nativas.
@@ -2554,7 +2556,7 @@ listas de idiomas ni decide por su cuenta:
     de por defecto de su género (la que atendería sin elegir ninguna), `null` si no. El principal,
     sea el que sea, no exige nada. Con Marta y Sergio nunca: cada una es la de por defecto de su
     género. La mira `PATCH /business/me`.
-  - **Transcripción:** con un principal Ultra, flux en `multi` (los siete); con uno cooficial,
+  - **Transcripción:** con un principal Ultra, flux en `multi` (los ocho); con uno cooficial,
     `soniox/stt-rt-v5` con dos pistas, la suya y la del español (no las de los ocho que habla).
     **Medido el 05-10 en el laboratorio** (de 3 a 5 llamadas por tanda: muestras pequeñas):
     `multi` no empeora el español frente a `es` (p50 983 frente a 1193 ms y error de palabra del
@@ -2567,7 +2569,7 @@ listas de idiomas ni decide por su cuenta:
   - **Instrucción del prompt** (`instruccionesDeIdioma`): «En las llamadas, el saludo en
     {principal} ya lo dice el sistema al descolgar y es el primer mensaje de la conversación: no lo
     repitas. Desde tu primera respuesta, contesta y continúa exclusivamente en el idioma en que te
-    habla quien llama si es uno de estos: {los siete u ocho, en orden canónico}…», con «Las frases
+    habla quien llama si es uno de estos: {los ocho o nueve, en orden canónico}…», con «Las frases
     que estas instrucciones ponen entre comillas para decírselas a quien llama están en castellano:
     dilas traducidas al idioma de la conversación.» y la nota valenciana y balear del catalán; y un
     bloque «## Idioma» que cierra el prompt y lo recuerda (también la primera respuesta, lo que

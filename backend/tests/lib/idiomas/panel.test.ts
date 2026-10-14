@@ -33,11 +33,11 @@ const ELEGIR_ENTRE_29 = {
   funcion: "elegir_voz",
   texto: "Elegir entre las 29 voces: planes Pro y Scale",
 };
-const EXTRANJEROS = ["en-GB", "fr-FR", "de-DE", "it-IT", "pt-PT", "nl-NL"];
+const EXTRANJEROS = ["en-GB", "fr-FR", "de-DE", "it-IT", "pt-PT", "nl-NL", "ru-RU"];
 const HABLA_EN_ESPANOL =
-  "Habla en 7 idiomas: español, inglés, francés, alemán, italiano, portugués y neerlandés. Saluda en español y sigue en el idioma de quien llama.";
+  "Habla en 8 idiomas: español, inglés, francés, alemán, italiano, portugués, neerlandés y ruso. Saluda en español y sigue en el idioma de quien llama.";
 const HABLA_EN_CATALAN =
-  "Habla en 8 idiomas: catalán, español, inglés, francés, alemán, italiano, portugués y neerlandés. Saluda en catalán y sigue en el idioma de quien llama.";
+  "Habla en 9 idiomas: catalán, español, inglés, francés, alemán, italiano, portugués, neerlandés y ruso. Saluda en catalán y sigue en el idioma de quien llama.";
 
 describe("catalogoParaElPanel", () => {
   // Desde el 2026-10-05 el dueño solo elige el principal: español, catalán,
@@ -85,7 +85,7 @@ describe("catalogoParaElPanel", () => {
     expect(de("ca-ES").idiomas).toEqual(idiomasQueHabla("ca-ES"));
     expect(de("ca-ES").entradilla).toBe(HABLA_EN_CATALAN);
     expect(de("de-DE").entradilla).toBe(
-      "Habla en 7 idiomas: alemán, español, inglés, francés, italiano, portugués y neerlandés. Saluda en alemán y sigue en el idioma de quien llama."
+      "Habla en 8 idiomas: alemán, español, inglés, francés, italiano, portugués, neerlandés y ruso. Saluda en alemán y sigue en el idioma de quien llama."
     );
   });
 
@@ -192,6 +192,7 @@ describe("catalogoConCamposDelPanelAnterior", () => {
         "it-IT",
         "pt-PT",
         "nl-NL",
+      "ru-RU",
       ],
       expresiva: true,
     });
@@ -307,7 +308,7 @@ describe("vistaPreviaDeIdiomas", () => {
     expect(vista.languages).toEqual(idiomasQueHabla("es-ES"));
     expect(vista.voz).toBe("Telnyx.Ultra.538a8872-3799-4df5-b373-b78493b766c6");
     expect(vista.entradilla).toBe(
-      "Habla en 8 idiomas: español, inglés, francés, catalán, alemán, italiano, portugués y neerlandés. Saluda en español y sigue en el idioma de quien llama."
+      "Habla en 9 idiomas: español, inglés, francés, catalán, alemán, italiano, portugués, neerlandés y ruso. Saluda en español y sigue en el idioma de quien llama."
     );
     expect(vista.avisos).toEqual([
       "Como el negocio está donde el catalán es lengua oficial, también lo entiende y, si le hablan en catalán, contesta en catalán con la voz de Marta. A cambio tarda algo más en contestar, también cuando le hablan en español: entre medio segundo y un segundo y medio más por respuesta.",
@@ -402,7 +403,7 @@ describe("vistaPreviaDeIdiomas — principal, cooficial y voces (2026-10-05)", (
   it("la entradilla lista los idiomas que habla empezando por el principal", () => {
     expect(entradillaDeIdiomas("es-ES")).toBe(HABLA_EN_ESPANOL);
     expect(entradillaDeIdiomas("gl-ES")).toBe(
-      "Habla en 8 idiomas: gallego, español, inglés, francés, alemán, italiano, portugués y neerlandés. Saluda en gallego y sigue en el idioma de quien llama."
+      "Habla en 9 idiomas: gallego, español, inglés, francés, alemán, italiano, portugués, neerlandés y ruso. Saluda en gallego y sigue en el idioma de quien llama."
     );
     expect(entradillaDeIdiomas("es-ES", ["es-ES"])).toBe(
       "Atiende siempre en español."

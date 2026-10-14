@@ -65,7 +65,7 @@ export interface PrincipalDelPanel extends IdiomaDelPanel {
   /** Los que habla con este principal, en orden canónico: lo que se guarda
    * en `languages` al elegirlo (idiomasQueHabla). */
   idiomas: CodigoDeIdioma[];
-  /** «Habla en 7 idiomas: español, inglés, … Saluda en español y sigue en
+  /** «Habla en 8 idiomas: español, inglés, … Saluda en español y sigue en
    * el idioma de quien llama.» */
   entradilla: string;
   /** Si elegirlo exige una función del plan (el panel lo enseña con
@@ -154,10 +154,10 @@ function enumerar(palabras: readonly string[], conjuncion: string): string {
 
 /**
  * Lo que dice el panel de los idiomas que habla con `principal`: «Habla en
- * 7 idiomas: español, inglés, francés, alemán, italiano, portugués y
- * neerlandés. Saluda en español y sigue en el idioma de quien llama.» La
- * lista empieza por el principal (con una cooficial, «Habla en 8 idiomas:
- * catalán, español…»).
+ * 8 idiomas: español, inglés, francés, alemán, italiano, portugués,
+ * neerlandés y ruso. Saluda en español y sigue en el idioma de quien
+ * llama.» La lista empieza por el principal (con una cooficial, «Habla en 9
+ * idiomas: catalán, español…»).
  */
 export function entradillaDeIdiomas(
   principal: CodigoDeIdioma,
@@ -299,7 +299,7 @@ export interface VistaPreviaDeIdiomas {
   /** Lo que exige elegir entre `voces` una que no es la de por defecto de
    * su género (requisitoParaElegirVoz). */
   requiereParaElegirVoz: RequisitoDelPlan | null;
-  /** «Habla en 7 idiomas: … Saluda en español y sigue en el idioma de
+  /** «Habla en 8 idiomas: … Saluda en español y sigue en el idioma de
    * quien llama.» (entradillaDeIdiomas). */
   entradilla: string;
   /** El saludo real, con el nombre del negocio. */
@@ -362,7 +362,7 @@ export function vistaPreviaDeIdiomas(
   // Con un principal de voces Ultra fuera de una zona cooficial, flux no
   // entiende las lenguas cooficiales (47 % de error de palabra con un
   // cliente en catalán, tanda «B piloto» del laboratorio, 2026-10-05). Que
-  // el dueño no lo deduzca de «Habla en 7 idiomas». En una zona cooficial
+  // el dueño no lo deduzca de «Habla en 8 idiomas». En una zona cooficial
   // la entiende Soniox y contesta Marta o Sergio en un nodo (arriba).
   const cooficiales = oferta.principales.filter(esCooficial);
   const deLaZona = perfil.cooficialDeLaZona;
