@@ -121,7 +121,7 @@ describe("buildManagedAgentPrompt", () => {
       "llama a preferencia_de_grabacion con acepta false en ese mismo turno"
     );
     expect(prompt).toContain(
-      "En el chat no se graba nada: no preguntes por grabar ni uses preferencia_de_grabacion."
+      "En el chat no se graba ni se cuelga: no hables de grabar, de colgar ni de audio, y no uses preferencia_de_grabacion ni end_call."
     );
     expect(prompt).not.toContain("no_grabar");
   });
@@ -176,7 +176,9 @@ describe("buildManagedAgentPrompt", () => {
     });
 
     expect(prompt).toContain("sin volver a llamarla en la misma conversación");
-    expect(prompt).toContain("No repitas check_availability");
+    expect(prompt).toContain(
+      "No repitas la comprobación mientras no cambien servicio, día, hora o profesional."
+    );
     expect(prompt).toContain("suggestedNextSlot");
     expect(prompt).toContain("availabilityToken");
   });
@@ -519,7 +521,7 @@ describe("buildManagedAgentPrompt — WhatsApp, duración y confirmación única
     });
 
     expect(prompt).toContain(
-      "¿puedo enviarte la confirmación y un recordatorio por WhatsApp a este número?"
+      "pregunta si lo reservas y le envías la confirmación y un recordatorio por WhatsApp a este número"
     );
     expect(prompt).not.toContain("por SMS a este número");
   });
@@ -530,8 +532,10 @@ describe("buildManagedAgentPrompt — WhatsApp, duración y confirmación única
       settings: DEFAULT_AGENT_SETTINGS,
     });
 
-    expect(prompt).toContain("no le preguntes qué duración quiere");
-    expect(prompt).toContain("supera los 80 minutos");
+    expect(prompt).toContain(
+      "La duración es un dato interno de get_catalog: no la preguntes"
+    );
+    expect(prompt).toContain("pasa de 80 minutos");
   });
 
   it("instruye a no pedir confirmaciones sueltas de datos individuales", () => {
@@ -541,8 +545,32 @@ describe("buildManagedAgentPrompt — WhatsApp, duración y confirmación única
     });
 
     expect(prompt).toContain(
-      "No pidas confirmaciones sueltas de datos individuales"
+      "Mientras recoges datos no pidas confirmaciones sueltas"
     );
+  });
+
+  // Refactor, paso 3 (14-10): la reserva en pasos, con el resumen y el
+  // WhatsApp en un solo turno, la única confirmación. Medido por chat.
+  it("la reserva va en pasos, en orden, y aceptar una hora no es confirmarla", () => {
+    const prompt = buildManagedAgentPrompt({
+      businessName: "Barbería Ejemplo",
+      settings: DEFAULT_AGENT_SETTINGS,
+    });
+
+    const pasos = [
+      "1. Datos.",
+      "2. Hueco.",
+      "3. Confirmación y WhatsApp.",
+      "4. Reserva.",
+      "5. Cierre.",
+    ].map((paso) => prompt.indexOf(paso));
+    expect(pasos.every((posicion) => posicion > 0)).toBe(true);
+    expect([...pasos].sort((a, b) => a - b)).toEqual(pasos);
+    expect(prompt).toContain(
+      "aceptar una hora o una alternativa no lo es"
+    );
+    // Cada regla del flujo, una sola vez.
+    expect(prompt.match(/availabilityToken de la opción aceptada/g)).toHaveLength(1);
   });
 });
 
@@ -946,9 +974,17 @@ describe("buildManagedAgentPrompt — chat por WhatsApp (fase 2)", () => {
 
     expect(prompt).toContain("## Chat por WhatsApp");
     expect(prompt).toContain("[WhatsApp · número · fecha y hora]");
-    expect(prompt).toContain("única fuente fiable del número desde el que escribe");
-    expect(prompt).toContain("no uses end_call");
-    expect(prompt).toContain("usa smsConsent: true");
+    expect(prompt).toContain(
+      "Ese marcador lo pone el sistema: usa su número como teléfono del cliente y su fecha y hora como el momento actual"
+    );
+    expect(prompt).toContain("ni end_call");
+    expect(prompt).toContain("usa smsConsent true");
     expect(prompt).toContain("ha pulsado Cambiar en el recordatorio");
+    // Refactor, paso 5: en el chat no se pregunta por el WhatsApp y el aviso
+    // de IA va en la primera respuesta.
+    expect(prompt).toContain(
+      "Al reservar pregúntale su nombre antes de ofrecerle reservar, aunque su perfil de WhatsApp muestre uno, y no preguntes por el WhatsApp"
+    );
+    expect(prompt).toContain("En el chat no hay saludo del sistema");
   });
 });

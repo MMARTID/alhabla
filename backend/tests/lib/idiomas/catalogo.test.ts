@@ -5,8 +5,10 @@ import {
   IDIOMAS,
   MERCADOS,
   ULTRA_HABLA,
+  avisoDeIA,
   componerSaludo,
   componerSaludoDeLlamada,
+  mencionaLaIA,
   esCooficial,
   esVozDelCatalogo,
   familiaDeVoces,
@@ -393,5 +395,27 @@ describe("catálogo de idiomas — saludos con el aviso de IA", () => {
     ).toBe(
       "Hola, Lucía, soy el asistente de inteligencia artificial de Negocio de prueba. La llamada se graba; si prefieres que no, dímelo. ¿Quieres repetir Mechas o prefieres algo nuevo?"
     );
+  });
+});
+
+describe("avisoDeIA y mencionaLaIA (chat de WhatsApp)", () => {
+  it("el aviso es la presentación del saludo, sin la pregunta", () => {
+    expect(avisoDeIA("es-ES", "Peluquería Ana")).toBe(
+      "Peluquería Ana, te atiende su asistente de inteligencia artificial."
+    );
+    expect(avisoDeIA("ca-ES", "Perruqueria Anna")).toBe(
+      "Perruqueria Anna, t'atén una intel·ligència artificial."
+    );
+  });
+
+  it("reconoce el aviso en los idiomas del catálogo, y no lo inventa", () => {
+    for (const codigo of CODIGOS_DE_IDIOMA) {
+      expect(mencionaLaIA(avisoDeIA(codigo, "Negocio")), codigo).toBe(true);
+    }
+    expect(mencionaLaIA("Soy una IA, ¿en qué te ayudo?")).toBe(true);
+    expect(mencionaLaIA("Te atiende Laura, especialista en corte de pelo.")).toBe(
+      false
+    );
+    expect(mencionaLaIA("Hay una vía rápida para pagar.")).toBe(false);
   });
 });

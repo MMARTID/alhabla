@@ -6,6 +6,7 @@ import {
   leerClave,
 } from "../../lib/almacenTemporal.js";
 import { nombreParaElCliente } from "../../lib/nombreProfesional.js";
+import { esNombreDeClienteValido } from "../../lib/nombreDelCliente.js";
 import { enlazarReservaModificada } from "../bookings/reservaModificada.js";
 import {
   claveDeCacheDeVoz,
@@ -1407,6 +1408,23 @@ async function executeBookAppointment(
     ? rawParams.serviceIds.filter((id): id is string => typeof id === "string")
     : []);
 
+  // Sin el nombre real de quien llama no se reserva (lib/nombreDelCliente.ts):
+  // el error le dice a la recepcionista qué hacer.
+  if (!esNombreDeClienteValido(clientName)) {
+    console.warn(
+      `[VoiceTools] ${callLabel} book_appointment sin el nombre del cliente («${clientName ?? ""}», negocio ${business.id}); no se reserva`
+    );
+    return {
+      success: true,
+      result: {
+        success: false,
+        code: "CLIENT_NAME_REQUIRED",
+        message:
+          "Falta el nombre de quien reserva. Pregúntaselo y vuelve a llamar a book_appointment con su nombre en clientName.",
+      },
+    };
+  }
+
   if (!clientName || !startDateTime) {
     return {
       success: true,
@@ -2613,7 +2631,13 @@ export async function executeVoiceTool(
       );
     case "book_appointment": {
       const reserva = await executeBookAppointment(business, params, callLabel, callId);
-      if (callId && reserva.result?.success === false) {
+      // Sin nombre no es un fallo de la reserva: la recepcionista lo pregunta
+      // y vuelve a intentarlo.
+      if (
+        callId &&
+        reserva.result?.success === false &&
+        reserva.result.code !== "CLIENT_NAME_REQUIRED"
+      ) {
         const code = reserva.result.code;
         await registrarIntentoFallido(business, params, callId, typeof code === "string" ? code : null);
       }

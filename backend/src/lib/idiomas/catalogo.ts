@@ -602,6 +602,23 @@ export function componerSaludo(
 }
 
 /**
+ * El aviso de IA del chat de WhatsApp cuando la primera respuesta no lo da
+ * (modules/whatsapp/chatCliente.ts): la presentación del saludo, sin la
+ * pregunta.
+ */
+export function avisoDeIA(codigo: CodigoDeIdioma, negocio: string): string {
+  return rellenar(IDIOMAS[codigo].saludo.presentacion, { negocio });
+}
+
+/** ¿Dice el texto que es una inteligencia artificial, en alguno de los
+ * idiomas del catálogo? */
+export function mencionaLaIA(texto: string): boolean {
+  return /inteligencia artificial|intel·ligència artificial|intelixencia artificial|adimen artifizial|artificial intelligence|intelligence artificielle|künstliche[nr]? intelligenz|intelligenza artificiale|inteligência artificial|kunstmatige intelligentie|(?<![\p{L}])(IA|AI|KI)(?![\p{L}])/iu.test(
+    texto
+  );
+}
+
+/**
  * El saludo de una llamada concreta (lib/contextoDeLlamada.ts): con el
  * nombre de quien ya reservó y su último servicio (o «lo de la última vez»),
  * «nueva» la primera semana, y el aviso de grabación solo si ese cliente

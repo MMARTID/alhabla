@@ -402,6 +402,50 @@ describe("conversarConRecepcionista", () => {
     );
   });
 
+  // Reglamento de IA, art. 50: el aviso lo garantiza el backend en la
+  // primera respuesta de cada conversación (laboratorio del 14-10: la
+  // recepcionista lo omitía en 1 o 2 de cada 10).
+  it("la primera respuesta de una conversación nueva lleva el aviso de IA si no lo dice", async () => {
+    mockedConvFindUnique.mockResolvedValueOnce(null);
+    const message = entrante();
+
+    await conversarConRecepcionista({
+      message,
+      businessId: "biz_1",
+      texto: message.text!,
+    });
+
+    expect(cuerpoEnviado()).toBe(
+      "Peluquería Ana, te atiende su asistente de inteligencia artificial.\nMañana a las cinco tengo hueco. ¿Te lo reservo?"
+    );
+  });
+
+  it("si ya lo dice, o la conversación no es nueva, la respuesta va tal cual", async () => {
+    mockedConvFindUnique.mockResolvedValueOnce(null);
+    mockedChat.mockResolvedValueOnce(
+      "Te atiende la recepcionista virtual de Peluquería Ana, una inteligencia artificial. ¿En qué te ayudo?"
+    );
+    const message = entrante();
+
+    await conversarConRecepcionista({
+      message,
+      businessId: "biz_1",
+      texto: message.text!,
+    });
+    await conversarConRecepcionista({
+      message: entrante({ id: "in_2" }),
+      businessId: "biz_1",
+      texto: message.text!,
+    });
+
+    expect(cuerpoEnviado(0)).toBe(
+      "Te atiende la recepcionista virtual de Peluquería Ana, una inteligencia artificial. ¿En qué te ayudo?"
+    );
+    expect(cuerpoEnviado(1)).toBe(
+      "Mañana a las cinco tengo hueco. ¿Te lo reservo?"
+    );
+  });
+
   it("cada mensaje sube el chat al principio del historial (última actividad), antes de responder", async () => {
     let actividadAntesDeResponder = false;
     mockedChat.mockImplementationOnce(async () => {
