@@ -14,6 +14,9 @@ import {
   type ResultadoEnrutado,
 } from "./respuestas.js";
 import * as mensajes from "./mensajes.js";
+import { avisoDeIA, mencionaLaIA } from "../../lib/idiomas/catalogo.js";
+import { resolverIdiomas } from "../../lib/idiomas/resolver.js";
+import { parseAgentSettings } from "../../lib/managedAgentPrompt.js";
 
 /**
  * La recepcionista por chat (PLAN-CANAL-DUENO.md § 7, fase 2 / PR 1): el
@@ -86,6 +89,7 @@ interface NegocioDelChat {
   telnyxPhoneNumber: string | null;
   hideOwnerNumberFromClients: boolean;
   timezone: string;
+  agentSettings: unknown;
   active: boolean;
   clientChatEnabled: boolean;
   subscriptionStatus: string | null;
@@ -101,6 +105,7 @@ const SELECT_NEGOCIO_DEL_CHAT = {
   telnyxPhoneNumber: true,
   hideOwnerNumberFromClients: true,
   timezone: true,
+  agentSettings: true,
   active: true,
   clientChatEnabled: true,
   subscriptionStatus: true,
@@ -475,12 +480,17 @@ export async function conversarConRecepcionista(input: {
       };
     }
 
-    const enviada = await responder(
-      message,
-      "chat",
-      respuesta.trim(),
-      opciones
-    );
+    // El aviso de IA (Reglamento de IA, art. 50) lo garantiza el backend,
+    // como el saludo en las llamadas: si la primera respuesta de una
+    // conversación nueva no dice que es una inteligencia artificial, se le
+    // antepone. Por chat la omitía en 1 o 2 de cada 10 primeras respuestas,
+    // y alguna vez la cambiaba por «Te atiende Laura» (laboratorio del
+    // 14-10).
+    const textoAEnviar =
+      conversacion?.nueva && !mencionaLaIA(respuesta)
+        ? `${avisoDeIA(resolverIdiomas(parseAgentSettings(business.agentSettings)).principal, negocio)}\n${respuesta.trim()}`
+        : respuesta.trim();
+    const enviada = await responder(message, "chat", textoAEnviar, opciones);
     if (conversacion) {
       const now = new Date();
       await prisma.clientConversation
