@@ -1,6 +1,7 @@
 import { prisma } from "./prisma.js";
 import { parseAgentSettings } from "./managedAgentPrompt.js";
 import { resolverIdiomas } from "./idiomas/resolver.js";
+import { IDIOMA_OBLIGATORIO } from "./idiomas/ajustes.js";
 import { componerSaludoDeLlamada } from "./idiomas/catalogo.js";
 import { isBusinessType, type BusinessType } from "./businessType.js";
 import {
@@ -96,8 +97,13 @@ export async function resolverContextoDeLlamada(input: {
         select: { name: true },
       })
     : [];
+  const nombresDeServicios = servicios.map((servicio) => servicio.name);
+  // Para el prompt (en castellano): «Coloración, Hidratación profunda y
+  // Peinado».
   const ultimoServicio =
-    servicios.map((servicio) => servicio.name).join(" y ") || null;
+    nombresDeServicios.length > 1
+      ? `${nombresDeServicios.slice(0, -1).join(", ")} y ${nombresDeServicios.at(-1)}`
+      : (nombresDeServicios[0] ?? null);
   const nombre = reserva?.clientName?.trim() || null;
 
   const tipo: BusinessType = isBusinessType(business.businessType)
@@ -111,16 +117,22 @@ export async function resolverContextoDeLlamada(input: {
     ahora.getTime() - primeraLlamada.startedAt.getTime() < UNA_SEMANA_MS;
 
   const perfil = resolverIdiomas(parseAgentSettings(business.agentSettings));
+  // El saludo nombra el servicio solo si es uno y saluda en castellano: con
+  // varios se hacía largo («¿Quieres repetir Coloración y Hidratación
+  // profunda y Peinado…?», llamada de producción del 14-10), y los nombres
+  // del catálogo suelen estar en castellano, que leídos dentro de otro idioma
+  // suenan mal. Si no, «lo de la última vez».
+  const servicioDelSaludo =
+    !SIN_SERVICIO_EN_EL_SALUDO.has(tipo) &&
+    perfil.principal === IDIOMA_OBLIGATORIO &&
+    nombresDeServicios.length === 1
+      ? nombresDeServicios[0]
+      : null;
   const saludo = componerSaludoDeLlamada(perfil.principal, {
     negocio: business.name,
     genero: perfil.genero,
     primeraSemana,
-    cliente: nombre
-      ? {
-          nombre,
-          servicio: SIN_SERVICIO_EN_EL_SALUDO.has(tipo) ? null : ultimoServicio,
-        }
-      : null,
+    cliente: nombre ? { nombre, servicio: servicioDelSaludo } : null,
     grabando: grabar,
   });
 
