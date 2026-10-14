@@ -121,6 +121,7 @@ cd frontend && npm run dev   # la app, Next.js :3001
 cd web && npm run dev        # la web pública, Next.js :3002
 
 docker compose --profile dev up   # backend + postgres + redis + cloudflared (desde la raíz)
+docker compose --profile sim up -d backend-sim   # :3010, destino de los webhooks de Telnyx simulados
 ```
 
 ## Estructura
@@ -163,6 +164,8 @@ y `WEB_URL` (`backend/src/lib/urls.ts`). Nada de rutas de la otra web escritas a
   modelos Prisma, flujos de webhooks, WhatsApp, telefonía, facturación Stripe, calendarios,
   orquestadores de voz (Telnyx y Retell), despliegue.
   Consúltalo cuando trabajes sobre un subsistema concreto.
+- MCP `alhabla-dev` (`.mcp.json`, `backend/mcp/`): SQL de solo lectura en dev y en producción, JWT
+  de dev y webhooks firmados de Telnyx/Retell contra el backend local. Ver `AGENTS.md` § MCP de desarrollo.
 - `.claude-context.md` — resumen de producto, audiencia, tono de marca y problemas
   UI/UX conocidos.
 - `PRODUCT.md` (producto y marca), `DESIGN.md` (sistema de diseño), `CONTRIBUTING.md`

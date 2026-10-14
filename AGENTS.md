@@ -418,6 +418,27 @@ docker compose --profile prod up
 - Prisma Studio exposed on `localhost:5555`
 - The app (`localhost:3001`) and the public site (`localhost:3002`) are not in Compose: run them with `npm run dev`
 - The dev profile adds `cloudflared`, a named Cloudflare tunnel exposing `backend-dev` at `https://dev-api.alhabla.ai` (`CLOUDFLARE_TUNNEL_TOKEN`)
+- The `sim` profile adds `backend-sim` (`localhost:3010`): the same dev backend and database, but trusting a locally generated Ed25519 key (`TELNYX_PUBLIC_KEY_SIMULACION`) instead of Telnyx's. It is the target of the Telnyx webhooks signed by the dev MCP below; `backend-dev` still accepts only real Telnyx signatures. `docker compose --profile sim up -d backend-sim`
+
+### MCP de desarrollo (`backend/mcp/`, desde 2026-10-14)
+
+Servidor MCP local (stdio) registrado en `.mcp.json` como `alhabla-dev`; Claude Code lo arranca
+solo en este repo (hace falta `npm ci` en `backend/`, también en un worktree). Lee el `.env` del
+checkout PRINCIPAL aunque se lance desde un worktree (`git rev-parse --git-common-dir`;
+`ALHABLA_ENV_FILE` lo cambia). Herramientas:
+
+| Herramienta | Qué hace | Barreras |
+|-------------|----------|----------|
+| `consultar_bd_dev` | SQL contra `botbook` (Postgres de Docker, `localhost:5433`) | Transacción `READ ONLY` + protocolo extendido (una sola sentencia); se niega si `DATABASE_URL` no es local o lleva `?host=` |
+| `consultar_bd_prod` | SQL contra Cloud SQL `alhabla-db` / `alhabla` por Cloud SQL Auth Proxy (`--gcloud-auth`, lo arranca el MCP) | Rol `alhabla_lectura`: solo `pg_read_all_data`, `default_transaction_read_only`, `statement_timeout` 30 s y `CONNECTION LIMIT 2` (presupuesto de conexiones de Cloud SQL); contraseña en Secret Manager `DB_LECTURA_PASSWORD`. Más la misma transacción READ ONLY |
+| `generar_jwt_dev` | JWT de un usuario de dev (por email o negocio), mismo payload que `createToken` (`tv` = `tokenVersion`) | Solo con el `JWT_SECRET` y la BD de dev |
+| `simular_webhook_telnyx` | POST firmado Ed25519 a `/webhooks/telnyx…` de `backend-sim` (:3010). Con `businessId` crea o reutiliza una fila de `calls` `sim-mcp-<negocio>-<teléfono>` y pone `x-alhabla-call-control-id` | Solo localhost y rutas `/webhooks/telnyx`; firma con `TELNYX_PRIVATE_KEY_SIMULACION`, que ningún otro backend acepta |
+| `simular_webhook_retell` | POST con `x-retell-signature` (HMAC con la `RETELL_API_KEY` de dev) a `/webhooks/retell…` de `backend-dev` (:3000) | Solo localhost y rutas `/webhooks/retell` |
+
+Las tools simuladas se ejecutan de verdad: `book_appointment` reserva en el calendario real del
+negocio de dev y los avisos de WhatsApp salen. Las claves de simulación se generan con
+`cd backend && npx tsx mcp/generarClavesDeSimulacion.ts` y van al `.env` de la raíz. La
+verificación de firmas del backend no se toca: el MCP firma como el proveedor.
 
 ## Environment Variables
 
