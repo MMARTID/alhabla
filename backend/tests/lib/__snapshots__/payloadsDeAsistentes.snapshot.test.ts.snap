@@ -201,7 +201,7 @@ exports[`payloads de asistentes (instantáneas) > assistant de la recepcionista 
       },
       {
         "condition": {
-          "prompt": "Quien llama habla inglés, francés, alemán, italiano, portugués o neerlandés.",
+          "prompt": "Quien llama habla inglés, francés, alemán, italiano, portugués, neerlandés o ruso.",
           "type": "llm",
         },
         "id": "a_inicial",
@@ -228,7 +228,7 @@ Si quien llama habla en catalán (aunque sea una sola frase o un saludo, mezclad
         "id": "cooficial",
         "instructions": "## Idioma en este paso
 
-Desde ahora habla en catalán con naturalidad; no repitas el saludo ni el aviso de IA ya dados, pero si es tu primera frase en catalán di brevemente, en catalán, que eres una inteligencia artificial. Si quien llama vuelve a hablarte en castellano, contéstale en castellano. Si habla en inglés, francés, alemán, italiano, portugués o neerlandés, llama a la herramienta transition__a_inicial en ese mismo turno, sin decir nada antes, y contéstale después solo en su idioma. Usa transition__a_inicial solo para eso.",
+Desde ahora habla en catalán con naturalidad; no repitas el saludo ni el aviso de IA ya dados, pero si es tu primera frase en catalán di brevemente, en catalán, que eres una inteligencia artificial. Si quien llama vuelve a hablarte en castellano, contéstale en castellano. Si habla en inglés, francés, alemán, italiano, portugués, neerlandés o ruso, llama a la herramienta transition__a_inicial en ese mismo turno, sin decir nada antes, y contéstale después solo en su idioma. Usa transition__a_inicial solo para eso.",
         "instructions_mode": "append",
         "name": "En catalán",
         "shared_tool_ids": [],

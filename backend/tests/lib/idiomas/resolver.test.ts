@@ -39,8 +39,9 @@ describe("resolverIdiomas — voz y transcripción", () => {
     expect(resolver(["es-ES"], "es-ES", "masculina").voz.nombre).toBe("Marcos");
   });
 
-  it("con cualquier principal Ultra habla los siete, en orden canónico, y flux los entiende", () => {
-    for (const principal of ULTRA_HABLA) {
+  it("con cualquier principal Ultra habla los ocho, en orden canónico, y flux los entiende", () => {
+    // El ruso lo hablan, pero sin voces propias no puede ser principal.
+    for (const principal of ULTRA_HABLA.filter(puedeSerPrincipal)) {
       const perfil = resolver([], principal);
       expect(perfil.principal, principal).toBe(principal);
       expect(perfil.idiomas, principal).toEqual([
@@ -51,6 +52,7 @@ describe("resolverIdiomas — voz y transcripción", () => {
         "it-IT",
         "pt-PT",
         "nl-NL",
+      "ru-RU",
       ]);
       expect(perfil.familia, principal).toBe("ultra");
       expect(perfil.transcripcion, principal).toEqual({
@@ -76,6 +78,7 @@ describe("resolverIdiomas — voz y transcripción", () => {
       "it-IT",
       "pt-PT",
       "nl-NL",
+    "ru-RU",
     ]);
     expect(catalan.transcripcion).toEqual({
       motor: "soniox",
@@ -114,6 +117,7 @@ describe("resolverIdiomas — la cooficial de la zona", () => {
       "it-IT",
       "pt-PT",
       "nl-NL",
+    "ru-RU",
     ]);
     expect(perfil.transcripcion).toEqual({
       motor: "soniox",
@@ -294,10 +298,10 @@ describe("elegirVoz, con voces que el catálogo aún no tiene", () => {
 describe("resolverIdiomas — prompt y saludo", () => {
   it("con principal español, saluda en español y sigue en cualquiera de los siete", () => {
     expect(resolver(["es-ES"]).instruccionDelPrompt).toBe(
-      "En las llamadas, el saludo en español de España ya lo dice el sistema al descolgar y es el primer mensaje de la conversación: no lo repitas. Desde tu primera respuesta, contesta y continúa exclusivamente en el idioma en que te habla quien llama si es uno de estos: español de España, inglés, francés, alemán, italiano, portugués, neerlandés. Si cambia entre esos idiomas, acompaña el cambio sin pedirle que elija uno. Las frases que estas instrucciones ponen entre comillas para decírselas a quien llama están en castellano: dilas traducidas al idioma de la conversación. Los nombres de los servicios del catálogo también suelen estar en castellano y no son nombres propios: en otro idioma, dilos traducidos a ese idioma, no tal cual (salvo los que no tienen traducción, como «balayage»)."
+      "En las llamadas, el saludo en español de España ya lo dice el sistema al descolgar y es el primer mensaje de la conversación: no lo repitas. Desde tu primera respuesta, contesta y continúa exclusivamente en el idioma en que te habla quien llama si es uno de estos: español de España, inglés, francés, alemán, italiano, portugués, neerlandés, ruso. Si cambia entre esos idiomas, acompaña el cambio sin pedirle que elija uno. Las frases que estas instrucciones ponen entre comillas para decírselas a quien llama están en castellano: dilas traducidas al idioma de la conversación. Los nombres de los servicios del catálogo también suelen estar en castellano y no son nombres propios: en otro idioma, dilos traducidos a ese idioma, no tal cual (salvo los que no tienen traducción, como «balayage»)."
     );
     expect(resolver(["es-ES"]).recordatorioDelPrompt).toBe(
-      "## Idioma\nContesta cada turno en el idioma en que te habla quien llama si es uno de estos: español de España, inglés, francés, alemán, italiano, portugués, neerlandés; también tu primera respuesta, lo que digas después de usar una herramienta (aunque te conteste en castellano), los nombres de los servicios, el resumen de la reserva, la pregunta del WhatsApp y la despedida. No cambies de idioma por tu cuenta mientras siga hablando en el suyo."
+      "## Idioma\nContesta cada turno en el idioma en que te habla quien llama si es uno de estos: español de España, inglés, francés, alemán, italiano, portugués, neerlandés, ruso; también tu primera respuesta, lo que digas después de usar una herramienta (aunque te conteste en castellano), los nombres de los servicios, el resumen de la reserva, la pregunta del WhatsApp y la despedida. No cambies de idioma por tu cuenta mientras siga hablando en el suyo."
     );
   });
 
@@ -586,7 +590,7 @@ describe("funcionQueExige", () => {
 describe("resolverIdiomas — el prompt con un principal cooficial", () => {
   it("saluda en catalán, lista los ocho y lleva la nota valenciana y balear", () => {
     expect(resolver([], "ca-ES").instruccionDelPrompt).toBe(
-      "En las llamadas, el saludo en catalán ya lo dice el sistema al descolgar y es el primer mensaje de la conversación: no lo repitas. Desde tu primera respuesta, contesta y continúa exclusivamente en el idioma en que te habla quien llama si es uno de estos: español de España, inglés, francés, catalán, alemán, italiano, portugués, neerlandés. Si cambia entre esos idiomas, acompaña el cambio sin pedirle que elija uno. Las frases que estas instrucciones ponen entre comillas para decírselas a quien llama están en castellano: dilas traducidas al idioma de la conversación. Los nombres de los servicios del catálogo también suelen estar en castellano y no son nombres propios: en otro idioma, dilos traducidos a ese idioma, no tal cual (salvo los que no tienen traducción, como «balayage»). Si quien llama usa formas valencianas o baleares del catalán, adáptate a ellas."
+      "En las llamadas, el saludo en catalán ya lo dice el sistema al descolgar y es el primer mensaje de la conversación: no lo repitas. Desde tu primera respuesta, contesta y continúa exclusivamente en el idioma en que te habla quien llama si es uno de estos: español de España, inglés, francés, catalán, alemán, italiano, portugués, neerlandés, ruso. Si cambia entre esos idiomas, acompaña el cambio sin pedirle que elija uno. Las frases que estas instrucciones ponen entre comillas para decírselas a quien llama están en castellano: dilas traducidas al idioma de la conversación. Los nombres de los servicios del catálogo también suelen estar en castellano y no son nombres propios: en otro idioma, dilos traducidos a ese idioma, no tal cual (salvo los que no tienen traducción, como «balayage»). Si quien llama usa formas valencianas o baleares del catalán, adáptate a ellas."
     );
   });
 });

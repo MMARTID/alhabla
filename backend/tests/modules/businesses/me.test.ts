@@ -831,6 +831,7 @@ describe("idiomas de la recepcionista en el panel", () => {
       "it-IT",
       "pt-PT",
       "nl-NL",
+    "ru-RU",
     ]);
     expect(espanol.voces[0]).toMatchObject({
       nombre: "Blanca",
@@ -862,7 +863,7 @@ describe("idiomas de la recepcionista en el panel", () => {
       familia: "soniox",
       saludo: "Perruqueria Anna, t'atén una intel·ligència artificial. En què et puc ajudar?",
       entradilla:
-        "Habla en 8 idiomas: catalán, español, inglés, francés, alemán, italiano, portugués y neerlandés. Saluda en catalán y sigue en el idioma de quien llama.",
+        "Habla en 9 idiomas: catalán, español, inglés, francés, alemán, italiano, portugués, neerlandés y ruso. Saluda en catalán y sigue en el idioma de quien llama.",
     });
     expect(
       response.json().voces.map((voz: { nombre: string }) => voz.nombre)

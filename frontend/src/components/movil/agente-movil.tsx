@@ -45,7 +45,7 @@ export function AgenteMovil({ business }: { business: Business }) {
   const profesionales = ajustes.data?.professionals.length ?? 0;
   const capacidad = ajustes.data?.bookingCapacity ?? business.bookingCapacity ?? 1;
   const cargando = ajustes.isLoading;
-  // «Español · habla 7 idiomas · Blanca»: el principal, cuántos idiomas
+  // «Español · habla 8 idiomas · Blanca»: el principal, cuántos idiomas
   // habla con él (los del catálogo; sin él, los `languages` del negocio,
   // que pueden ser de antes si la caché viene de una respuesta sin
   // normalizar) y la voz que atiende, la elegida o, sin ella, la primera de
