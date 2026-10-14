@@ -100,7 +100,7 @@ function catalogoDelBackendAnterior() {
 
 const IDIOMAS_CON_CATALAN = principalDelCatalogo("ca-ES").idiomas!;
 const HABLA_SIETE =
-  "Habla en 7 idiomas: español, inglés, francés, alemán, italiano, portugués y neerlandés. Saluda en español y sigue en el idioma de quien llama.";
+  "Habla en 8 idiomas: español, inglés, francés, alemán, italiano, portugués, neerlandés y ruso. Saluda en español y sigue en el idioma de quien llama.";
 
 const principales = () => screen.getByRole("radiogroup", { name: "Idioma principal" });
 const principal = (nombre: string) => within(principales()).getByRole("radio", { name: new RegExp(`^${nombre}`) });

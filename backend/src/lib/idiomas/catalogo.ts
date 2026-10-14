@@ -44,6 +44,7 @@ export const CODIGOS_DE_IDIOMA = [
   "it-IT",
   "pt-PT",
   "nl-NL",
+  "ru-RU",
 ] as const;
 
 export type CodigoDeIdioma = (typeof CODIGOS_DE_IDIOMA)[number];
@@ -158,7 +159,8 @@ export interface IdiomaDelCatalogo {
 /**
  * Lo que habla cualquier voz Ultra: su idioma y los extranjeros que se
  * ofrecen (alemán, italiano, portugués y neerlandés, aprobados de oído por
- * el usuario el 2026-10-03 en el laboratorio de voces). Ni catalán, ni
+ * el usuario el 2026-10-03 en el laboratorio de voces; el ruso, el
+ * 2026-10-14, tras escuchar a Blanca y Marcos hablándolo). Ni catalán, ni
  * euskera, ni gallego. Desde el 2026-10-05 la recepcionista los habla
  * todos, sea cual sea el principal (idiomasQueHabla).
  */
@@ -170,6 +172,7 @@ export const ULTRA_HABLA = [
   "it-IT",
   "pt-PT",
   "nl-NL",
+  "ru-RU",
 ] as const;
 
 /**
@@ -453,6 +456,34 @@ export const IDIOMAS: Record<CodigoDeIdioma, IdiomaDelCatalogo> = {
     cooficial: false,
     voces: ultra("nl-NL"),
   },
+  // Decisión del usuario del 2026-10-14: lo hablan las voces Ultra de
+  // cualquier principal (Blanca y Marcos, escuchados), y flux lo entiende.
+  // Sin voces propias, así que no puede ser principal; su saludo sirve para
+  // saludar en ruso a quien ya llamó hablándolo. De usted, como se atiende
+  // en ruso; sin género, como en los demás idiomas que no son el español.
+  "ru-RU": {
+    iso: "ru",
+    nombreEnPrompt: "ruso",
+    etiqueta: "Ruso",
+    saludo: {
+      presentacion: "{negocio}, с вами говорит искусственный интеллект.",
+      presentacionNueva:
+        "{negocio}, с вами говорит наш новый помощник на основе искусственного интеллекта.",
+      presentacionAlCliente:
+        "Здравствуйте, {nombre}! С вами говорит помощник {negocio} на основе искусственного интеллекта.",
+      avisoDeGrabacion:
+        "Разговор записывается; если вы не хотите, скажите мне.",
+      pregunta: "Чем могу помочь?",
+      repetir: "Хотите повторить {servicio} или что-то другое?",
+      repetirLoDeLaUltimaVez:
+        "Хотите повторить то же, что в прошлый раз, или что-то другое?",
+    },
+    transcripcion: { flux: "ru", soniox: "ru" },
+    // Retell solo recibe el principal y el español (ajustesParaRetell).
+    retell: { locale: null, vozMultilingue: false },
+    cooficial: false,
+    voces: null,
+  },
 };
 
 /**
@@ -613,7 +644,7 @@ export function avisoDeIA(codigo: CodigoDeIdioma, negocio: string): string {
 /** ¿Dice el texto que es una inteligencia artificial, en alguno de los
  * idiomas del catálogo? */
 export function mencionaLaIA(texto: string): boolean {
-  return /inteligencia artificial|intel·ligència artificial|intelixencia artificial|adimen artifizial|artificial intelligence|intelligence artificielle|künstliche[nr]? intelligenz|intelligenza artificiale|inteligência artificial|kunstmatige intelligentie|(?<![\p{L}])(IA|AI|KI)(?![\p{L}])/iu.test(
+  return /inteligencia artificial|intel·ligència artificial|intelixencia artificial|adimen artifizial|artificial intelligence|intelligence artificielle|künstliche[nr]? intelligenz|intelligenza artificiale|inteligência artificial|kunstmatige intelligentie|искусственн(?:ый|ого) интеллект|(?<![\p{L}])(IA|AI|KI)(?![\p{L}])/iu.test(
     texto
   );
 }

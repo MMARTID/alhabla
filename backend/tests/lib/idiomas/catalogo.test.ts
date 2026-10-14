@@ -278,8 +278,9 @@ describe("catálogo de idiomas — voces Ultra y mercado de España", () => {
 
   // Decisión del usuario del 2026-10-05 («nos hemos complicado»): el dueño
   // solo elige el principal.
-  it("lo que habla con cada principal: los siete de ULTRA_HABLA y, con una cooficial, también ella, en orden canónico", () => {
-    for (const principal of ULTRA_HABLA) {
+  it("lo que habla con cada principal: los ocho de ULTRA_HABLA y, con una cooficial, también ella, en orden canónico", () => {
+    // El ruso lo hablan, pero no tiene voces propias: no puede ser principal.
+    for (const principal of ULTRA_HABLA.filter(puedeSerPrincipal)) {
       expect(idiomasQueHabla(principal), principal).toEqual([...ULTRA_HABLA]);
     }
     expect(idiomasQueHabla("ca-ES")).toEqual([
@@ -291,10 +292,11 @@ describe("catálogo de idiomas — voces Ultra y mercado de España", () => {
       "it-IT",
       "pt-PT",
       "nl-NL",
+      "ru-RU",
     ]);
     for (const principal of ["eu-ES", "gl-ES"] as const) {
       const idiomas = idiomasQueHabla(principal);
-      expect(idiomas, principal).toHaveLength(8);
+      expect(idiomas, principal).toHaveLength(9);
       expect(idiomas.filter(esCooficial), principal).toEqual([principal]);
     }
   });
@@ -325,6 +327,7 @@ describe("catálogo de idiomas — saludos con el aviso de IA", () => {
     "it-IT": { ia: "intelligenza artificiale", grabacion: "registrata" },
     "pt-PT": { ia: "inteligência artificial", grabacion: "gravada" },
     "nl-NL": { ia: "kunstmatige intelligentie", grabacion: "opgenomen" },
+    "ru-RU": { ia: "искусственн", grabacion: "записывается" },
   };
   const base = {
     negocio: "Negocio de prueba",

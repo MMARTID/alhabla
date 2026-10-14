@@ -111,7 +111,7 @@ export type PrincipalDelCatalogo = {
   /** Los que habla con este principal, en el orden del catálogo: lo que se
    * guarda en `languages` al elegirlo. */
   idiomas?: AgentLanguage[];
-  /** «Habla en 7 idiomas: español, inglés, … Saluda en español y sigue en
+  /** «Habla en 8 idiomas: español, inglés, … Saluda en español y sigue en
    * el idioma de quien llama.» */
   entradilla?: string;
   /** Si elegirlo exige una función del plan: se ve con candado. Desde el
@@ -154,7 +154,7 @@ export type VistaPreviaDeIdiomas = {
   voces: VozDelPanel[];
   /** Como PrincipalDelCatalogo.requiereParaElegirVoz, para `voces`. */
   requiereParaElegirVoz?: RequisitoDelPlan | null;
-  /** «Habla en 7 idiomas: … Saluda en español y sigue en el idioma de
+  /** «Habla en 8 idiomas: … Saluda en español y sigue en el idioma de
    * quien llama.» */
   entradilla: string;
   saludo: string;

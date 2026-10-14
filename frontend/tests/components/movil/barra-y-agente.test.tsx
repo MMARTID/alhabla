@@ -97,7 +97,7 @@ describe("AgenteMovil", () => {
     expect(await screen.findByText("Sin servicios configurados")).toBeInTheDocument();
     expect(screen.getByText("Sin conectar")).toBeInTheDocument();
     // Desde el 2026-10-05: el principal, cuántos idiomas habla y la voz.
-    expect(await screen.findByText("Español · habla 7 idiomas · Blanca")).toBeInTheDocument();
+    expect(await screen.findByText("Español · habla 8 idiomas · Blanca")).toBeInTheDocument();
   });
 
   it("el resumen de cómo atiende dice el principal, cuántos idiomas habla y la voz que atiende", async () => {
@@ -112,7 +112,7 @@ describe("AgenteMovil", () => {
     } as Business;
     conCliente(<AgenteMovil business={enCatalan} />);
 
-    expect(await screen.findByText("Catalán · habla 8 idiomas · Sergio")).toBeInTheDocument();
+    expect(await screen.findByText("Catalán · habla 9 idiomas · Sergio")).toBeInTheDocument();
   });
 
   it("con una voz elegida, el resumen la nombra", async () => {
@@ -122,7 +122,7 @@ describe("AgenteMovil", () => {
     } as Business;
     conCliente(<AgenteMovil business={conLara} />);
 
-    expect(await screen.findByText("Español · habla 7 idiomas · Lara")).toBeInTheDocument();
+    expect(await screen.findByText("Español · habla 8 idiomas · Lara")).toBeInTheDocument();
   });
 
   // Unos `languages` de cuando se elegían (p. ej. de una respuesta que no
@@ -134,7 +134,7 @@ describe("AgenteMovil", () => {
     } as Business;
     conCliente(<AgenteMovil business={deAntes} />);
 
-    expect(await screen.findByText("Español · habla 7 idiomas · Blanca")).toBeInTheDocument();
+    expect(await screen.findByText("Español · habla 8 idiomas · Blanca")).toBeInTheDocument();
   });
 
   it("los enlaces de siempre (?section=) abren la pantalla del ajuste", async () => {
