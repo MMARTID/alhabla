@@ -2530,12 +2530,15 @@ async function executePreferenciaDeGrabacion(
 
 /**
  * Pide permiso para grabar con la primera respuesta de check_availability
- * de la llamada, si toca (lib/grabacion.ts, tocaPreguntarPorGrabar): así la
- * recepcionista lo pregunta «mientras comprueba la disponibilidad» de lo que
- * le han pedido, antes de dar la respuesta. No con get_catalog, que también
- * se consulta para el horario o antes de pasar la llamada al dueño (no
- * pidió ningún servicio). No con un error ni con un «no se puede» (llevan
- * `code`): ahí lo que toca es contestar a eso. Nunca en el chat.
+ * de la llamada que tiene algo que ofrecer, si toca (lib/grabacion.ts,
+ * tocaPreguntarPorGrabar): así la recepcionista lo pregunta «mientras
+ * comprueba la disponibilidad» de lo que le han pedido, antes de dar la
+ * respuesta. Con hueco o con una alternativa: «a las 12 no, pero a las
+ * 12:30 sí» lleva `code` (CAPACITY_REACHED) y en la llamada de prueba del
+ * 14-10 se quedó sin preguntar. No con un error ni con un «no» sin
+ * alternativa: ahí lo que toca es contestar a eso. No con get_catalog, que
+ * también se consulta para el horario o antes de pasar la llamada al dueño
+ * (no pidió ningún servicio). Nunca en el chat.
  */
 async function conPreguntaDeGrabacion(
   respuesta: ResultadoDeTool,
@@ -2544,7 +2547,10 @@ async function conPreguntaDeGrabacion(
   callId: string | undefined
 ): Promise<ResultadoDeTool> {
   if (!callId || canalDeLaTool(callId) === "client_chat") return respuesta;
-  if (!respuesta.result || "code" in respuesta.result) return respuesta;
+  const ofreceAlgo =
+    respuesta.result?.available === true ||
+    Boolean(respuesta.result?.suggestedNextSlot);
+  if (!ofreceAlgo) return respuesta;
   const toca = await tocaPreguntarPorGrabar({
     callId,
     businessId: business.id,

@@ -2959,12 +2959,44 @@ describe("executeVoiceTool: la pregunta de grabar", () => {
     expect(catalogo.result).not.toHaveProperty("pregunta_de_grabacion");
   });
 
-  it("con un error o un «no se puede» (llevan code) no se pregunta", async () => {
+  // Llamada de prueba del 14-10: «a las 12 no, pero a las 12:30 sí» lleva
+  // code y se quedaba sin preguntar.
+  it("sin plaza a esa hora pero con una alternativa, también se pregunta", async () => {
+    mockedToca.mockResolvedValue(true);
+    mockedCheckAvailability.mockResolvedValue({
+      available: false,
+      code: "CAPACITY_REACHED",
+      message: "El negocio ya tiene todas sus plazas ocupadas en ese horario.",
+      capacityUsed: 1,
+      capacityTotal: 1,
+      suggestedNextSlot: {
+        startDateTime: "2026-08-25T15:30:00.000Z",
+        availableProfessionals: [{ id: "professional_123", name: "Ana" }],
+      },
+    } as any);
+
+    const result = await comprobar("v3:ctrl_1");
+
+    expect(result.result).toMatchObject({ code: "CAPACITY_REACHED" });
+    expect(result.result.suggestedNextSlot).toBeTruthy();
+    expect(result.result.pregunta_de_grabacion).toBe(PREGUNTA);
+  });
+
+  it("con un error o un «no» sin alternativa no se pregunta", async () => {
     mockedToca.mockResolvedValue(true);
 
-    const disponibilidad = await comprobar("v3:ctrl_1", { durationMinutes: -30 });
+    const invalida = await comprobar("v3:ctrl_1", { durationMinutes: -30 });
+    mockedCheckAvailability.mockResolvedValue({
+      available: false,
+      code: "CAPACITY_REACHED",
+      message: "El negocio ya tiene todas sus plazas ocupadas en ese horario.",
+      capacityUsed: 1,
+      capacityTotal: 1,
+    } as any);
+    const sinHueco = await comprobar("v3:ctrl_1");
 
-    expect(disponibilidad.result).toMatchObject({ code: "INVALID_DURATION" });
+    expect(invalida.result).toMatchObject({ code: "INVALID_DURATION" });
+    expect(sinHueco.result).not.toHaveProperty("pregunta_de_grabacion");
     expect(mockedToca).not.toHaveBeenCalled();
   });
 
