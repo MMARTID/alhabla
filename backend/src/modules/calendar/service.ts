@@ -610,7 +610,7 @@ export class CalendarService {
         // vale para las próximas llamadas por Telnyx.
         name: "preferencia_de_grabacion",
         description:
-          "Guarda lo que contesta quien llama sobre grabar la llamada. Con acepta true se empieza a grabar y se recuerda para sus próximas llamadas; con false no se graba (o se deja de grabar) y no se guarda el audio; la transcripción sí. Úsala cuando conteste a tu pregunta de grabar o si en cualquier momento dice que no quiere que se grabe. No la uses en el chat de WhatsApp.",
+          "Guarda lo que contesta quien llama sobre grabar sus llamadas (el audio es solo para que el negocio las revise). Con acepta true se empieza a grabar y se recuerda para sus próximas llamadas; con false no se graba (o se deja de grabar) y no se guarda el audio; la transcripción sí. Úsala cuando conteste con claridad a tu pregunta de grabar, o si en cualquier momento dice que no quiere que se grabe. Si su respuesta no es clara, no la uses. No la uses en el chat de WhatsApp.",
         url: `${toolBaseUrl}/preferencia_de_grabacion`,
         method: "POST",
         args_at_root: false,
@@ -620,7 +620,7 @@ export class CalendarService {
             acepta: {
               type: "boolean",
               description:
-                "true solo si acepta con claridad que se grabe; false si dice que no, duda o no quiere.",
+                "true si acepta con claridad que se grabe (sí, vale, claro); false si dice que no.",
             },
           },
           required: ["acepta"],

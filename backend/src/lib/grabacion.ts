@@ -36,11 +36,31 @@ export function estadoDeGrabacion(
   return "sin_preguntar";
 }
 
-/** Un teléfono con el que recordar al cliente: E.164, no «anonymous». */
+/** Los teléfonos del propio negocio, que nunca son un cliente. */
+export interface TelefonosDelNegocio {
+  phone?: string | null;
+  telnyxPhoneNumber?: string | null;
+  ownerWhatsappNumber?: string | null;
+}
+
+/**
+ * Un teléfono con el que recordar al cliente: E.164, no «anonymous», y que
+ * no sea del propio negocio. Con algunos desvíos la operadora presenta como
+ * llamante la línea del negocio (esLlamadaDeComprobacionDeDesvio lo
+ * contempla): sin esta exclusión todos sus clientes acabarían en una sola
+ * ficha, con el mismo nombre, idioma y permiso de grabar.
+ */
 export function telefonoDelCliente(
-  telefono: string | null | undefined
+  telefono: string | null | undefined,
+  negocio: TelefonosDelNegocio = {}
 ): string | null {
-  return telefono && /^\+\d{6,15}$/.test(telefono) ? telefono : null;
+  if (!telefono || !/^\+\d{6,15}$/.test(telefono)) return null;
+  const propios = [
+    negocio.phone,
+    negocio.telnyxPhoneNumber,
+    negocio.ownerWhatsappNumber,
+  ];
+  return propios.includes(telefono) ? null : telefono;
 }
 
 type LlamadaParaGrabar = {
@@ -54,7 +74,7 @@ type LlamadaParaGrabar = {
 export type ResultadoDeLaPreferencia = "aceptada" | "rechazada" | "sin_llamada";
 
 /**
- * Lo que contestó quien llama a «¿te importa que grabe la llamada?» (o que
+ * Lo que contestó quien llama a «¿te parece bien que grabe tus llamadas?» (o que
  * pidió después que no se grabe). Se recuerda para sus próximas llamadas si
  * llama con su número; con número oculto solo vale para esta.
  */
@@ -74,6 +94,9 @@ export async function guardarPreferenciaDeGrabacion(input: {
       voiceProvider: true,
       grabacionPermitida: true,
       grabacionRechazadaAt: true,
+      business: {
+        select: { phone: true, telnyxPhoneNumber: true, ownerWhatsappNumber: true },
+      },
     },
   });
   if (!call) {
@@ -83,7 +106,7 @@ export async function guardarPreferenciaDeGrabacion(input: {
     return "sin_llamada";
   }
 
-  const telefono = telefonoDelCliente(call.fromNumber);
+  const telefono = telefonoDelCliente(call.fromNumber, call.business);
   if (telefono) {
     const decision = {
       grabacionAceptada: input.acepta,
@@ -99,7 +122,7 @@ export async function guardarPreferenciaDeGrabacion(input: {
     });
   } else {
     console.log(
-      `[Grabación] ${input.etiqueta}: llama con número oculto; lo que ha dicho de grabar vale solo para esta llamada (negocio ${input.businessId})`
+      `[Grabación] ${input.etiqueta}: llama con número oculto o del propio negocio; lo que ha dicho de grabar vale solo para esta llamada (negocio ${input.businessId})`
     );
   }
 

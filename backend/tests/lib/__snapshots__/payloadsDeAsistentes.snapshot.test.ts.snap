@@ -446,7 +446,7 @@ exports[`payloads de asistentes (instantáneas) > assistant de la recepcionista,
         "body_parameters": {
           "properties": {
             "acepta": {
-              "description": "true solo si acepta con claridad que se grabe; false si dice que no, duda o no quiere.",
+              "description": "true si acepta con claridad que se grabe (sí, vale, claro); false si dice que no.",
               "type": "boolean",
             },
           },
@@ -455,7 +455,7 @@ exports[`payloads de asistentes (instantáneas) > assistant de la recepcionista,
           ],
           "type": "object",
         },
-        "description": "Guarda lo que contesta quien llama sobre grabar la llamada. Con acepta true se empieza a grabar y se recuerda para sus próximas llamadas; con false no se graba (o se deja de grabar) y no se guarda el audio; la transcripción sí. Úsala cuando conteste a tu pregunta de grabar o si en cualquier momento dice que no quiere que se grabe. No la uses en el chat de WhatsApp.",
+        "description": "Guarda lo que contesta quien llama sobre grabar sus llamadas (el audio es solo para que el negocio las revise). Con acepta true se empieza a grabar y se recuerda para sus próximas llamadas; con false no se graba (o se deja de grabar) y no se guarda el audio; la transcripción sí. Úsala cuando conteste con claridad a tu pregunta de grabar, o si en cualquier momento dice que no quiere que se grabe. Si su respuesta no es clara, no la uses. No la uses en el chat de WhatsApp.",
         "headers": [
           {
             "name": "X-Alhabla-Call-Control-Id",
@@ -983,7 +983,7 @@ Si te escriben en catalán, gallego, euskera o inglés, responde en ese idioma; 
 exports[`payloads de asistentes (instantáneas) > el JSON enviado es idéntico byte a byte (hash) 1`] = `
 {
   "gestor": "d42493dfb458dbe1ef8fa7fab6dbf284ec727a79d37293a97bff584963af6abf",
-  "recepcionista": "3ccda1fe20faf619bd1df54b87d2f85e891bf427547a50cc8c08fd5584d847e5",
+  "recepcionista": "4a25faef46ad730f191619540ddfefcdb70a320e4e3b08dc4d08b3be45c12462",
 }
 `;
 
@@ -1167,7 +1167,7 @@ exports[`payloads de asistentes (instantáneas) > tools de voz de la recepcionis
     "url": "https://api.alhabla.test/webhooks/telnyx/tools/notify_when_available",
   },
   {
-    "description": "Guarda lo que contesta quien llama sobre grabar la llamada. Con acepta true se empieza a grabar y se recuerda para sus próximas llamadas; con false no se graba (o se deja de grabar) y no se guarda el audio; la transcripción sí. Úsala cuando conteste a tu pregunta de grabar o si en cualquier momento dice que no quiere que se grabe. No la uses en el chat de WhatsApp.",
+    "description": "Guarda lo que contesta quien llama sobre grabar sus llamadas (el audio es solo para que el negocio las revise). Con acepta true se empieza a grabar y se recuerda para sus próximas llamadas; con false no se graba (o se deja de grabar) y no se guarda el audio; la transcripción sí. Úsala cuando conteste con claridad a tu pregunta de grabar, o si en cualquier momento dice que no quiere que se grabe. Si su respuesta no es clara, no la uses. No la uses en el chat de WhatsApp.",
     "headers": [
       {
         "name": "X-Alhabla-Call-Control-Id",
@@ -1178,7 +1178,7 @@ exports[`payloads de asistentes (instantáneas) > tools de voz de la recepcionis
     "name": "preferencia_de_grabacion",
     "properties": {
       "acepta": {
-        "description": "true solo si acepta con claridad que se grabe; false si dice que no, duda o no quiere.",
+        "description": "true si acepta con claridad que se grabe (sí, vale, claro); false si dice que no.",
         "type": "boolean",
       },
     },

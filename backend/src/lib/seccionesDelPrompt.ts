@@ -193,14 +193,17 @@ function seccionCliente(): Parrafos {
 
 function seccionGrabacion(): Parrafos {
   return [
-    // Grabación con permiso (decisiones del usuario del 12 y 13-10-2026,
+    // Grabación con permiso (decisiones del usuario del 12, 13 y 14-10-2026,
     // lib/grabacion.ts): se pregunta mientras se comprueba el primer
     // servicio, con la respuesta de get_catalog ya en la mano, para que la
-    // respuesta del servicio no salga encima de la del cliente. Sin
-    // explicaciones legales salvo que pregunten.
+    // respuesta del servicio no salga encima de la del cliente. En positivo:
+    // con «¿te importa…?» el cliente contestaba «No» queriendo decir que sí
+    // y se guardaba como rechazo (dev, 13-10). La finalidad, la real: el
+    // audio es solo para que el negocio lo revise. Sin explicaciones
+    // legales salvo que pregunten.
     "## Grabación",
     "La llamada solo se graba si quien llama lo acepta; la transcripción se guarda siempre. Si deja grabar sus llamadas: {{grabacion}}.",
-    "Si es sin_preguntar, pregúntaselo una sola vez mientras compruebas el primer servicio que te pida: en cuanto get_catalog te responda, no contestes todavía a lo que preguntó y di solo «Mientras lo compruebo, ¿te importa que grabe la llamada para mejorar el servicio?». Con su respuesta, llama a preferencia_de_grabacion (acepta true solo si dice que sí con claridad) y después contesta a lo que había preguntado con lo que te dio get_catalog. Si no llega a pedir ningún servicio, no lo preguntes.",
+    "Si es sin_preguntar, pregúntaselo una sola vez mientras compruebas el primer servicio que te pida: en cuanto get_catalog te responda, no contestes todavía a lo que preguntó y di solo «Mientras lo compruebo, ¿te parece bien que grabe tus llamadas para que {{nombre_negocio}} pueda revisarlas?». Si dice que sí (sí, vale, claro, de acuerdo), llama a preferencia_de_grabacion con acepta true; si dice que no, con acepta false; si su respuesta no es clara, no la llames: se le preguntará en otra llamada. Después contesta a lo que había preguntado con lo que te dio get_catalog. Si no llega a pedir ningún servicio, no lo preguntes.",
     "Si es aceptada, el saludo ya ha avisado de que se graba: no lo preguntes. Si es rechazada, no saques el tema. En cualquier caso, si dice que no quiere que se grabe, llama a preferencia_de_grabacion con acepta false en ese mismo turno y dile en una frase que de acuerdo.",
     "Si pregunta qué se hace con sus datos, dile que {{nombre_negocio}} los usa solo para gestionar sus citas y que puede pedirle que se los enseñe o los borre.",
   ];

@@ -3,7 +3,11 @@ import { parseAgentSettings } from "./managedAgentPrompt.js";
 import { resolverIdiomas } from "./idiomas/resolver.js";
 import { componerSaludoDeLlamada } from "./idiomas/catalogo.js";
 import { isBusinessType, type BusinessType } from "./businessType.js";
-import { estadoDeGrabacion, telefonoDelCliente } from "./grabacion.js";
+import {
+  estadoDeGrabacion,
+  telefonoDelCliente,
+  type TelefonosDelNegocio,
+} from "./grabacion.js";
 import type { VariablesDeLaLlamada } from "./seccionesDelPrompt.js";
 
 /**
@@ -37,7 +41,7 @@ const SIN_SERVICIO_EN_EL_SALUDO: ReadonlySet<BusinessType> = new Set([
 const UNA_SEMANA_MS = 7 * 24 * 60 * 60 * 1000;
 
 export async function resolverContextoDeLlamada(input: {
-  business: {
+  business: TelefonosDelNegocio & {
     id: string;
     name: string;
     agentSettings: unknown;
@@ -49,7 +53,7 @@ export async function resolverContextoDeLlamada(input: {
 }): Promise<ContextoDeLlamada> {
   const { business } = input;
   const ahora = input.ahora ?? new Date();
-  const telefono = telefonoDelCliente(input.telefono);
+  const telefono = telefonoDelCliente(input.telefono, business);
 
   const [primeraLlamada, cliente, reserva] = await Promise.all([
     // Los chats de WhatsApp son filas Call sintéticas: no cuentan.

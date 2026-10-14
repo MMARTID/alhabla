@@ -346,6 +346,7 @@ export async function handleCallInitiated(
         businessType: true,
         phone: true,
         telnyxPhoneNumber: true,
+        ownerWhatsappNumber: true,
         callsSuspendedAt: true,
         paymentFailureSuspensionAt: true,
         agents: {

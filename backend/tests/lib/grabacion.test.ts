@@ -62,6 +62,20 @@ describe("estadoDeGrabacion y telefonoDelCliente", () => {
     expect(telefonoDelCliente("")).toBeNull();
     expect(telefonoDelCliente(null)).toBeNull();
   });
+
+  // Con algunos desvíos la operadora presenta como llamante la línea del
+  // negocio: todos sus clientes acabarían en una sola ficha.
+  it("nunca recuerda un teléfono del propio negocio", () => {
+    const negocio = {
+      phone: "+34930000001",
+      telnyxPhoneNumber: "+34930000002",
+      ownerWhatsappNumber: "+34600000003",
+    };
+    expect(telefonoDelCliente("+34930000001", negocio)).toBeNull();
+    expect(telefonoDelCliente("+34930000002", negocio)).toBeNull();
+    expect(telefonoDelCliente("+34600000003", negocio)).toBeNull();
+    expect(telefonoDelCliente("+34600111222", negocio)).toBe("+34600111222");
+  });
 });
 
 describe("guardarPreferenciaDeGrabacion", () => {

@@ -207,6 +207,18 @@ describe("resolverContextoDeLlamada", () => {
     );
   });
 
+  it("si llama desde un teléfono del propio negocio, no lo trata como cliente", async () => {
+    const contexto = await resolverContextoDeLlamada({
+      business: negocio({ phone: "+34930000001" }),
+      telefono: "+34930000001",
+      ahora: AHORA,
+    });
+
+    expect(mockedClienteFindUnique).not.toHaveBeenCalled();
+    expect(mockedBookingFindFirst).not.toHaveBeenCalled();
+    expect(contexto.variables.nombre_cliente).toBe("");
+  });
+
   it("con número oculto no busca al cliente", async () => {
     const contexto = await resolverContextoDeLlamada({
       business: negocio(),

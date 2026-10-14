@@ -156,21 +156,25 @@ export async function buildInboundCallDynamicVariables(
   prismaClient: typeof prisma = prisma,
   telefono: string | null = null
 ): Promise<Record<string, string>> {
-  const telefonoValido = telefonoDelCliente(telefono);
-  const [business, cliente] = await Promise.all([
-    prismaClient.business.findUnique({
-      where: { id: businessId },
-      select: { name: true, timezone: true },
-    }),
-    telefonoValido
-      ? prismaClient.clienteDelNegocio.findUnique({
-          where: {
-            businessId_telefono: { businessId, telefono: telefonoValido },
-          },
-          select: { grabacionAceptada: true },
-        })
-      : null,
-  ]);
+  const business = await prismaClient.business.findUnique({
+    where: { id: businessId },
+    select: {
+      name: true,
+      timezone: true,
+      phone: true,
+      telnyxPhoneNumber: true,
+      ownerWhatsappNumber: true,
+    },
+  });
+  const telefonoValido = telefonoDelCliente(telefono, business ?? {});
+  const cliente = telefonoValido
+    ? await prismaClient.clienteDelNegocio.findUnique({
+        where: {
+          businessId_telefono: { businessId, telefono: telefonoValido },
+        },
+        select: { grabacionAceptada: true },
+      })
+    : null;
 
   const timezone = resolvePromptTimezone(business?.timezone);
 

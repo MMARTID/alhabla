@@ -110,7 +110,7 @@ describe("buildManagedAgentPrompt", () => {
     expect(prompt).toContain("## Grabación");
     expect(prompt).toContain("Si deja grabar sus llamadas: {{grabacion}}.");
     expect(prompt).toContain(
-      "en cuanto get_catalog te responda, no contestes todavía a lo que preguntó y di solo «Mientras lo compruebo, ¿te importa que grabe la llamada para mejorar el servicio?»"
+      "en cuanto get_catalog te responda, no contestes todavía a lo que preguntó y di solo «Mientras lo compruebo, ¿te parece bien que grabe tus llamadas para que {{nombre_negocio}} pueda revisarlas?»"
     );
     expect(prompt).toContain(
       "llama a preferencia_de_grabacion con acepta false en ese mismo turno"
