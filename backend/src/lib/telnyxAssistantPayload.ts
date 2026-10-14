@@ -203,7 +203,7 @@ export function buildTelnyxVoiceTools(
     {
       name: "check_availability",
       description:
-        "Comprueba una cita en una fecha y hora concretas: valida horario, restricciones, capacidad, profesionales y calendario real. Úsala antes de book_appointment y conserva el availabilityToken que devuelve. Si el cliente no pide a nadie, no envíes professionalId: el sistema asigna a quien mejor hace el servicio y lo devuelve en assignedProfessional. Si devuelve recommendation, propón UNA vez a esa persona siguiendo sus instructions.",
+        "Comprueba una cita en una fecha y hora concretas: valida horario, restricciones, capacidad, profesionales y calendario real. Úsala antes de book_appointment y conserva el availabilityToken que devuelve. Si el cliente no pide a nadie, no envíes professionalId: el sistema asigna a quien mejor hace el servicio y lo devuelve en assignedProfessional.",
       properties: {
         startDateTime: {
           type: "string",
@@ -260,7 +260,7 @@ export function buildTelnyxVoiceTools(
         smsConsent: {
           type: "boolean",
           description:
-            "true si el cliente confirmó por voz que puedes enviarle la confirmación (y un recordatorio) por SMS a este número; false si dijo que no o no se le preguntó.",
+            "true si el cliente dijo que sí a recibir la confirmación y un recordatorio por WhatsApp en este número; false si dijo que no, dudó o no se le preguntó.",
         },
         professionalConfirmed: {
           type: "boolean",
@@ -273,7 +273,7 @@ export function buildTelnyxVoiceTools(
     {
       name: "find_my_appointment",
       description:
-        "Busca la próxima cita del negocio asociada al número desde el que llama, si el cliente dio consentimiento SMS al reservarla. Devuelve también clientName (el nombre con el que se reservó; puede venir vacío en citas antiguas) — úsalo si el cliente quiere recrear la cita al mismo nombre. Úsala solo si quien llama pide cambiar o cancelar una cita existente y no te ha dado datos concretos.",
+        "Busca la próxima cita del negocio asociada al número desde el que llama, si el cliente aceptó los mensajes por WhatsApp al reservarla. Devuelve también clientName (el nombre con el que se reservó; puede venir vacío en citas antiguas) — úsalo si el cliente quiere recrear la cita al mismo nombre. Úsala solo si quien llama pide cambiar o cancelar una cita existente y no te ha dado datos concretos.",
       properties: {},
     },
     {
@@ -326,7 +326,7 @@ export function buildTelnyxVoiceTools(
       // pregunta mientras comprueba el primer servicio.
       name: "preferencia_de_grabacion",
       description:
-        "Guarda lo que contesta quien llama sobre grabar sus llamadas (el audio es solo para que el negocio las revise). Con acepta true se empieza a grabar y se recuerda para sus próximas llamadas; con false no se graba (o se deja de grabar) y no se guarda el audio; la transcripción sí. Úsala cuando conteste con claridad a tu pregunta de grabar, o si en cualquier momento dice que no quiere que se grabe. Si su respuesta no es clara, no la uses. No la uses en el chat de WhatsApp.",
+        "Guarda lo que contesta quien llama sobre grabar sus llamadas (el audio es solo para que el negocio las revise). Con acepta true se empieza a grabar y se recuerda para sus próximas llamadas; con false no se graba (o se deja de grabar) y no se guarda el audio; la transcripción sí. Úsala solo en dos casos: cuando conteste con claridad a la pregunta_de_grabacion que te dio check_availability, o cuando pida con sus palabras que no se grabe. Nunca en otro momento, ni con lo que conteste a otras preguntas (su nombre, la hora, el WhatsApp). No la uses en el chat de WhatsApp.",
       properties: {
         acepta: {
           type: "boolean",

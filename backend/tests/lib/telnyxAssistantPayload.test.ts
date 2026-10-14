@@ -632,3 +632,27 @@ describe("buildTelnyxVoiceTools — informar_al_negocio (PR 5, post-conversació
     expect(payload.postConversationSettings).toEqual({ enabled: true });
   });
 });
+
+// Refactor, paso 4 (14-10): las tools dicen lo suyo una vez y sin
+// contradecir al prompt, que pregunta por WhatsApp.
+describe("descripciones de las tools de voz", () => {
+  const tools = buildTelnyxVoiceTools("https://api.alhabla.test/");
+  const texto = JSON.stringify(tools);
+
+  it("hablan de WhatsApp, no de SMS", () => {
+    expect(texto).not.toMatch(/SMS/);
+    const book = tools.find((tool) => tool.name === "book_appointment")!;
+    expect(
+      (book.properties as Record<string, { description: string }>).smsConsent
+        .description
+    ).toContain("por WhatsApp");
+  });
+
+  // Laboratorio del 14-10: la llamaba tras dar el nombre, sin que nadie
+  // hablara de grabar.
+  it("preferencia_de_grabacion solo para contestar la pregunta o pedir que no se grabe", () => {
+    const tool = tools.find((t) => t.name === "preferencia_de_grabacion")!;
+    expect(tool.description).toContain("Úsala solo en dos casos");
+    expect(tool.description).toContain("Nunca en otro momento");
+  });
+});

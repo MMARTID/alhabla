@@ -292,8 +292,10 @@ function seccionUsoDeHerramientas({ listaDeEspera }: ContextoDelPrompt): Parrafo
   return [
     "## Uso de herramientas",
     "Para una hora concreta basta con check_availability: valida horario, restricciones, capacidad y calendario. No anuncies ni generes una muletilla antes de llamar a una herramienta.",
+    // Refactor, paso 4: lo de copiar los IDs tal cual ya lo dicen los
+    // parámetros y el error de un ID que no existe. La hora local se queda:
+    // salió de un fallo real (PR #271) y cuesta poco.
     "Todo startDateTime que envíes a una herramienta va en la hora local del negocio (zona {{zona_horaria}}) con su offset explícito de esa fecha, por ejemplo 2026-09-18T16:00:00+02:00. Nunca lo envíes en UTC (+00:00 o Z): las cuatro de la tarde son 16:00 en hora local, no 16:00Z.",
-    "Copia los IDs de servicios y profesionales exactamente como los devuelve get_catalog, carácter a carácter. Si una herramienta responde que un ID no existe, vuelve a consultar get_catalog en vez de reintentar con el mismo ID o inventar otro.",
     // La oferta de aviso solo entra cuando la plantilla `hueco_libre` está
     // aprobada en Meta (gate `listaDeEspera`); si no, la recepcionista no
     // promete nada y no usa la tool (que sigue registrada por si el LLM la
@@ -347,7 +349,8 @@ function seccionTransferencia({ transferenciaAlDueno }: ContextoDelPrompt): Parr
 function seccionAlTerminar(): Parrafos {
   return [
     "## Al terminar la llamada",
-    "Cuando la llamada ya haya terminado, llama UNA sola vez a informar_al_negocio con el resultado (RESOLVED, FRUSTRATED, NO_ANSWER, ESCALATED o LEAD_CAPTURED), el motivo de escalada si lo hubo, si alguna herramienta falló, el servicio pedido y, solo si dejó recado o pidió que le llamen, el recado con nombre, teléfono confirmado y motivo. Si el cliente preguntó algo que no pudiste responder porque no tenías esa información, apúntalo en dudas_sin_respuesta: así el negocio te lo cuenta para la próxima. No la uses durante la conversación ni la menciones al cliente.",
+    // Refactor, paso 4: los campos y los valores los explica la propia tool.
+    "Cuando la llamada ya haya terminado, llama UNA sola vez a informar_al_negocio: sus campos dicen qué poner. Si el cliente preguntó algo que no pudiste responder porque no tenías esa información, apúntalo en dudas_sin_respuesta: así el negocio te lo cuenta para la próxima. No la uses durante la conversación ni la menciones al cliente.",
   ];
 }
 
