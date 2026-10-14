@@ -176,3 +176,60 @@ export function normalizeVoiceToolDateTime(
     return startDateTime;
   }
 }
+
+/** Fecha de pared (AAAA-MM-DD) de un instante en una zona. */
+function fechaEnZona(fecha: Date, timeZone: string): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(fecha);
+}
+
+const DIAS_RELATIVOS: Record<number, string> = {
+  0: "hoy",
+  1: "mañana",
+  2: "pasado mañana",
+};
+
+/**
+ * El día y la hora de una cita como se dicen («mañana, jueves, 15 de
+ * octubre, a las 17:00»), en la zona del negocio. Las tools lo devuelven en
+ * `cuando` para que la recepcionista no calcule el día: en una llamada de
+ * producción del 14-10 dijo «dijous setze» de una cita del jueves 15. El
+ * día relativo (hoy, mañana, pasado mañana) se cuenta desde `ahora`. Una
+ * entrada que no es una fecha válida devuelve null.
+ */
+export function cuandoParaDecir(
+  instante: string | Date,
+  timeZone: string,
+  ahora: Date = new Date()
+): string | null {
+  const fecha = instante instanceof Date ? instante : new Date(instante);
+  if (Number.isNaN(fecha.getTime())) return null;
+  const zona = timeZone || "Europe/Madrid";
+  try {
+    const dia = new Intl.DateTimeFormat("es-ES", {
+      timeZone: zona,
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+    }).format(fecha);
+    const hora = new Intl.DateTimeFormat("es-ES", {
+      timeZone: zona,
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+    }).format(fecha);
+    const diferencia = Math.round(
+      (Date.parse(fechaEnZona(fecha, zona)) -
+        Date.parse(fechaEnZona(ahora, zona))) /
+        86_400_000
+    );
+    const relativo = DIAS_RELATIVOS[diferencia];
+    return `${relativo ? `${relativo}, ` : ""}${dia}, a las ${hora}`;
+  } catch {
+    return null;
+  }
+}

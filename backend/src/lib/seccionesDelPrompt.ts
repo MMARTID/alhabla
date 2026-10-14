@@ -294,6 +294,9 @@ function seccionUsoDeHerramientas({ listaDeEspera }: ContextoDelPrompt): Parrafo
     // Refactor, paso 4: lo de copiar los IDs tal cual ya lo dicen los
     // parámetros y el error de un ID que no existe. La hora local se queda:
     // salió de un fallo real (PR #271) y cuesta poco.
+    // Llamada de producción del 14-10: dijo «dijous setze» de una cita del
+    // jueves 15. Las tools devuelven el día ya escrito (voiceDateTime.ts).
+    "Para decir el día y la hora de una cita usa el campo cuando que te devuelven las herramientas, en el idioma de la conversación: no calcules tú el día de la semana ni del mes.",
     "Todo startDateTime que envíes a una herramienta va en la hora local del negocio (zona {{zona_horaria}}) con su offset explícito de esa fecha, por ejemplo 2026-09-18T16:00:00+02:00. Nunca lo envíes en UTC (+00:00 o Z): las cuatro de la tarde son 16:00 en hora local, no 16:00Z.",
     // La oferta de aviso solo entra cuando la plantilla `hueco_libre` está
     // aprobada en Meta (gate `listaDeEspera`); si no, la recepcionista no
