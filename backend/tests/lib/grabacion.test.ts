@@ -111,14 +111,20 @@ describe("tocaPreguntarPorGrabar", () => {
       },
       select: { grabacionAceptada: true },
     });
-    // Atómico: dos tools a la vez no lo preguntan dos veces.
+    // Atómico: dos tools a la vez no lo preguntan dos veces, ni a quien
+    // contestó entre la lectura y la escritura.
     expect(mockedCallUpdateMany).toHaveBeenCalledWith({
-      where: { id: "call_db_1", grabacionPreguntadaAt: null },
+      where: {
+        id: "call_db_1",
+        grabacionPreguntadaAt: null,
+        grabacionRechazadaAt: null,
+        OR: [{ grabacionPermitida: null }, { grabacionPermitida: false }],
+      },
       data: { grabacionPreguntadaAt: expect.any(Date) },
     });
   });
 
-  it("si otra tool lo anotó a la vez, no", async () => {
+  it("si otra tool lo anotó a la vez, o ya contestó, no", async () => {
     mockedCallFindFirst.mockResolvedValue(sinPreguntar());
     mockedCallUpdateMany.mockResolvedValue({ count: 0 } as any);
 

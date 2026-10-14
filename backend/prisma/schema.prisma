@@ -625,7 +625,7 @@ model Call {
   // preferencia_de_grabacion). Null en las llamadas anteriores al 13-10-2026.
   grabacionPermitida     Boolean?
   // Cuándo se le pidió permiso para grabar: lo decide el backend y va en la
-  // respuesta de get_catalog o check_availability, una sola vez por llamada
+  // respuesta de check_availability, una sola vez por llamada
   // (lib/grabacion.ts, tocaPreguntarPorGrabar).
   grabacionPreguntadaAt  DateTime?
   providerCallId         String?

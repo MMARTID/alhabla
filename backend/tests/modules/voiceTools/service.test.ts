@@ -2875,12 +2875,25 @@ describe("executeVoiceTool preferencia_de_grabacion", () => {
 });
 
 // Cuándo pedir permiso para grabar lo decide el backend (lib/grabacion.ts):
-// la pregunta va en la primera respuesta de get_catalog o
-// check_availability de la llamada.
+// la pregunta va en la primera respuesta de check_availability de la
+// llamada, «mientras comprueba la disponibilidad».
 describe("executeVoiceTool: la pregunta de grabar", () => {
   const mockedToca = vi.mocked(tocaPreguntarPorGrabar);
   const PREGUNTA =
     "Mientras lo compruebo, ¿te parece bien que grabe tus llamadas para que Peluquería Ana pueda revisarlas?";
+  const comprobar = (callId?: string, params: Record<string, unknown> = {}) =>
+    executeVoiceTool({
+      businessId: "business_123",
+      toolName: "check_availability",
+      params: {
+        startDateTime: "2026-08-25T17:00:00+02:00",
+        durationMinutes: 30,
+        serviceIds: ["service_123"],
+        ...params,
+      },
+      callLabel: "llamada v3:ctrl_1",
+      callId,
+    });
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -2892,48 +2905,48 @@ describe("executeVoiceTool: la pregunta de grabar", () => {
       { id: "service_123", name: "Corte", durationMinutes: 30 },
     ] as any);
     mockedProfessionalFindMany.mockResolvedValue([]);
+    mockedGetBusyIntervals.mockResolvedValue({
+      intervals: [],
+      calendarAvailabilityKnown: true,
+    } as any);
+    mockedCheckAvailability.mockResolvedValue({
+      available: true,
+      message: "Hay disponibilidad.",
+      capacityUsed: 0,
+      capacityTotal: 1,
+      availableProfessionals: [{ id: "professional_123", name: "Ana" }],
+    } as any);
   });
 
   afterEach(() => {
     mockedToca.mockResolvedValue(false);
   });
 
-  it("si toca, va con el catálogo, para la llamada y el negocio del webhook", async () => {
+  it("si toca, va con la disponibilidad, para la llamada y el negocio del webhook", async () => {
     mockedToca.mockResolvedValue(true);
 
-    const result = await executeVoiceTool({
-      businessId: "business_123",
-      toolName: "get_catalog",
-      params: {},
-      callLabel: "llamada v3:ctrl_1",
-      callId: "v3:ctrl_1",
-    });
+    const result = await comprobar("v3:ctrl_1");
 
     expect(mockedToca).toHaveBeenCalledWith({
       callId: "v3:ctrl_1",
       businessId: "business_123",
       etiqueta: "llamada v3:ctrl_1",
     });
-    expect(result.result.services).toContain("[service_123] Corte (30 min)");
+    expect(result.result.available).toBe(true);
     expect(result.result.pregunta_de_grabacion).toBe(PREGUNTA);
   });
 
-  it("si no toca (ya se preguntó, ya graba o ya lo decidió), el catálogo va solo", async () => {
-    const result = await executeVoiceTool({
-      businessId: "business_123",
-      toolName: "get_catalog",
-      params: {},
-      callId: "v3:ctrl_1",
-    });
+  it("si no toca (ya se preguntó, ya graba o ya lo decidió), la disponibilidad va sola", async () => {
+    const result = await comprobar("v3:ctrl_1");
 
     expect(mockedToca).toHaveBeenCalled();
     expect(result.result).not.toHaveProperty("pregunta_de_grabacion");
   });
 
-  it("con un error o un «no se puede» (llevan code) no se pregunta", async () => {
+  // get_catalog también se consulta para el horario o antes de pasar la
+  // llamada al dueño: no ha pedido ningún servicio.
+  it("con el catálogo no se pregunta", async () => {
     mockedToca.mockResolvedValue(true);
-    mockedServiceFindMany.mockRejectedValueOnce(new Error("BD caída"));
-    vi.spyOn(console, "error").mockImplementation(() => {});
 
     const catalogo = await executeVoiceTool({
       businessId: "business_123",
@@ -2941,14 +2954,16 @@ describe("executeVoiceTool: la pregunta de grabar", () => {
       params: {},
       callId: "v3:ctrl_1",
     });
-    const disponibilidad = await executeVoiceTool({
-      businessId: "business_123",
-      toolName: "check_availability",
-      params: { startDateTime: "2026-08-25T17:00:00+02:00", durationMinutes: -30 },
-      callId: "v3:ctrl_1",
-    });
 
-    expect(catalogo.result).toMatchObject({ code: "CATALOG_UNAVAILABLE" });
+    expect(mockedToca).not.toHaveBeenCalled();
+    expect(catalogo.result).not.toHaveProperty("pregunta_de_grabacion");
+  });
+
+  it("con un error o un «no se puede» (llevan code) no se pregunta", async () => {
+    mockedToca.mockResolvedValue(true);
+
+    const disponibilidad = await comprobar("v3:ctrl_1", { durationMinutes: -30 });
+
     expect(disponibilidad.result).toMatchObject({ code: "INVALID_DURATION" });
     expect(mockedToca).not.toHaveBeenCalled();
   });
@@ -2956,17 +2971,8 @@ describe("executeVoiceTool: la pregunta de grabar", () => {
   it("ni en el chat de WhatsApp ni sin callId", async () => {
     mockedToca.mockResolvedValue(true);
 
-    const chat = await executeVoiceTool({
-      businessId: "business_123",
-      toolName: "get_catalog",
-      params: {},
-      callId: "whatsapp:chat:conv_1",
-    });
-    const sinLlamada = await executeVoiceTool({
-      businessId: "business_123",
-      toolName: "get_catalog",
-      params: {},
-    });
+    const chat = await comprobar("whatsapp:chat:conv_1");
+    const sinLlamada = await comprobar(undefined);
 
     expect(mockedToca).not.toHaveBeenCalled();
     expect(chat.result).not.toHaveProperty("pregunta_de_grabacion");

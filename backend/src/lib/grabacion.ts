@@ -13,9 +13,9 @@ import {
  * y se guardan siempre.
  *
  * - Sin decidir: no se graba al contestar. La recepcionista lo pregunta
- *   mientras comprueba el primer servicio que le piden: la pregunta va en la
- *   respuesta de get_catalog o check_availability (`tocaPreguntarPorGrabar`)
- *   y, con su sí, la tool `preferencia_de_grabacion` empieza a grabar en ese
+ *   mientras comprueba la disponibilidad de lo que le piden: la pregunta va
+ *   en la respuesta de check_availability (`tocaPreguntarPorGrabar`) y, con
+ *   su sí, la tool `preferencia_de_grabacion` empieza a grabar en ese
  *   momento.
  * - Ya lo aceptó: se graba desde que se contesta y el saludo lo avisa
  *   (lib/contextoDeLlamada.ts).
@@ -68,7 +68,7 @@ export function telefonoDelCliente(
  * ¿Toca pedirle permiso para grabar ahora? Lo decide el backend, no el
  * modelo: con la regla en el prompt («si {{grabacion}} es sin_preguntar,
  * pregúntalo») volvía a preguntar aunque el cliente ya lo hubiera aceptado
- * (4 de 4 llamadas de prueba del 15-10). Una sola vez por llamada y solo a
+ * (4 de 4 llamadas de prueba del 14-10). Una sola vez por llamada y solo a
  * quien no lo ha decidido: ni se graba ya, ni lo ha rechazado en esta
  * llamada o en otra. Con true queda anotado (`grabacionPreguntadaAt`), de
  * forma atómica: dos tools a la vez no lo preguntan dos veces.
@@ -123,8 +123,15 @@ export async function tocaPreguntarPorGrabar(input: {
       }
     }
 
+    // Con las mismas condiciones en el where: si entre la lectura y aquí
+    // contestó (preferencia_de_grabacion), no se le vuelve a preguntar.
     const { count } = await prisma.call.updateMany({
-      where: { id: call.id, grabacionPreguntadaAt: null },
+      where: {
+        id: call.id,
+        grabacionPreguntadaAt: null,
+        grabacionRechazadaAt: null,
+        OR: [{ grabacionPermitida: null }, { grabacionPermitida: false }],
+      },
       data: { grabacionPreguntadaAt: new Date() },
     });
     return count === 1;
@@ -281,18 +288,21 @@ export async function borrarGrabacionesDeTelnyx(input: {
   grabaciones: TelnyxRecording[];
   businessId: string;
   etiqueta: string;
+  /** Por qué se descarta, para el log. */
+  motivo?: string;
 }): Promise<void> {
+  const motivo = input.motivo ?? "quien llama pidió no grabar";
   for (const grabacion of input.grabaciones) {
     if (!grabacion.id) continue;
     try {
       await telnyxAiAdapter.deleteRecording(grabacion.id);
     } catch (error) {
       console.error(
-        `[Grabación] ${input.etiqueta}: no se pudo borrar en Telnyx la grabación ${grabacion.id} que quien llama pidió no guardar (negocio ${input.businessId}): ${errorMessage(error)}`
+        `[Grabación] ${input.etiqueta}: no se pudo borrar en Telnyx la grabación ${grabacion.id} (${motivo}, negocio ${input.businessId}): ${errorMessage(error)}`
       );
     }
   }
   console.log(
-    `[Grabación] ${input.etiqueta}: grabación descartada, quien llama pidió no grabar (negocio ${input.businessId})`
+    `[Grabación] ${input.etiqueta}: grabación descartada, ${motivo} (negocio ${input.businessId})`
   );
 }

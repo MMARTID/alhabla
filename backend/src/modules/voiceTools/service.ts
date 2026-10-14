@@ -2529,12 +2529,13 @@ async function executePreferenciaDeGrabacion(
 }
 
 /**
- * Pide permiso para grabar con la primera respuesta de get_catalog o
- * check_availability de la llamada, si toca (lib/grabacion.ts,
- * tocaPreguntarPorGrabar): así la recepcionista lo pregunta «mientras lo
- * comprueba», antes de dar la respuesta. No con un error ni con un «no se
- * puede» (llevan `code`): ahí lo que toca es contestar a eso. Nunca en el
- * chat.
+ * Pide permiso para grabar con la primera respuesta de check_availability
+ * de la llamada, si toca (lib/grabacion.ts, tocaPreguntarPorGrabar): así la
+ * recepcionista lo pregunta «mientras comprueba la disponibilidad» de lo que
+ * le han pedido, antes de dar la respuesta. No con get_catalog, que también
+ * se consulta para el horario o antes de pasar la llamada al dueño (no
+ * pidió ningún servicio). No con un error ni con un «no se puede» (llevan
+ * `code`): ahí lo que toca es contestar a eso. Nunca en el chat.
  */
 async function conPreguntaDeGrabacion(
   respuesta: ResultadoDeTool,
@@ -2583,12 +2584,7 @@ export async function executeVoiceTool(
 
   switch (toolName) {
     case "get_catalog":
-      return conPreguntaDeGrabacion(
-        await executeGetCatalog(business, callLabel),
-        business,
-        callLabel,
-        callId
-      );
+      return executeGetCatalog(business, callLabel);
     case "check_availability":
       return conPreguntaDeGrabacion(
         await executeCheckAvailability(business, params, callLabel, callId),

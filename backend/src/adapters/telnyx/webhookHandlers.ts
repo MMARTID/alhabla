@@ -310,16 +310,21 @@ export async function handleCallAnswered(
  * sin Call (transferencias al dueño) se quedan como están.
  */
 async function activarSupresionDeRuido(callControlId: string): Promise<void> {
+  let negocio = "desconocido";
   try {
     const call = await prisma.call.findUnique({
       where: { callId: callControlId },
       select: { businessId: true, voiceProvider: true },
     });
     if (!call || call.voiceProvider !== "telnyx") return;
+    negocio = call.businessId;
     await telnyxAiAdapter.startNoiseSuppression(callControlId);
+    console.log(
+      `[Telnyx] ${callLabel(callControlId)}: supresión de ruido activada (negocio ${negocio})`
+    );
   } catch (error) {
     console.error(
-      `[Telnyx] ${callLabel(callControlId)} no se pudo activar la supresión de ruido: ${errorMessage(error)}`
+      `[Telnyx] ${callLabel(callControlId)} no se pudo activar la supresión de ruido (negocio ${negocio}): ${errorMessage(error)}`
     );
   }
 }
@@ -673,13 +678,29 @@ export async function handleCallRecordingSaved(
       return { success: false };
     }
 
-    // Quien llama pidió que no se grabara (tool no_grabar): ni fila, ni
-    // copia a R2, y el audio se borra en Telnyx (lib/grabacion.ts).
+    // Quien llama pidió que no se grabara (preferencia_de_grabacion o la
+    // tool de antes, no_grabar): ni fila, ni copia a R2, y el audio se borra
+    // en Telnyx (lib/grabacion.ts).
     if (dbCall.grabacionRechazadaAt) {
       await borrarGrabacionesDeTelnyx({
         grabaciones,
         businessId: dbCall.businessId,
         etiqueta: callLabel(callControlId),
+      });
+      return { success: true };
+    }
+    // Ni lo aceptó antes ni durante la llamada (se marca antes de
+    // record_start): lo ha grabado el assistant por su cuenta, p. ej. uno
+    // aún sin resincronizar con recording_settings.enabled. No se guarda.
+    if (dbCall.grabacionPermitida === false) {
+      console.error(
+        `[Grabación] ${callLabel(callControlId)}: llegó una grabación sin permiso de quien llama (negocio ${dbCall.businessId}); ¿el assistant graba por su cuenta? Se descarta`
+      );
+      await borrarGrabacionesDeTelnyx({
+        grabaciones,
+        businessId: dbCall.businessId,
+        etiqueta: callLabel(callControlId),
+        motivo: "no había permiso para grabar",
       });
       return { success: true };
     }

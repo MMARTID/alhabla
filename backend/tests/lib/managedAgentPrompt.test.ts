@@ -115,7 +115,7 @@ describe("buildManagedAgentPrompt", () => {
       "No preguntes nunca por tu cuenta si puedes grabar."
     );
     expect(prompt).toContain(
-      "Si la respuesta de get_catalog o de check_availability trae pregunta_de_grabacion, no contestes todavía a lo que te pidió: di solo esa pregunta, en el idioma de la conversación, y espera."
+      "Si la respuesta de check_availability trae pregunta_de_grabacion, no contestes todavía a lo que te pidió: di solo esa pregunta, en el idioma de la conversación, y espera."
     );
     expect(prompt).toContain(
       "llama a preferencia_de_grabacion con acepta false en ese mismo turno"

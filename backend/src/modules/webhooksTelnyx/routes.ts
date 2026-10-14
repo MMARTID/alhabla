@@ -79,8 +79,8 @@ export async function webhooksTelnyxRoutes(fastify: FastifyInstance) {
         case "call.initiated":
           result = await handleCallInitiated(payload);
           break;
-        // Solo actúa sobre la pata saliente de «Comprobar desvío» (por su
-        // client_state); en las llamadas de clientes no hace nada.
+        // La pata saliente de «Comprobar desvío» (por su client_state) y,
+        // en las llamadas de clientes, la supresión de ruido.
         case "call.answered":
           result = await handleCallAnswered(payload);
           break;

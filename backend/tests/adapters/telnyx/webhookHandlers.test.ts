@@ -181,9 +181,10 @@ describe("handleCallAnswered en una llamada de cliente", () => {
 
   beforeEach(() => {
     vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(console, "log").mockImplementation(() => {});
   });
 
-  it("activa la supresión de ruido cuando la recepcionista ya ha contestado", async () => {
+  it("activa la supresión de ruido cuando la recepcionista ya ha contestado, y lo dice en el log", async () => {
     mockedCallFindUnique.mockResolvedValue({
       businessId: "biz1",
       voiceProvider: "telnyx",
@@ -199,6 +200,9 @@ describe("handleCallAnswered en una llamada de cliente", () => {
     });
     expect(mockedStartNoiseSuppression).toHaveBeenCalledWith("call_ctrl_1");
     expect(mockedHangupCall).not.toHaveBeenCalled();
+    expect(console.log).toHaveBeenCalledWith(
+      expect.stringMatching(/supresión de ruido activada \(negocio biz1\)/)
+    );
   });
 
   it("si falla (BETA de Telnyx), lo dice en el log y la llamada sigue", async () => {
@@ -213,7 +217,7 @@ describe("handleCallAnswered en una llamada de cliente", () => {
     });
 
     expect(console.error).toHaveBeenCalledWith(
-      expect.stringMatching(/no se pudo activar la supresión de ruido.*BETA caída/)
+      expect.stringMatching(/no se pudo activar la supresión de ruido \(negocio biz1\).*BETA caída/)
     );
     expect(mockedHangupCall).not.toHaveBeenCalled();
   });
@@ -660,6 +664,72 @@ describe("handleCallRecordingSaved", () => {
       businessId: "biz1",
       etiqueta: expect.stringContaining("call_ctrl_1"),
     });
+  });
+
+  // Una llamada que nunca tuvo permiso (no lo aceptó antes ni durante): lo
+  // ha grabado el assistant por su cuenta, p. ej. uno sin resincronizar.
+  it("descarta la grabación de una llamada sin permiso para grabar, y lo dice en el log", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const grabaciones = [{ id: "rec_1", callControlId: "call_ctrl_1" }];
+    mockedListRecordingsByCallLegId.mockResolvedValue(grabaciones);
+    mockedCallFindUnique.mockResolvedValue({
+      id: "call_db_1",
+      businessId: "biz1",
+      grabacionRechazadaAt: null,
+      grabacionPermitida: false,
+    } as any);
+
+    const result = await handleCallRecordingSaved({
+      data: {
+        id: "evt_4",
+        event_type: "call.recording.saved",
+        payload: {
+          call_leg_id: "leg_1",
+          recording_urls: { mp3: "https://example.com/a.mp3" },
+        },
+      },
+    });
+
+    expect(result).toEqual({ success: true });
+    expect(mockedRecordingUpsert).not.toHaveBeenCalled();
+    expect(mockedEnqueueRecordingJob).not.toHaveBeenCalled();
+    expect(mockedBorrarGrabacionesDeTelnyx).toHaveBeenCalledWith({
+      grabaciones,
+      businessId: "biz1",
+      etiqueta: expect.stringContaining("call_ctrl_1"),
+      motivo: "no había permiso para grabar",
+    });
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringMatching(/grabación sin permiso.*negocio biz1/)
+    );
+  });
+
+  it("con permiso (o de antes de la grabación con permiso, null) la guarda", async () => {
+    mockedListRecordingsByCallLegId.mockResolvedValue([
+      { id: "rec_1", callControlId: "call_ctrl_1" },
+    ]);
+    for (const grabacionPermitida of [true, null]) {
+      mockedRecordingUpsert.mockClear();
+      mockedCallFindUnique.mockResolvedValue({
+        id: "call_db_1",
+        businessId: "biz1",
+        grabacionRechazadaAt: null,
+        grabacionPermitida,
+      } as any);
+
+      await handleCallRecordingSaved({
+        data: {
+          id: "evt_4",
+          event_type: "call.recording.saved",
+          payload: {
+            call_leg_id: "leg_1",
+            recording_urls: { mp3: "https://example.com/a.mp3" },
+          },
+        },
+      });
+
+      expect(mockedRecordingUpsert).toHaveBeenCalledTimes(1);
+    }
   });
 
   it("devuelve false si no hay URL de grabación utilizable", async () => {
