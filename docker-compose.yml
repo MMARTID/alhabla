@@ -252,8 +252,8 @@ services:
   # Ed25519 generada en local en vez de en la de Telnyx: es el destino de los
   # webhooks de Telnyx firmados por el MCP de desarrollo (backend/mcp/). El
   # backend de dev (:3000) sigue aceptando solo los de Telnyx, así que las
-  # llamadas reales contra dev no cambian. Se levanta aparte:
-  #   docker compose --profile sim up -d backend-sim
+  # llamadas reales contra dev no cambian. Se levanta con
+  # scripts/backend-sim.sh (también desde un worktree).
   backend-sim:
     extends:
       service: backend-dev
