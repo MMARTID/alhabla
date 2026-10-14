@@ -309,6 +309,32 @@ describe("executeVoiceTool book_appointment — vinculación a la llamada correc
     );
   });
 
+  // Laboratorio del 14-10: reservaba con «Cliente», «No indicado» o la
+  // variable sin sustituir antes de preguntar el nombre.
+  it.each(["", "Cliente", "No indicado", "{{nombre_cliente}}"])(
+    "sin el nombre real («%s») no reserva y pide preguntarlo, sin anotarlo como intento fallido",
+    async (clientName) => {
+      vi.spyOn(console, "warn").mockImplementation(() => {});
+      const result = await executeVoiceTool(
+        buildBookAppointmentInput({
+          callId: "call_vapi_1",
+          params: {
+            clientName,
+            startDateTime: "2026-08-25T17:00:00+02:00",
+            durationMinutes: 60,
+          },
+        })
+      );
+
+      expect(result.result).toMatchObject({
+        success: false,
+        code: "CLIENT_NAME_REQUIRED",
+      });
+      expect(mockedBookAppointment).not.toHaveBeenCalled();
+      expect(mockedGuardarIntento).not.toHaveBeenCalled();
+    }
+  );
+
   it("si la reserva no se guarda (upsert sin fila) no avisa por WhatsApp", async () => {
     mockedCallFindUnique.mockResolvedValue({
       id: "call_row_1",
