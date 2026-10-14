@@ -261,12 +261,16 @@ async function recibirLlamadaDeComprobacion(
 }
 
 /**
- * `call.answered` solo interesa para la pata saliente de «Comprobar
- * desvío»: si alguien la coge (el dueño por reflejo o su contestador), la
- * comprobación ya no puede salir bien, así que se anota y se cuelga para no
- * dejar a nadie escuchando silencio. Para las llamadas de clientes (la
- * recepcionista contesta con `answerCallWithAssistant`) no hay nada que
- * hacer aquí.
+ * `call.answered` interesa en dos casos:
+ *
+ * - La pata saliente de «Comprobar desvío»: si alguien la coge (el dueño
+ *   por reflejo o su contestador), la comprobación ya no puede salir bien,
+ *   así que se anota y se cuelga para no dejar a nadie escuchando silencio.
+ * - Una llamada de cliente que la recepcionista acaba de contestar: aquí se
+ *   activa la supresión de ruido. Pedida justo después de
+ *   `answerCallWithAssistant`, Telnyx la rechazaba siempre con 90034 («Call
+ *   not answered yet»): el answer vuelve antes de que la llamada esté
+ *   contestada.
  */
 export async function handleCallAnswered(
   payload: unknown
@@ -275,7 +279,10 @@ export async function handleCallAnswered(
   const { call_control_id, client_state } = event.data.payload;
 
   const comprobacion = leerClientStateDeComprobacion(client_state);
-  if (!comprobacion) return { success: true };
+  if (!comprobacion) {
+    await activarSupresionDeRuido(call_control_id);
+    return { success: true };
+  }
 
   try {
     const check = await registrarSalienteContestada(comprobacion.checkId);
@@ -295,6 +302,26 @@ export async function handleCallAnswered(
     );
   }
   return { success: true };
+}
+
+/**
+ * Mejora de calidad de audio (BETA de Telnyx) para las llamadas de clientes
+ * por Telnyx; nunca debe poder tumbar la llamada ya contestada. Las patas
+ * sin Call (transferencias al dueño) se quedan como están.
+ */
+async function activarSupresionDeRuido(callControlId: string): Promise<void> {
+  try {
+    const call = await prisma.call.findUnique({
+      where: { callId: callControlId },
+      select: { businessId: true, voiceProvider: true },
+    });
+    if (!call || call.voiceProvider !== "telnyx") return;
+    await telnyxAiAdapter.startNoiseSuppression(callControlId);
+  } catch (error) {
+    console.error(
+      `[Telnyx] ${callLabel(callControlId)} no se pudo activar la supresión de ruido: ${errorMessage(error)}`
+    );
+  }
 }
 
 export async function handleCallInitiated(
@@ -424,16 +451,6 @@ export async function handleCallInitiated(
           }
         : {}
     );
-
-    // Mejora de calidad de audio, nunca debe poder tumbar la llamada ya
-    // contestada — BETA de Telnyx, aislado en su propio try/catch.
-    try {
-      await telnyxAiAdapter.startNoiseSuppression(call_control_id);
-    } catch (noiseSuppressionError) {
-      console.error(
-        `[Telnyx] ${callLabel(call_control_id)} no se pudo activar la supresión de ruido: ${errorMessage(noiseSuppressionError)}`
-      );
-    }
 
     console.log(
       `[Telnyx] ${callLabel(call_control_id)} contestada con el assistant ${agent.telnyxAssistantId}`

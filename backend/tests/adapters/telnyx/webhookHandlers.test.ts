@@ -171,6 +171,63 @@ describe("extractTelnyxEventEnvelope", () => {
   });
 });
 
+describe("handleCallAnswered en una llamada de cliente", () => {
+  const contestada = {
+    data: {
+      id: "evt_ans",
+      event_type: "call.answered" as const,
+      payload: { call_control_id: "call_ctrl_1", client_state: null },
+    },
+  };
+
+  beforeEach(() => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+  });
+
+  it("activa la supresión de ruido cuando la recepcionista ya ha contestado", async () => {
+    mockedCallFindUnique.mockResolvedValue({
+      businessId: "biz1",
+      voiceProvider: "telnyx",
+    } as any);
+
+    await expect(handleCallAnswered(contestada)).resolves.toEqual({
+      success: true,
+    });
+
+    expect(mockedCallFindUnique).toHaveBeenCalledWith({
+      where: { callId: "call_ctrl_1" },
+      select: { businessId: true, voiceProvider: true },
+    });
+    expect(mockedStartNoiseSuppression).toHaveBeenCalledWith("call_ctrl_1");
+    expect(mockedHangupCall).not.toHaveBeenCalled();
+  });
+
+  it("si falla (BETA de Telnyx), lo dice en el log y la llamada sigue", async () => {
+    mockedCallFindUnique.mockResolvedValue({
+      businessId: "biz1",
+      voiceProvider: "telnyx",
+    } as any);
+    mockedStartNoiseSuppression.mockRejectedValue(new Error("Telnyx BETA caída"));
+
+    await expect(handleCallAnswered(contestada)).resolves.toEqual({
+      success: true,
+    });
+
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringMatching(/no se pudo activar la supresión de ruido.*BETA caída/)
+    );
+    expect(mockedHangupCall).not.toHaveBeenCalled();
+  });
+
+  it("una pata sin Call (transferencia al dueño) se queda como está", async () => {
+    mockedCallFindUnique.mockResolvedValue(null);
+
+    await handleCallAnswered(contestada);
+
+    expect(mockedStartNoiseSuppression).not.toHaveBeenCalled();
+  });
+});
+
 describe("handleCallInitiated", () => {
   const basePayload = {
     data: {
@@ -215,27 +272,9 @@ describe("handleCallInitiated", () => {
       CONTESTAR_CON_CONTEXTO
     );
     expect(mockedHangupCall).not.toHaveBeenCalled();
-    expect(mockedStartNoiseSuppression).toHaveBeenCalledWith("call_ctrl_1");
-  });
-
-  it("contesta igualmente aunque falle la supresión de ruido (BETA, nunca debe tumbar la llamada)", async () => {
-    mockedBusinessFindUnique.mockResolvedValue({
-      id: "biz1",
-      callsSuspendedAt: null,
-      paymentFailureSuspensionAt: null,
-      agents: [{ id: "agent1", telnyxAssistantId: "assistant_1" }],
-    } as any);
-    mockedCallUpsert.mockResolvedValue({} as any);
-    mockedStartNoiseSuppression.mockRejectedValue(new Error("Telnyx BETA caída"));
-
-    const result = await handleCallInitiated(basePayload);
-
-    expect(result).toEqual({ success: true });
-    expect(mockedAnswerCallWithAssistant).toHaveBeenCalledWith(
-      "call_ctrl_1",
-      "assistant_1",
-      CONTESTAR_CON_CONTEXTO
-    );
+    // Aún no está contestada (Telnyx respondía 90034): la supresión de
+    // ruido espera a call.answered.
+    expect(mockedStartNoiseSuppression).not.toHaveBeenCalled();
   });
 
   // Lo resuelve lib/contextoDeLlamada.ts antes de guardar la Call: el
@@ -1339,7 +1378,7 @@ describe("«Comprobar desvío» en los webhooks de Telnyx", () => {
     expect(mockedMotivoDePataSinCall).toHaveBeenCalledTimes(2);
   });
 
-  it("call.answered de la saliente: anota que la cogieron y cuelga; el de una llamada de cliente no hace nada", async () => {
+  it("call.answered de la saliente: anota que la cogieron y cuelga; el de una llamada de cliente no cuelga nada", async () => {
     mockedRegistrarContestada.mockResolvedValue({ contestada: true } as any);
 
     let result = await handleCallAnswered({
@@ -1353,6 +1392,7 @@ describe("«Comprobar desvío» en los webhooks de Telnyx", () => {
     expect(result).toEqual({ success: true });
     expect(mockedRegistrarContestada).toHaveBeenCalledWith("a".repeat(32));
     expect(mockedHangupCall).toHaveBeenCalledWith("call_ctrl_out");
+    expect(mockedStartNoiseSuppression).not.toHaveBeenCalled();
 
     vi.clearAllMocks();
     result = await handleCallAnswered({
