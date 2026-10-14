@@ -418,12 +418,13 @@ docker compose --profile prod up
 - Prisma Studio exposed on `localhost:5555`
 - The app (`localhost:3001`) and the public site (`localhost:3002`) are not in Compose: run them with `npm run dev`
 - The dev profile adds `cloudflared`, a named Cloudflare tunnel exposing `backend-dev` at `https://dev-api.alhabla.ai` (`CLOUDFLARE_TUNNEL_TOKEN`)
-- The `sim` profile adds `backend-sim` (`localhost:3010`): the same dev backend and database, but trusting a locally generated Ed25519 key (`TELNYX_PUBLIC_KEY_SIMULACION`) instead of Telnyx's. It is the target of the Telnyx webhooks signed by the dev MCP below; `backend-dev` still accepts only real Telnyx signatures. `docker compose --profile sim up -d backend-sim`
+- The `sim` profile adds `backend-sim` (`localhost:3010`): the same dev backend and database, but trusting a locally generated Ed25519 key (`TELNYX_PUBLIC_KEY_SIMULACION`) instead of Telnyx's. It is the target of the Telnyx webhooks signed by the dev MCP below; `backend-dev` still accepts only real Telnyx signatures. Start it with `scripts/backend-sim.sh` (stop: `scripts/backend-sim.sh parar`), which works the same from the main checkout or a worktree: it links the main `.env`, uses project `asistai` and the override, and `--no-deps` so the running Postgres/Redis are reused. It mounts `backend/` of the checkout it is launched from
 
 ### MCP de desarrollo (`backend/mcp/`, desde 2026-10-14)
 
 Servidor MCP local (stdio) registrado en `.mcp.json` como `alhabla-dev`; Claude Code lo arranca
-solo en este repo (hace falta `npm ci` en `backend/`, también en un worktree). Lee el `.env` del
+solo en este repo a través de `backend/mcp/arrancar.sh`, que la primera vez en un worktree sin
+`node_modules` instala las dependencias (`npm install --no-save`, unos 7 s con la caché). Lee el `.env` del
 checkout PRINCIPAL aunque se lance desde un worktree (`git rev-parse --git-common-dir`;
 `ALHABLA_ENV_FILE` lo cambia). Herramientas:
 

@@ -121,7 +121,7 @@ cd frontend && npm run dev   # la app, Next.js :3001
 cd web && npm run dev        # la web pública, Next.js :3002
 
 docker compose --profile dev up   # backend + postgres + redis + cloudflared (desde la raíz)
-docker compose --profile sim up -d backend-sim   # :3010, destino de los webhooks de Telnyx simulados
+scripts/backend-sim.sh            # backend-sim :3010, destino de los webhooks de Telnyx simulados (también desde un worktree)
 ```
 
 ## Estructura

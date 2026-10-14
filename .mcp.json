@@ -1,8 +1,7 @@
 {
   "mcpServers": {
     "alhabla-dev": {
-      "command": "backend/node_modules/.bin/tsx",
-      "args": ["backend/mcp/servidorDev.ts"]
+      "command": "backend/mcp/arrancar.sh"
     }
   }
 }
