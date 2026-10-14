@@ -122,7 +122,7 @@ export async function processRecordingJob(data: ProcessRecordingJob): Promise<vo
     }
     if (call.grabacionRechazadaAt) {
       // Quien llama pidió no grabar después de que la grabación entrase en
-      // la cola (lib/grabacionRechazada.ts): no se sube y se retira para que
+      // la cola (lib/grabacion.ts): no se sube y se retira para que
       // retryStuckRecordings no la vuelva a encolar.
       await prisma.recording.update({
         where: { id: pendingRecording.id },

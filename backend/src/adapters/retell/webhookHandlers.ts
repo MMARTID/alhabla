@@ -5,7 +5,7 @@ import type {
   CallSentiment,
 } from "@prisma/client";
 import { prisma } from "../../lib/prisma.js";
-import { enqueueRecordingJob, enqueueUsageReportJob } from "../../lib/cloudTasks.js";
+import { enqueueUsageReportJob } from "../../lib/cloudTasks.js";
 import { callLabel, errorMessage } from "../../lib/logUtils.js";
 
 // Un call_started retrasado o reentregado por Retell no debe poder revivir
@@ -367,46 +367,18 @@ export async function handleCallEnded(
         });
       }
 
-      // Quien llama pidió que no se grabara (tool no_grabar): el audio no se
-      // guarda ni se copia (lib/grabacionRechazada.ts). Retell no deja
-      // borrar solo la grabación; la retiene sus 30 días de retención.
-      if (data.recording_url && !updatedCall.grabacionRechazadaAt) {
-        await tx.recording.upsert({
-          where: { callId: updatedCall.id },
-          create: {
-            callId: updatedCall.id,
-            externalUrl: data.recording_url,
-          },
-          update: {
-            externalUrl: data.recording_url,
-          },
-        });
-      }
-
       return updatedCall;
     });
 
-    if (data.recording_url && result.grabacionRechazadaAt) {
+    // Grabación con permiso (13-10-2026, lib/grabacion.ts): Retell graba
+    // siempre por su cuenta y no deja empezar ni parar a mitad de llamada,
+    // así que no puede grabar solo con el permiso de quien llama. Su audio no
+    // se guarda ni se copia a R2; la transcripción sí. Retell lo retiene sus
+    // 30 días (dataStorageRetentionDays).
+    if (data.recording_url) {
       console.log(
-        `[Retell] ${callLabel(call_id)}: grabación descartada, quien llama pidió no grabar (negocio ${result.businessId})`
+        `[Retell] ${callLabel(call_id)}: grabación de Retell no guardada, solo se graba con permiso (negocio ${result.businessId})`
       );
-    } else if (data.recording_url) {
-      try {
-        await enqueueRecordingJob(
-          {
-            callId: result.id,
-            externalUrl: data.recording_url,
-            businessId: result.businessId,
-          },
-          `process-recording-${result.id}`
-        );
-      } catch (err) {
-        console.error(
-          `[Retell] La ${callLabel(call_id)} se guardó, pero no se pudo encolar su grabación: ${errorMessage(
-            err
-          )}`
-        );
-      }
     }
 
     if (durationSecs !== undefined) {
@@ -450,7 +422,7 @@ export async function handleCallAnalyzed(
   try {
     let dbCall = await prisma.call.findUnique({
       where: { callId: call_id },
-      select: { id: true, businessId: true, grabacionRechazadaAt: true },
+      select: { id: true, businessId: true },
     });
 
     if (!dbCall) {
@@ -479,7 +451,7 @@ export async function handleCallAnalyzed(
           agentId: agent?.id || null,
           status: "COMPLETED",
         },
-        select: { id: true, businessId: true, grabacionRechazadaAt: true },
+        select: { id: true, businessId: true },
       });
     }
 
@@ -515,19 +487,6 @@ export async function handleCallAnalyzed(
           update: {
             fullText: data.transcript,
             messages,
-          },
-        });
-      }
-
-      if (data.recording_url && !dbCall.grabacionRechazadaAt) {
-        await tx.recording.upsert({
-          where: { callId: dbCall.id },
-          create: {
-            callId: dbCall.id,
-            externalUrl: data.recording_url,
-          },
-          update: {
-            externalUrl: data.recording_url,
           },
         });
       }

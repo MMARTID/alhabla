@@ -23,13 +23,16 @@ import { componerSaludo } from "./idiomas/catalogo.js";
 import {
   ajustesParaRetell,
   idiomaDeRetell,
+  resolverIdiomas,
   usaVozMultilingueEnRetell,
 } from "./idiomas/resolver.js";
+import { cooficialDeLaZona } from "./idiomas/zona.js";
 import { calendarService } from "../modules/calendar/service.js";
 import { crearAssistantYPromocionar } from "./telnyxAgentSync.js";
 import { listaDeEsperaDisponible } from "../modules/whatsapp/service.js";
 import { isVoiceTelnyxRolloutEnabled } from "./voiceRollout.js";
 import { resolverTransferenciaAlDueno } from "./transferenciaAlDueno.js";
+import { VARIABLES_DE_LA_LLAMADA_POR_DEFECTO } from "./seccionesDelPrompt.js";
 
 /**
  * Campo de post_call_analysis_data para clasificar el resultado de la llamada:
@@ -143,6 +146,11 @@ export async function buildPostCallAnalysisDataForBusiness(
  * Variables mínimas por llamada entrante. El catálogo, profesionales y
  * horario se obtienen con get_catalog solo cuando hacen falta: inyectarlos
  * siempre aumentaba el contexto y la latencia de todos los turnos.
+ *
+ * Las de quien llama (lib/contextoDeLlamada.ts) van vacías, como a quien no
+ * se conoce: el saludo de Retell es fijo y no le llama por su nombre. Si
+ * toca pedirle permiso para grabar lo decide el backend en las tools
+ * (lib/grabacion.ts).
  */
 export async function buildInboundCallDynamicVariables(
   businessId: string,
@@ -158,6 +166,7 @@ export async function buildInboundCallDynamicVariables(
   return {
     nombre_negocio: business?.name?.trim() || "el negocio",
     zona_horaria: timezone,
+    ...VARIABLES_DE_LA_LLAMADA_POR_DEFECTO,
   };
 }
 
@@ -804,6 +813,9 @@ export async function syncAgentToRetell(
     where: { id: businessId },
     select: {
       name: true,
+      // La cooficial de la zona, solo para la copia del panel (ver
+      // promptDelPanel): Retell atiende el principal y el español.
+      address: true,
       businessDetails: true,
       businessType: true,
       agentSettings: true,
@@ -892,6 +904,11 @@ export async function syncAgentToRetell(
       business,
       agentSettings.pasarLlamadas
     ),
+    // Con la cooficial de su zona, como el de telnyxAgentSync.ts.
+    idiomas: resolverIdiomas({
+      ...agentSettings,
+      zona: cooficialDeLaZona(business),
+    }).idiomas,
   });
 
   const postCallAnalysisData = buildPostCallAnalysisData(

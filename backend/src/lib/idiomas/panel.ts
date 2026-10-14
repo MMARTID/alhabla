@@ -359,14 +359,24 @@ export function vistaPreviaDeIdiomas(
       `También saluda en ${enMinusculas(perfil.principal)} a los clientes de aquí; si le contestan en ${enMinusculas(oferta.obligatorio)}, sigue en ${enMinusculas(oferta.obligatorio)}.`
     );
   }
-  // Con un principal de voces Ultra, flux no entiende las lenguas
-  // cooficiales (47 % de error de palabra con un cliente en catalán, tanda
-  // «B piloto» del laboratorio, 2026-10-05) y la voz no cambia a mitad de
-  // llamada: un assistant de Telnyx tiene una sola. Que el dueño no lo
-  // deduzca de «Habla en 7 idiomas». Revisar si se adopta el
-  // conversation_flow que salta a Marta al oír catalán.
+  // Con un principal de voces Ultra fuera de una zona cooficial, flux no
+  // entiende las lenguas cooficiales (47 % de error de palabra con un
+  // cliente en catalán, tanda «B piloto» del laboratorio, 2026-10-05). Que
+  // el dueño no lo deduzca de «Habla en 7 idiomas». En una zona cooficial
+  // la entiende Soniox y contesta Marta o Sergio en un nodo (arriba).
   const cooficiales = oferta.principales.filter(esCooficial);
-  if (!perfil.cooficial && cooficiales.length > 0) {
+  const deLaZona = perfil.cooficialDeLaZona;
+  if (deLaZona) {
+    // La cooficial de donde está el negocio (lib/idiomas/zona.ts): Soniox
+    // desde el principio y un nodo que cambia la voz. Más espera en todas
+    // las respuestas, también en castellano: 1,4–2 s frente a 0,9 con flux
+    // (2026-10-03) y 3,7–3,9 s frente a 2,2–2,6 en los turnos con consulta
+    // (variante S, 2026-10-14).
+    const lengua = enMinusculas(deLaZona.idioma);
+    avisos.push(
+      `Como el negocio está donde el ${lengua} es lengua oficial, también lo entiende y, si le hablan en ${lengua}, contesta en ${lengua} con la voz de ${deLaZona.voz.nombre}. A cambio tarda algo más en contestar, también cuando le hablan en ${enMinusculas(oferta.obligatorio)}: entre medio segundo y un segundo y medio más por respuesta.`
+    );
+  } else if (!perfil.cooficial && cooficiales.length > 0) {
     avisos.push(
       `No entiende ${enumerar(
         cooficiales.map((cooficial) => `el ${enMinusculas(cooficial)}`),
@@ -386,7 +396,11 @@ export function vistaPreviaDeIdiomas(
 
   const voces = vocesEnPanel(perfil.principal, perfil.voces);
   return {
-    languages: perfil.idiomas,
+    // Sin la cooficial de la zona: estos se guardan, y una cooficial entre
+    // ellos pasaría a ser el principal (normalizarIdiomas).
+    languages: deLaZona
+      ? perfil.idiomas.filter((idioma) => idioma !== deLaZona.idioma)
+      : perfil.idiomas,
     voiceLanguage: perfil.principal,
     voz: perfil.voz.id,
     voiceGender: perfil.genero,

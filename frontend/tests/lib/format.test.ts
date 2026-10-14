@@ -109,6 +109,12 @@ describe("motivoSinGrabacion", () => {
     ).toBe("El cliente pidió que no se grabara la llamada. Queda la transcripción.");
   });
 
+  it("dice que el cliente no había dado permiso para grabar", () => {
+    expect(
+      motivoSinGrabacion({ voiceProvider: "telnyx", grabacionPermitida: false })
+    ).toBe("No se grabó: el cliente no había dado permiso. Queda la transcripción.");
+  });
+
   it("si no, la grabación todavía no ha llegado", () => {
     expect(motivoSinGrabacion({ voiceProvider: "telnyx" })).toBe(
       "Todavía no hay grabación disponible."

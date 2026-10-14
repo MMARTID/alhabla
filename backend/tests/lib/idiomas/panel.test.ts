@@ -243,7 +243,7 @@ describe("vistaPreviaDeIdiomas", () => {
       requiereParaElegirVoz: ELEGIR_ENTRE_29,
       entradilla: HABLA_EN_ESPANOL,
       saludo:
-        "Peluquería Ana, te atiende su asistente de inteligencia artificial. La llamada se graba; si no quieres, dímelo. ¿En qué te ayudo?",
+        "Peluquería Ana, te atiende su asistente de inteligencia artificial. ¿En qué te ayudo?",
       avisos: [AVISO_SIN_COOFICIALES],
     });
   });
@@ -287,12 +287,31 @@ describe("vistaPreviaDeIdiomas", () => {
       familia: "soniox",
       entradilla: HABLA_EN_CATALAN,
       saludo:
-        "Perruqueria Anna, t'atén una intel·ligència artificial. La trucada s'enregistra; si no vols, digues-m'ho. En què et puc ajudar?",
+        "Perruqueria Anna, t'atén una intel·ligència artificial. En què et puc ajudar?",
     });
     expect(vista.voces.map((voz) => voz.nombre)).toEqual(["Marta", "Sergio"]);
     expect(vista.voces[0].muestra).toBe("/voces/ca/marta.mp3");
     expect(vista.requiereParaElegirVoz).toBeNull();
     expect(vista.avisos).toEqual([AVISO_ESPERA_CATALAN, AVISO_VOCES_CATALAN]);
+  });
+
+  // La cooficial de donde está el negocio (lib/idiomas/zona.ts): la dice y
+  // avisa de la espera, pero `languages` va sin ella, porque se guarda y
+  // una cooficial entre ellos pasaría a ser el principal.
+  it("español en Cataluña: habla también catalán con Marta, avisa de la espera y no la guarda en languages", () => {
+    const vista = vistaPreviaDeIdiomas(
+      { voiceLanguage: "es-ES", voiceGender: "femenina", zona: "ca-ES" },
+      "Peluquería Ana"
+    );
+
+    expect(vista.languages).toEqual(idiomasQueHabla("es-ES"));
+    expect(vista.voz).toBe("Telnyx.Ultra.538a8872-3799-4df5-b373-b78493b766c6");
+    expect(vista.entradilla).toBe(
+      "Habla en 8 idiomas: español, inglés, francés, catalán, alemán, italiano, portugués y neerlandés. Saluda en español y sigue en el idioma de quien llama."
+    );
+    expect(vista.avisos).toEqual([
+      "Como el negocio está donde el catalán es lengua oficial, también lo entiende y, si le hablan en catalán, contesta en catalán con la voz de Marta. A cambio tarda algo más en contestar, también cuando le hablan en español: entre medio segundo y un segundo y medio más por respuesta.",
+    ]);
   });
 
   // Antes el inglés como principal era un legado que ya no se ofrecía.

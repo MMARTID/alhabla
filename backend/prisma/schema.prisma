@@ -205,6 +205,7 @@ model Business {
   onboardingState      OnboardingState?
   calendarConnections  CalendarConnection[]
   clientConversations  ClientConversation[]
+  clientesDelNegocio   ClienteDelNegocio[]
   ownerPendingActions  OwnerPendingAction[]
   ownerChatFeedback    OwnerChatFeedback[]
   clavesTemporales     ClaveTemporal[]
@@ -286,6 +287,28 @@ model ClientConversation {
 
   @@unique([businessId, clientPhone])
   @@map("client_conversations")
+}
+
+/// Lo que la recepcionista sabe de quien llama a un negocio, por teléfono:
+/// por ahora, si deja grabar sus llamadas (lib/contextoDeLlamada.ts). El
+/// nombre y el último servicio salen de sus reservas.
+model ClienteDelNegocio {
+  id                  String    @id @default(cuid())
+  businessId          String
+  /// E.164, el `Call.fromNumber` de sus llamadas.
+  telefono            String
+  /// true: aceptó que se graben sus llamadas; false: no quiere. Null: no
+  /// se le ha preguntado.
+  grabacionAceptada   Boolean?
+  grabacionDecididaAt DateTime?
+  /// `Call.callId` de la llamada en la que lo dijo (prueba del permiso).
+  grabacionCallId     String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  business            Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@unique([businessId, telefono])
+  @@map("clientes_del_negocio")
 }
 
 model BillingUsagePeriod {
@@ -596,6 +619,15 @@ model Call {
   // no_grabar): se intenta parar la grabación en el momento y, cuando llega,
   // ni se copia a R2 ni se conserva en el proveedor. La transcripción sí.
   grabacionRechazadaAt   DateTime?
+  // ¿Se grababa al contestar? Solo si ese cliente aceptó antes que se
+  // graben sus llamadas (ClienteDelNegocio); si no, la recepcionista se lo
+  // pide en la llamada y, con su sí, empieza a grabar en ese momento (tool
+  // preferencia_de_grabacion). Null en las llamadas anteriores al 13-10-2026.
+  grabacionPermitida     Boolean?
+  // Cuándo se le pidió permiso para grabar: lo decide el backend y va en la
+  // respuesta de check_availability, una sola vez por llamada
+  // (lib/grabacion.ts, tocaPreguntarPorGrabar).
+  grabacionPreguntadaAt  DateTime?
   providerCallId         String?
   providerConversationId String?
   // OJO: en Telnyx, providerCostCents viene del webhook call.cost y SOLO

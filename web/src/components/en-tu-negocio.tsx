@@ -86,10 +86,10 @@ function pasosDe(g: GuionRelato): [PasoCopy, PasoCopy, PasoCopy] {
       numero: "02",
       etiqueta: "Llamadas",
       pantalla: "Detalle de una llamada",
-      titulo: "Cada llamada, con su grabación y su transcripción.",
+      titulo: "Cada llamada, con su transcripción y su grabación.",
       texto: `Abre la llamada de ${g.cliente.nombre} y ves qué pidió, por qué se le ofreció esa hora y la cita que salió de ella.`,
       detalles: [
-        "La grabación completa, para escucharla cuando quieras",
+        "La grabación, si el cliente da permiso, para escucharla cuando quieras",
         "La transcripción turno a turno",
         "La cita que salió de la llamada, ya vinculada",
       ],

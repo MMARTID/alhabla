@@ -1,12 +1,19 @@
 import type {
+  ConversationFlowReq,
   CreateTelnyxAssistantInput,
   HangupTool,
   TelnyxTransferTool,
   TelnyxWebhookTool,
 } from "../adapters/telnyx/TelnyxAiAdapter.js";
-import type { TranscriptionSettings } from "telnyx/resources/ai/assistants/assistants.js";
+import type {
+  FlowNodeReq,
+  TranscriptionSettings,
+} from "telnyx/resources/ai/assistants/assistants.js";
 import { resolveManagedPromptTimezone } from "./managedAgentPrompt.js";
+import { VARIABLES_DE_LA_LLAMADA_POR_DEFECTO } from "./seccionesDelPrompt.js";
 import type { PerfilDeIdiomas } from "./idiomas/resolver.js";
+import { IDIOMAS } from "./idiomas/catalogo.js";
+import { IDIOMA_OBLIGATORIO } from "./idiomas/ajustes.js";
 
 /**
  * Nombre estable y determinista del assistant Telnyx de un agente — permite
@@ -315,12 +322,19 @@ export function buildTelnyxVoiceTools(
       required: ["startDateTime", "durationMinutes"],
     },
     {
-      // El saludo dice que la llamada se graba y ofrece no hacerlo
-      // (lib/grabacionRechazada.ts).
-      name: "no_grabar",
+      // Grabación con permiso (lib/grabacion.ts): la recepcionista lo
+      // pregunta mientras comprueba el primer servicio.
+      name: "preferencia_de_grabacion",
       description:
-        "Deja de grabar esta llamada: el audio no se guarda y la transcripción sí. Úsala una sola vez, en cuanto quien llama diga que no quiere que se grabe, sin pedirle que lo confirme. No la uses en el chat de WhatsApp.",
-      properties: {},
+        "Guarda lo que contesta quien llama sobre grabar sus llamadas (el audio es solo para que el negocio las revise). Con acepta true se empieza a grabar y se recuerda para sus próximas llamadas; con false no se graba (o se deja de grabar) y no se guarda el audio; la transcripción sí. Úsala cuando conteste con claridad a tu pregunta de grabar, o si en cualquier momento dice que no quiere que se grabe. Si su respuesta no es clara, no la uses. No la uses en el chat de WhatsApp.",
+      properties: {
+        acepta: {
+          type: "boolean",
+          description:
+            "true si acepta con claridad que se grabe (sí, vale, claro); false si dice que no.",
+        },
+      },
+      required: ["acepta"],
     },
     buildInformarAlNegocioTool(),
   ]);
@@ -508,6 +522,100 @@ function transcripcionDeSoniox(
   };
 }
 
+/** Sonido de oficina de fondo, el mismo en la voz de cada nodo. */
+const AUDIO_DE_FONDO = {
+  type: "predefined_media",
+  value: "office",
+  volume: 0.2,
+} as const;
+
+/** «inglés, francés o alemán». */
+function enumerarConO(palabras: readonly string[]): string {
+  return palabras.length < 2
+    ? palabras.join("")
+    : `${palabras.slice(0, -1).join(", ")} o ${palabras[palabras.length - 1]}`;
+}
+
+/**
+ * La cooficial de la zona (lib/idiomas/zona.ts) en un solo assistant: la
+ * transcripción (Soniox con su pista) la entiende desde el principio y un
+ * nodo solo cambia la voz a la que la habla (Marta o Sergio). Es la
+ * variante S del laboratorio con llamadas reales del 2026-10-14: catalán
+ * perfecto y los mensajes del cliente guardados, con un segundo más de
+ * espera en los turnos con consulta. Cambiar de transcripción en un nodo
+ * (flux → Soniox) hacía que Telnyx dejara de guardar los mensajes del
+ * cliente, y con flux el catalán llegaba transcrito como italiano.
+ *
+ * Las aristas son de tipo llm: en voz el modelo las ve como tools
+ * `transition__<id>`; en el chat no están y contesta en la cooficial sin
+ * más. Al volver al nodo inicial contestó una vez en catalán y castellano a
+ * quien ya hablaba inglés: de ahí «solo en el suyo».
+ */
+export function flujoDeLaCooficial(
+  idiomas: Pick<PerfilDeIdiomas, "idiomas" | "cooficialDeLaZona">
+): ConversationFlowReq | null {
+  const cooficial = idiomas.cooficialDeLaZona;
+  if (!cooficial) return null;
+  const lengua = IDIOMAS[cooficial.idioma].nombreEnPrompt;
+  const otros = enumerarConO(
+    idiomas.idiomas
+      .filter(
+        (idioma) => idioma !== IDIOMA_OBLIGATORIO && idioma !== cooficial.idioma
+      )
+      .map((idioma) => IDIOMAS[idioma].nombreEnPrompt)
+  );
+  return {
+    start_node_id: "inicial",
+    nodes: [
+      {
+        type: "prompt",
+        id: "inicial",
+        name: "Inicial",
+        instructions_mode: "append",
+        tools_mode: "append",
+        shared_tool_ids: [],
+        instructions: `## Idioma en este paso\n\nSi quien llama habla en ${lengua} (aunque sea una sola frase o un saludo, mezclado con castellano, o aunque la transcripción llegue con errores, con palabras en ${lengua} mal reconocidas) o pide que le atiendas en ${lengua}, llama a la herramienta transition__a_cooficial en ese mismo turno, sin decir nada antes: la respuesta la darás en ${lengua} justo después. No le digas que le pasas con nadie. Usa transition__a_cooficial solo para eso: nunca para consultar el catálogo, la disponibilidad, dejar un recado ni colgar, que tienen sus propias herramientas. Si no tienes esa herramienta (en el chat no está), no digas que no puedes cambiar de idioma: contéstale directamente en ${lengua}. Contesta solo en el idioma en que te habla, sin repetir la respuesta en otro: si vienes del paso en ${lengua} porque ha cambiado de idioma, contesta solo en el suyo.`,
+      },
+      {
+        type: "prompt",
+        id: "cooficial",
+        name: `En ${lengua}`,
+        instructions_mode: "append",
+        tools_mode: "append",
+        shared_tool_ids: [],
+        instructions: `## Idioma en este paso\n\nDesde ahora habla en ${lengua} con naturalidad; no repitas el saludo ni el aviso de IA ya dados, pero si es tu primera frase en ${lengua} di brevemente, en ${lengua}, que eres una inteligencia artificial. Si quien llama vuelve a hablarte en castellano, contéstale en castellano. Si habla en ${otros}, llama a la herramienta transition__a_inicial en ese mismo turno, sin decir nada antes, y contéstale después solo en su idioma. Usa transition__a_inicial solo para eso.`,
+        voice_settings: {
+          voice: cooficial.voz.id,
+          // El idioma de la voz de Soniox; el SDK no lo declara.
+          language: cooficial.iso,
+          expressive_mode: false,
+          background_audio: AUDIO_DE_FONDO,
+        } as FlowNodeReq["voice_settings"],
+      },
+    ],
+    edges: [
+      {
+        id: "a_cooficial",
+        start_node_id: "inicial",
+        target: { type: "node", node_id: "cooficial" },
+        condition: {
+          type: "llm",
+          prompt: `Quien llama habla ${lengua} (aunque la transcripción llegue con errores) o pide hablar en ${lengua}.`,
+        },
+      },
+      {
+        id: "a_inicial",
+        start_node_id: "cooficial",
+        target: { type: "node", node_id: "inicial" },
+        condition: {
+          type: "llm",
+          prompt: `Quien llama habla ${otros}.`,
+        },
+      },
+    ],
+  };
+}
+
 export interface BuildTelnyxAssistantPayloadInput {
   businessId: string;
   agentId: string;
@@ -524,10 +632,12 @@ export interface BuildTelnyxAssistantPayloadInput {
   /** Cadena vacía para que el assistant espere a que hable el cliente. */
   greeting: string;
   /** Lo que el idioma decide del payload (resolverIdiomas, en
-   * lib/idiomas/resolver.ts): el motor de transcripción con sus pistas y el
+   * lib/idiomas/resolver.ts): el motor de transcripción con sus pistas, el
    * idioma en que arranca una voz de Soniox (el del principal, la
-   * cooficial). */
-  idiomas: Pick<PerfilDeIdiomas, "transcripcion" | "isoDeLaVoz">;
+   * cooficial) y la cooficial de la zona, que lleva su nodo
+   * (flujoDeLaCooficial). */
+  idiomas: Pick<PerfilDeIdiomas, "transcripcion" | "isoDeLaVoz"> &
+    Partial<Pick<PerfilDeIdiomas, "idiomas" | "cooficialDeLaZona">>;
   /** Identificador Telnyx (`Telnyx.<modelo>.<voz>`), de Soniox
    * (`Soniox.tts-rt-v2.<voz>`) o de ElevenLabs vía `api_key_ref` — resuelto
    * contra la API de voces de la cuenta, no fijo. */
@@ -642,11 +752,7 @@ export function buildTelnyxAssistantPayload(
       expressive_mode:
         input.voice.startsWith("Telnyx.Ultra.") ||
         input.voice.startsWith("XAI."),
-      background_audio: {
-        type: "predefined_media",
-        value: "office",
-        volume: 0.2,
-      },
+      background_audio: AUDIO_DE_FONDO,
     },
     // deepgram/flux — decisión explícita del usuario 2026-09-12: mejor
     // detección de turno de palabra (end-of-turn/eager end-of-turn) que
@@ -742,8 +848,12 @@ export function buildTelnyxAssistantPayload(
       // grabación pasa por Cloud Run al copiarla a R2, que es salida a
       // internet de pago. Telnyx solo da la URL del formato con el que se grabó. Se
       // mantienen los dos canales (uno por interlocutor).
+      // Grabación con permiso (13-10-2026, lib/grabacion.ts): el assistant
+      // no graba por su cuenta. Se graba por llamada, con `record` al
+      // contestar (cliente que ya lo aceptó) o `record_start` cuando lo
+      // acepta, en el mismo formato.
       recording_settings: {
-        enabled: true,
+        enabled: false,
         format: "mp3",
         channels: "dual",
         stop_on_conversation_end: true,
@@ -782,6 +892,16 @@ export function buildTelnyxAssistantPayload(
     // Post-conversación (PLAN-CANAL-DUENO.md § 10): el assistant vuelve a
     // ejecutarse tras colgar para llamar a informar_al_negocio.
     postConversationSettings: { enabled: true },
+    // Lo de quien llama lo manda el backend en cada llamada
+    // (lib/contextoDeLlamada.ts); estos valores quedan para el chat y para
+    // una llamada en la que no se pudo mirar nada.
+    dynamicVariables: { ...VARIABLES_DE_LA_LLAMADA_POR_DEFECTO },
     tools,
+    // null y no ausente: un negocio que deja la zona (cambia de dirección)
+    // pierde el nodo al sincronizar.
+    conversationFlow: flujoDeLaCooficial({
+      idiomas: input.idiomas.idiomas ?? [],
+      cooficialDeLaZona: input.idiomas.cooficialDeLaZona ?? null,
+    }),
   };
 }

@@ -9,7 +9,8 @@ import {
 import { callLabel, errorMessage } from "../../lib/logUtils.js";
 import { selectTelnyxInboundAgent } from "../../modules/phone/telnyxInbound.js";
 import { executeVoiceTool } from "../../modules/voiceTools/service.js";
-import { borrarGrabacionesDeTelnyx } from "../../lib/grabacionRechazada.js";
+import { borrarGrabacionesDeTelnyx } from "../../lib/grabacion.js";
+import { resolverContextoDeLlamada } from "../../lib/contextoDeLlamada.js";
 import {
   comprobacionDeDesvioReciente,
   leerClientStateDeComprobacion,
@@ -260,12 +261,16 @@ async function recibirLlamadaDeComprobacion(
 }
 
 /**
- * `call.answered` solo interesa para la pata saliente de «Comprobar
- * desvío»: si alguien la coge (el dueño por reflejo o su contestador), la
- * comprobación ya no puede salir bien, así que se anota y se cuelga para no
- * dejar a nadie escuchando silencio. Para las llamadas de clientes (la
- * recepcionista contesta con `answerCallWithAssistant`) no hay nada que
- * hacer aquí.
+ * `call.answered` interesa en dos casos:
+ *
+ * - La pata saliente de «Comprobar desvío»: si alguien la coge (el dueño
+ *   por reflejo o su contestador), la comprobación ya no puede salir bien,
+ *   así que se anota y se cuelga para no dejar a nadie escuchando silencio.
+ * - Una llamada de cliente que la recepcionista acaba de contestar: aquí se
+ *   activa la supresión de ruido. Pedida justo después de
+ *   `answerCallWithAssistant`, Telnyx la rechazaba siempre con 90034 («Call
+ *   not answered yet»): el answer vuelve antes de que la llamada esté
+ *   contestada.
  */
 export async function handleCallAnswered(
   payload: unknown
@@ -274,7 +279,10 @@ export async function handleCallAnswered(
   const { call_control_id, client_state } = event.data.payload;
 
   const comprobacion = leerClientStateDeComprobacion(client_state);
-  if (!comprobacion) return { success: true };
+  if (!comprobacion) {
+    await activarSupresionDeRuido(call_control_id);
+    return { success: true };
+  }
 
   try {
     const check = await registrarSalienteContestada(comprobacion.checkId);
@@ -294,6 +302,31 @@ export async function handleCallAnswered(
     );
   }
   return { success: true };
+}
+
+/**
+ * Mejora de calidad de audio (BETA de Telnyx) para las llamadas de clientes
+ * por Telnyx; nunca debe poder tumbar la llamada ya contestada. Las patas
+ * sin Call (transferencias al dueño) se quedan como están.
+ */
+async function activarSupresionDeRuido(callControlId: string): Promise<void> {
+  let negocio = "desconocido";
+  try {
+    const call = await prisma.call.findUnique({
+      where: { callId: callControlId },
+      select: { businessId: true, voiceProvider: true },
+    });
+    if (!call || call.voiceProvider !== "telnyx") return;
+    negocio = call.businessId;
+    await telnyxAiAdapter.startNoiseSuppression(callControlId);
+    console.log(
+      `[Telnyx] ${callLabel(callControlId)}: supresión de ruido activada (negocio ${negocio})`
+    );
+  } catch (error) {
+    console.error(
+      `[Telnyx] ${callLabel(callControlId)} no se pudo activar la supresión de ruido (negocio ${negocio}): ${errorMessage(error)}`
+    );
+  }
 }
 
 export async function handleCallInitiated(
@@ -340,8 +373,12 @@ export async function handleCallInitiated(
       where: { telnyxPhoneNumber: to },
       select: {
         id: true,
+        name: true,
+        agentSettings: true,
+        businessType: true,
         phone: true,
         telnyxPhoneNumber: true,
+        ownerWhatsappNumber: true,
         callsSuspendedAt: true,
         paymentFailureSuspensionAt: true,
         agents: {
@@ -376,6 +413,20 @@ export async function handleCallInitiated(
       return { success: false };
     }
 
+    // Saludo, variables del prompt y si se graba, según quién llama
+    // (lib/contextoDeLlamada.ts). Antes de guardar la Call: así su primera
+    // llamada no se cuenta a sí misma. Si falla, se contesta igual con el
+    // saludo del assistant (que ya avisa de la IA) y sin grabar.
+    const contexto = await resolverContextoDeLlamada({
+      business,
+      telefono: from ?? null,
+    }).catch((error) => {
+      console.error(
+        `[Telnyx] ${callLabel(call_control_id)}: no se pudo saber quién llama (negocio ${business.id}); se contesta con el saludo del assistant y sin grabar: ${errorMessage(error)}`
+      );
+      return null;
+    });
+
     // upsert, no create: un reintento del mismo call.initiated no debe
     // pisar el estado que ya haya avanzado la llamada.
     await prisma.call.upsert({
@@ -389,24 +440,22 @@ export async function handleCallInitiated(
         fromNumber: from || null,
         status: "IN_PROGRESS",
         startedAt: new Date(),
+        grabacionPermitida: contexto?.grabar ?? false,
       },
       update: {},
     });
 
     await telnyxAiAdapter.answerCallWithAssistant(
       call_control_id,
-      agent.telnyxAssistantId
+      agent.telnyxAssistantId,
+      contexto
+        ? {
+            greeting: contexto.saludo,
+            dynamicVariables: contexto.variables,
+            grabar: contexto.grabar,
+          }
+        : {}
     );
-
-    // Mejora de calidad de audio, nunca debe poder tumbar la llamada ya
-    // contestada — BETA de Telnyx, aislado en su propio try/catch.
-    try {
-      await telnyxAiAdapter.startNoiseSuppression(call_control_id);
-    } catch (noiseSuppressionError) {
-      console.error(
-        `[Telnyx] ${callLabel(call_control_id)} no se pudo activar la supresión de ruido: ${errorMessage(noiseSuppressionError)}`
-      );
-    }
 
     console.log(
       `[Telnyx] ${callLabel(call_control_id)} contestada con el assistant ${agent.telnyxAssistantId}`
@@ -629,13 +678,29 @@ export async function handleCallRecordingSaved(
       return { success: false };
     }
 
-    // Quien llama pidió que no se grabara (tool no_grabar): ni fila, ni
-    // copia a R2, y el audio se borra en Telnyx (lib/grabacionRechazada.ts).
+    // Quien llama pidió que no se grabara (preferencia_de_grabacion o la
+    // tool de antes, no_grabar): ni fila, ni copia a R2, y el audio se borra
+    // en Telnyx (lib/grabacion.ts).
     if (dbCall.grabacionRechazadaAt) {
       await borrarGrabacionesDeTelnyx({
         grabaciones,
         businessId: dbCall.businessId,
         etiqueta: callLabel(callControlId),
+      });
+      return { success: true };
+    }
+    // Ni lo aceptó antes ni durante la llamada (se marca antes de
+    // record_start): lo ha grabado el assistant por su cuenta, p. ej. uno
+    // aún sin resincronizar con recording_settings.enabled. No se guarda.
+    if (dbCall.grabacionPermitida === false) {
+      console.error(
+        `[Grabación] ${callLabel(callControlId)}: llegó una grabación sin permiso de quien llama (negocio ${dbCall.businessId}); ¿el assistant graba por su cuenta? Se descarta`
+      );
+      await borrarGrabacionesDeTelnyx({
+        grabaciones,
+        businessId: dbCall.businessId,
+        etiqueta: callLabel(callControlId),
+        motivo: "no había permiso para grabar",
       });
       return { success: true };
     }

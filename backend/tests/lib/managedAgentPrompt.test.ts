@@ -98,20 +98,45 @@ describe("buildManagedAgentPrompt", () => {
     expect(prompt).not.toContain("No menciones que eres una IA");
   });
 
-  // El saludo ofrece no grabar (lib/grabacionRechazada.ts); en el chat no
-  // hay grabación y el aviso de IA lo da la primera respuesta.
-  it("explica cuándo usar no_grabar en las llamadas, y en el chat avisa de la IA sin usarla", () => {
+  // Grabación con permiso (lib/grabacion.ts): se pregunta mientras se
+  // comprueba el primer servicio; en el chat no hay grabación y el aviso de
+  // IA lo da la primera respuesta.
+  // Cuándo preguntarlo lo decide el backend (lib/grabacion.ts): con la
+  // regla en el prompt volvía a preguntar a quien ya lo había aceptado.
+  it("pide permiso para grabar solo cuando se lo trae una tool, y en el chat no", () => {
     const prompt = buildManagedAgentPrompt({
       businessName: "Barbería Ejemplo",
       settings: DEFAULT_AGENT_SETTINGS,
     });
 
     expect(prompt).toContain("## Grabación");
+    expect(prompt).not.toContain("{{grabacion}}");
     expect(prompt).toContain(
-      "llama a no_grabar en ese mismo turno y dile en una frase que de acuerdo, que no se guardará la grabación"
+      "No preguntes nunca por tu cuenta si puedes grabar."
     );
     expect(prompt).toContain(
-      "en tu primera respuesta de la conversación di, en una frase corta, que le atiende la recepcionista virtual de {{nombre_negocio}}, una inteligencia artificial. En el chat no se graba nada: no uses no_grabar."
+      "Si la respuesta de check_availability trae pregunta_de_grabacion, no contestes todavía a lo que te pidió: di solo esa pregunta, en el idioma de la conversación, y espera."
+    );
+    expect(prompt).toContain(
+      "llama a preferencia_de_grabacion con acepta false en ese mismo turno"
+    );
+    expect(prompt).toContain(
+      "En el chat no se graba nada: no preguntes por grabar ni uses preferencia_de_grabacion."
+    );
+    expect(prompt).not.toContain("no_grabar");
+  });
+
+  it("sabe quién llama: nombre y último servicio de su última reserva", () => {
+    const prompt = buildManagedAgentPrompt({
+      businessName: "Barbería Ejemplo",
+      settings: DEFAULT_AGENT_SETTINGS,
+    });
+
+    expect(prompt).toContain(
+      "Nombre de su última reserva con este teléfono: {{nombre_cliente}}. Su último servicio: {{ultimo_servicio}}."
+    );
+    expect(prompt).toContain(
+      "Si dice que no es esa persona, discúlpate y pídele el nombre como a cualquier cliente."
     );
   });
 
@@ -785,6 +810,12 @@ describe("buildManagedAgentPrompt — profesionales y especialidades", () => {
   it("deja decir en positivo con quién queda la cita cuando es especialista", () => {
     expect(prompt).toContain("assignedProfessional");
     expect(prompt).toContain("isSpecialist");
+    // Sin ejemplo literal que copiar: dijo «especialista en color» de un
+    // corte de pelo.
+    expect(prompt).toContain(
+      "especialista en el servicio que ha pedido, nombrándolo como en el catálogo"
+    );
+    expect(prompt).not.toContain("especialista en color");
   });
 });
 

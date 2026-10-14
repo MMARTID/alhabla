@@ -55,7 +55,7 @@ describe("processRecordingJob", () => {
   });
 
   // Quien llama pidió no grabar cuando la grabación ya estaba en la cola
-  // (lib/grabacionRechazada.ts): ni descarga ni subida, y se retira para que
+  // (lib/grabacion.ts): ni descarga ni subida, y se retira para que
   // retryStuckRecordings no la vuelva a encolar.
   it("no sube la grabación de una llamada en la que pidieron no grabar", async () => {
     mockedCallFindUnique.mockResolvedValue({

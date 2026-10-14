@@ -114,16 +114,20 @@ export function esChatDeWhatsapp(call: { voiceProvider?: string | null }) {
 
 /**
  * Qué decir en lugar del reproductor cuando no hay grabación: un chat no se
- * graba, el cliente puede pedir que no se grabe la llamada (el saludo se lo
- * ofrece) y, si no, el audio aún no ha llegado.
+ * graba, y una llamada solo se graba con el permiso del cliente (se lo pide
+ * la recepcionista y puede retirarlo). Si no, el audio aún no ha llegado.
  */
 export function motivoSinGrabacion(call: {
   voiceProvider?: string | null;
   grabacionRechazadaAt?: string | null;
+  grabacionPermitida?: boolean | null;
 }) {
   if (esChatDeWhatsapp(call)) return "Chat de WhatsApp: no hay grabación.";
   if (call.grabacionRechazadaAt) {
     return "El cliente pidió que no se grabara la llamada. Queda la transcripción.";
+  }
+  if (call.grabacionPermitida === false) {
+    return "No se grabó: el cliente no había dado permiso. Queda la transcripción.";
   }
   return "Todavía no hay grabación disponible.";
 }

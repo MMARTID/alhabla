@@ -32,6 +32,7 @@ import {
   funcionQueExige,
   resolverIdiomas,
 } from "../src/lib/idiomas/resolver.js";
+import { cooficialDeLaZona } from "../src/lib/idiomas/zona.js";
 import { planAllows, resolvePlanId } from "../src/lib/planFeatures.js";
 
 function clave(valor: unknown): string {
@@ -45,6 +46,8 @@ async function main() {
       name: true,
       orchestrator: true,
       agentSettings: true,
+      address: true,
+      businessDetails: true,
       plan: true,
       stripePriceId: true,
       agents: {
@@ -69,7 +72,16 @@ async function main() {
     const assistants = negocio.agents.filter(
       (agente) => agente.telnyxAssistantId
     ).length;
-    const configuracion = `principal ${perfil.principal} · habla ${perfil.idiomas.length} idiomas · voz ${perfil.voz.proveedor} ${perfil.voz.nombre}${elegida ? " (elegida)" : ""} · ${perfil.transcripcion.motor} · ${negocio.orchestrator}`;
+    // Lo que atiende de verdad, con la cooficial de su zona (no se guarda
+    // en `languages`: la comparación de abajo va sin ella).
+    const atiende = resolverIdiomas({
+      ...ajustes,
+      zona: cooficialDeLaZona(negocio),
+    });
+    const zona = atiende.cooficialDeLaZona
+      ? ` · zona ${atiende.cooficialDeLaZona.idioma} con ${atiende.cooficialDeLaZona.voz.nombre}`
+      : "";
+    const configuracion = `principal ${perfil.principal} · habla ${atiende.idiomas.length} idiomas · voz ${perfil.voz.proveedor} ${perfil.voz.nombre}${elegida ? " (elegida)" : ""}${zona} · ${atiende.transcripcion.motor} · ${negocio.orchestrator}`;
     porConfiguracion.set(
       configuracion,
       (porConfiguracion.get(configuracion) ?? 0) + 1

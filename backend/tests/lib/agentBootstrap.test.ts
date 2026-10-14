@@ -105,6 +105,19 @@ describe("buildInboundCallDynamicVariables", () => {
     expect(variables).not.toHaveProperty("horario_semanal");
   });
 
+  // Las de quien llama van vacías: el saludo de Retell es fijo.
+  it("lleva las variables de quien llama vacías", async () => {
+    mockedBusinessFindUnique.mockResolvedValue({ name: "Peluquería Ana" } as any);
+
+    const variables = await buildInboundCallDynamicVariables("biz_123");
+
+    expect(variables).toMatchObject({
+      nombre_negocio: "Peluquería Ana",
+      nombre_cliente: "",
+      ultimo_servicio: "",
+    });
+  });
+
   it("no revienta si el negocio no existe (findUnique devuelve null)", async () => {
     mockedBusinessFindUnique.mockResolvedValue(null);
     mockedServiceFindMany.mockResolvedValue([]);
@@ -223,6 +236,29 @@ describe("syncAgentToRetell — voiceGender", () => {
       "Configuración gestionada por Alhabla"
     );
     expect(mockedGetAgent).toHaveBeenCalledWith("retell_agent_1", 7);
+  });
+
+  // La cooficial de la zona (lib/idiomas/zona.ts): Retell atiende el
+  // principal y el español, pero la copia del panel es la de Telnyx.
+  it("en Cataluña, Retell atiende en español y la copia del panel lleva el catalán", async () => {
+    mockedBusinessFindUnique.mockResolvedValue({
+      name: "Salón de prueba",
+      address: "Av. Rei en Jaume, 231, 08440 Cardedeu, Barcelona, Spain",
+      businessDetails: null,
+      businessType: "peluqueria",
+      agentSettings: null,
+      orchestrator: "telnyx",
+      minAdvanceBookingMinutes: null,
+      maxAppointmentDurationMinutes: null,
+    } as any);
+
+    await syncAgentToRetell("biz_123");
+
+    const promptDeRetell = mockedUpdateLlm.mock.calls[0][1].generalPrompt;
+    expect(promptDeRetell).toContain("Habla siempre en español de España.");
+    expect(promptDeRetell).not.toContain("catalán");
+    const copia = mockedAgentUpdate.mock.calls[0][0].data.systemPrompt;
+    expect(copia).toContain("catalán");
   });
 
   it("no actualiza un prompt editado a mano al sincronizar solo gestionados", async () => {
@@ -393,7 +429,7 @@ describe("syncAgentToRetell — voiceGender", () => {
       "retell_llm_1",
       expect.objectContaining({
         beginMessage:
-          "Salon Anna, Sie sprechen mit einer künstlichen Intelligenz. Das Gespräch wird aufgezeichnet; wenn Sie das nicht möchten, sagen Sie es mir. Wie kann ich Ihnen helfen?",
+          "Salon Anna, Sie sprechen mit einer künstlichen Intelligenz. Wie kann ich Ihnen helfen?",
       })
     );
     expect(mockedUpdateAgent).toHaveBeenCalledWith(
@@ -477,7 +513,7 @@ describe("syncAgentToRetell — voiceGender", () => {
       "retell_llm_1",
       expect.objectContaining({
         beginMessage:
-          "Perruqueria Anna, t'atén una intel·ligència artificial. La trucada s'enregistra; si no vols, digues-m'ho. En què et puc ajudar?",
+          "Perruqueria Anna, t'atén una intel·ligència artificial. En què et puc ajudar?",
       })
     );
     expect(mockedUpdateAgent).toHaveBeenCalledWith(
@@ -918,22 +954,22 @@ describe("createBusinessAgent — creación dual Telnyx (Fase 2 del plan Telnyx-
 describe("componerSaludo", () => {
   it("saluda en el idioma principal", () => {
     expect(componerSaludo("es-ES", "Peluquería Ana")).toBe(
-      "Peluquería Ana, te atiende su asistente de inteligencia artificial. La llamada se graba; si no quieres, dímelo. ¿En qué te ayudo?"
+      "Peluquería Ana, te atiende su asistente de inteligencia artificial. ¿En qué te ayudo?"
     );
     expect(componerSaludo("en-GB", "Ana's Salon")).toBe(
-      "Ana's Salon, you're speaking with an artificial intelligence assistant. This call is recorded; if you'd rather it wasn't, just tell me. How can I help?"
+      "Ana's Salon, you're speaking with an artificial intelligence assistant. How can I help?"
     );
     expect(componerSaludo("fr-FR", "Salon Anne")).toBe(
-      "Salon Anne, vous êtes en ligne avec une intelligence artificielle. L'appel est enregistré ; si vous ne le souhaitez pas, dites-le-moi. Comment puis-je vous aider ?"
+      "Salon Anne, vous êtes en ligne avec une intelligence artificielle. Comment puis-je vous aider ?"
     );
     expect(componerSaludo("ca-ES", "Perruqueria Anna")).toBe(
-      "Perruqueria Anna, t'atén una intel·ligència artificial. La trucada s'enregistra; si no vols, digues-m'ho. En què et puc ajudar?"
+      "Perruqueria Anna, t'atén una intel·ligència artificial. En què et puc ajudar?"
     );
     expect(componerSaludo("eu-ES", "Ana ile-apaindegia")).toBe(
-      "Kaixo, Ana ile-apaindegia. Adimen artifizial bat naiz. Deia grabatu egiten da; nahi ez baduzu, esadazu. Zertan lagun zaitzaket?"
+      "Kaixo, Ana ile-apaindegia. Adimen artifizial bat naiz. Zertan lagun zaitzaket?"
     );
     expect(componerSaludo("gl-ES", "Perruquería Ana")).toBe(
-      "Perruquería Ana, atendete unha intelixencia artificial. A chamada grávase; se non queres, dimo. En que te axudo?"
+      "Perruquería Ana, atendete unha intelixencia artificial. En que te axudo?"
     );
   });
 });

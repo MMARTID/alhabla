@@ -6,6 +6,7 @@ import {
   MERCADOS,
   ULTRA_HABLA,
   componerSaludo,
+  componerSaludoDeLlamada,
   esCooficial,
   esVozDelCatalogo,
   familiaDeVoces,
@@ -48,7 +49,21 @@ describe("catálogo de idiomas", () => {
       expect(codigo.startsWith(idioma.iso), codigo).toBe(true);
       expect(idioma.nombreEnPrompt.length, codigo).toBeGreaterThan(0);
       expect(idioma.etiqueta.length, codigo).toBeGreaterThan(0);
-      expect(idioma.saludo, codigo).toContain("{negocio}");
+      // Cada pieza que presenta lleva el negocio; la del cliente, su nombre;
+      // las de repetir, el servicio solo la que lo nombra.
+      const { saludo } = idioma;
+      const conGeneros = (texto: string | Record<string, string>) =>
+        typeof texto === "string" ? [texto] : Object.values(texto);
+      expect(saludo.presentacion, codigo).toContain("{negocio}");
+      for (const texto of conGeneros(saludo.presentacionNueva)) {
+        expect(texto, codigo).toContain("{negocio}");
+      }
+      for (const texto of conGeneros(saludo.presentacionAlCliente)) {
+        expect(texto, codigo).toContain("{negocio}");
+        expect(texto, codigo).toContain("{nombre}");
+      }
+      expect(saludo.repetir, codigo).toContain("{servicio}");
+      expect(saludo.repetirLoDeLaUltimaVez, codigo).not.toContain("{servicio}");
       expect(idioma.transcripcion.soniox, codigo).toBe(idioma.iso);
     }
   });
@@ -120,16 +135,16 @@ describe("catálogo de idiomas", () => {
 
   it("los saludos de siempre, con el aviso de IA y de grabación, y los nombres de los idiomas siguen byte a byte", () => {
     expect(componerSaludo("es-ES", "Peluquería Ana")).toBe(
-      "Peluquería Ana, te atiende su asistente de inteligencia artificial. La llamada se graba; si no quieres, dímelo. ¿En qué te ayudo?"
+      "Peluquería Ana, te atiende su asistente de inteligencia artificial. ¿En qué te ayudo?"
     );
     expect(componerSaludo("ca-ES", "Perruqueria Anna")).toBe(
-      "Perruqueria Anna, t'atén una intel·ligència artificial. La trucada s'enregistra; si no vols, digues-m'ho. En què et puc ajudar?"
+      "Perruqueria Anna, t'atén una intel·ligència artificial. En què et puc ajudar?"
     );
     expect(componerSaludo("eu-ES", "Ana ile-apaindegia")).toBe(
-      "Kaixo, Ana ile-apaindegia. Adimen artifizial bat naiz. Deia grabatu egiten da; nahi ez baduzu, esadazu. Zertan lagun zaitzaket?"
+      "Kaixo, Ana ile-apaindegia. Adimen artifizial bat naiz. Zertan lagun zaitzaket?"
     );
     expect(componerSaludo("gl-ES", "Perruquería Ana")).toBe(
-      "Perruquería Ana, atendete unha intelixencia artificial. A chamada grávase; se non queres, dimo. En que te axudo?"
+      "Perruquería Ana, atendete unha intelixencia artificial. En que te axudo?"
     );
     expect(
       CODIGOS_DE_IDIOMA.slice(0, 6).map(
@@ -292,27 +307,91 @@ describe("catálogo de idiomas — voces Ultra y mercado de España", () => {
   });
 });
 
-// Reglamento europeo de IA, art. 50 (desde el 2026-10-12): el saludo de cada
-// idioma dice que es una inteligencia artificial, con esas palabras, y que
-// la llamada se graba (lib/grabacionRechazada.ts).
-describe("catálogo de idiomas — aviso de IA y de grabación en el saludo", () => {
+// Reglamento europeo de IA, art. 50: el saludo de cada idioma dice que es
+// una inteligencia artificial, con esas palabras. Desde el 13-10-2026 solo
+// se graba con permiso (lib/grabacion.ts): el aviso de grabación va solo en
+// el saludo de quien lo aceptó (lib/contextoDeLlamada.ts).
+describe("catálogo de idiomas — saludos con el aviso de IA", () => {
   const AVISO: Record<CodigoDeIdioma, { ia: string; grabacion: string }> = {
     "es-ES": { ia: "inteligencia artificial", grabacion: "se graba" },
     "en-GB": { ia: "artificial intelligence", grabacion: "recorded" },
     "fr-FR": { ia: "intelligence artificielle", grabacion: "enregistré" },
     "ca-ES": { ia: "intel·ligència artificial", grabacion: "s'enregistra" },
-    "eu-ES": { ia: "Adimen artifizial", grabacion: "grabatu" },
+    "eu-ES": { ia: "adimen artifizial", grabacion: "grabatu" },
     "gl-ES": { ia: "intelixencia artificial", grabacion: "grávase" },
-    "de-DE": { ia: "künstlichen Intelligenz", grabacion: "aufgezeichnet" },
+    "de-DE": { ia: "künstliche", grabacion: "aufgezeichnet" },
     "it-IT": { ia: "intelligenza artificiale", grabacion: "registrata" },
     "pt-PT": { ia: "inteligência artificial", grabacion: "gravada" },
     "nl-NL": { ia: "kunstmatige intelligentie", grabacion: "opgenomen" },
   };
+  const base = {
+    negocio: "Negocio de prueba",
+    genero: "femenina" as const,
+    primeraSemana: false,
+    cliente: null,
+    grabando: false,
+  };
 
-  it.each(CODIGOS_DE_IDIOMA)("%s: con el nombre del negocio, la IA y la grabación", (codigo) => {
+  it.each(CODIGOS_DE_IDIOMA)("%s: el saludo fijo dice que es una IA y no habla de grabar", (codigo) => {
     const saludo = componerSaludo(codigo, "Negocio de prueba");
     expect(saludo).toContain("Negocio de prueba");
-    expect(saludo).toContain(AVISO[codigo].ia);
+    expect(saludo.toLowerCase()).toContain(AVISO[codigo].ia);
+    expect(saludo).not.toContain(AVISO[codigo].grabacion);
+    // El de una llamada a quien no se conoce y sin grabar es el mismo.
+    expect(componerSaludoDeLlamada(codigo, base)).toBe(saludo);
+  });
+
+  it.each(CODIGOS_DE_IDIOMA)("%s: a un cliente que deja grabar, con su nombre, su servicio y el aviso de grabación", (codigo) => {
+    const saludo = componerSaludoDeLlamada(codigo, {
+      ...base,
+      cliente: { nombre: "Lucía", servicio: "Corte de pelo" },
+      grabando: true,
+    });
+    expect(saludo).toContain("Lucía");
+    expect(saludo).toContain("Negocio de prueba");
+    expect(saludo).toContain("Corte de pelo");
+    expect(saludo.toLowerCase()).toContain(AVISO[codigo].ia);
     expect(saludo).toContain(AVISO[codigo].grabacion);
+    expect(saludo).not.toMatch(/\{\w+\}/);
+  });
+
+  it.each(CODIGOS_DE_IDIOMA)("%s: sin servicio, «lo de la última vez»; sin permiso, sin aviso de grabación", (codigo) => {
+    const saludo = componerSaludoDeLlamada(codigo, {
+      ...base,
+      cliente: { nombre: "Lucía", servicio: null },
+    });
+    expect(saludo).toContain("Lucía");
+    expect(saludo).toContain(
+      IDIOMAS[codigo].saludo.repetirLoDeLaUltimaVez
+    );
+    expect(saludo).not.toContain(AVISO[codigo].grabacion);
+  });
+
+  it("en español, «nuevo» o «nueva» y «el» o «la» con el género de la voz", () => {
+    expect(
+      componerSaludoDeLlamada("es-ES", { ...base, primeraSemana: true })
+    ).toBe(
+      "Negocio de prueba, te atiende su nueva asistente de inteligencia artificial. ¿En qué te ayudo?"
+    );
+    expect(
+      componerSaludoDeLlamada("es-ES", {
+        ...base,
+        genero: "masculina",
+        primeraSemana: true,
+      })
+    ).toBe(
+      "Negocio de prueba, te atiende su nuevo asistente de inteligencia artificial. ¿En qué te ayudo?"
+    );
+    expect(
+      componerSaludoDeLlamada("es-ES", {
+        ...base,
+        genero: "masculina",
+        primeraSemana: true,
+        cliente: { nombre: "Lucía", servicio: "Mechas" },
+        grabando: true,
+      })
+    ).toBe(
+      "Hola, Lucía, soy el asistente de inteligencia artificial de Negocio de prueba. La llamada se graba; si prefieres que no, dímelo. ¿Quieres repetir Mechas o prefieres algo nuevo?"
+    );
   });
 });

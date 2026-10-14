@@ -83,7 +83,7 @@ describe("EnTuNegocioScroll", () => {
     // La lista para lectores de pantalla lleva el texto entero de cada paso.
     const lista = seccion().querySelector("ol.sr-only");
     expect(lista?.textContent).toContain(
-      "Cada llamada, con su grabación y su transcripción."
+      "Cada llamada, con su transcripción y su grabación."
     );
   });
 

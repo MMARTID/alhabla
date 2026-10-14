@@ -31,7 +31,7 @@ export const HOME_QUICK_FAQS = [
   },
   {
     question: "¿Puedo escuchar lo que ha hablado con mis clientes?",
-    answer: "Sí. En tu panel tienes cada llamada con su grabación, su transcripción y cómo terminó: cita reservada, cambio, recado o consulta resuelta.",
+    answer: "Sí. En tu panel tienes cada llamada con su transcripción y cómo terminó: cita reservada, cambio, recado o consulta resuelta. Y su grabación, si el cliente ha dado permiso: la recepcionista se lo pide.",
   },
   {
     question: "¿Y si prefiero cambiar algo sin entrar al panel?",

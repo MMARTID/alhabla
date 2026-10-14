@@ -4,6 +4,7 @@ import type {
   AssistantCreateParams,
   AssistantTool,
   AssistantUpdateParams,
+  ConversationFlowReq,
   HangupTool,
   InferenceEmbedding,
   InferenceEmbeddingInterruptionSettings,
@@ -94,7 +95,16 @@ export interface CreateTelnyxAssistantInput {
   /** `post_conversation_settings.enabled`: el assistant se invoca de nuevo
    * al terminar la llamada para las tools finales (informar_al_negocio). */
   postConversationSettings?: { enabled: boolean };
+  /** Valores por defecto de las variables del prompt (`{{nombre}}`): los usa
+   * Telnyx cuando la llamada (o el chat) no trae los suyos. */
+  dynamicVariables?: Record<string, string>;
+  /** Nodos y aristas del assistant (la cooficial de la zona,
+   * telnyxAssistantPayload.ts). Telnyx lo trata entero: al actualizar,
+   * `null` lo borra y sin el campo se queda el que hubiera. */
+  conversationFlow?: ConversationFlowReq | null;
 }
+
+export type { ConversationFlowReq };
 
 export interface TelnyxAssistant {
   id: string;
@@ -127,6 +137,9 @@ function toAssistantCreatePayload(
     tools: input.tools,
     enabled_features: input.enabledFeatures ?? ["telephony"],
     post_conversation_settings: input.postConversationSettings,
+    dynamic_variables: input.dynamicVariables,
+    // Al crear no hay flujo que borrar: null es lo mismo que no mandarlo.
+    conversation_flow: input.conversationFlow ?? undefined,
   };
 }
 
@@ -267,6 +280,12 @@ export class TelnyxAiAdapter {
       payload.enabled_features = input.enabledFeatures;
     if (input.postConversationSettings !== undefined)
       payload.post_conversation_settings = input.postConversationSettings;
+    if (input.dynamicVariables !== undefined)
+      payload.dynamic_variables = input.dynamicVariables;
+    // null borra el flujo (documentación de workflows de Telnyx, y
+    // comprobado en vivo el 2026-10-14); el SDK no lo declara.
+    if (input.conversationFlow !== undefined)
+      payload.conversation_flow = input.conversationFlow;
 
     const response = await client.ai.assistants.update(
       assistantId,
@@ -507,12 +526,34 @@ export class TelnyxAiAdapter {
   async answerCallWithAssistant(
     callControlId: string,
     assistantId: string,
-    options: { clientState?: string } = {}
+    options: {
+      clientState?: string;
+      /** Saludo de esta llamada; sin él, el guardado en el assistant. */
+      greeting?: string;
+      /** Variables del prompt para esta llamada (lib/contextoDeLlamada.ts). */
+      dynamicVariables?: Record<string, string>;
+      /** Grabar desde que se contesta: solo con el permiso del cliente. MP3
+       * a dos canales, como grababa el assistant (issue #280). */
+      grabar?: boolean;
+    } = {}
   ): Promise<void> {
     const client = getTelnyxClient();
     await client.calls.actions.answer(callControlId, {
-      assistant: { id: assistantId },
+      assistant: {
+        id: assistantId,
+        ...(options.greeting ? { greeting: options.greeting } : {}),
+        ...(options.dynamicVariables
+          ? { dynamic_variables: options.dynamicVariables }
+          : {}),
+      },
       client_state: options.clientState,
+      ...(options.grabar
+        ? {
+            record: "record-from-answer",
+            record_format: "mp3",
+            record_channels: "dual",
+          }
+        : {}),
     });
   }
 
@@ -798,13 +839,21 @@ export class TelnyxAiAdapter {
 
   /**
    * Para la grabación de una llamada en curso (`record_stop` de Call
-   * Control) cuando quien llama pide que no se grabe (tool no_grabar). Lo
-   * grabado hasta ese momento llega igualmente en `call.recording.saved`, y
-   * ahí se descarta. La grabación la arranca el assistant
-   * (`recording_settings`), no un `record_start` nuestro: que este comando
-   * también la pare no está documentado, así que quien lo llama no depende
-   * de ello.
+   * Control) cuando quien llama pide que no se grabe (tool
+   * preferencia_de_grabacion). Lo grabado hasta ese momento llega igualmente
+   * en `call.recording.saved`, y ahí se descarta (lib/grabacion.ts). Probado
+   * en dev el 12-10 con la grabación que arrancaba el assistant.
    */
+  /** Empieza a grabar una llamada en curso: quien llama acaba de dar
+   * permiso (tool preferencia_de_grabacion). Mismo formato que al contestar. */
+  async startRecording(callControlId: string): Promise<void> {
+    const client = getTelnyxClient();
+    await client.calls.actions.startRecording(callControlId, {
+      format: "mp3",
+      channels: "dual",
+    });
+  }
+
   async stopRecording(callControlId: string): Promise<void> {
     const client = getTelnyxClient();
     await client.calls.actions.stopRecording(callControlId, {});

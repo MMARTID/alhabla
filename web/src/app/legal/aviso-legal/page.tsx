@@ -79,8 +79,8 @@ export default function AvisoLegalPage() {
         <ul className="list-disc space-y-2 pl-5">
           <li>Que la información que configures sobre tu negocio sea veraz.</li>
           <li>
-            No pedir a la recepcionista que oculte que es una inteligencia artificial ni que la llamada se graba: lo
-            dice ella al descolgar.
+            No pedir a la recepcionista que oculte que es una inteligencia artificial ni que grabe a quien no ha dado
+            permiso.
           </li>
           <li>
             No utilizar el servicio para fines ilícitos ni para comunicaciones comerciales no solicitadas, ya sean

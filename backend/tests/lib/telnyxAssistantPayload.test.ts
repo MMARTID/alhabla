@@ -470,13 +470,14 @@ describe("buildTelnyxAssistantPayload", () => {
     });
   });
 
-  it("activa grabación dual en MP3 y aplica los límites por defecto de silencio/duración", () => {
+  it("no graba por su cuenta, lleva las variables de quien llama por defecto y aplica los límites de silencio/duración", () => {
     const payload = buildTelnyxAssistantPayload(baseInput);
 
-    // MP3: el WAV pesa 1,9 MB por minuto (el MP3, 8 veces menos) y sale de
-    // Cloud Run al copiarlo a R2.
+    // Grabación con permiso (lib/grabacion.ts): se graba por llamada, al
+    // contestar o con record_start. El formato se conserva: MP3, porque el
+    // WAV pesa 1,9 MB por minuto y sale de Cloud Run al copiarlo a R2.
     expect(payload.telephonySettings?.recording_settings).toEqual({
-      enabled: true,
+      enabled: false,
       format: "mp3",
       channels: "dual",
       stop_on_conversation_end: true,
@@ -484,6 +485,10 @@ describe("buildTelnyxAssistantPayload", () => {
     expect(payload.telephonySettings?.user_idle_timeout_secs).toBe(30);
     expect(payload.telephonySettings?.user_idle_reply_secs).toBe(12);
     expect(payload.telephonySettings?.time_limit_secs).toBe(10 * 60);
+    expect(payload.dynamicVariables).toEqual({
+      nombre_cliente: "",
+      ultimo_servicio: "",
+    });
   });
 
   it("desactiva la supresión de ruido a nivel de assistant (la hace Call Control por llamada, ver TelnyxAiAdapter)", () => {

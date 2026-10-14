@@ -2,7 +2,7 @@
 
 exports[`payloads de asistentes (instantáneas) > assistant de la recepcionista con ca-ES como idioma principal 1`] = `
 {
-  "greeting": "Perruqueria Anna, t'atén una intel·ligència artificial. La trucada s'enregistra; si no vols, digues-m'ho. En què et puc ajudar?",
+  "greeting": "Perruqueria Anna, t'atén una intel·ligència artificial. En què et puc ajudar?",
   "interruptionSettings": {
     "start_speaking_plan": {
       "transcription_endpointing_plan": {
@@ -41,7 +41,7 @@ exports[`payloads de asistentes (instantáneas) > assistant de la recepcionista 
 
 exports[`payloads de asistentes (instantáneas) > assistant de la recepcionista con español con una voz elegida que no es la de por defecto (Lara) 1`] = `
 {
-  "greeting": "Perruqueria Anna, te atiende su asistente de inteligencia artificial. La llamada se graba; si no quieres, dímelo. ¿En qué te ayudo?",
+  "greeting": "Perruqueria Anna, te atiende su asistente de inteligencia artificial. ¿En qué te ayudo?",
   "interruptionSettings": {
     "interrupt_prediction_threshold": 0.4,
     "start_speaking_plan": {
@@ -74,7 +74,7 @@ exports[`payloads de asistentes (instantáneas) > assistant de la recepcionista 
 
 exports[`payloads de asistentes (instantáneas) > assistant de la recepcionista con eu-ES como idioma principal 1`] = `
 {
-  "greeting": "Kaixo, Perruqueria Anna. Adimen artifizial bat naiz. Deia grabatu egiten da; nahi ez baduzu, esadazu. Zertan lagun zaitzaket?",
+  "greeting": "Kaixo, Perruqueria Anna. Adimen artifizial bat naiz. Zertan lagun zaitzaket?",
   "interruptionSettings": {
     "start_speaking_plan": {
       "transcription_endpointing_plan": {
@@ -113,7 +113,7 @@ exports[`payloads de asistentes (instantáneas) > assistant de la recepcionista 
 
 exports[`payloads de asistentes (instantáneas) > assistant de la recepcionista con gl-ES como idioma principal 1`] = `
 {
-  "greeting": "Perruqueria Anna, atendete unha intelixencia artificial. A chamada grávase; se non queres, dimo. En que te axudo?",
+  "greeting": "Perruqueria Anna, atendete unha intelixencia artificial. En que te axudo?",
   "interruptionSettings": {
     "start_speaking_plan": {
       "transcription_endpointing_plan": {
@@ -152,7 +152,7 @@ exports[`payloads de asistentes (instantáneas) > assistant de la recepcionista 
 
 exports[`payloads de asistentes (instantáneas) > assistant de la recepcionista con saludo en alemán (su Ultra nativa y flux) 1`] = `
 {
-  "greeting": "Perruqueria Anna, Sie sprechen mit einer künstlichen Intelligenz. Das Gespräch wird aufgezeichnet; wenn Sie das nicht möchten, sagen Sie es mir. Wie kann ich Ihnen helfen?",
+  "greeting": "Perruqueria Anna, Sie sprechen mit einer künstlichen Intelligenz. Wie kann ich Ihnen helfen?",
   "interruptionSettings": {
     "interrupt_prediction_threshold": 0.4,
     "start_speaking_plan": {
@@ -183,8 +183,114 @@ exports[`payloads de asistentes (instantáneas) > assistant de la recepcionista 
 }
 `;
 
+exports[`payloads de asistentes (instantáneas) > assistant de la recepcionista que saluda en español en Cataluña 1`] = `
+{
+  "conversationFlow": {
+    "edges": [
+      {
+        "condition": {
+          "prompt": "Quien llama habla catalán (aunque la transcripción llegue con errores) o pide hablar en catalán.",
+          "type": "llm",
+        },
+        "id": "a_cooficial",
+        "start_node_id": "inicial",
+        "target": {
+          "node_id": "cooficial",
+          "type": "node",
+        },
+      },
+      {
+        "condition": {
+          "prompt": "Quien llama habla inglés, francés, alemán, italiano, portugués o neerlandés.",
+          "type": "llm",
+        },
+        "id": "a_inicial",
+        "start_node_id": "cooficial",
+        "target": {
+          "node_id": "inicial",
+          "type": "node",
+        },
+      },
+    ],
+    "nodes": [
+      {
+        "id": "inicial",
+        "instructions": "## Idioma en este paso
+
+Si quien llama habla en catalán (aunque sea una sola frase o un saludo, mezclado con castellano, o aunque la transcripción llegue con errores, con palabras en catalán mal reconocidas) o pide que le atiendas en catalán, llama a la herramienta transition__a_cooficial en ese mismo turno, sin decir nada antes: la respuesta la darás en catalán justo después. No le digas que le pasas con nadie. Usa transition__a_cooficial solo para eso: nunca para consultar el catálogo, la disponibilidad, dejar un recado ni colgar, que tienen sus propias herramientas. Si no tienes esa herramienta (en el chat no está), no digas que no puedes cambiar de idioma: contéstale directamente en catalán. Contesta solo en el idioma en que te habla, sin repetir la respuesta en otro: si vienes del paso en catalán porque ha cambiado de idioma, contesta solo en el suyo.",
+        "instructions_mode": "append",
+        "name": "Inicial",
+        "shared_tool_ids": [],
+        "tools_mode": "append",
+        "type": "prompt",
+      },
+      {
+        "id": "cooficial",
+        "instructions": "## Idioma en este paso
+
+Desde ahora habla en catalán con naturalidad; no repitas el saludo ni el aviso de IA ya dados, pero si es tu primera frase en catalán di brevemente, en catalán, que eres una inteligencia artificial. Si quien llama vuelve a hablarte en castellano, contéstale en castellano. Si habla en inglés, francés, alemán, italiano, portugués o neerlandés, llama a la herramienta transition__a_inicial en ese mismo turno, sin decir nada antes, y contéstale después solo en su idioma. Usa transition__a_inicial solo para eso.",
+        "instructions_mode": "append",
+        "name": "En catalán",
+        "shared_tool_ids": [],
+        "tools_mode": "append",
+        "type": "prompt",
+        "voice_settings": {
+          "background_audio": {
+            "type": "predefined_media",
+            "value": "office",
+            "volume": 0.2,
+          },
+          "expressive_mode": false,
+          "language": "ca",
+          "voice": "Soniox.tts-rt-v2.Marta",
+        },
+      },
+    ],
+    "start_node_id": "inicial",
+  },
+  "greeting": "Peluquería Ana, te atiende su asistente de inteligencia artificial. ¿En qué te ayudo?",
+  "interruptionSettings": {
+    "start_speaking_plan": {
+      "transcription_endpointing_plan": {
+        "on_no_punctuation_seconds": 0.5,
+        "on_number_seconds": 0.5,
+        "on_punctuation_seconds": 0.1,
+      },
+      "wait_seconds": 0.1,
+    },
+  },
+  "transcription": {
+    "language": "auto",
+    "model": "soniox/stt-rt-v5",
+    "settings": {
+      "context": "Corte,Laura",
+      "enable_endpoint_detection": true,
+      "language_hints": [
+        "es",
+        "ca",
+      ],
+      "max_endpoint_delay_ms": 500,
+    },
+  },
+  "voiceSettings": {
+    "background_audio": {
+      "type": "predefined_media",
+      "value": "office",
+      "volume": 0.2,
+    },
+    "expressive_mode": true,
+    "voice": "Telnyx.Ultra.538a8872-3799-4df5-b373-b78493b766c6",
+  },
+}
+`;
+
 exports[`payloads de asistentes (instantáneas) > assistant de la recepcionista, completo con transferencia y palabras clave 1`] = `
 {
+  "conversationFlow": null,
+  "dynamicVariables": {
+    "nombre_cliente": "",
+    "ultimo_servicio": "",
+  },
   "fallbackConfig": {
     "model": "moonshotai/Kimi-K2.6",
   },
@@ -209,7 +315,7 @@ exports[`payloads de asistentes (instantáneas) > assistant de la recepcionista,
     "noise_suppression": "disabled",
     "recording_settings": {
       "channels": "dual",
-      "enabled": true,
+      "enabled": false,
       "format": "mp3",
       "stop_on_conversation_end": true,
     },
@@ -439,11 +545,18 @@ exports[`payloads de asistentes (instantáneas) > assistant de la recepcionista,
       "type": "webhook",
       "webhook": {
         "body_parameters": {
-          "properties": {},
-          "required": undefined,
+          "properties": {
+            "acepta": {
+              "description": "true si acepta con claridad que se grabe (sí, vale, claro); false si dice que no.",
+              "type": "boolean",
+            },
+          },
+          "required": [
+            "acepta",
+          ],
           "type": "object",
         },
-        "description": "Deja de grabar esta llamada: el audio no se guarda y la transcripción sí. Úsala una sola vez, en cuanto quien llama diga que no quiere que se grabe, sin pedirle que lo confirme. No la uses en el chat de WhatsApp.",
+        "description": "Guarda lo que contesta quien llama sobre grabar sus llamadas (el audio es solo para que el negocio las revise). Con acepta true se empieza a grabar y se recuerda para sus próximas llamadas; con false no se graba (o se deja de grabar) y no se guarda el audio; la transcripción sí. Úsala cuando conteste con claridad a tu pregunta de grabar, o si en cualquier momento dice que no quiere que se grabe. Si su respuesta no es clara, no la uses. No la uses en el chat de WhatsApp.",
         "headers": [
           {
             "name": "X-Alhabla-Call-Control-Id",
@@ -451,8 +564,8 @@ exports[`payloads de asistentes (instantáneas) > assistant de la recepcionista,
           },
         ],
         "method": "POST",
-        "name": "no_grabar",
-        "url": "https://api.alhabla.test/webhooks/telnyx/tools/no_grabar",
+        "name": "preferencia_de_grabacion",
+        "url": "https://api.alhabla.test/webhooks/telnyx/tools/preferencia_de_grabacion",
       },
     },
     {
@@ -593,6 +706,11 @@ exports[`payloads de asistentes (instantáneas) > assistant de la recepcionista,
 
 exports[`payloads de asistentes (instantáneas) > assistant de la recepcionista, mínimo (sin tools, voz Natural) 1`] = `
 {
+  "conversationFlow": null,
+  "dynamicVariables": {
+    "nombre_cliente": "",
+    "ultimo_servicio": "",
+  },
   "fallbackConfig": {
     "model": "moonshotai/Kimi-K2.6",
   },
@@ -617,7 +735,7 @@ exports[`payloads de asistentes (instantáneas) > assistant de la recepcionista,
     "noise_suppression": "disabled",
     "recording_settings": {
       "channels": "dual",
-      "enabled": true,
+      "enabled": false,
       "format": "mp3",
       "stop_on_conversation_end": true,
     },
@@ -966,7 +1084,7 @@ Si te escriben en catalán, gallego, euskera o inglés, responde en ese idioma; 
 exports[`payloads de asistentes (instantáneas) > el JSON enviado es idéntico byte a byte (hash) 1`] = `
 {
   "gestor": "d42493dfb458dbe1ef8fa7fab6dbf284ec727a79d37293a97bff584963af6abf",
-  "recepcionista": "bbf523fcf32fb7a85e12e0ff400ee69da3bc618a7d92607637a4774719dbfdaf",
+  "recepcionista": "658d26f292f3794709448c28ba8b21b4bdffb008952d65b9673456242f0d3ae1",
 }
 `;
 
@@ -1150,7 +1268,7 @@ exports[`payloads de asistentes (instantáneas) > tools de voz de la recepcionis
     "url": "https://api.alhabla.test/webhooks/telnyx/tools/notify_when_available",
   },
   {
-    "description": "Deja de grabar esta llamada: el audio no se guarda y la transcripción sí. Úsala una sola vez, en cuanto quien llama diga que no quiere que se grabe, sin pedirle que lo confirme. No la uses en el chat de WhatsApp.",
+    "description": "Guarda lo que contesta quien llama sobre grabar sus llamadas (el audio es solo para que el negocio las revise). Con acepta true se empieza a grabar y se recuerda para sus próximas llamadas; con false no se graba (o se deja de grabar) y no se guarda el audio; la transcripción sí. Úsala cuando conteste con claridad a tu pregunta de grabar, o si en cualquier momento dice que no quiere que se grabe. Si su respuesta no es clara, no la uses. No la uses en el chat de WhatsApp.",
     "headers": [
       {
         "name": "X-Alhabla-Call-Control-Id",
@@ -1158,10 +1276,18 @@ exports[`payloads de asistentes (instantáneas) > tools de voz de la recepcionis
       },
     ],
     "method": "POST",
-    "name": "no_grabar",
-    "properties": {},
+    "name": "preferencia_de_grabacion",
+    "properties": {
+      "acepta": {
+        "description": "true si acepta con claridad que se grabe (sí, vale, claro); false si dice que no.",
+        "type": "boolean",
+      },
+    },
+    "required": [
+      "acepta",
+    ],
     "timeoutMs": 20000,
-    "url": "https://api.alhabla.test/webhooks/telnyx/tools/no_grabar",
+    "url": "https://api.alhabla.test/webhooks/telnyx/tools/preferencia_de_grabacion",
   },
   {
     "description": "Informe final de la llamada para el negocio. Llámala UNA sola vez, solo cuando la llamada ya ha terminado (post-conversación), nunca durante la conversación. Resume cómo acabó y, si el cliente dejó un recado o pidió que le llamen, inclúyelo en recado.",

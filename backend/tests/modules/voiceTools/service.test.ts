@@ -32,7 +32,10 @@ import { cancelarReserva } from "../../../src/modules/bookings/cancelacion.js";
 import { buildCalendarIdempotencyKey } from "../../../src/lib/calendarIdempotency.js";
 import { normalizeVoiceToolDateTime } from "../../../src/lib/voiceDateTime.js";
 import { guardarIntentoDeReservaFallido } from "../../../src/lib/intentoDeReserva.js";
-import { registrarGrabacionRechazada } from "../../../src/lib/grabacionRechazada.js";
+import {
+  guardarPreferenciaDeGrabacion,
+  tocaPreguntarPorGrabar,
+} from "../../../src/lib/grabacion.js";
 
 vi.mock("../../../src/lib/prisma.js", () => ({
   prisma: {
@@ -143,8 +146,9 @@ vi.mock(
 // La cancelación (BD, evento externo, aviso #4, lista de espera) vive en
 // modules/bookings/cancelacion.ts con sus propios tests; cancel_appointment
 // solo conserva la titularidad por número y delega.
-vi.mock("../../../src/lib/grabacionRechazada.js", () => ({
-  registrarGrabacionRechazada: vi.fn(),
+vi.mock("../../../src/lib/grabacion.js", () => ({
+  guardarPreferenciaDeGrabacion: vi.fn(),
+  tocaPreguntarPorGrabar: vi.fn().mockResolvedValue(false),
 }));
 
 vi.mock("../../../src/modules/bookings/cancelacion.js", () => ({
@@ -2772,29 +2776,31 @@ describe("executeVoiceTool cancel_appointment", () => {
   });
 });
 
-// El saludo ofrece no grabar la llamada (lib/grabacionRechazada.ts).
-describe("executeVoiceTool no_grabar", () => {
-  const mockedRegistrar = vi.mocked(registrarGrabacionRechazada);
+// Grabación con permiso (lib/grabacion.ts): la recepcionista lo pregunta
+// mientras comprueba el primer servicio.
+describe("executeVoiceTool preferencia_de_grabacion", () => {
+  const mockedGuardar = vi.mocked(guardarPreferenciaDeGrabacion);
 
   beforeEach(() => {
     vi.clearAllMocks();
     mockedBusinessFindUnique.mockResolvedValue(buildBusiness() as any);
   });
 
-  it("registra el rechazo con la llamada y el negocio del webhook", async () => {
-    mockedRegistrar.mockResolvedValue("registrado");
+  it("con su sí, lo guarda con la llamada y el negocio del webhook", async () => {
+    mockedGuardar.mockResolvedValue("aceptada");
 
     const result = await executeVoiceTool({
       businessId: "business_123",
-      toolName: "no_grabar",
-      params: { businessId: "otro_negocio" },
+      toolName: "preferencia_de_grabacion",
+      params: { acepta: true, businessId: "otro_negocio" },
       callLabel: "llamada v3:ctrl_1",
       callId: "v3:ctrl_1",
     });
 
-    expect(mockedRegistrar).toHaveBeenCalledWith({
+    expect(mockedGuardar).toHaveBeenCalledWith({
       callId: "v3:ctrl_1",
       businessId: "business_123",
+      acepta: true,
       etiqueta: "llamada v3:ctrl_1",
     });
     expect(result).toEqual({
@@ -2802,13 +2808,28 @@ describe("executeVoiceTool no_grabar", () => {
       result: {
         success: true,
         message:
-          "Hecho: no se guardará la grabación de esta llamada. La transcripción sí.",
+          "Hecho: se graba desde ahora, y sus próximas llamadas también. Dale las gracias en pocas palabras y sigue con lo que había pedido.",
       },
     });
   });
 
-  it("si la llamada no existe, se lo dice a la recepcionista sin fallar", async () => {
-    mockedRegistrar.mockResolvedValue("sin_llamada");
+  it("solo un true explícito es un sí", async () => {
+    mockedGuardar.mockResolvedValue("rechazada");
+
+    await executeVoiceTool({
+      businessId: "business_123",
+      toolName: "preferencia_de_grabacion",
+      params: { acepta: "sí" },
+      callId: "v3:ctrl_1",
+    });
+
+    expect(mockedGuardar).toHaveBeenCalledWith(
+      expect.objectContaining({ acepta: false })
+    );
+  });
+
+  it("la tool de antes, no_grabar, es un no", async () => {
+    mockedGuardar.mockResolvedValue("rechazada");
 
     const result = await executeVoiceTool({
       businessId: "business_123",
@@ -2817,23 +2838,177 @@ describe("executeVoiceTool no_grabar", () => {
       callId: "v3:ctrl_1",
     });
 
+    expect(mockedGuardar).toHaveBeenCalledWith(
+      expect.objectContaining({ acepta: false })
+    );
+    expect(result.result).toMatchObject({ success: true });
+  });
+
+  it("si la llamada no existe, se lo dice a la recepcionista sin fallar", async () => {
+    mockedGuardar.mockResolvedValue("sin_llamada");
+
+    const result = await executeVoiceTool({
+      businessId: "business_123",
+      toolName: "preferencia_de_grabacion",
+      params: { acepta: true },
+      callId: "v3:ctrl_1",
+    });
+
     expect(result.success).toBe(true);
     expect(result.result).toMatchObject({ success: false });
   });
 
-  it("en el chat de WhatsApp no hay nada que dejar de grabar", async () => {
+  it("en el chat de WhatsApp no hay nada que grabar", async () => {
     const result = await executeVoiceTool({
       businessId: "business_123",
-      toolName: "no_grabar",
-      params: {},
+      toolName: "preferencia_de_grabacion",
+      params: { acepta: true },
       callId: "whatsapp:chat:conv_1",
     });
 
-    expect(mockedRegistrar).not.toHaveBeenCalled();
+    expect(mockedGuardar).not.toHaveBeenCalled();
     expect(result.result).toEqual({
       success: true,
       message: "En el chat no se graba nada.",
     });
+  });
+});
+
+// Cuándo pedir permiso para grabar lo decide el backend (lib/grabacion.ts):
+// la pregunta va en la primera respuesta de check_availability de la
+// llamada, «mientras comprueba la disponibilidad».
+describe("executeVoiceTool: la pregunta de grabar", () => {
+  const mockedToca = vi.mocked(tocaPreguntarPorGrabar);
+  const PREGUNTA =
+    "Mientras lo compruebo, ¿te parece bien que grabe tus llamadas para que Peluquería Ana pueda revisarlas?";
+  const comprobar = (callId?: string, params: Record<string, unknown> = {}) =>
+    executeVoiceTool({
+      businessId: "business_123",
+      toolName: "check_availability",
+      params: {
+        startDateTime: "2026-08-25T17:00:00+02:00",
+        durationMinutes: 30,
+        serviceIds: ["service_123"],
+        ...params,
+      },
+      callLabel: "llamada v3:ctrl_1",
+      callId,
+    });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    mockedBusinessFindUnique.mockResolvedValue(
+      buildBusiness({ name: "Peluquería Ana" }) as any
+    );
+    mockedServiceFindMany.mockResolvedValue([
+      { id: "service_123", name: "Corte", durationMinutes: 30 },
+    ] as any);
+    mockedProfessionalFindMany.mockResolvedValue([]);
+    mockedGetBusyIntervals.mockResolvedValue({
+      intervals: [],
+      calendarAvailabilityKnown: true,
+    } as any);
+    mockedCheckAvailability.mockResolvedValue({
+      available: true,
+      message: "Hay disponibilidad.",
+      capacityUsed: 0,
+      capacityTotal: 1,
+      availableProfessionals: [{ id: "professional_123", name: "Ana" }],
+    } as any);
+  });
+
+  afterEach(() => {
+    mockedToca.mockResolvedValue(false);
+  });
+
+  it("si toca, va con la disponibilidad, para la llamada y el negocio del webhook", async () => {
+    mockedToca.mockResolvedValue(true);
+
+    const result = await comprobar("v3:ctrl_1");
+
+    expect(mockedToca).toHaveBeenCalledWith({
+      callId: "v3:ctrl_1",
+      businessId: "business_123",
+      etiqueta: "llamada v3:ctrl_1",
+    });
+    expect(result.result.available).toBe(true);
+    expect(result.result.pregunta_de_grabacion).toBe(PREGUNTA);
+  });
+
+  it("si no toca (ya se preguntó, ya graba o ya lo decidió), la disponibilidad va sola", async () => {
+    const result = await comprobar("v3:ctrl_1");
+
+    expect(mockedToca).toHaveBeenCalled();
+    expect(result.result).not.toHaveProperty("pregunta_de_grabacion");
+  });
+
+  // get_catalog también se consulta para el horario o antes de pasar la
+  // llamada al dueño: no ha pedido ningún servicio.
+  it("con el catálogo no se pregunta", async () => {
+    mockedToca.mockResolvedValue(true);
+
+    const catalogo = await executeVoiceTool({
+      businessId: "business_123",
+      toolName: "get_catalog",
+      params: {},
+      callId: "v3:ctrl_1",
+    });
+
+    expect(mockedToca).not.toHaveBeenCalled();
+    expect(catalogo.result).not.toHaveProperty("pregunta_de_grabacion");
+  });
+
+  // Llamada de prueba del 14-10: «a las 12 no, pero a las 12:30 sí» lleva
+  // code y se quedaba sin preguntar.
+  it("sin plaza a esa hora pero con una alternativa, también se pregunta", async () => {
+    mockedToca.mockResolvedValue(true);
+    mockedCheckAvailability.mockResolvedValue({
+      available: false,
+      code: "CAPACITY_REACHED",
+      message: "El negocio ya tiene todas sus plazas ocupadas en ese horario.",
+      capacityUsed: 1,
+      capacityTotal: 1,
+      suggestedNextSlot: {
+        startDateTime: "2026-08-25T15:30:00.000Z",
+        availableProfessionals: [{ id: "professional_123", name: "Ana" }],
+      },
+    } as any);
+
+    const result = await comprobar("v3:ctrl_1");
+
+    expect(result.result).toMatchObject({ code: "CAPACITY_REACHED" });
+    expect(result.result.suggestedNextSlot).toBeTruthy();
+    expect(result.result.pregunta_de_grabacion).toBe(PREGUNTA);
+  });
+
+  it("con un error o un «no» sin alternativa no se pregunta", async () => {
+    mockedToca.mockResolvedValue(true);
+
+    const invalida = await comprobar("v3:ctrl_1", { durationMinutes: -30 });
+    mockedCheckAvailability.mockResolvedValue({
+      available: false,
+      code: "CAPACITY_REACHED",
+      message: "El negocio ya tiene todas sus plazas ocupadas en ese horario.",
+      capacityUsed: 1,
+      capacityTotal: 1,
+    } as any);
+    const sinHueco = await comprobar("v3:ctrl_1");
+
+    expect(invalida.result).toMatchObject({ code: "INVALID_DURATION" });
+    expect(sinHueco.result).not.toHaveProperty("pregunta_de_grabacion");
+    expect(mockedToca).not.toHaveBeenCalled();
+  });
+
+  it("ni en el chat de WhatsApp ni sin callId", async () => {
+    mockedToca.mockResolvedValue(true);
+
+    const chat = await comprobar("whatsapp:chat:conv_1");
+    const sinLlamada = await comprobar(undefined);
+
+    expect(mockedToca).not.toHaveBeenCalled();
+    expect(chat.result).not.toHaveProperty("pregunta_de_grabacion");
+    expect(sinLlamada.result).not.toHaveProperty("pregunta_de_grabacion");
   });
 });
 
