@@ -296,9 +296,17 @@ describe("«Comprobar desvío» de punta a punta (integración)", () => {
       },
     });
     expect(cliente).toEqual({ success: true });
+    // Con el saludo y las variables de quien llama, resueltos contra la base
+    // de datos real (lib/contextoDeLlamada.ts): un cliente que no se conoce,
+    // sin grabar.
     expect(mockedAnswer).toHaveBeenCalledWith(
       "call_ctrl_cliente",
-      "assistant_test"
+      "assistant_test",
+      {
+        greeting: expect.stringContaining("inteligencia artificial"),
+        dynamicVariables: { nombre_cliente: "", ultimo_servicio: "" },
+        grabar: false,
+      }
     );
     expect(await prisma.call.count({ where: { businessId } })).toBe(1);
     expect(
