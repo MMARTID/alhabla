@@ -119,6 +119,9 @@ vi.mock("../../../src/modules/whatsapp/avisosNegocio.js", () => ({
   avisarCancelacion: vi.fn().mockResolvedValue({ via: "interactivo" }),
   nombreDeServicios: vi.fn().mockResolvedValue([]),
 }));
+vi.mock("../../../src/lib/idiomaDelCliente.js", () => ({
+  guardarIdiomaDelCliente: vi.fn().mockResolvedValue(undefined),
+}));
 vi.mock("../../../src/modules/whatsapp/recados.js", () => ({
   procesarInformeFinal: vi.fn().mockResolvedValue({ outcome: "guardado", leadId: "lead_1" }),
 }));
@@ -3507,6 +3510,26 @@ describe("executeVoiceTool informar_al_negocio (post-conversación)", () => {
       business: expect.objectContaining({ id: "business_123" }),
       callControlId: "v3:abc",
       params,
+    });
+  });
+
+  it("guarda el idioma en que habló quien llama para su próxima llamada", async () => {
+    const { guardarIdiomaDelCliente } = await import(
+      "../../../src/lib/idiomaDelCliente.js"
+    );
+
+    await executeVoiceTool({
+      businessId: "business_123",
+      toolName: "informar_al_negocio",
+      params: { resultado: "RESOLVED", idioma_del_cliente: "ca-ES" },
+      callId: "v3:abc",
+    });
+
+    expect(guardarIdiomaDelCliente).toHaveBeenCalledWith({
+      callId: "v3:abc",
+      businessId: "business_123",
+      idioma: "ca-ES",
+      etiqueta: expect.any(String),
     });
   });
 

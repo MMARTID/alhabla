@@ -228,7 +228,7 @@ Si quien llama habla en catalán (aunque sea una sola frase o un saludo, mezclad
         "id": "cooficial",
         "instructions": "## Idioma en este paso
 
-Desde ahora habla en catalán con naturalidad; no repitas el saludo ni el aviso de IA ya dados, pero si es tu primera frase en catalán di brevemente, en catalán, que eres una inteligencia artificial. Si quien llama vuelve a hablarte en castellano, contéstale en castellano. Si habla en inglés, francés, alemán, italiano, portugués o neerlandés, llama a la herramienta transition__a_inicial en ese mismo turno, sin decir nada antes, y contéstale después solo en su idioma. Usa transition__a_inicial solo para eso.",
+Desde ahora habla en catalán con naturalidad; no repitas el saludo ni el aviso de IA ya dados, pero si aún no se ha dicho en catalán que eres una inteligencia artificial (el saludo puede haberlo dicho ya en catalán), dilo brevemente en tu primera frase. Si quien llama vuelve a hablarte en castellano, contéstale en castellano. Si habla en inglés, francés, alemán, italiano, portugués o neerlandés, llama a la herramienta transition__a_inicial en ese mismo turno, sin decir nada antes, y contéstale después solo en su idioma. Usa transition__a_inicial solo para eso.",
         "instructions_mode": "append",
         "name": "En catalán",
         "shared_tool_ids": [],
@@ -584,6 +584,22 @@ exports[`payloads de asistentes (instantáneas) > assistant de la recepcionista,
             "fallo_de_tool": {
               "description": "true si alguna herramienta (disponibilidad, reserva, cancelación) falló o devolvió error durante la llamada.",
               "type": "boolean",
+            },
+            "idioma_del_cliente": {
+              "description": "El idioma en que habló quien llama la mayor parte de la llamada: es-ES español de España, en-GB inglés, fr-FR francés, ca-ES catalán, eu-ES euskera, gl-ES gallego, de-DE alemán, it-IT italiano, pt-PT portugués, nl-NL neerlandés. Si no llegó a hablar, no lo envíes.",
+              "enum": [
+                "es-ES",
+                "en-GB",
+                "fr-FR",
+                "ca-ES",
+                "eu-ES",
+                "gl-ES",
+                "de-DE",
+                "it-IT",
+                "pt-PT",
+                "nl-NL",
+              ],
+              "type": "string",
             },
             "motivo_escalada": {
               "description": "Por qué no se resolvió en la llamada. NO_APLICA si se resolvió.",
@@ -1084,7 +1100,7 @@ Si te escriben en catalán, gallego, euskera o inglés, responde en ese idioma; 
 exports[`payloads de asistentes (instantáneas) > el JSON enviado es idéntico byte a byte (hash) 1`] = `
 {
   "gestor": "d42493dfb458dbe1ef8fa7fab6dbf284ec727a79d37293a97bff584963af6abf",
-  "recepcionista": "cdc9cd73660ff003bb14efa69cc8e1280d3a2d09a1da1e835a9497b7af185b77",
+  "recepcionista": "7f07483e5564e3669618987351d411fee4da7ecacb088f899290899bc8111d29",
 }
 `;
 
@@ -1310,6 +1326,22 @@ exports[`payloads de asistentes (instantáneas) > tools de voz de la recepcionis
       "fallo_de_tool": {
         "description": "true si alguna herramienta (disponibilidad, reserva, cancelación) falló o devolvió error durante la llamada.",
         "type": "boolean",
+      },
+      "idioma_del_cliente": {
+        "description": "El idioma en que habló quien llama la mayor parte de la llamada: es-ES español de España, en-GB inglés, fr-FR francés, ca-ES catalán, eu-ES euskera, gl-ES gallego, de-DE alemán, it-IT italiano, pt-PT portugués, nl-NL neerlandés. Si no llegó a hablar, no lo envíes.",
+        "enum": [
+          "es-ES",
+          "en-GB",
+          "fr-FR",
+          "ca-ES",
+          "eu-ES",
+          "gl-ES",
+          "de-DE",
+          "it-IT",
+          "pt-PT",
+          "nl-NL",
+        ],
+        "type": "string",
       },
       "motivo_escalada": {
         "description": "Por qué no se resolvió en la llamada. NO_APLICA si se resolvió.",

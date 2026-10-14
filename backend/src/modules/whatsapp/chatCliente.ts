@@ -15,6 +15,8 @@ import {
 } from "./respuestas.js";
 import * as mensajes from "./mensajes.js";
 import { avisoDeIA, mencionaLaIA } from "../../lib/idiomas/catalogo.js";
+import { idiomaGuardadoDelCliente } from "../../lib/idiomaDelCliente.js";
+import { cooficialDeLaZona } from "../../lib/idiomas/zona.js";
 import { resolverIdiomas } from "../../lib/idiomas/resolver.js";
 import { parseAgentSettings } from "../../lib/managedAgentPrompt.js";
 
@@ -90,6 +92,8 @@ interface NegocioDelChat {
   hideOwnerNumberFromClients: boolean;
   timezone: string;
   agentSettings: unknown;
+  address: string | null;
+  businessDetails: string | null;
   active: boolean;
   clientChatEnabled: boolean;
   subscriptionStatus: string | null;
@@ -106,6 +110,9 @@ const SELECT_NEGOCIO_DEL_CHAT = {
   hideOwnerNumberFromClients: true,
   timezone: true,
   agentSettings: true,
+  // La zona (lib/idiomas/zona.ts), para el idioma del aviso de IA.
+  address: true,
+  businessDetails: true,
   active: true,
   clientChatEnabled: true,
   subscriptionStatus: true,
@@ -486,10 +493,24 @@ export async function conversarConRecepcionista(input: {
     // antepone. Por chat la omitía en 1 o 2 de cada 10 primeras respuestas,
     // y alguna vez la cambiaba por «Te atiende Laura» (laboratorio del
     // 14-10).
-    const textoAEnviar =
-      conversacion?.nueva && !mencionaLaIA(respuesta)
-        ? `${avisoDeIA(resolverIdiomas(parseAgentSettings(business.agentSettings)).principal, negocio)}\n${respuesta.trim()}`
-        : respuesta.trim();
+    // En el idioma en que habló la última vez si lo hay
+    // (lib/idiomaDelCliente.ts).
+    let textoAEnviar = respuesta.trim();
+    if (conversacion?.nueva && !mencionaLaIA(respuesta)) {
+      const perfil = resolverIdiomas({
+        ...parseAgentSettings(business.agentSettings),
+        zona: cooficialDeLaZona(business),
+      });
+      const idioma =
+        (await idiomaGuardadoDelCliente({
+          businessId: business.id,
+          telefono: from,
+          negocio: business,
+          idiomas: perfil.idiomas,
+          etiqueta: `Chat cliente ${business.id}/${from}`,
+        })) ?? perfil.principal;
+      textoAEnviar = `${avisoDeIA(idioma, negocio)}\n${textoAEnviar}`;
+    }
     const enviada = await responder(message, "chat", textoAEnviar, opciones);
     if (conversacion) {
       const now = new Date();

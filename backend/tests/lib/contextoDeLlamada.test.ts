@@ -48,6 +48,7 @@ describe("resolverContextoDeLlamada", () => {
       saludo:
         "Peluquería Ana, te atiende su asistente de inteligencia artificial. ¿En qué te ayudo?",
       grabar: false,
+      voz: null,
       variables: {
         nombre_cliente: "",
         ultimo_servicio: "",
@@ -58,7 +59,7 @@ describe("resolverContextoDeLlamada", () => {
       where: {
         businessId_telefono: { businessId: "biz_1", telefono: "+34600111222" },
       },
-      select: { grabacionAceptada: true },
+      select: { grabacionAceptada: true, idioma: true },
     });
     expect(mockedBookingFindFirst).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -127,6 +128,7 @@ describe("resolverContextoDeLlamada", () => {
       saludo:
         "Hola, Lucía, soy la asistente de inteligencia artificial de Peluquería Ana. La llamada se graba; si prefieres que no, dímelo. ¿Quieres repetir Corte o prefieres algo nuevo?",
       grabar: true,
+      voz: null,
       variables: {
         nombre_cliente: "Lucía",
         ultimo_servicio: "Corte",
@@ -190,6 +192,98 @@ describe("resolverContextoDeLlamada", () => {
       "Hola, Lucía, sóc la intel·ligència artificial de Peluquería Ana. Vols repetir el de l'última vegada o prefereixes una altra cosa?"
     );
     expect(contexto.variables.ultimo_servicio).toBe("Peinado");
+  });
+
+  describe("en el idioma en que habló la última vez", () => {
+    const lucia = () => {
+      mockedBookingFindFirst.mockResolvedValue({
+        clientName: "Lucía",
+        serviceIds: ["srv_1"],
+      } as any);
+      mockedServiceFindMany.mockResolvedValue([{ name: "Peinado" }] as any);
+    };
+
+    it("en inglés: le saluda en inglés con la voz del assistant y sin nombrar el servicio", async () => {
+      lucia();
+      mockedClienteFindUnique.mockResolvedValue({ idioma: "en-GB" } as any);
+
+      const contexto = await resolverContextoDeLlamada({
+        business: negocio(),
+        telefono: "+34600111222",
+        ahora: AHORA,
+      });
+
+      expect(contexto.saludo).toBe(
+        "Hi Lucía, this is the artificial intelligence assistant at Peluquería Ana. Would you like the same as last time, or something new?"
+      );
+      expect(contexto.voz).toBeNull();
+      expect(contexto.variables.ultimo_servicio).toBe("Peinado");
+    });
+
+    it("en la cooficial de la zona: le saluda en ella y ya con la voz de Soniox", async () => {
+      lucia();
+      mockedClienteFindUnique.mockResolvedValue({ idioma: "ca-ES" } as any);
+
+      const contexto = await resolverContextoDeLlamada({
+        business: negocio({
+          address: "Carrer de Mallorca 1, 08001 Barcelona, Spain",
+        }),
+        telefono: "+34600111222",
+        ahora: AHORA,
+      });
+
+      expect(contexto.saludo).toBe(
+        "Hola, Lucía, sóc la intel·ligència artificial de Peluquería Ana. Vols repetir el de l'última vegada o prefereixes una altra cosa?"
+      );
+      expect(contexto.voz).toEqual(
+        expect.objectContaining({
+          voice: expect.stringMatching(/^Soniox\./),
+          language: "ca",
+          expressive_mode: false,
+        })
+      );
+    });
+
+    it("en una cooficial que el negocio no habla (otra zona): en el principal", async () => {
+      lucia();
+      mockedClienteFindUnique.mockResolvedValue({ idioma: "ca-ES" } as any);
+
+      const contexto = await resolverContextoDeLlamada({
+        business: negocio({ address: "Calle Mayor 1, 28013 Madrid, Spain" }),
+        telefono: "+34600111222",
+        ahora: AHORA,
+      });
+
+      expect(contexto.saludo).toContain("¿Quieres repetir Peinado");
+      expect(contexto.voz).toBeNull();
+    });
+
+    it("con un idioma que no está en el catálogo, en el principal", async () => {
+      lucia();
+      mockedClienteFindUnique.mockResolvedValue({ idioma: "xx-XX" } as any);
+
+      const contexto = await resolverContextoDeLlamada({
+        business: negocio(),
+        telefono: "+34600111222",
+        ahora: AHORA,
+      });
+
+      expect(contexto.saludo).toContain("¿Quieres repetir Peinado");
+      expect(contexto.voz).toBeNull();
+    });
+
+    it("a quien aún no ha reservado también le saluda en su idioma", async () => {
+      mockedClienteFindUnique.mockResolvedValue({ idioma: "en-GB" } as any);
+
+      const contexto = await resolverContextoDeLlamada({
+        business: negocio(),
+        telefono: "+34600111222",
+        ahora: AHORA,
+      });
+
+      expect(contexto.saludo).toMatch(/^Peluquería Ana/);
+      expect(contexto.saludo).toContain("artificial intelligence");
+    });
   });
 
   it.each(["fisioterapia", "centro-de-estetica", "other"])(

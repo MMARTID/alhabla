@@ -7,6 +7,7 @@ import {
 } from "../../lib/almacenTemporal.js";
 import { nombreParaElCliente } from "../../lib/nombreProfesional.js";
 import { esNombreDeClienteValido } from "../../lib/nombreDelCliente.js";
+import { guardarIdiomaDelCliente } from "../../lib/idiomaDelCliente.js";
 import { enlazarReservaModificada } from "../bookings/reservaModificada.js";
 import {
   claveDeCacheDeVoz,
@@ -2681,6 +2682,12 @@ export async function executeVoiceTool(
         },
         callControlId: callId,
         params,
+      });
+      await guardarIdiomaDelCliente({
+        callId,
+        businessId: business.id,
+        idioma: params.idioma_del_cliente,
+        etiqueta: callLabel,
       });
       return { success: true, result: { success: true, outcome: informe.outcome } };
     }

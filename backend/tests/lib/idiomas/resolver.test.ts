@@ -294,7 +294,7 @@ describe("elegirVoz, con voces que el catálogo aún no tiene", () => {
 describe("resolverIdiomas — prompt y saludo", () => {
   it("con principal español, saluda en español y sigue en cualquiera de los siete", () => {
     expect(resolver(["es-ES"]).instruccionDelPrompt).toBe(
-      "En las llamadas, el saludo en español de España ya lo dice el sistema al descolgar y es el primer mensaje de la conversación: no lo repitas. Desde tu primera respuesta, contesta y continúa exclusivamente en el idioma en que te habla quien llama si es uno de estos: español de España, inglés, francés, alemán, italiano, portugués, neerlandés. Si cambia entre esos idiomas, acompaña el cambio sin pedirle que elija uno. Las frases que estas instrucciones ponen entre comillas para decírselas a quien llama están en castellano: dilas traducidas al idioma de la conversación. Los nombres de los servicios del catálogo también suelen estar en castellano y no son nombres propios: en otro idioma, dilos traducidos a ese idioma, no tal cual (salvo los que no tienen traducción, como «balayage»)."
+      "En las llamadas, el saludo ya lo dice el sistema al descolgar (en español de España o, si quien llama ya ha llamado antes, en el idioma en que habló) y es el primer mensaje de la conversación: no lo repitas. Desde tu primera respuesta, contesta y continúa exclusivamente en el idioma en que te habla quien llama si es uno de estos: español de España, inglés, francés, alemán, italiano, portugués, neerlandés. Si cambia entre esos idiomas, acompaña el cambio sin pedirle que elija uno. Las frases que estas instrucciones ponen entre comillas para decírselas a quien llama están en castellano: dilas traducidas al idioma de la conversación. Los nombres de los servicios del catálogo también suelen estar en castellano y no son nombres propios: en otro idioma, dilos traducidos a ese idioma, no tal cual (salvo los que no tienen traducción, como «balayage»)."
     );
     expect(resolver(["es-ES"]).recordatorioDelPrompt).toBe(
       "## Idioma\nContesta cada turno en el idioma en que te habla quien llama si es uno de estos: español de España, inglés, francés, alemán, italiano, portugués, neerlandés; también tu primera respuesta, lo que digas después de usar una herramienta (aunque te conteste en castellano), los nombres de los servicios, el resumen de la reserva, la pregunta del WhatsApp y la despedida. No cambies de idioma por tu cuenta mientras siga hablando en el suyo."
@@ -315,7 +315,7 @@ describe("resolverIdiomas — prompt y saludo", () => {
 
       expect(instruccion).not.toMatch(/Empieza/);
       expect(instruccion).toContain(
-        "ya lo dice el sistema al descolgar y es el primer mensaje de la conversación: no lo repitas"
+        "en el idioma en que habló) y es el primer mensaje de la conversación: no lo repitas"
       );
       expect(instruccion).toContain("Desde tu primera respuesta");
       expect(recordatorio).toContain("también tu primera respuesta");
@@ -586,7 +586,7 @@ describe("funcionQueExige", () => {
 describe("resolverIdiomas — el prompt con un principal cooficial", () => {
   it("saluda en catalán, lista los ocho y lleva la nota valenciana y balear", () => {
     expect(resolver([], "ca-ES").instruccionDelPrompt).toBe(
-      "En las llamadas, el saludo en catalán ya lo dice el sistema al descolgar y es el primer mensaje de la conversación: no lo repitas. Desde tu primera respuesta, contesta y continúa exclusivamente en el idioma en que te habla quien llama si es uno de estos: español de España, inglés, francés, catalán, alemán, italiano, portugués, neerlandés. Si cambia entre esos idiomas, acompaña el cambio sin pedirle que elija uno. Las frases que estas instrucciones ponen entre comillas para decírselas a quien llama están en castellano: dilas traducidas al idioma de la conversación. Los nombres de los servicios del catálogo también suelen estar en castellano y no son nombres propios: en otro idioma, dilos traducidos a ese idioma, no tal cual (salvo los que no tienen traducción, como «balayage»). Si quien llama usa formas valencianas o baleares del catalán, adáptate a ellas."
+      "En las llamadas, el saludo ya lo dice el sistema al descolgar (en catalán o, si quien llama ya ha llamado antes, en el idioma en que habló) y es el primer mensaje de la conversación: no lo repitas. Desde tu primera respuesta, contesta y continúa exclusivamente en el idioma en que te habla quien llama si es uno de estos: español de España, inglés, francés, catalán, alemán, italiano, portugués, neerlandés. Si cambia entre esos idiomas, acompaña el cambio sin pedirle que elija uno. Las frases que estas instrucciones ponen entre comillas para decírselas a quien llama están en castellano: dilas traducidas al idioma de la conversación. Los nombres de los servicios del catálogo también suelen estar en castellano y no son nombres propios: en otro idioma, dilos traducidos a ese idioma, no tal cual (salvo los que no tienen traducción, como «balayage»). Si quien llama usa formas valencianas o baleares del catalán, adáptate a ellas."
     );
   });
 });
