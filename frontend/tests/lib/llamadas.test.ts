@@ -3,6 +3,7 @@ import {
   enlaceTel,
   etiquetaDeLlamada,
   momentoCorto,
+  motivoDeCitaPendiente,
   parseTranscriptMessages,
   resultadoDeLlamada,
   telefonoParaDevolver,
@@ -105,5 +106,22 @@ describe("parseTranscriptMessages", () => {
   it("se queda con los objetos de una lista y devuelve null si no es una lista", () => {
     expect(parseTranscriptMessages([{ role: "user", content: "Hola" }, "ruido", null])).toEqual([{ role: "user", content: "Hola" }]);
     expect(parseTranscriptMessages("texto")).toBeNull();
+  });
+});
+
+describe("motivoDeCitaPendiente", () => {
+  it("separa la agenda caducada, otra reserva a la vez y un fallo nuestro", () => {
+    expect(motivoDeCitaPendiente("CALENDAR_RECONNECT_REQUIRED")).toBe(
+      "La conexión con tu agenda estaba caducada en ese momento."
+    );
+    expect(motivoDeCitaPendiente("BOOKING_LOCK_TIMEOUT")).toBe(
+      "Había otra reserva en curso para la misma hora."
+    );
+    expect(motivoDeCitaPendiente("BOOKING_LOCK_ERROR")).toBe(
+      "Un fallo técnico momentáneo nuestro impidió guardarla durante la llamada."
+    );
+    expect(motivoDeCitaPendiente(null)).toBe(
+      "No se pudo guardar en la agenda durante la llamada."
+    );
   });
 });

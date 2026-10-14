@@ -9,7 +9,12 @@ import { cifrarJson, descifrarJson } from "../../../src/lib/cifradoDeCredenciale
 import { prisma } from "../../../src/lib/prisma.js";
 import { retellAdapter } from "../../../src/adapters/retell/RetellAdapter.js";
 import { getPublicWebhookBaseUrl } from "../../../src/lib/serverUrl.js";
-import { getRedis } from "../../../src/lib/redis.js";
+import {
+  almacenEnMemoria,
+  clavesVivas,
+  entradaDelAlmacen,
+  reiniciarAlmacenEnMemoria,
+} from "../../helpers/almacenEnMemoria.js";
 import { syncAgentToTelnyx } from "../../../src/lib/telnyxAgentSync.js";
 import { resolverConexionDeCalendario } from "../../../src/modules/calendar/conexion.js";
 import {
@@ -90,9 +95,12 @@ vi.mock("../../../src/lib/microsoftGraph.js", () => ({
   refreshMicrosoftAccessToken: vi.fn(),
 }));
 
-vi.mock("../../../src/lib/redis.js", () => ({
-  getRedis: vi.fn(),
-}));
+// El state de OAuth y la caché de voz van al almacén temporal de Postgres:
+// aquí, su versión en memoria, vacía al empezar cada test.
+vi.mock("../../../src/lib/almacenTemporal.js", async () =>
+  (await import("../../helpers/almacenEnMemoria.js")).almacenEnMemoria
+);
+beforeEach(() => reiniciarAlmacenEnMemoria());
 
 vi.mock("../../../src/lib/telnyxAgentSync.js", () => ({
   syncAgentToTelnyx: vi.fn(),
@@ -109,7 +117,6 @@ const mockedRetellCreateAgentVersion = vi.mocked(
 const mockedRetellPublishAgent = vi.mocked(retellAdapter.publishAgent);
 const mockedGetPublicWebhookBaseUrl = vi.mocked(getPublicWebhookBaseUrl);
 const mockedGoogleCalendar = vi.mocked(google.calendar);
-const mockedGetRedis = vi.mocked(getRedis);
 const mockedSyncAgentToTelnyx = vi.mocked(syncAgentToTelnyx);
 
 /** Conexión de prueba pasando por el resolver REAL de conexion.ts (misma
@@ -932,8 +939,7 @@ describe("CalendarService.selectGoogleCalendar", () => {
 
   it("guarda el calendario elegido, marca la conexión como activa e invalida la caché de voz (hallazgo #8)", async () => {
     mockedBusinessUpdate.mockResolvedValue({ id: "business_123" } as any);
-    const del = vi.fn().mockResolvedValue(1);
-    mockedGetRedis.mockReturnValue({ del } as any);
+    const del = almacenEnMemoria.borrarClave;
 
     await calendarService.selectGoogleCalendar("business_123", "secundario_id");
 
@@ -976,39 +982,28 @@ describe("CalendarService.selectGoogleCalendar", () => {
 });
 
 describe("CalendarService OAuth state (hijack protection)", () => {
-  let redisStore: Map<string, string>;
-  let del: ReturnType<typeof vi.fn>;
+  const del = almacenEnMemoria.borrarClave;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    redisStore = new Map();
-    del = vi.fn().mockResolvedValue(1);
-    mockedGetRedis.mockReturnValue({
-      set: vi.fn(async (key: string, value: string) => {
-        redisStore.set(key, value);
-        return "OK";
-      }),
-      getdel: vi.fn(async (key: string) => {
-        const value = redisStore.get(key) ?? null;
-        redisStore.delete(key);
-        return value;
-      }),
-      del,
-    } as any);
   });
 
-  it("getAuthUrl genera un state opaco (no el businessId en claro) y lo guarda en Redis", async () => {
+  it("getAuthUrl genera un state opaco (no el businessId en claro) y lo guarda ligado al negocio", async () => {
     const url = await calendarService.getAuthUrl("business_victima");
 
     // El businessId nunca debe viajar en claro en la URL de autorización —
     // es precisamente lo que permitía sustituir el calendario de otro
     // negocio antes de este fix.
     expect(url).not.toContain("business_victima");
-    expect(redisStore.size).toBe(1);
-    expect([...redisStore.values()]).toEqual(["business_victima"]);
+    expect(clavesVivas()).toHaveLength(1);
+    expect(entradaDelAlmacen(clavesVivas()[0])).toMatchObject({
+      valor: "business_victima",
+      // Se borra con el negocio (ON DELETE CASCADE).
+      businessId: "business_victima",
+    });
   });
 
-  it("handleCallback rechaza un state que no existe en Redis (inventado, caducado o ya usado)", async () => {
+  it("handleCallback rechaza un state que no existe (inventado, caducado o ya usado)", async () => {
     await expect(
       calendarService.handleCallback("some-code", "state-que-no-existe")
     ).rejects.toThrow();
@@ -1020,7 +1015,7 @@ describe("CalendarService OAuth state (hijack protection)", () => {
     mockedAgentFindMany.mockResolvedValue([]);
 
     await calendarService.getAuthUrl("business_real");
-    const state = [...redisStore.keys()][0].split(":").pop()!;
+    const state = clavesVivas()[0].split(":").pop()!;
 
     await calendarService.handleCallback("some-code", state);
 
@@ -1030,7 +1025,7 @@ describe("CalendarService OAuth state (hijack protection)", () => {
     // Cache de voice_config invalidada tras conectar (hallazgo #8).
     expect(del).toHaveBeenCalledWith("voice_config:business_real");
 
-    // Un segundo intento con el mismo state ya no debe funcionar (getdel = un solo uso).
+    // Un segundo intento con el mismo state ya no debe funcionar (un solo uso).
     mockedBusinessUpdate.mockClear();
     await expect(calendarService.handleCallback("some-code", state)).rejects.toThrow();
     expect(mockedBusinessUpdate).not.toHaveBeenCalled();
@@ -1054,7 +1049,7 @@ describe("CalendarService OAuth state (hijack protection)", () => {
     } as any);
 
     await calendarService.getAuthUrl("business_real");
-    const state = [...redisStore.keys()][0].split(":").pop()!;
+    const state = clavesVivas()[0].split(":").pop()!;
 
     const result = await calendarService.handleCallback("some-code", state);
 
@@ -1085,11 +1080,11 @@ describe("CalendarService OAuth state (hijack protection)", () => {
     mockedAgentFindMany.mockResolvedValue([]);
 
     await calendarService.getAuthUrl("business_A");
-    const stateForA = [...redisStore.keys()][0].split(":").pop()!;
+    const stateForA = clavesVivas()[0].split(":").pop()!;
 
     // Un atacante que intenta colar el state de A junto con el código de
     // otra sesión sigue resolviendo al businessId real de A (el vínculo
-    // vive en Redis, no en lo que el atacante controla en la URL) — nunca a
+    // vive en el almacén, no en lo que el atacante controla en la URL) — nunca a
     // un business_id arbitrario que el atacante intente pasar por su cuenta.
     await calendarService.handleCallback("attacker-code", stateForA);
 
@@ -1201,33 +1196,8 @@ describe("CalendarService OAuth state (hijack protection)", () => {
     });
 
     it("el state sigue valiendo a los 9:59 y caduca a los 10:01 (vive minutos, no milisegundos)", async () => {
-      // Almacén que caduca con el reloj, como Redis (EX en segundos, PX en
-      // milisegundos): el Map del beforeEach no mira la caducidad. Cuando el
-      // state cambie de almacén, este se sustituye por el helper en memoria
-      // del nuevo, que también caduca con Date.now(); las aserciones no
-      // cambian.
-      const almacen = new Map<string, { valor: string; caducaEn: number }>();
-      mockedGetRedis.mockReturnValue({
-        set: vi.fn(
-          async (clave: string, valor: string, modo?: string, ttl?: number) => {
-            const vidaMs =
-              modo === "EX"
-                ? ttl! * 1000
-                : modo === "PX"
-                  ? ttl!
-                  : Number.POSITIVE_INFINITY;
-            almacen.set(clave, { valor, caducaEn: Date.now() + vidaMs });
-            return "OK";
-          }
-        ),
-        getdel: vi.fn(async (clave: string) => {
-          const entrada = almacen.get(clave);
-          almacen.delete(clave);
-          if (!entrada || entrada.caducaEn <= Date.now()) return null;
-          return entrada.valor;
-        }),
-        del: vi.fn().mockResolvedValue(1),
-      } as never);
+      // El almacén en memoria caduca con Date.now(), como la tabla con su
+      // expiraEn: el reloj falso decide si el state sigue vivo.
 
       vi.useFakeTimers({ toFake: ["Date"] });
       try {
@@ -1263,8 +1233,7 @@ describe("CalendarService.connectMicrosoftCalendar", () => {
   it("guarda el calendario de Outlook elegido e invalida la caché de voz (hallazgo #8)", async () => {
     mockedBusinessUpdate.mockResolvedValue({ id: "business_123" } as any);
     mockedAgentFindMany.mockResolvedValue([]);
-    const del = vi.fn().mockResolvedValue(1);
-    mockedGetRedis.mockReturnValue({ del } as any);
+    const del = almacenEnMemoria.borrarClave;
 
     await calendarService.connectMicrosoftCalendar("business_123", "outlook_cal_1");
 
@@ -1978,9 +1947,6 @@ describe("CalendarService.seleccionarCalendario", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockedBusinessUpdate.mockResolvedValue({ id: "business_123" } as any);
-    mockedGetRedis.mockReturnValue({
-      del: vi.fn().mockResolvedValue(1),
-    } as any);
   });
 
   it("con proveedor google guarda el calendario sin resincronizar tools (asimetría conservada)", async () => {
@@ -2158,7 +2124,6 @@ describe("CalendarService.conectarConCredenciales (CalDAV)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockedBusinessUpdate.mockResolvedValue({ id: "business_123" } as any);
-    mockedGetRedis.mockReturnValue({ del: vi.fn().mockResolvedValue(1) } as any);
     vi.mocked(createAccount).mockResolvedValue({
       serverUrl: "https://caldav.icloud.com",
       accountType: "caldav",

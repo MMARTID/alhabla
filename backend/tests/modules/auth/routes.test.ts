@@ -4,7 +4,10 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { authRoutes } from "../../../src/modules/auth/routes.js";
 import { prisma } from "../../../src/lib/prisma.js";
-import { getRedis } from "../../../src/lib/redis.js";
+import {
+  consumirClave,
+  guardarClave,
+} from "../../../src/lib/almacenTemporal.js";
 import { createBusinessAgent } from "../../../src/lib/agentBootstrap.js";
 import {
   changeAccountPassword,
@@ -27,8 +30,9 @@ vi.mock("../../../src/lib/prisma.js", () => ({
   },
 }));
 
-vi.mock("../../../src/lib/redis.js", () => ({
-  getRedis: vi.fn(),
+vi.mock("../../../src/lib/almacenTemporal.js", () => ({
+  guardarClave: vi.fn(),
+  consumirClave: vi.fn(),
 }));
 
 vi.mock("../../../src/lib/agentBootstrap.js", () => ({
@@ -88,7 +92,8 @@ const mockedBusinessCreate = vi.mocked(prisma.business.create);
 const mockedBcryptCompare = vi.mocked(bcrypt.compare);
 const mockedBcryptHash = vi.mocked(bcrypt.hash);
 const mockedJwtSign = vi.mocked(jwt.sign);
-const mockedGetRedis = vi.mocked(getRedis);
+const mockedGuardarClave = vi.mocked(guardarClave);
+const mockedConsumirClave = vi.mocked(consumirClave);
 const mockedCreateBusinessAgent = vi.mocked(createBusinessAgent);
 const mockedGetAccountOverview = vi.mocked(getAccountOverview);
 const mockedChangeAccountPassword = vi.mocked(changeAccountPassword);
@@ -191,7 +196,7 @@ describe("authRoutes", () => {
       );
     });
 
-    it("devuelve además un pase de un solo uso guardado en Redis 60 s; sin Redis, solo el token", async () => {
+    it("devuelve además un pase de un solo uso guardado 60 s; si el almacén falla, solo el token", async () => {
       mockedUserFindUnique.mockResolvedValue(null);
       mockedBcryptHash.mockResolvedValue("hashed_password" as any);
       mockedJwtSign.mockReturnValue("token_123" as any);
@@ -200,8 +205,7 @@ describe("authRoutes", () => {
         mockedUserCreate.mockResolvedValue({ id: "user_123", businessId: "business_123" } as any);
         return callback({ business: { create: mockedBusinessCreate }, user: { create: mockedUserCreate } });
       });
-      const redisMock = { set: vi.fn().mockResolvedValue("OK") };
-      mockedGetRedis.mockReturnValue(redisMock as any);
+      mockedGuardarClave.mockResolvedValue(undefined);
 
       const response = await fastify.inject({
         method: "POST",
@@ -211,22 +215,22 @@ describe("authRoutes", () => {
       expect(response.statusCode).toBe(201);
       const { pase } = response.json();
       expect(pase).toMatch(/^[0-9a-f]{64}$/);
-      expect(redisMock.set).toHaveBeenCalledWith(
+      expect(mockedGuardarClave).toHaveBeenCalledWith(
         `auth:pase:${pase}`,
         JSON.stringify({ id: "user_123", businessId: "business_123" }),
-        "EX",
-        60
+        60_000,
+        { businessId: "business_123" }
       );
 
-      mockedGetRedis.mockReturnValue({ set: vi.fn().mockRejectedValue(new Error("redis caído")) } as any);
-      const sinRedis = await fastify.inject({
+      mockedGuardarClave.mockRejectedValueOnce(new Error("almacén caído"));
+      const sinAlmacen = await fastify.inject({
         method: "POST",
         url: "/register",
         payload: { email: "test2@example.com", password: "password1", isEuropeanUnion: true, acceptedTerms: true },
       });
-      expect(sinRedis.statusCode).toBe(201);
-      expect(sinRedis.json().token).toBe("token_123");
-      expect(sinRedis.json().pase).toBeUndefined();
+      expect(sinAlmacen.statusCode).toBe(201);
+      expect(sinAlmacen.json().token).toBe("token_123");
+      expect(sinAlmacen.json().pase).toBeUndefined();
     });
 
     // La regresión de la auditoría del 24-09: el registro no aplicaba la
@@ -313,10 +317,7 @@ describe("authRoutes", () => {
     const PASE = "a".repeat(64);
 
     it("canjea el pase una sola vez (getdel) y devuelve un token del usuario guardado", async () => {
-      const redisMock = {
-        getdel: vi.fn().mockResolvedValue(JSON.stringify({ id: "user_9", businessId: "business_9" })),
-      };
-      mockedGetRedis.mockReturnValue(redisMock as any);
+      mockedConsumirClave.mockResolvedValue(JSON.stringify({ id: "user_9", businessId: "business_9" }));
       mockedJwtSign.mockReturnValue("token_9" as any);
       // El pase solo guarda id y negocio: la versión del token se lee ahora.
       mockedUserFindUnique.mockResolvedValue({ tokenVersion: 3 } as any);
@@ -324,7 +325,7 @@ describe("authRoutes", () => {
       const response = await fastify.inject({ method: "POST", url: "/pase/canjear", payload: { pase: PASE } });
       expect(response.statusCode).toBe(200);
       expect(response.json()).toEqual({ token: "token_9" });
-      expect(redisMock.getdel).toHaveBeenCalledWith(`auth:pase:${PASE}`);
+      expect(mockedConsumirClave).toHaveBeenCalledWith(`auth:pase:${PASE}`);
       expect(mockedJwtSign).toHaveBeenCalledWith(
         { id: "user_9", businessId: "business_9", tv: 3 },
         expect.any(String),
@@ -332,16 +333,15 @@ describe("authRoutes", () => {
       );
     });
 
-    it("un pase inexistente, caducado o ya usado es 401; un formato raro es 400 sin tocar Redis", async () => {
-      const redisMock = { getdel: vi.fn().mockResolvedValue(null) };
-      mockedGetRedis.mockReturnValue(redisMock as any);
+    it("un pase inexistente, caducado o ya usado es 401; un formato raro es 400 sin tocar el almacén", async () => {
+      mockedConsumirClave.mockResolvedValue(null);
       const caducado = await fastify.inject({ method: "POST", url: "/pase/canjear", payload: { pase: PASE } });
       expect(caducado.statusCode).toBe(401);
       expect(caducado.json().code).toBe("PASE_INVALIDO");
 
       const raro = await fastify.inject({ method: "POST", url: "/pase/canjear", payload: { pase: "../x" } });
       expect(raro.statusCode).toBe(400);
-      expect(redisMock.getdel).toHaveBeenCalledTimes(1);
+      expect(mockedConsumirClave).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -504,8 +504,7 @@ describe("authRoutes", () => {
 
   describe("GET /google", () => {
     it("genera URL de autenticación de Google", async () => {
-      const redisMock = { set: vi.fn().mockResolvedValue("OK") };
-      mockedGetRedis.mockReturnValue(redisMock as any);
+      mockedGuardarClave.mockResolvedValue(undefined);
 
       const response = await fastify.inject({
         method: "GET",
@@ -528,12 +527,8 @@ describe("authRoutes", () => {
     });
 
     it("no crea la cuenta si el state no llevaba los términos aceptados", async () => {
-      mockedGetRedis.mockReturnValue({
-        getdel: vi
-          .fn()
-          .mockResolvedValue(JSON.stringify({ termsAccepted: false, intent: "register" })),
-        set: vi.fn().mockResolvedValue("OK"),
-      } as any);
+      mockedConsumirClave.mockResolvedValue(JSON.stringify({ termsAccepted: false, intent: "register" }));
+      mockedGuardarClave.mockResolvedValue(undefined);
 
       const response = await fastify.inject({
         method: "GET",
@@ -547,12 +542,8 @@ describe("authRoutes", () => {
     });
 
     it("crea la cuenta y registra termsAcceptedAt si el state llevaba los términos aceptados", async () => {
-      mockedGetRedis.mockReturnValue({
-        getdel: vi
-          .fn()
-          .mockResolvedValue(JSON.stringify({ termsAccepted: true, intent: "register" })),
-        set: vi.fn().mockResolvedValue("OK"),
-      } as any);
+      mockedConsumirClave.mockResolvedValue(JSON.stringify({ termsAccepted: true, intent: "register" }));
+      mockedGuardarClave.mockResolvedValue(undefined);
       mockedTransaction.mockImplementation(async (callback: any) => {
         const business = { id: "business_123", name: "Negocio de new@example.com" };
         const user = { id: "user_123", email: "new@example.com", businessId: business.id };
@@ -575,12 +566,8 @@ describe("authRoutes", () => {
     });
 
     it("no crea cuenta si el intent es login (bug corregido: /login ya no registra en silencio)", async () => {
-      mockedGetRedis.mockReturnValue({
-        getdel: vi
-          .fn()
-          .mockResolvedValue(JSON.stringify({ termsAccepted: true, intent: "login" })),
-        set: vi.fn().mockResolvedValue("OK"),
-      } as any);
+      mockedConsumirClave.mockResolvedValue(JSON.stringify({ termsAccepted: true, intent: "login" }));
+      mockedGuardarClave.mockResolvedValue(undefined);
 
       const response = await fastify.inject({
         method: "GET",
@@ -594,10 +581,8 @@ describe("authRoutes", () => {
     });
 
     it("rechaza el callback si no llega la cookie del navegador que inició el flujo (login CSRF)", async () => {
-      mockedGetRedis.mockReturnValue({
-        getdel: vi.fn().mockResolvedValue(JSON.stringify({ termsAccepted: true })),
-        set: vi.fn().mockResolvedValue("OK"),
-      } as any);
+      mockedConsumirClave.mockResolvedValue(JSON.stringify({ termsAccepted: true }));
+      mockedGuardarClave.mockResolvedValue(undefined);
 
       const response = await fastify.inject({
         method: "GET",
@@ -612,10 +597,8 @@ describe("authRoutes", () => {
     });
 
     it("rechaza el callback si la cookie no coincide con el state recibido", async () => {
-      mockedGetRedis.mockReturnValue({
-        getdel: vi.fn().mockResolvedValue(JSON.stringify({ termsAccepted: true })),
-        set: vi.fn().mockResolvedValue("OK"),
-      } as any);
+      mockedConsumirClave.mockResolvedValue(JSON.stringify({ termsAccepted: true }));
+      mockedGuardarClave.mockResolvedValue(undefined);
 
       const response = await fastify.inject({
         method: "GET",
@@ -631,8 +614,7 @@ describe("authRoutes", () => {
 
   describe("GET /facebook", () => {
     it("genera URL de autenticación de Facebook", async () => {
-      const redisMock = { set: vi.fn().mockResolvedValue("OK") };
-      mockedGetRedis.mockReturnValue(redisMock as any);
+      mockedGuardarClave.mockResolvedValue(undefined);
 
       const response = await fastify.inject({
         method: "GET",
@@ -666,12 +648,8 @@ describe("authRoutes", () => {
     });
 
     it("no crea la cuenta si el intent es login y no existe cuenta previa", async () => {
-      mockedGetRedis.mockReturnValue({
-        getdel: vi
-          .fn()
-          .mockResolvedValue(JSON.stringify({ termsAccepted: true, intent: "login" })),
-        set: vi.fn().mockResolvedValue("OK"),
-      } as any);
+      mockedConsumirClave.mockResolvedValue(JSON.stringify({ termsAccepted: true, intent: "login" }));
+      mockedGuardarClave.mockResolvedValue(undefined);
 
       const response = await fastify.inject({
         method: "GET",
@@ -685,12 +663,8 @@ describe("authRoutes", () => {
     });
 
     it("no crea la cuenta si el state no llevaba los términos aceptados", async () => {
-      mockedGetRedis.mockReturnValue({
-        getdel: vi
-          .fn()
-          .mockResolvedValue(JSON.stringify({ termsAccepted: false, intent: "register" })),
-        set: vi.fn().mockResolvedValue("OK"),
-      } as any);
+      mockedConsumirClave.mockResolvedValue(JSON.stringify({ termsAccepted: false, intent: "register" }));
+      mockedGuardarClave.mockResolvedValue(undefined);
 
       const response = await fastify.inject({
         method: "GET",
@@ -704,12 +678,8 @@ describe("authRoutes", () => {
     });
 
     it("crea la cuenta y registra termsAcceptedAt si intent es register y los términos están aceptados", async () => {
-      mockedGetRedis.mockReturnValue({
-        getdel: vi
-          .fn()
-          .mockResolvedValue(JSON.stringify({ termsAccepted: true, intent: "register" })),
-        set: vi.fn().mockResolvedValue("OK"),
-      } as any);
+      mockedConsumirClave.mockResolvedValue(JSON.stringify({ termsAccepted: true, intent: "register" }));
+      mockedGuardarClave.mockResolvedValue(undefined);
       mockedTransaction.mockImplementation(async (callback: any) => {
         const business = { id: "business_123", name: "Negocio de new@example.com" };
         const user = { id: "user_123", email: "new@example.com", businessId: business.id };
@@ -749,12 +719,8 @@ describe("authRoutes", () => {
           json: async () => ({ id: "facebook_123" }),
         });
       });
-      mockedGetRedis.mockReturnValue({
-        getdel: vi
-          .fn()
-          .mockResolvedValue(JSON.stringify({ termsAccepted: true, intent: "register" })),
-        set: vi.fn().mockResolvedValue("OK"),
-      } as any);
+      mockedConsumirClave.mockResolvedValue(JSON.stringify({ termsAccepted: true, intent: "register" }));
+      mockedGuardarClave.mockResolvedValue(undefined);
 
       const response = await fastify.inject({
         method: "GET",
@@ -768,12 +734,8 @@ describe("authRoutes", () => {
     });
 
     it("rechaza el callback si la cookie no coincide con el state recibido", async () => {
-      mockedGetRedis.mockReturnValue({
-        getdel: vi
-          .fn()
-          .mockResolvedValue(JSON.stringify({ termsAccepted: true, intent: "register" })),
-        set: vi.fn().mockResolvedValue("OK"),
-      } as any);
+      mockedConsumirClave.mockResolvedValue(JSON.stringify({ termsAccepted: true, intent: "register" }));
+      mockedGuardarClave.mockResolvedValue(undefined);
 
       const response = await fastify.inject({
         method: "GET",

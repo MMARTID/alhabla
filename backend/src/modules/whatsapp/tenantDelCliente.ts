@@ -1,5 +1,5 @@
 import { prisma } from "../../lib/prisma.js";
-import { getRedis } from "../../lib/redis.js";
+import { guardarClave, leerClave } from "../../lib/almacenTemporal.js";
 import { errorMessage } from "../../lib/logUtils.js";
 
 /**
@@ -60,9 +60,10 @@ export async function negociosDelCliente(
 
 async function leerEleccion(fromNumber: string): Promise<string | null> {
   try {
-    return await getRedis().get(claveDeEleccion(fromNumber));
+    return await leerClave(claveDeEleccion(fromNumber));
   } catch (error) {
-    // Sin Redis se sigue: solo se pierde la continuidad, no la corrección.
+    // Si el almacén falla se sigue: solo se pierde la continuidad, no la
+    // corrección.
     console.error(
       `[WhatsApp] No se pudo leer el negocio elegido por ${fromNumber}: ${errorMessage(error)}`
     );
@@ -75,11 +76,11 @@ export async function guardarEleccion(
   businessId: string
 ): Promise<void> {
   try {
-    await getRedis().set(
+    await guardarClave(
       claveDeEleccion(fromNumber),
       businessId,
-      "EX",
-      TTL_ELECCION_SEGUNDOS
+      TTL_ELECCION_SEGUNDOS * 1000,
+      { businessId }
     );
   } catch (error) {
     console.error(

@@ -1,6 +1,5 @@
 import type { FastifyInstance } from "fastify";
 import rateLimit from "@fastify/rate-limit";
-import { initRedis } from "./redis.js";
 import { initStorage } from "./storage.js";
 import { conectarRedisDeCompatibilidad } from "./redisDeCompatibilidad.js";
 import { AlmacenDeLimites } from "./limitesDePeticiones.js";
@@ -23,7 +22,6 @@ import { AlmacenDeLimites } from "./limitesDePeticiones.js";
  * quedan en «solo Postgres» (lib/redisDeCompatibilidad.ts).
  */
 export async function iniciarServiciosExternos(): Promise<void> {
-  initRedis();
   initStorage();
   await conectarRedisDeCompatibilidad();
 }

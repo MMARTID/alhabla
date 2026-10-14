@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { prisma } from "../../../src/lib/prisma.js";
-import { getRedis } from "../../../src/lib/redis.js";
+import { leerClave, leerContador } from "../../../src/lib/almacenTemporal.js";
 import { resetDb } from "../helpers/db.js";
 import { createTestBusiness } from "../helpers/fixtures.js";
 import { telnyxAiAdapter } from "../../../src/adapters/telnyx/TelnyxAiAdapter.js";
@@ -15,7 +15,7 @@ import {
   obtenerComprobacionDeDesvio,
 } from "../../../src/modules/onboarding/comprobacionDesvio.js";
 
-// Contra Postgres y Redis reales: lo que se prueba es el flujo completo de
+// Contra Postgres real (con su almacén temporal): lo que se prueba es el flujo completo de
 // «Comprobar desvío» (docs/historico/PLAN-TELEFONIA-UX.md § 4) con los webhooks
 // de Telnyx
 // simulados. Solo se sustituye la API de Telnyx (originar y colgar).
@@ -173,11 +173,11 @@ describe("«Comprobar desvío» de punta a punta (integración)", () => {
     expect(final?.callControlId).toBe("call_ctrl_out");
     // Turno libre para otra comprobación, contador de la hora en 1.
     await expect(
-      getRedis().get(`desvio:check:negocio:${businessId}`)
+      leerClave(`desvio:check:negocio:${businessId}`)
     ).resolves.toBeNull();
     await expect(
-      getRedis().get(`desvio:check:limite:${businessId}`)
-    ).resolves.toBe("1");
+      leerContador(`desvio:check:limite:${businessId}`)
+    ).resolves.toBe(1);
   });
 
   it("fijo con «si no contesta» a 30 s: el colgado de la saliente (timeout) se procesa ANTES que la entrante desviada y el resultado sigue siendo ok", async () => {

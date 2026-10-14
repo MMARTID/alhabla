@@ -31,7 +31,6 @@ const { creados, ajustes, FalsoRedis } = await vi.hoisted(async () => {
 });
 
 vi.mock("ioredis", () => ({ default: FalsoRedis }));
-vi.mock("../../src/lib/redis.js", () => ({ initRedis: vi.fn() }));
 vi.mock("../../src/lib/storage.js", () => ({ initStorage: vi.fn() }));
 vi.mock("../../src/lib/almacenTemporal.js", () => ({
   incrementarContadores: vi.fn(),
@@ -46,7 +45,6 @@ import {
   compatibilidadActiva,
 } from "../../src/lib/redisDeCompatibilidad.js";
 import { reiniciarEstadoDeLimitesParaTests } from "../../src/lib/limitesDePeticiones.js";
-import { initRedis } from "../../src/lib/redis.js";
 import { initStorage } from "../../src/lib/storage.js";
 import {
   incrementarContadores,
@@ -135,7 +133,6 @@ describe("arranque del servidor", () => {
         "redis://redis.interno:6379/0",
       ]);
       expect(creados[0].cliente.status).toBe("ready");
-      expect(initRedis).toHaveBeenCalledTimes(1);
       expect(initStorage).toHaveBeenCalledTimes(1);
     });
 

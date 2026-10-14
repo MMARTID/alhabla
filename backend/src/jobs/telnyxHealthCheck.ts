@@ -1,5 +1,9 @@
 import { prisma } from "../lib/prisma.js";
-import { getRedis } from "../lib/redis.js";
+import {
+  anotarLecturaDeSalud,
+  reiniciarRachaBuena,
+  tickDeLaLectura,
+} from "../lib/saludTelnyx.js";
 import { acquireLock, releaseLock } from "../lib/bookingLock.js";
 import { checkTelnyxAiInfraStatus } from "../lib/telnyxStatusPage.js";
 import { telnyxAiAdapter } from "../adapters/telnyx/TelnyxAiAdapter.js";
@@ -7,13 +11,11 @@ import { errorMessage } from "../lib/logUtils.js";
 
 // Plan §7: dos lecturas malas consecutivas activan el failover a Retell,
 // cinco buenas consecutivas hacen el failback a Telnyx.
+// Las rachas viven en `salud_telnyx` (lib/saludTelnyx.ts): una lectura
+// repetida del mismo tick no cuenta dos veces y una racha de hace más de
+// media hora empieza de nuevo.
 const CONSECUTIVE_BAD_TO_FAILOVER = 2;
-/** Algo más que dos ticks del scheduler: una racha vieja no cuenta. */
-const STREAK_TTL_SECONDS = 30 * 60;
 const CONSECUTIVE_GOOD_TO_FAILBACK = 5;
-
-const REDIS_KEY_BAD_STREAK = "telnyx_health:consecutive_bad";
-const REDIS_KEY_GOOD_STREAK = "telnyx_health:consecutive_good";
 
 // Mismo formato de clave que provisionPhoneNumber (phone/service.ts) — un
 // cambio de ruta y un aprovisionamiento inicial nunca deben poder pisarse.
@@ -37,8 +39,12 @@ function isVoiceFailoverEnabled(): boolean {
  * POST /internal/jobs/telnyx-health-check (plan §7). Actúa sobre los
  * negocios con `orchestrator="telnyx"` (todos desde el cutover), pero hasta
  * que TELNYX_STATUS_COMPONENT_IDS esté configurado no evalúa nada.
+ * `horaProgramada` es la cabecera `X-CloudScheduler-ScheduleTime`: identifica
+ * el tick aunque el Scheduler lo entregue dos veces.
  */
-export async function telnyxHealthCheckJob(): Promise<void> {
+export async function telnyxHealthCheckJob(
+  opciones: { horaProgramada?: string } = {}
+): Promise<void> {
   if (!isVoiceFailoverEnabled()) {
     console.log(
       "[TelnyxHealth] VOICE_FAILOVER_ENABLED no está activo — no se evalúa nada."
@@ -70,22 +76,21 @@ export async function telnyxHealthCheckJob(): Promise<void> {
     return;
   }
 
-  const redis = getRedis();
-  let badStreak = 0;
-  let goodStreak = 0;
+  // Cloud Scheduler entrega al menos una vez: una única lectura degradada
+  // entregada dos veces no puede valer por dos lecturas seguidas (dispararía
+  // el failover de todos los negocios). El tick la identifica.
+  const tick = tickDeLaLectura(opciones.horaProgramada);
+  const rachas = await anotarLecturaDeSalud(status.healthy, tick);
+  if (!rachas) {
+    console.log(
+      `[TelnyxHealth] Lectura del tick ${tick} ya contada (entrega repetida del Scheduler): no cambia las rachas`
+    );
+    return;
+  }
+  const badStreak = rachas.malas;
+  const goodStreak = rachas.buenas;
 
-  // TTL en los contadores: Cloud Scheduler entrega al menos una vez, así que
-  // una única lectura degradada entregada dos veces alcanzaba el umbral de
-  // dos lecturas seguidas y disparaba el failover de todos los negocios. Con
-  // caducidad, una racha solo se sostiene con lecturas de ticks distintos.
-  if (status.healthy) {
-    goodStreak = await redis.incr(REDIS_KEY_GOOD_STREAK);
-    await redis.expire(REDIS_KEY_GOOD_STREAK, STREAK_TTL_SECONDS);
-    await redis.del(REDIS_KEY_BAD_STREAK);
-  } else {
-    badStreak = await redis.incr(REDIS_KEY_BAD_STREAK);
-    await redis.expire(REDIS_KEY_BAD_STREAK, STREAK_TTL_SECONDS);
-    await redis.del(REDIS_KEY_GOOD_STREAK);
+  if (!status.healthy) {
     console.warn(
       `[TelnyxHealth] Lectura degradada (${badStreak}/${CONSECUTIVE_BAD_TO_FAILOVER}): ${JSON.stringify(
         status.components
@@ -107,7 +112,7 @@ export async function telnyxHealthCheckJob(): Promise<void> {
     );
     // Sin este reset, cada tick posterior a alcanzar el umbral repetiría el
     // failback (ya no-op en la práctica, pero generaría ruido/logs de más).
-    await redis.del(REDIS_KEY_GOOD_STREAK);
+    await reiniciarRachaBuena();
   }
 }
 

@@ -1,7 +1,10 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { prisma } from "../../../src/lib/prisma.js";
 import { DEFAULT_BUSINESS_SCHEDULE } from "../../../src/lib/businessSchedule.js";
-import { getRedis } from "../../../src/lib/redis.js";
+import {
+  almacenEnMemoria,
+  reiniciarAlmacenEnMemoria,
+} from "../../helpers/almacenEnMemoria.js";
 import { registrarPropuesta } from "../../../src/modules/gestor/acciones.js";
 import { buscarCliente } from "../../../src/modules/gestor/buscarCliente.js";
 import { dudasSinRespuesta } from "../../../src/modules/gestor/dudasSinRespuesta.js";
@@ -22,10 +25,13 @@ vi.mock("../../../src/lib/prisma.js", () => ({
     call: { aggregate: vi.fn(), groupBy: vi.fn() },
   },
 }));
-vi.mock("../../../src/lib/redis.js", () => {
-  const redis = { get: vi.fn(), set: vi.fn(), del: vi.fn() };
-  return { getRedis: () => redis };
-});
+// El turno en curso y la propuesta viven en el almacén temporal de
+// Postgres: aquí, su versión en memoria.
+vi.mock(
+  "../../../src/lib/almacenTemporal.js",
+  async () =>
+    (await import("../../helpers/almacenEnMemoria.js")).almacenEnMemoria
+);
 vi.mock("../../../src/modules/gestor/acciones.js", () => ({
   registrarPropuesta: vi.fn(),
 }));
@@ -44,11 +50,14 @@ const mockedServiceFindMany = vi.mocked(prisma.service.findMany);
 const mockedCallAggregate = vi.mocked(prisma.call.aggregate);
 const mockedCallGroupBy = vi.mocked(prisma.call.groupBy);
 const mockedRegistrar = vi.mocked(registrarPropuesta);
-const redis = getRedis() as unknown as {
-  get: ReturnType<typeof vi.fn>;
-  set: ReturnType<typeof vi.fn>;
-  del: ReturnType<typeof vi.fn>;
-};
+/** El turno que chatDueno.ts anota antes de dar paso al assistant. */
+function turnoEnCurso() {
+  return almacenEnMemoria.guardarClave(
+    claveDelTurno("biz_1"),
+    JSON.stringify({ inboundMessageId: "in_9", conversationId: "conv_9" }),
+    180_000
+  );
+}
 
 const NEGOCIO = {
   id: "biz_1",
@@ -112,9 +121,7 @@ beforeEach(() => {
     _sum: { durationSecs: 0 },
   } as never);
   mockedCallGroupBy.mockResolvedValue([] as never);
-  redis.get.mockResolvedValue(null);
-  redis.set.mockResolvedValue("OK");
-  redis.del.mockResolvedValue(1);
+  reiniciarAlmacenEnMemoria();
 });
 
 describe("handleGestorToolInvocation — autorización por cabeceras", () => {
@@ -607,7 +614,6 @@ describe("resumen_llamadas", () => {
 
 describe("proponer_accion", () => {
   it("sin turno de chat en curso no registra nada y lo dice", async () => {
-    redis.get.mockResolvedValueOnce(null);
     const r = await handleGestorToolInvocation({
       ...CABECERAS,
       toolName: "proponer_accion",
@@ -625,9 +631,7 @@ describe("proponer_accion", () => {
   });
 
   it("con turno en curso registra la propuesta con el entrante y la conversación, y la anota para los botones", async () => {
-    redis.get.mockResolvedValueOnce(
-      JSON.stringify({ inboundMessageId: "in_9", conversationId: "conv_9" })
-    );
+    await turnoEnCurso();
     mockedRegistrar.mockResolvedValueOnce({
       ok: true,
       accionId: "acc_9",
@@ -659,19 +663,19 @@ describe("proponer_accion", () => {
       parametros: { pendienteId: "lead_1" },
       resumen: "Doy por resuelta la cita de Elena.",
     });
-    expect(redis.get).toHaveBeenCalledWith(claveDelTurno("biz_1"));
-    expect(redis.set).toHaveBeenCalledWith(
+    expect(await almacenEnMemoria.leerClave(claveDePropuesta("biz_1"))).toBe(
+      "acc_9"
+    );
+    expect(almacenEnMemoria.guardarClave).toHaveBeenLastCalledWith(
       claveDePropuesta("biz_1"),
       "acc_9",
-      "EX",
-      180
+      180_000,
+      { businessId: "biz_1" }
     );
   });
 
   it("devuelve el motivo del registro cuando la propuesta no procede", async () => {
-    redis.get.mockResolvedValueOnce(
-      JSON.stringify({ inboundMessageId: "in_9", conversationId: "conv_9" })
-    );
+    await turnoEnCurso();
     mockedRegistrar.mockResolvedValueOnce({
       ok: false,
       motivo: "Esa cita pendiente ya está resuelta.",
@@ -689,6 +693,8 @@ describe("proponer_accion", () => {
       ok: false,
       motivo: "Esa cita pendiente ya está resuelta.",
     });
-    expect(redis.set).not.toHaveBeenCalled();
+    expect(
+      await almacenEnMemoria.leerClave(claveDePropuesta("biz_1"))
+    ).toBeNull();
   });
 });

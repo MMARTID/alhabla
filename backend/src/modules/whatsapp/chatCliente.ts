@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { InboundMessage } from "@prisma/client";
 import { prisma } from "../../lib/prisma.js";
-import { getRedis } from "../../lib/redis.js";
+import { incrementarContador } from "../../lib/almacenTemporal.js";
 import { errorMessage } from "../../lib/logUtils.js";
 import { acquireLock, releaseLock } from "../../lib/bookingLock.js";
 import { servicioSuspendidoPorPago } from "../../lib/planFeatures.js";
@@ -153,7 +153,7 @@ function claveDelDia(
 
 /**
  * Turnos de hoy (en la zona del negocio) de este cliente con este negocio,
- * contando el actual. Si Redis falla se deja pasar: el techo de 20
+ * contando el actual. Si el contador falla se deja pasar: el techo de 20
  * respuestas por hora de `responder` sigue vigente.
  */
 async function turnosDeHoy(
@@ -163,11 +163,7 @@ async function turnosDeHoy(
 ): Promise<number> {
   try {
     const clave = claveDelDia(businessId, from, timezone);
-    const turnos = await getRedis().incr(clave);
-    if (turnos === 1) {
-      await getRedis().expire(clave, 2 * 24 * 60 * 60);
-    }
-    return turnos;
+    return await incrementarContador(clave, 2 * 24 * 60 * 60 * 1000);
   } catch (error) {
     console.error(
       `[WhatsApp] Chat cliente ${businessId}/${from}: no se pudo contar el turno del día; se atiende: ${errorMessage(error)}`

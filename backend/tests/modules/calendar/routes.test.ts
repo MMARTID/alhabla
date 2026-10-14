@@ -7,6 +7,10 @@ import Fastify from "fastify";
 import { calendarRoutes } from "../../../src/modules/calendar/routes.js";
 import { calendarService } from "../../../src/modules/calendar/service.js";
 import { prisma } from "../../../src/lib/prisma.js";
+import {
+  almacenEnMemoria,
+  reiniciarAlmacenEnMemoria,
+} from "../../helpers/almacenEnMemoria.js";
 
 vi.mock("../../../src/lib/prisma.js", () => ({
   prisma: {
@@ -15,13 +19,13 @@ vi.mock("../../../src/lib/prisma.js", () => ({
   },
 }));
 
-const { mockRedisClient } = vi.hoisted(() => ({
-  mockRedisClient: { del: vi.fn().mockResolvedValue(1) },
-}));
-
-vi.mock("../../../src/lib/redis.js", () => ({
-  getRedis: () => mockRedisClient,
-}));
+// La caché de voz vive en el almacén temporal de Postgres: aquí, su
+// versión en memoria, para mirar la clave exacta que se borra.
+vi.mock(
+  "../../../src/lib/almacenTemporal.js",
+  async () =>
+    (await import("../../helpers/almacenEnMemoria.js")).almacenEnMemoria
+);
 
 vi.mock("../../../src/modules/calendar/service.js", () => ({
   CalendarBusinessError: class CalendarBusinessError extends Error {},
@@ -162,7 +166,7 @@ describe("GET /calendars", () => {
 
   beforeEach(async () => {
     vi.clearAllMocks();
-    mockRedisClient.del.mockResolvedValue(1);
+    reiniciarAlmacenEnMemoria();
     mockedBusinessUpdate.mockResolvedValue({} as any);
     fastify = Fastify();
     fastify.decorate("authenticate", async (request: any) => {
@@ -241,7 +245,9 @@ describe("GET /calendars", () => {
       },
     });
     expect(mockedBusinessUpdate).not.toHaveBeenCalled();
-    expect(mockRedisClient.del).toHaveBeenCalledWith("voice_config:biz_1");
+    expect(almacenEnMemoria.borrarClave).toHaveBeenCalledWith(
+      "voice_config:biz_1"
+    );
   });
 
   it("responde 502 ante cualquier otro CalendarBusinessError sin tocar la conexión", async () => {
@@ -261,7 +267,7 @@ describe("GET /calendars", () => {
       error: "No se pudo obtener la lista de calendarios.",
     });
     expect(mockedBusinessUpdate).not.toHaveBeenCalled();
-    expect(mockRedisClient.del).not.toHaveBeenCalled();
+    expect(almacenEnMemoria.borrarClave).not.toHaveBeenCalled();
   });
 });
 

@@ -14,6 +14,7 @@ import { suspendOverdueCallsJob } from "../../../src/jobs/suspendOverdueCalls.js
 import { attachUsagePricesJob } from "../../../src/jobs/attachUsagePrices.js";
 import { retryUsageReportsJob } from "../../../src/jobs/retryUsageReports.js";
 import { purgarCaducados } from "../../../src/lib/almacenTemporal.js";
+import { telnyxHealthCheckJob } from "../../../src/jobs/telnyxHealthCheck.js";
 
 vi.mock("../../../src/jobs/processRecording.js", () => ({
   processRecordingJob: vi.fn(),
@@ -46,6 +47,9 @@ vi.mock("../../../src/jobs/attachUsagePrices.js", () => ({
 vi.mock("../../../src/jobs/retryUsageReports.js", () => ({
   retryUsageReportsJob: vi.fn(),
 }));
+vi.mock("../../../src/jobs/telnyxHealthCheck.js", () => ({
+  telnyxHealthCheckJob: vi.fn(),
+}));
 // La purga del estado temporal (cerrojos, contadores) corre dentro de
 // cleanup-zombie-calls; aquí no hay base de datos.
 vi.mock("../../../src/lib/almacenTemporal.js", () => ({
@@ -66,6 +70,7 @@ const mockedSuspendOverdueCallsJob = vi.mocked(suspendOverdueCallsJob);
 const mockedAttachUsagePricesJob = vi.mocked(attachUsagePricesJob);
 const mockedRetryUsageReportsJob = vi.mocked(retryUsageReportsJob);
 const mockedPurgarCaducados = vi.mocked(purgarCaducados);
+const mockedTelnyxHealthCheckJob = vi.mocked(telnyxHealthCheckJob);
 
 describe("internalJobsRoutes", () => {
   let fastify: ReturnType<typeof Fastify>;
@@ -400,6 +405,29 @@ describe("internalJobsRoutes", () => {
         expect(response.statusCode).toBe(400);
       }
       expect(mockedProcessSendSmsJob).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("POST /jobs/telnyx-health-check", () => {
+    it("pasa al job la hora programada del Scheduler: identifica el tick aunque llegue dos veces", async () => {
+      mockedTelnyxHealthCheckJob.mockResolvedValue(undefined);
+
+      const conCabecera = await fastify.inject({
+        method: "POST",
+        url: "/jobs/telnyx-health-check",
+        headers: { "x-cloudscheduler-scheduletime": "2026-10-14T10:02:00Z" },
+      });
+      const sinCabecera = await fastify.inject({
+        method: "POST",
+        url: "/jobs/telnyx-health-check",
+      });
+
+      expect(conCabecera.statusCode).toBe(200);
+      expect(sinCabecera.statusCode).toBe(200);
+      expect(mockedTelnyxHealthCheckJob.mock.calls).toEqual([
+        [{ horaProgramada: "2026-10-14T10:02:00Z" }],
+        [{ horaProgramada: undefined }],
+      ]);
     });
   });
 

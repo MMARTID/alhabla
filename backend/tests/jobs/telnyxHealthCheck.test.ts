@@ -1,7 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { telnyxHealthCheckJob } from "../../src/jobs/telnyxHealthCheck.js";
 import { prisma } from "../../src/lib/prisma.js";
-import { getRedis } from "../../src/lib/redis.js";
+import {
+  anotarLecturaDeSalud,
+  reiniciarRachaBuena,
+  tickDeLaLectura,
+} from "../../src/lib/saludTelnyx.js";
 import { acquireLock, releaseLock } from "../../src/lib/bookingLock.js";
 import { checkTelnyxAiInfraStatus } from "../../src/lib/telnyxStatusPage.js";
 import { telnyxAiAdapter } from "../../src/adapters/telnyx/TelnyxAiAdapter.js";
@@ -12,8 +16,13 @@ vi.mock("../../src/lib/prisma.js", () => ({
   },
 }));
 
-vi.mock("../../src/lib/redis.js", () => ({
-  getRedis: vi.fn(),
+// Las rachas (con su SQL de un tick = una lectura) tienen su test de
+// integración en tests/integration/lib/saludTelnyx.test.ts; aquí se mira qué
+// hace el job con ellas. tickDeLaLectura es el real.
+vi.mock("../../src/lib/saludTelnyx.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../src/lib/saludTelnyx.js")>()),
+  anotarLecturaDeSalud: vi.fn(),
+  reiniciarRachaBuena: vi.fn(),
 }));
 
 vi.mock("../../src/lib/bookingLock.js", () => ({
@@ -31,15 +40,13 @@ vi.mock("../../src/adapters/telnyx/TelnyxAiAdapter.js", () => ({
 
 const mockedBusinessFindMany = vi.mocked(prisma.business.findMany);
 const mockedBusinessUpdate = vi.mocked(prisma.business.update);
-const mockedGetRedis = vi.mocked(getRedis);
+const mockedAnotar = vi.mocked(anotarLecturaDeSalud);
+const mockedReiniciarBuena = vi.mocked(reiniciarRachaBuena);
 const mockedAcquireLock = vi.mocked(acquireLock);
 const mockedReleaseLock = vi.mocked(releaseLock);
 const mockedCheckStatus = vi.mocked(checkTelnyxAiInfraStatus);
 const mockedSetConnectionId = vi.mocked(telnyxAiAdapter.setPhoneNumberConnectionId);
 
-// expire además de incr: las rachas caducan para que una misma lectura
-// entregada dos veces por el scheduler no cuente como dos consecutivas.
-const mockRedisClient = { incr: vi.fn(), del: vi.fn(), expire: vi.fn() };
 
 const ORIGINAL_ENV = {
   VOICE_FAILOVER_ENABLED: process.env.VOICE_FAILOVER_ENABLED,
@@ -49,7 +56,7 @@ const ORIGINAL_ENV = {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockedGetRedis.mockReturnValue(mockRedisClient as any);
+  mockedReiniciarBuena.mockResolvedValue(undefined);
   mockedAcquireLock.mockResolvedValue("lock-token");
   process.env.VOICE_FAILOVER_ENABLED = "true";
   process.env.TELNYX_CALL_CONTROL_APP_ID = "cca_platform_1";
@@ -81,7 +88,7 @@ describe("telnyxHealthCheckJob", () => {
 
     await telnyxHealthCheckJob();
 
-    expect(mockedGetRedis).not.toHaveBeenCalled();
+    expect(mockedAnotar).not.toHaveBeenCalled();
     expect(mockedBusinessFindMany).not.toHaveBeenCalled();
   });
 
@@ -116,22 +123,40 @@ describe("telnyxHealthCheckJob", () => {
     mockedCheckStatus.mockRejectedValue(new Error("network down"));
 
     await expect(telnyxHealthCheckJob()).resolves.toBeUndefined();
-    expect(mockedGetRedis).not.toHaveBeenCalled();
+    expect(mockedAnotar).not.toHaveBeenCalled();
   });
 
-  it("con lectura sana, incrementa la racha buena y limpia la mala sin llegar al umbral de failback", async () => {
+  it("con lectura sana la anota con el tick de la hora programada del Scheduler, sin llegar al umbral de failback", async () => {
     mockedCheckStatus.mockResolvedValue({
       healthy: true,
       unconfigured: false,
       components: [],
     });
-    mockRedisClient.incr.mockResolvedValue(3);
+    mockedAnotar.mockResolvedValue({ malas: 0, buenas: 3 });
 
-    await telnyxHealthCheckJob();
+    await telnyxHealthCheckJob({ horaProgramada: "2026-10-14T10:02:00Z" });
 
-    expect(mockRedisClient.incr).toHaveBeenCalledWith("telnyx_health:consecutive_good");
-    expect(mockRedisClient.del).toHaveBeenCalledWith("telnyx_health:consecutive_bad");
+    expect(mockedAnotar).toHaveBeenCalledWith(
+      true,
+      BigInt(Date.parse("2026-10-14T10:02:00Z") / 1000)
+    );
     expect(mockedBusinessFindMany).not.toHaveBeenCalled();
+  });
+
+  it("una entrega repetida del mismo tick no hace nada aunque la racha mala ya esté en el umbral", async () => {
+    mockedCheckStatus.mockResolvedValue({
+      healthy: false,
+      unconfigured: false,
+      components: [],
+    });
+    mockedAnotar.mockResolvedValue(null);
+    const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
+
+    await telnyxHealthCheckJob({ horaProgramada: "2026-10-14T10:02:00Z" });
+
+    expect(mockedBusinessFindMany).not.toHaveBeenCalled();
+    expect(log).toHaveBeenCalledWith(expect.stringContaining("ya contada"));
+    log.mockRestore();
   });
 
   it("activa el failover a Retell tras 2 lecturas malas consecutivas", async () => {
@@ -140,7 +165,7 @@ describe("telnyxHealthCheckJob", () => {
       unconfigured: false,
       components: [{ id: "comp_1", name: "AI", status: "major_outage" }],
     });
-    mockRedisClient.incr.mockResolvedValue(2);
+    mockedAnotar.mockResolvedValue({ malas: 2, buenas: 0 });
     mockedBusinessFindMany.mockResolvedValue([
       { id: "biz1", telnyxPhoneNumberId: "pn_1" },
     ] as any);
@@ -176,7 +201,7 @@ describe("telnyxHealthCheckJob", () => {
       unconfigured: false,
       components: [],
     });
-    mockRedisClient.incr.mockResolvedValue(1);
+    mockedAnotar.mockResolvedValue({ malas: 1, buenas: 0 });
 
     await telnyxHealthCheckJob();
 
@@ -189,7 +214,7 @@ describe("telnyxHealthCheckJob", () => {
       unconfigured: false,
       components: [],
     });
-    mockRedisClient.incr.mockResolvedValue(5);
+    mockedAnotar.mockResolvedValue({ malas: 0, buenas: 5 });
     mockedBusinessFindMany.mockResolvedValue([
       { id: "biz1", telnyxPhoneNumberId: "pn_1" },
     ] as any);
@@ -206,6 +231,9 @@ describe("telnyxHealthCheckJob", () => {
         voiceFailoverReason: null,
       }),
     });
+    // Tras el failback la racha buena vuelve a cero: el tick siguiente no
+    // lo repite.
+    expect(mockedReiniciarBuena).toHaveBeenCalledTimes(1);
   });
 
   it("no cambia ningún negocio si no hay ninguno en orchestrator=telnyx", async () => {
@@ -214,7 +242,7 @@ describe("telnyxHealthCheckJob", () => {
       unconfigured: false,
       components: [],
     });
-    mockRedisClient.incr.mockResolvedValue(2);
+    mockedAnotar.mockResolvedValue({ malas: 2, buenas: 0 });
     mockedBusinessFindMany.mockResolvedValue([]);
 
     await telnyxHealthCheckJob();
@@ -229,7 +257,7 @@ describe("telnyxHealthCheckJob", () => {
       unconfigured: false,
       components: [],
     });
-    mockRedisClient.incr.mockResolvedValue(2);
+    mockedAnotar.mockResolvedValue({ malas: 2, buenas: 0 });
     mockedBusinessFindMany.mockResolvedValue([
       { id: "biz1", telnyxPhoneNumberId: "pn_1" },
     ] as any);
@@ -247,7 +275,7 @@ describe("telnyxHealthCheckJob", () => {
       unconfigured: false,
       components: [],
     });
-    mockRedisClient.incr.mockResolvedValue(2);
+    mockedAnotar.mockResolvedValue({ malas: 2, buenas: 0 });
     mockedBusinessFindMany.mockResolvedValue([
       { id: "biz1", telnyxPhoneNumberId: "pn_1" },
     ] as any);
@@ -256,5 +284,20 @@ describe("telnyxHealthCheckJob", () => {
 
     expect(mockedAcquireLock).not.toHaveBeenCalled();
     expect(mockedSetConnectionId).not.toHaveBeenCalled();
+  });
+});
+
+describe("tickDeLaLectura", () => {
+  it("usa la hora programada del Scheduler (segundos) y, sin ella, el tramo de 2 minutos", () => {
+    expect(tickDeLaLectura("2026-10-14T10:02:00Z")).toBe(
+      BigInt(Date.parse("2026-10-14T10:02:00Z") / 1000)
+    );
+    const ahora = Date.parse("2026-10-14T10:03:59.900Z");
+    expect(tickDeLaLectura(undefined, ahora)).toBe(
+      BigInt(Date.parse("2026-10-14T10:02:00Z") / 1000)
+    );
+    expect(tickDeLaLectura("no es una fecha", ahora)).toBe(
+      BigInt(Date.parse("2026-10-14T10:02:00Z") / 1000)
+    );
   });
 });

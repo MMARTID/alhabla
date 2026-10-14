@@ -4,7 +4,6 @@ import cors from "@fastify/cors";
 import authPlugin from "./plugins/auth.js";
 import rawBody from "fastify-raw-body";
 import { prisma } from "./lib/prisma.js";
-import { getRedis } from "./lib/redis.js";
 import { cerrarConexionDelLimitador } from "./lib/limitesDePeticiones.js";
 import {
   iniciarServiciosExternos,
@@ -32,6 +31,7 @@ import { webhooksRetellRoutes } from "./modules/webhooksRetell/routes.js";
 import { retellAdapter } from "./adapters/retell/RetellAdapter.js";
 import { telnyxAdapter } from "./adapters/telnyx/TelnyxAdapter.js";
 import { comprobarSalud, conMemoria } from "./lib/salud.js";
+import { pingDeRedisDeCompatibilidad } from "./lib/redisDeCompatibilidad.js";
 import { comprobarClaveDeCifrado } from "./lib/cifradoDeCredenciales.js";
 import { origenesPermitidos } from "./lib/urls.js";
 import { confianzaEnProxies } from "./lib/proxyDeConfianza.js";
@@ -96,8 +96,8 @@ async function start() {
   try {
     // Initialize external services
     console.log("[Server] Initializing external services...");
-    // Redis, R2 y, con REDIS_URL, el Redis de compatibilidad de los cerrojos:
-    // se espera hasta 3 s a que esté listo; si no llega, se arranca igual y
+    // R2 y, con REDIS_URL, el Redis de compatibilidad de los cerrojos: se
+    // espera hasta 3 s a que esté listo; si no llega, se arranca igual y
     // los cerrojos fallan cerrados hasta que conecte
     // (lib/arranqueDelServidor.ts).
     await iniciarServiciosExternos();
@@ -190,11 +190,16 @@ async function start() {
       if (process.env.RETELL_API_KEY) {
         informativas.retell = comprobarRetell;
       }
+      // Redis solo cuenta mientras haya REDIS_URL, y por el cliente de los
+      // cerrojos (lib/redisDeCompatibilidad.ts): sin él, las reservas fallan
+      // cerradas. Desde la fase 2 del corte deja de salir aquí.
+      const criticas: Record<string, () => Promise<unknown>> = {
+        postgres: () => prisma.$queryRaw`SELECT 1`,
+      };
+      const redis = pingDeRedisDeCompatibilidad();
+      if (redis) criticas.redis = redis;
       const { healthy, dependencies } = await comprobarSalud({
-        criticas: {
-          postgres: () => prisma.$queryRaw`SELECT 1`,
-          redis: () => getRedis().ping(),
-        },
+        criticas,
         informativas,
       });
       const statusCode = healthy ? 200 : 503;
@@ -269,7 +274,7 @@ async function start() {
 // Apagado ordenado. Cloud Run manda SIGTERM y da 10 s antes de matar el
 // contenedor: primero se deja de aceptar peticiones y se espera a las que
 // están en vuelo (una tool de voz a mitad de reserva), y solo después se
-// cierran Redis y Prisma. Antes se desconectaba Prisma con consultas abiertas
+// cierra Prisma. Antes se desconectaba Prisma con consultas abiertas
 // y las peticiones en curso fallaban. Si algo se cuelga, se sale igual a los
 // 8 s para no llegar al SIGKILL.
 let apagando = false;
@@ -286,11 +291,6 @@ async function apagar(senal: string) {
     await servidor?.close();
   } catch (error) {
     console.error("[Server] Error al cerrar Fastify:", error);
-  }
-  try {
-    await getRedis().quit();
-  } catch {
-    // Redis no llegó a inicializarse o ya estaba cerrado.
   }
   // El Redis de compatibilidad de los cerrojos no se cierra: cerrarlo deja
   // la revisión en «solo Postgres», y una adquisición que aún estuviera
