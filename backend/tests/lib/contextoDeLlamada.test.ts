@@ -113,12 +113,9 @@ describe("resolverContextoDeLlamada", () => {
     } as any);
     mockedBookingFindFirst.mockResolvedValue({
       clientName: " Lucía ",
-      serviceIds: ["srv_1", "srv_2"],
+      serviceIds: ["srv_1"],
     } as any);
-    mockedServiceFindMany.mockResolvedValue([
-      { name: "Corte" },
-      { name: "Mechas" },
-    ] as any);
+    mockedServiceFindMany.mockResolvedValue([{ name: "Corte" }] as any);
 
     const contexto = await resolverContextoDeLlamada({
       business: negocio(),
@@ -128,23 +125,71 @@ describe("resolverContextoDeLlamada", () => {
 
     expect(contexto).toEqual({
       saludo:
-        "Hola, Lucía, soy la asistente de inteligencia artificial de Peluquería Ana. La llamada se graba; si prefieres que no, dímelo. ¿Quieres repetir Corte y Mechas o prefieres algo nuevo?",
+        "Hola, Lucía, soy la asistente de inteligencia artificial de Peluquería Ana. La llamada se graba; si prefieres que no, dímelo. ¿Quieres repetir Corte o prefieres algo nuevo?",
       grabar: true,
       variables: {
         nombre_cliente: "Lucía",
-        ultimo_servicio: "Corte y Mechas",
+        ultimo_servicio: "Corte",
       },
     });
     // Solo servicios activos de ese negocio.
     expect(mockedServiceFindMany).toHaveBeenCalledWith({
       where: {
-        id: { in: ["srv_1", "srv_2"] },
+        id: { in: ["srv_1"] },
         businessId: "biz_1",
         active: true,
         deletedAt: null,
       },
       select: { name: true },
     });
+  });
+
+  // Llamada de producción del 14-10: «¿Quieres repetir Coloración y
+  // Hidratación profunda y Peinado…?» se hacía largo.
+  it("con varios servicios, el saludo dice «lo de la última vez» y el prompt los tiene todos", async () => {
+    mockedBookingFindFirst.mockResolvedValue({
+      clientName: "Lucía",
+      serviceIds: ["srv_1", "srv_2", "srv_3"],
+    } as any);
+    mockedServiceFindMany.mockResolvedValue([
+      { name: "Coloración" },
+      { name: "Hidratación profunda" },
+      { name: "Peinado" },
+    ] as any);
+
+    const contexto = await resolverContextoDeLlamada({
+      business: negocio(),
+      telefono: "+34600111222",
+      ahora: AHORA,
+    });
+
+    expect(contexto.saludo).toContain("¿Quieres repetir lo de la última vez");
+    expect(contexto.variables.ultimo_servicio).toBe(
+      "Coloración, Hidratación profunda y Peinado"
+    );
+  });
+
+  // Los nombres del catálogo suelen estar en castellano: dentro de un
+  // saludo en catalán sonaban raros («Vols repetir Peinado…?»).
+  it("si no saluda en castellano, no nombra el servicio", async () => {
+    mockedBookingFindFirst.mockResolvedValue({
+      clientName: "Lucía",
+      serviceIds: ["srv_1"],
+    } as any);
+    mockedServiceFindMany.mockResolvedValue([{ name: "Peinado" }] as any);
+
+    const contexto = await resolverContextoDeLlamada({
+      business: negocio({
+        agentSettings: { ...DEFAULT_AGENT_SETTINGS, voiceLanguage: "ca-ES" },
+      }),
+      telefono: "+34600111222",
+      ahora: AHORA,
+    });
+
+    expect(contexto.saludo).toBe(
+      "Hola, Lucía, sóc la intel·ligència artificial de Peluquería Ana. Vols repetir el de l'última vegada o prefereixes una altra cosa?"
+    );
+    expect(contexto.variables.ultimo_servicio).toBe("Peinado");
   });
 
   it.each(["fisioterapia", "centro-de-estetica", "other"])(

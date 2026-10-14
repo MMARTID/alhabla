@@ -189,7 +189,7 @@ export default function AvisoLegalPage() {
         </p>
         <p>
           <strong className={negrita}>Tipo de datos y personas afectadas.</strong> Nombre, número de teléfono y el
-          contenido de la conversación (grabación y transcripción de las llamadas, y texto de los mensajes de WhatsApp)
+          contenido de la conversación (transcripción de las llamadas, su grabación si quien llama da permiso, y texto de los mensajes de WhatsApp)
           de las personas que llaman o escriben a tu negocio para pedir información o reservar cita. No se tratan
           categorías especiales de datos salvo que la persona las mencione por iniciativa propia.
         </p>
