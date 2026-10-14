@@ -48,6 +48,7 @@ import {
   proveedorDesdeErrorDeReconexion,
 } from "../../adapters/calendar/errors.js";
 import {
+  cuandoParaDecir,
   instanteEnHoraLocal,
   normalizeVoiceToolDateTime,
 } from "../../lib/voiceDateTime.js";
@@ -542,9 +543,16 @@ async function executeCheckAvailability(
     // decir. Un profesional "no sugerir" nunca aparece como tal.
     const { recommendedProfessional, ...sinRecomendacion } = availability;
     const specialistIds = availability.available ? availability.specialistIds : undefined;
-    const paraElAgente: Omit<typeof sinRecomendacion, "specialistIds"> = Object.fromEntries(
-      Object.entries(sinRecomendacion).filter(([clave]) => clave !== "specialistIds")
-    ) as Omit<typeof sinRecomendacion, "specialistIds">;
+    const paraElAgente: Omit<typeof sinRecomendacion, "specialistIds"> & {
+      cuando: string | null;
+    } = {
+      ...(Object.fromEntries(
+        Object.entries(sinRecomendacion).filter(([clave]) => clave !== "specialistIds")
+      ) as Omit<typeof sinRecomendacion, "specialistIds">),
+      // El día y la hora pedidos, como se dicen (voiceDateTime.ts): que la
+      // recepcionista no calcule el día de la semana ni del mes.
+      cuando: cuandoParaDecir(startDateTime, business.timezone || "Europe/Madrid"),
+    };
 
     // El cliente pidió por su nombre a alguien marcado "no sugerir" y hay
     // alguien mejor libre a esa hora: se le propone UNA vez, con su propio
@@ -658,6 +666,10 @@ async function executeCheckAvailability(
           ...paraElAgente,
           suggestedNextSlot: {
             ...alternativa,
+            cuando: cuandoParaDecir(
+              alternativa.startDateTime,
+              business.timezone || "Europe/Madrid"
+            ),
             availabilityToken: suggestedToken,
           },
           ...conRecomendacion,
@@ -1828,6 +1840,7 @@ async function executeBookAppointment(
             result: {
               success: true,
               message: "Cita agendada correctamente.",
+              cuando: cuandoParaDecir(startDateTime, business.timezone || "Europe/Madrid"),
               professionalId: resolvedProfessionalId,
               professionalName: nombreParaElCliente(resolvedProfessionalName),
               mensajeCliente: mensajeClienteRepetido,
@@ -2084,6 +2097,7 @@ async function executeBookAppointment(
           result: {
             success: true,
             message: "Cita agendada correctamente.",
+            cuando: cuandoParaDecir(startDateTime, business.timezone || "Europe/Madrid"),
             eventLink: (result as { htmlLink?: string })?.htmlLink,
             professionalId: resolvedProfessionalId,
             // Para que la confirmación pueda decir con quién queda la cita
@@ -2267,21 +2281,13 @@ async function executeFindMyAppointment(
         })
       : [];
 
-  const formattedDateTime = new Intl.DateTimeFormat("es-ES", {
-    timeZone: business.timezone || "Europe/Madrid",
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(booking.programedAt);
 
   return {
     success: true,
     result: {
       success: true,
       bookingId: booking.id,
-      formattedDateTime,
+      cuando: cuandoParaDecir(booking.programedAt, business.timezone || "Europe/Madrid"),
       serviceNames: services.map((s) => s.name),
       professionalName: nombreParaElCliente(booking.professional?.name),
       // Sin este campo, al "cambiar la cita al mismo nombre" el LLM no tenía

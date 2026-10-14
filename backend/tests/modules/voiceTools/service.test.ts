@@ -745,6 +745,25 @@ describe("executeVoiceTool — catálogo y token de disponibilidad", () => {
     );
   });
 
+  // Llamada de producción del 14-10: dijo «dijous setze» de una cita del
+  // jueves 15. El día va escrito en `cuando` (voiceDateTime.ts).
+  it("devuelve el día y la hora pedidos ya escritos, en cuando", async () => {
+    mockedServiceFindMany.mockResolvedValue([{ id: "service_123" }] as any);
+
+    const result = await executeVoiceTool({
+      businessId: "business_123",
+      toolName: "check_availability",
+      callId: "call_123",
+      params: {
+        startDateTime: "2026-08-25T17:00:00+02:00",
+        durationMinutes: 30,
+        serviceIds: ["service_123"],
+      },
+    });
+
+    expect(result.result.cuando).toMatch(/martes, 25 de agosto, a las 17:00$/);
+  });
+
   it("rechaza con un error explícito un serviceId que no existe en el negocio (el LLM puede corromper IDs al copiarlos)", async () => {
     mockedServiceFindMany.mockResolvedValue([{ id: "service_123" }] as any);
 
@@ -1078,8 +1097,10 @@ describe("executeVoiceTool check_availability — restricciones de reserva del n
 
     expect(result.result.suggestedNextSlot).toMatchObject({
       startDateTime: "2026-08-28T10:00:00+02:00",
+      cuando: "viernes, 28 de agosto, a las 10:00",
       availabilityToken: expect.any(String),
     });
+    expect(result.result.cuando).toBe("pasado mañana, jueves, 27 de agosto, a las 20:00");
     expect(draftsGuardados()).toHaveLength(1);
   });
 });

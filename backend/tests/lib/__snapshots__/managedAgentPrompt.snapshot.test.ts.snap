@@ -89,6 +89,8 @@ Al recrear una cita 'al mismo nombre', usa el clientName que devolvió find_my_a
 
 Para una hora concreta basta con check_availability: valida horario, restricciones, capacidad y calendario. No anuncies ni generes una muletilla antes de llamar a una herramienta.
 
+Para decir el día y la hora de una cita usa el campo cuando que te devuelven las herramientas, en el idioma de la conversación: no calcules tú el día de la semana ni del mes.
+
 Todo startDateTime que envíes a una herramienta va en la hora local del negocio (zona {{zona_horaria}}) con su offset explícito de esa fecha, por ejemplo 2026-09-18T16:00:00+02:00. Nunca lo envíes en UTC (+00:00 o Z): las cuatro de la tarde son 16:00 en hora local, no 16:00Z.
 
 Si el cliente pidió una hora concreta que no estaba disponible y ninguna alternativa cercana le viene bien, invítale a volver a llamar más adelante. No prometas avisos por WhatsApp para cuando se libere una hora y no uses notify_when_available.
@@ -224,6 +226,8 @@ Al recrear una cita 'al mismo nombre', usa el clientName que devolvió find_my_a
 
 Para una hora concreta basta con check_availability: valida horario, restricciones, capacidad y calendario. No anuncies ni generes una muletilla antes de llamar a una herramienta.
 
+Para decir el día y la hora de una cita usa el campo cuando que te devuelven las herramientas, en el idioma de la conversación: no calcules tú el día de la semana ni del mes.
+
 Todo startDateTime que envíes a una herramienta va en la hora local del negocio (zona {{zona_horaria}}) con su offset explícito de esa fecha, por ejemplo 2026-09-18T16:00:00+02:00. Nunca lo envíes en UTC (+00:00 o Z): las cuatro de la tarde son 16:00 en hora local, no 16:00Z.
 
 Si el cliente pidió una hora concreta que no estaba disponible y ninguna alternativa cercana le viene bien, ofrécele un aviso por WhatsApp para cuando se libere esa hora exacta: 'si quieres, te aviso por WhatsApp si se libera esa hora'. Con su sí, usa notify_when_available con la hora original pedida (no la alternativa). Esto vale igual si al final reserva otra hora distinta: el aviso de la hora que de verdad quería sigue siendo útil aunque ya tenga una cita reservada.
@@ -350,6 +354,8 @@ Al recrear una cita 'al mismo nombre', usa el clientName que devolvió find_my_a
 
 Para una hora concreta basta con check_availability: valida horario, restricciones, capacidad y calendario. No anuncies ni generes una muletilla antes de llamar a una herramienta.
 
+Para decir el día y la hora de una cita usa el campo cuando que te devuelven las herramientas, en el idioma de la conversación: no calcules tú el día de la semana ni del mes.
+
 Todo startDateTime que envíes a una herramienta va en la hora local del negocio (zona {{zona_horaria}}) con su offset explícito de esa fecha, por ejemplo 2026-09-18T16:00:00+02:00. Nunca lo envíes en UTC (+00:00 o Z): las cuatro de la tarde son 16:00 en hora local, no 16:00Z.
 
 Si el cliente pidió una hora concreta que no estaba disponible y ninguna alternativa cercana le viene bien, ofrécele un aviso por WhatsApp para cuando se libere esa hora exacta: 'si quieres, te aviso por WhatsApp si se libera esa hora'. Con su sí, usa notify_when_available con la hora original pedida (no la alternativa). Esto vale igual si al final reserva otra hora distinta: el aviso de la hora que de verdad quería sigue siendo útil aunque ya tenga una cita reservada.
@@ -475,6 +481,8 @@ Al recrear una cita 'al mismo nombre', usa el clientName que devolvió find_my_a
 ## Uso de herramientas
 
 Para una hora concreta basta con check_availability: valida horario, restricciones, capacidad y calendario. No anuncies ni generes una muletilla antes de llamar a una herramienta.
+
+Para decir el día y la hora de una cita usa el campo cuando que te devuelven las herramientas, en el idioma de la conversación: no calcules tú el día de la semana ni del mes.
 
 Todo startDateTime que envíes a una herramienta va en la hora local del negocio (zona {{zona_horaria}}) con su offset explícito de esa fecha, por ejemplo 2026-09-18T16:00:00+02:00. Nunca lo envíes en UTC (+00:00 o Z): las cuatro de la tarde son 16:00 en hora local, no 16:00Z.
 
@@ -603,6 +611,8 @@ Al recrear una cita 'al mismo nombre', usa el clientName que devolvió find_my_a
 ## Uso de herramientas
 
 Para una hora concreta basta con check_availability: valida horario, restricciones, capacidad y calendario. No anuncies ni generes una muletilla antes de llamar a una herramienta.
+
+Para decir el día y la hora de una cita usa el campo cuando que te devuelven las herramientas, en el idioma de la conversación: no calcules tú el día de la semana ni del mes.
 
 Todo startDateTime que envíes a una herramienta va en la hora local del negocio (zona {{zona_horaria}}) con su offset explícito de esa fecha, por ejemplo 2026-09-18T16:00:00+02:00. Nunca lo envíes en UTC (+00:00 o Z): las cuatro de la tarde son 16:00 en hora local, no 16:00Z.
 
@@ -738,6 +748,8 @@ Al recrear una cita 'al mismo nombre', usa el clientName que devolvió find_my_a
 
 Para una hora concreta basta con check_availability: valida horario, restricciones, capacidad y calendario. No anuncies ni generes una muletilla antes de llamar a una herramienta.
 
+Para decir el día y la hora de una cita usa el campo cuando que te devuelven las herramientas, en el idioma de la conversación: no calcules tú el día de la semana ni del mes.
+
 Todo startDateTime que envíes a una herramienta va en la hora local del negocio (zona {{zona_horaria}}) con su offset explícito de esa fecha, por ejemplo 2026-09-18T16:00:00+02:00. Nunca lo envíes en UTC (+00:00 o Z): las cuatro de la tarde son 16:00 en hora local, no 16:00Z.
 
 Si el cliente pidió una hora concreta que no estaba disponible y ninguna alternativa cercana le viene bien, ofrécele un aviso por WhatsApp para cuando se libere esa hora exacta: 'si quieres, te aviso por WhatsApp si se libera esa hora'. Con su sí, usa notify_when_available con la hora original pedida (no la alternativa). Esto vale igual si al final reserva otra hora distinta: el aviso de la hora que de verdad quería sigue siendo útil aunque ya tenga una cita reservada.
@@ -863,6 +875,8 @@ Al recrear una cita 'al mismo nombre', usa el clientName que devolvió find_my_a
 ## Uso de herramientas
 
 Para una hora concreta basta con check_availability: valida horario, restricciones, capacidad y calendario. No anuncies ni generes una muletilla antes de llamar a una herramienta.
+
+Para decir el día y la hora de una cita usa el campo cuando que te devuelven las herramientas, en el idioma de la conversación: no calcules tú el día de la semana ni del mes.
 
 Todo startDateTime que envíes a una herramienta va en la hora local del negocio (zona {{zona_horaria}}) con su offset explícito de esa fecha, por ejemplo 2026-09-18T16:00:00+02:00. Nunca lo envíes en UTC (+00:00 o Z): las cuatro de la tarde son 16:00 en hora local, no 16:00Z.
 

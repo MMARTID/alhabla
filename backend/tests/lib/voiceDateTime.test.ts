@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  cuandoParaDecir,
   inicioDelDiaEnZona,
   instanteEnHoraLocal,
   normalizeVoiceToolDateTime,
@@ -140,5 +141,40 @@ describe("instanteEnHoraLocal", () => {
     expect(instanteEnHoraLocal("2026-10-15T07:00:00.000Z", "Zona/Inventada")).toBe(
       "2026-10-15T07:00:00.000Z"
     );
+  });
+});
+
+// Llamada de producción del 14-10: dijo «dijous setze» de una cita del
+// jueves 15. Las tools devuelven el día escrito.
+describe("cuandoParaDecir", () => {
+  const ahora = new Date("2026-10-14T16:00:00Z"); // miércoles en Madrid
+
+  it("dice el día de la semana, el del mes y la hora local, con hoy, mañana y pasado mañana", () => {
+    expect(cuandoParaDecir("2026-10-14T19:30:00+02:00", "Europe/Madrid", ahora)).toBe(
+      "hoy, miércoles, 14 de octubre, a las 19:30"
+    );
+    expect(cuandoParaDecir("2026-10-15T17:00:00+02:00", "Europe/Madrid", ahora)).toBe(
+      "mañana, jueves, 15 de octubre, a las 17:00"
+    );
+    expect(cuandoParaDecir("2026-10-16T09:00:00+02:00", "Europe/Madrid", ahora)).toBe(
+      "pasado mañana, viernes, 16 de octubre, a las 09:00"
+    );
+    expect(cuandoParaDecir("2026-10-20T12:30:00+02:00", "Europe/Madrid", ahora)).toBe(
+      "martes, 20 de octubre, a las 12:30"
+    );
+  });
+
+  it("en la zona del negocio, aunque el instante venga en UTC", () => {
+    // 22:30 UTC del 14 son las 00:30 del 15 en Madrid: mañana.
+    expect(cuandoParaDecir("2026-10-14T22:30:00Z", "Europe/Madrid", ahora)).toBe(
+      "mañana, jueves, 15 de octubre, a las 00:30"
+    );
+    expect(cuandoParaDecir(new Date("2026-10-15T15:00:00Z"), "Atlantic/Canary", ahora)).toBe(
+      "mañana, jueves, 15 de octubre, a las 16:00"
+    );
+  });
+
+  it("una fecha que no lo es devuelve null", () => {
+    expect(cuandoParaDecir("mañana", "Europe/Madrid", ahora)).toBeNull();
   });
 });
