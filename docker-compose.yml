@@ -247,6 +247,29 @@ services:
     profiles:
       - dev
 
+  # ---------- BACKEND DE SIMULACIÓN (perfil sim) ----------
+  # El mismo backend de dev, con la misma BD, pero confiando en una clave
+  # Ed25519 generada en local en vez de en la de Telnyx: es el destino de los
+  # webhooks de Telnyx firmados por el MCP de desarrollo (backend/mcp/). El
+  # backend de dev (:3000) sigue aceptando solo los de Telnyx, así que las
+  # llamadas reales contra dev no cambian. Se levanta aparte:
+  #   docker compose --profile sim up -d backend-sim
+  backend-sim:
+    extends:
+      service: backend-dev
+    container_name: alhabla_backend_sim
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      TELNYX_PUBLIC_KEY: ${TELNYX_PUBLIC_KEY_SIMULACION}
+    ports: !override
+      - "3010:3000"
+    profiles: !override
+      - sim
+
   # ---------- POSTGRES ----------
   postgres:
     image: postgres:15-alpine
