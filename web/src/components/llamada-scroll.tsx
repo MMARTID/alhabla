@@ -110,7 +110,7 @@ function pasosDe(g: GuionRelato): [PasoCopy, PasoCopy, PasoCopy] {
       detalles: [
         `Si ${elCliente} acepta, le llega la confirmación por WhatsApp`,
         "Si conectas tu WhatsApp, a ti te avisa de la cita nueva",
-        "En tu panel tienes la grabación y la transcripción de la llamada",
+        "En tu panel tienes la transcripción y, con permiso, la grabación",
       ],
     },
   ];

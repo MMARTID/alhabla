@@ -86,7 +86,7 @@ function pasosDe(g: GuionRelato): [PasoCopy, PasoCopy, PasoCopy] {
       numero: "02",
       etiqueta: "Llamadas",
       pantalla: "Detalle de una llamada",
-      titulo: "Cada llamada, con su transcripción y su grabación.",
+      titulo: "Cada llamada, transcrita y grabada si hay permiso.",
       texto: `Abre la llamada de ${g.cliente.nombre} y ves qué pidió, por qué se le ofreció esa hora y la cita que salió de ella.`,
       detalles: [
         "La grabación, si el cliente da permiso, para escucharla cuando quieras",
@@ -552,10 +552,7 @@ export function EnTuNegocioScroll({
                     <div className="mx-fila-cab">
                       <div>
                         <p className="mx-h2">Llamadas recientes</p>
-                        <p>
-                          Toca una llamada para leer la conversación y escuchar
-                          la grabación.
-                        </p>
+                        <p>Toca una llamada para leer la conversación.</p>
                       </div>
                       <span className="mx-link">
                         Ver historial
@@ -589,8 +586,8 @@ export function EnTuNegocioScroll({
                   <div>
                     <p className="mx-h1">Llamadas</p>
                     <p>
-                      Todas las conversaciones de tu recepcionista, con
-                      grabación y transcripción.
+                      Todas las conversaciones de tu recepcionista, con su
+                      transcripción.
                     </p>
                   </div>
                   <span className="mx-btn">Analítica</span>
