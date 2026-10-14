@@ -982,7 +982,9 @@ describe("buildManagedAgentPrompt — chat por WhatsApp (fase 2)", () => {
     expect(prompt).toContain("ha pulsado Cambiar en el recordatorio");
     // Refactor, paso 5: en el chat no se pregunta por el WhatsApp y el aviso
     // de IA va en la primera respuesta.
-    expect(prompt).toContain("Al reservar no preguntes por el WhatsApp");
+    expect(prompt).toContain(
+      "Al reservar pregúntale su nombre antes de ofrecerle reservar, aunque su perfil de WhatsApp muestre uno, y no preguntes por el WhatsApp"
+    );
     expect(prompt).toContain("En el chat no hay saludo del sistema");
   });
 });
