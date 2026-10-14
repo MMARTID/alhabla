@@ -624,6 +624,10 @@ model Call {
   // pide en la llamada y, con su sí, empieza a grabar en ese momento (tool
   // preferencia_de_grabacion). Null en las llamadas anteriores al 13-10-2026.
   grabacionPermitida     Boolean?
+  // Cuándo se le pidió permiso para grabar: lo decide el backend y va en la
+  // respuesta de get_catalog o check_availability, una sola vez por llamada
+  // (lib/grabacion.ts, tocaPreguntarPorGrabar).
+  grabacionPreguntadaAt  DateTime?
   providerCallId         String?
   providerConversationId String?
   // OJO: en Telnyx, providerCostCents viene del webhook call.cost y SOLO

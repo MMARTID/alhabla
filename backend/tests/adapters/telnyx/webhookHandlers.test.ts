@@ -132,7 +132,6 @@ const CONTEXTO = {
   variables: {
     nombre_cliente: "",
     ultimo_servicio: "",
-    grabacion: "sin_preguntar" as const,
   },
 };
 const CONTESTAR_CON_CONTEXTO = {
@@ -298,7 +297,6 @@ describe("handleCallInitiated", () => {
       variables: {
         nombre_cliente: "Lucía",
         ultimo_servicio: "Corte",
-        grabacion: "aceptada" as const,
       },
     };
     mockedResolverContexto.mockResolvedValue(conocido);

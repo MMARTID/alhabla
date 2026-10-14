@@ -4,6 +4,7 @@ import {
   estadoDeGrabacion,
   guardarPreferenciaDeGrabacion,
   telefonoDelCliente,
+  tocaPreguntarPorGrabar,
 } from "../../src/lib/grabacion.js";
 import { prisma } from "../../src/lib/prisma.js";
 import { telnyxAiAdapter } from "../../src/adapters/telnyx/TelnyxAiAdapter.js";
@@ -11,7 +12,7 @@ import { telnyxAiAdapter } from "../../src/adapters/telnyx/TelnyxAiAdapter.js";
 vi.mock("../../src/lib/prisma.js", () => ({
   prisma: {
     call: { findFirst: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
-    clienteDelNegocio: { upsert: vi.fn() },
+    clienteDelNegocio: { upsert: vi.fn(), findUnique: vi.fn() },
   },
 }));
 
@@ -27,6 +28,7 @@ const mockedCallFindFirst = vi.mocked(prisma.call.findFirst);
 const mockedCallUpdate = vi.mocked(prisma.call.update);
 const mockedCallUpdateMany = vi.mocked(prisma.call.updateMany);
 const mockedClienteUpsert = vi.mocked(prisma.clienteDelNegocio.upsert);
+const mockedClienteFindUnique = vi.mocked(prisma.clienteDelNegocio.findUnique);
 const mockedStartRecording = vi.mocked(telnyxAiAdapter.startRecording);
 const mockedStopRecording = vi.mocked(telnyxAiAdapter.stopRecording);
 const mockedDeleteRecording = vi.mocked(telnyxAiAdapter.deleteRecording);
@@ -75,6 +77,97 @@ describe("estadoDeGrabacion y telefonoDelCliente", () => {
     expect(telefonoDelCliente("+34930000002", negocio)).toBeNull();
     expect(telefonoDelCliente("+34600000003", negocio)).toBeNull();
     expect(telefonoDelCliente("+34600111222", negocio)).toBe("+34600111222");
+  });
+});
+
+describe("tocaPreguntarPorGrabar", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    mockedClienteFindUnique.mockResolvedValue(null);
+    mockedCallUpdateMany.mockResolvedValue({ count: 1 } as any);
+  });
+
+  const sinPreguntar = (campos: Record<string, unknown> = {}) =>
+    llamada({
+      grabacionPreguntadaAt: null,
+      business: { phone: "+34930000001" },
+      ...campos,
+    });
+
+  it("a quien no lo ha decidido, sí, una vez, y lo deja anotado", async () => {
+    mockedCallFindFirst.mockResolvedValue(sinPreguntar());
+
+    await expect(tocaPreguntarPorGrabar(entrada)).resolves.toBe(true);
+
+    expect(mockedCallFindFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { callId: "v3:ctrl_1", businessId: "biz_1" },
+      })
+    );
+    expect(mockedClienteFindUnique).toHaveBeenCalledWith({
+      where: {
+        businessId_telefono: { businessId: "biz_1", telefono: "+34600111222" },
+      },
+      select: { grabacionAceptada: true },
+    });
+    // Atómico: dos tools a la vez no lo preguntan dos veces.
+    expect(mockedCallUpdateMany).toHaveBeenCalledWith({
+      where: { id: "call_db_1", grabacionPreguntadaAt: null },
+      data: { grabacionPreguntadaAt: expect.any(Date) },
+    });
+  });
+
+  it("si otra tool lo anotó a la vez, no", async () => {
+    mockedCallFindFirst.mockResolvedValue(sinPreguntar());
+    mockedCallUpdateMany.mockResolvedValue({ count: 0 } as any);
+
+    await expect(tocaPreguntarPorGrabar(entrada)).resolves.toBe(false);
+  });
+
+  it.each([
+    ["ya se le preguntó en esta llamada", { grabacionPreguntadaAt: new Date() }],
+    ["ya se graba (lo aceptó antes)", { grabacionPermitida: true }],
+    ["pidió en esta llamada que no se grabe", { grabacionRechazadaAt: new Date() }],
+  ])("si %s, no", async (_motivo, campos) => {
+    mockedCallFindFirst.mockResolvedValue(sinPreguntar(campos));
+
+    await expect(tocaPreguntarPorGrabar(entrada)).resolves.toBe(false);
+    expect(mockedCallUpdateMany).not.toHaveBeenCalled();
+  });
+
+  it.each([true, false])(
+    "si ya lo decidió en otra llamada (%s), no",
+    async (aceptada) => {
+      mockedCallFindFirst.mockResolvedValue(sinPreguntar());
+      mockedClienteFindUnique.mockResolvedValue({
+        grabacionAceptada: aceptada,
+      } as any);
+
+      await expect(tocaPreguntarPorGrabar(entrada)).resolves.toBe(false);
+      expect(mockedCallUpdateMany).not.toHaveBeenCalled();
+    }
+  );
+
+  it("con número oculto o del negocio, se le pregunta para esta llamada", async () => {
+    mockedCallFindFirst.mockResolvedValue(
+      sinPreguntar({ fromNumber: "+34930000001" })
+    );
+
+    await expect(tocaPreguntarPorGrabar(entrada)).resolves.toBe(true);
+    expect(mockedClienteFindUnique).not.toHaveBeenCalled();
+  });
+
+  it("sin la llamada, o si falla la base de datos, no se pregunta y lo dice en el log", async () => {
+    mockedCallFindFirst.mockResolvedValueOnce(null);
+    await expect(tocaPreguntarPorGrabar(entrada)).resolves.toBe(false);
+
+    mockedCallFindFirst.mockRejectedValueOnce(new Error("timeout"));
+    await expect(tocaPreguntarPorGrabar(entrada)).resolves.toBe(false);
+
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringMatching(/no se pudo saber si toca preguntar.*negocio biz_1.*timeout/)
+    );
   });
 });
 

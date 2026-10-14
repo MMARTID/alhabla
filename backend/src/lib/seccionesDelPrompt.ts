@@ -44,15 +44,13 @@ export interface VariablesDeLaLlamada {
   nombre_cliente: string;
   /** Servicios de esa reserva; vacío si no se conoce. */
   ultimo_servicio: string;
-  /** Si deja grabar sus llamadas (lib/grabacion.ts). */
-  grabacion: "aceptada" | "rechazada" | "sin_preguntar";
 }
 
 /** Los valores de quien no se conoce: el assistant los guarda por defecto
  * para el chat de WhatsApp y para una llamada en la que no se pudo mirar
  * nada. */
 export const VARIABLES_DE_LA_LLAMADA_POR_DEFECTO: Readonly<VariablesDeLaLlamada> =
-  { nombre_cliente: "", ultimo_servicio: "", grabacion: "sin_preguntar" };
+  { nombre_cliente: "", ultimo_servicio: "" };
 
 type Parrafos = Array<string | null>;
 type Seccion = (contexto: ContextoDelPrompt) => Parrafos;
@@ -194,17 +192,19 @@ function seccionCliente(): Parrafos {
 function seccionGrabacion(): Parrafos {
   return [
     // Grabación con permiso (decisiones del usuario del 12, 13 y 14-10-2026,
-    // lib/grabacion.ts): se pregunta mientras se comprueba el primer
-    // servicio, con la respuesta de get_catalog ya en la mano, para que la
-    // respuesta del servicio no salga encima de la del cliente. En positivo:
-    // con «¿te importa…?» el cliente contestaba «No» queriendo decir que sí
-    // y se guardaba como rechazo (dev, 13-10). La finalidad, la real: el
+    // lib/grabacion.ts). Cuándo preguntarlo lo decide el backend y lo manda
+    // en la respuesta de get_catalog o check_availability: con la regla en
+    // el prompt («si {{grabacion}} es sin_preguntar…») volvía a preguntar a
+    // quien ya lo había aceptado (4 de 4 llamadas del 15-10). Con la
+    // respuesta de la tool ya en la mano, para que no salga encima de la
+    // del cliente. En positivo: con «¿te importa…?» el cliente contestaba
+    // «No» queriendo decir que sí (dev, 13-10). La finalidad, la real: el
     // audio es solo para que el negocio lo revise. Sin explicaciones
     // legales salvo que pregunten.
     "## Grabación",
-    "La llamada solo se graba si quien llama lo acepta; la transcripción se guarda siempre. Si deja grabar sus llamadas: {{grabacion}}.",
-    "Si es sin_preguntar, pregúntaselo una sola vez mientras compruebas el primer servicio que te pida: en cuanto get_catalog te responda, no contestes todavía a lo que preguntó y di solo «Mientras lo compruebo, ¿te parece bien que grabe tus llamadas para que {{nombre_negocio}} pueda revisarlas?». Si dice que sí (sí, vale, claro, de acuerdo), llama a preferencia_de_grabacion con acepta true; si dice que no, con acepta false; si su respuesta no es clara, no la llames: se le preguntará en otra llamada. Después contesta a lo que había preguntado con lo que te dio get_catalog. Si no llega a pedir ningún servicio, no lo preguntes.",
-    "Si es aceptada, el saludo ya ha avisado de que se graba: no lo preguntes. Si es rechazada, no saques el tema. En cualquier caso, si dice que no quiere que se grabe, llama a preferencia_de_grabacion con acepta false en ese mismo turno y dile en una frase que de acuerdo.",
+    "La transcripción se guarda siempre; el audio, solo si quien llama lo acepta. No preguntes nunca por tu cuenta si puedes grabar.",
+    "Si la respuesta de get_catalog o de check_availability trae pregunta_de_grabacion, no contestes todavía a lo que te pidió: di solo esa pregunta, en el idioma de la conversación, y espera. Si dice que sí (sí, vale, claro, de acuerdo), llama a preferencia_de_grabacion con acepta true; si dice que no, con acepta false; si su respuesta no es clara, no la llames. Después contesta a lo que había pedido con lo que te dio la herramienta.",
+    "Si en cualquier momento dice que no quiere que se grabe, llama a preferencia_de_grabacion con acepta false en ese mismo turno y dile en una frase que de acuerdo. Si pregunta si le estás grabando: solo si el saludo lo dijo o si lo ha aceptado en esta llamada.",
     "Si pregunta qué se hace con sus datos, dile que {{nombre_negocio}} los usa solo para gestionar sus citas y que puede pedirle que se los enseñe o los borre.",
   ];
 }

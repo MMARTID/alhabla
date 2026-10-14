@@ -32,9 +32,6 @@ vi.mock("../../src/lib/prisma.js", () => ({
       update: vi.fn(),
       create: vi.fn(),
     },
-    clienteDelNegocio: {
-      findUnique: vi.fn(),
-    },
   },
 }));
 
@@ -108,43 +105,17 @@ describe("buildInboundCallDynamicVariables", () => {
     expect(variables).not.toHaveProperty("horario_semanal");
   });
 
-  // Grabación con permiso (lib/grabacion.ts): con el teléfono de quien
-  // llama va si deja grabar, para no preguntárselo otra vez. Sin nombre ni
-  // servicio: el saludo de Retell es fijo.
-  it("con el teléfono, dice si deja grabar; sin nombre ni servicio", async () => {
+  // Las de quien llama van vacías: el saludo de Retell es fijo.
+  it("lleva las variables de quien llama vacías", async () => {
     mockedBusinessFindUnique.mockResolvedValue({ name: "Peluquería Ana" } as any);
-    vi.mocked(prisma.clienteDelNegocio.findUnique).mockResolvedValue({
-      grabacionAceptada: false,
-    } as any);
 
-    const variables = await buildInboundCallDynamicVariables(
-      "biz_123",
-      prisma,
-      "+34600111222"
-    );
+    const variables = await buildInboundCallDynamicVariables("biz_123");
 
-    expect(prisma.clienteDelNegocio.findUnique).toHaveBeenCalledWith({
-      where: {
-        businessId_telefono: { businessId: "biz_123", telefono: "+34600111222" },
-      },
-      select: { grabacionAceptada: true },
-    });
     expect(variables).toMatchObject({
       nombre_negocio: "Peluquería Ana",
       nombre_cliente: "",
       ultimo_servicio: "",
-      grabacion: "rechazada",
     });
-  });
-
-  it("sin teléfono, como a quien no se conoce", async () => {
-    mockedBusinessFindUnique.mockResolvedValue({ name: "Peluquería Ana" } as any);
-    vi.mocked(prisma.clienteDelNegocio.findUnique).mockClear();
-
-    const variables = await buildInboundCallDynamicVariables("biz_123");
-
-    expect(prisma.clienteDelNegocio.findUnique).not.toHaveBeenCalled();
-    expect(variables.grabacion).toBe("sin_preguntar");
   });
 
   it("no revienta si el negocio no existe (findUnique devuelve null)", async () => {

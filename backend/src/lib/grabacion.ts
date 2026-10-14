@@ -13,9 +13,10 @@ import {
  * y se guardan siempre.
  *
  * - Sin decidir: no se graba al contestar. La recepcionista lo pregunta
- *   mientras comprueba el primer servicio que le piden (prompt, «##
- *   Grabación») y, con su sí, la tool `preferencia_de_grabacion` empieza a
- *   grabar en ese momento.
+ *   mientras comprueba el primer servicio que le piden: la pregunta va en la
+ *   respuesta de get_catalog o check_availability (`tocaPreguntarPorGrabar`)
+ *   y, con su sí, la tool `preferencia_de_grabacion` empieza a grabar en ese
+ *   momento.
  * - Ya lo aceptó: se graba desde que se contesta y el saludo lo avisa
  *   (lib/contextoDeLlamada.ts).
  * - Dice que no, en cualquier momento: se para, lo grabado se descarta al
@@ -61,6 +62,78 @@ export function telefonoDelCliente(
     negocio.ownerWhatsappNumber,
   ];
   return propios.includes(telefono) ? null : telefono;
+}
+
+/**
+ * ¿Toca pedirle permiso para grabar ahora? Lo decide el backend, no el
+ * modelo: con la regla en el prompt («si {{grabacion}} es sin_preguntar,
+ * pregúntalo») volvía a preguntar aunque el cliente ya lo hubiera aceptado
+ * (4 de 4 llamadas de prueba del 15-10). Una sola vez por llamada y solo a
+ * quien no lo ha decidido: ni se graba ya, ni lo ha rechazado en esta
+ * llamada o en otra. Con true queda anotado (`grabacionPreguntadaAt`), de
+ * forma atómica: dos tools a la vez no lo preguntan dos veces.
+ *
+ * Si algo falla no se pregunta (se le preguntará en otra llamada) y se dice
+ * en el log.
+ */
+export async function tocaPreguntarPorGrabar(input: {
+  /** `Call.callId`: el call_control_id de Telnyx o el call_id de Retell. */
+  callId: string;
+  businessId: string;
+  etiqueta: string;
+}): Promise<boolean> {
+  try {
+    const call = await prisma.call.findFirst({
+      where: { callId: input.callId, businessId: input.businessId },
+      select: {
+        id: true,
+        fromNumber: true,
+        grabacionPermitida: true,
+        grabacionRechazadaAt: true,
+        grabacionPreguntadaAt: true,
+        business: {
+          select: { phone: true, telnyxPhoneNumber: true, ownerWhatsappNumber: true },
+        },
+      },
+    });
+    if (!call) {
+      console.error(
+        `[Grabación] ${input.etiqueta}: la llamada no está en la base de datos (negocio ${input.businessId}); no se pregunta si se puede grabar`
+      );
+      return false;
+    }
+    if (
+      call.grabacionPermitida === true ||
+      call.grabacionRechazadaAt ||
+      call.grabacionPreguntadaAt
+    ) {
+      return false;
+    }
+
+    const telefono = telefonoDelCliente(call.fromNumber, call.business);
+    if (telefono) {
+      const cliente = await prisma.clienteDelNegocio.findUnique({
+        where: {
+          businessId_telefono: { businessId: input.businessId, telefono },
+        },
+        select: { grabacionAceptada: true },
+      });
+      if (estadoDeGrabacion(cliente?.grabacionAceptada) !== "sin_preguntar") {
+        return false;
+      }
+    }
+
+    const { count } = await prisma.call.updateMany({
+      where: { id: call.id, grabacionPreguntadaAt: null },
+      data: { grabacionPreguntadaAt: new Date() },
+    });
+    return count === 1;
+  } catch (error) {
+    console.error(
+      `[Grabación] ${input.etiqueta}: no se pudo saber si toca preguntar por grabar (negocio ${input.businessId}); no se pregunta: ${errorMessage(error)}`
+    );
+    return false;
+  }
 }
 
 type LlamadaParaGrabar = {

@@ -101,16 +101,21 @@ describe("buildManagedAgentPrompt", () => {
   // Grabación con permiso (lib/grabacion.ts): se pregunta mientras se
   // comprueba el primer servicio; en el chat no hay grabación y el aviso de
   // IA lo da la primera respuesta.
-  it("pide permiso para grabar mientras comprueba el servicio, y en el chat no", () => {
+  // Cuándo preguntarlo lo decide el backend (lib/grabacion.ts): con la
+  // regla en el prompt volvía a preguntar a quien ya lo había aceptado.
+  it("pide permiso para grabar solo cuando se lo trae una tool, y en el chat no", () => {
     const prompt = buildManagedAgentPrompt({
       businessName: "Barbería Ejemplo",
       settings: DEFAULT_AGENT_SETTINGS,
     });
 
     expect(prompt).toContain("## Grabación");
-    expect(prompt).toContain("Si deja grabar sus llamadas: {{grabacion}}.");
+    expect(prompt).not.toContain("{{grabacion}}");
     expect(prompt).toContain(
-      "en cuanto get_catalog te responda, no contestes todavía a lo que preguntó y di solo «Mientras lo compruebo, ¿te parece bien que grabe tus llamadas para que {{nombre_negocio}} pueda revisarlas?»"
+      "No preguntes nunca por tu cuenta si puedes grabar."
+    );
+    expect(prompt).toContain(
+      "Si la respuesta de get_catalog o de check_availability trae pregunta_de_grabacion, no contestes todavía a lo que te pidió: di solo esa pregunta, en el idioma de la conversación, y espera."
     );
     expect(prompt).toContain(
       "llama a preferencia_de_grabacion con acepta false en ese mismo turno"

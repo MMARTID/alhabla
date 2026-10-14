@@ -47,7 +47,10 @@ import {
   normalizeVoiceToolDateTime,
 } from "../../lib/voiceDateTime.js";
 import { errorMessage } from "../../lib/logUtils.js";
-import { guardarPreferenciaDeGrabacion } from "../../lib/grabacion.js";
+import {
+  guardarPreferenciaDeGrabacion,
+  tocaPreguntarPorGrabar,
+} from "../../lib/grabacion.js";
 import { pendingBookingAlertEmail } from "../../lib/emailTemplates.js";
 import {
   enqueueEmailJob,
@@ -2525,6 +2528,40 @@ async function executePreferenciaDeGrabacion(
   };
 }
 
+/**
+ * Pide permiso para grabar con la primera respuesta de get_catalog o
+ * check_availability de la llamada, si toca (lib/grabacion.ts,
+ * tocaPreguntarPorGrabar): así la recepcionista lo pregunta «mientras lo
+ * comprueba», antes de dar la respuesta. No con un error ni con un «no se
+ * puede» (llevan `code`): ahí lo que toca es contestar a eso. Nunca en el
+ * chat.
+ */
+async function conPreguntaDeGrabacion(
+  respuesta: ResultadoDeTool,
+  business: BusinessVoiceConfig,
+  callLabel: string,
+  callId: string | undefined
+): Promise<ResultadoDeTool> {
+  if (!callId || canalDeLaTool(callId) === "client_chat") return respuesta;
+  if (!respuesta.result || "code" in respuesta.result) return respuesta;
+  const toca = await tocaPreguntarPorGrabar({
+    callId,
+    businessId: business.id,
+    etiqueta: callLabel,
+  });
+  if (!toca) return respuesta;
+  console.log(
+    `[Grabación] ${callLabel}: se le pide permiso para grabar (negocio ${business.id})`
+  );
+  return {
+    ...respuesta,
+    result: {
+      ...respuesta.result,
+      pregunta_de_grabacion: `Mientras lo compruebo, ¿te parece bien que grabe tus llamadas para que ${business.name} pueda revisarlas?`,
+    },
+  };
+}
+
 export async function executeVoiceTool(
   input: ExecuteVoiceToolInput
 ): Promise<ResultadoDeTool> {
@@ -2546,9 +2583,19 @@ export async function executeVoiceTool(
 
   switch (toolName) {
     case "get_catalog":
-      return executeGetCatalog(business, callLabel);
+      return conPreguntaDeGrabacion(
+        await executeGetCatalog(business, callLabel),
+        business,
+        callLabel,
+        callId
+      );
     case "check_availability":
-      return executeCheckAvailability(business, params, callLabel, callId);
+      return conPreguntaDeGrabacion(
+        await executeCheckAvailability(business, params, callLabel, callId),
+        business,
+        callLabel,
+        callId
+      );
     case "book_appointment": {
       const reserva = await executeBookAppointment(business, params, callLabel, callId);
       if (callId && reserva.result?.success === false) {

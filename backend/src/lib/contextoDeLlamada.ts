@@ -103,8 +103,7 @@ export async function resolverContextoDeLlamada(input: {
   const tipo: BusinessType = isBusinessType(business.businessType)
     ? business.businessType
     : "other";
-  const grabacion = estadoDeGrabacion(cliente?.grabacionAceptada);
-  const grabar = grabacion === "aceptada";
+  const grabar = estadoDeGrabacion(cliente?.grabacionAceptada) === "aceptada";
   // La llamada en curso aún no está guardada: sin ninguna anterior, es la
   // primera.
   const primeraSemana =
@@ -131,7 +130,6 @@ export async function resolverContextoDeLlamada(input: {
     variables: {
       nombre_cliente: nombre ?? "",
       ultimo_servicio: ultimoServicio ?? "",
-      grabacion,
     },
   };
 }

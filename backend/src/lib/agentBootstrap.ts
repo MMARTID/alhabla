@@ -30,7 +30,6 @@ import { crearAssistantYPromocionar } from "./telnyxAgentSync.js";
 import { listaDeEsperaDisponible } from "../modules/whatsapp/service.js";
 import { isVoiceTelnyxRolloutEnabled } from "./voiceRollout.js";
 import { resolverTransferenciaAlDueno } from "./transferenciaAlDueno.js";
-import { estadoDeGrabacion, telefonoDelCliente } from "./grabacion.js";
 import { VARIABLES_DE_LA_LLAMADA_POR_DEFECTO } from "./seccionesDelPrompt.js";
 
 /**
@@ -146,35 +145,19 @@ export async function buildPostCallAnalysisDataForBusiness(
  * horario se obtienen con get_catalog solo cuando hacen falta: inyectarlos
  * siempre aumentaba el contexto y la latencia de todos los turnos.
  *
- * Las de quien llama (lib/contextoDeLlamada.ts) van con su permiso de
- * grabar, para que la recepcionista no se lo pregunte otra vez, pero sin
- * nombre ni servicio: el saludo de Retell es fijo y no le llama por su
- * nombre.
+ * Las de quien llama (lib/contextoDeLlamada.ts) van vacías, como a quien no
+ * se conoce: el saludo de Retell es fijo y no le llama por su nombre. Si
+ * toca pedirle permiso para grabar lo decide el backend en las tools
+ * (lib/grabacion.ts).
  */
 export async function buildInboundCallDynamicVariables(
   businessId: string,
-  prismaClient: typeof prisma = prisma,
-  telefono: string | null = null
+  prismaClient: typeof prisma = prisma
 ): Promise<Record<string, string>> {
   const business = await prismaClient.business.findUnique({
     where: { id: businessId },
-    select: {
-      name: true,
-      timezone: true,
-      phone: true,
-      telnyxPhoneNumber: true,
-      ownerWhatsappNumber: true,
-    },
+    select: { name: true, timezone: true },
   });
-  const telefonoValido = telefonoDelCliente(telefono, business ?? {});
-  const cliente = telefonoValido
-    ? await prismaClient.clienteDelNegocio.findUnique({
-        where: {
-          businessId_telefono: { businessId, telefono: telefonoValido },
-        },
-        select: { grabacionAceptada: true },
-      })
-    : null;
 
   const timezone = resolvePromptTimezone(business?.timezone);
 
@@ -182,7 +165,6 @@ export async function buildInboundCallDynamicVariables(
     nombre_negocio: business?.name?.trim() || "el negocio",
     zona_horaria: timezone,
     ...VARIABLES_DE_LA_LLAMADA_POR_DEFECTO,
-    grabacion: estadoDeGrabacion(cliente?.grabacionAceptada),
   };
 }
 

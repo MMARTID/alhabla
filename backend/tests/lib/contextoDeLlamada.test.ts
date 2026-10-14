@@ -51,7 +51,6 @@ describe("resolverContextoDeLlamada", () => {
       variables: {
         nombre_cliente: "",
         ultimo_servicio: "",
-        grabacion: "sin_preguntar",
       },
     });
     // Solo los datos de ese negocio y ese teléfono.
@@ -134,7 +133,6 @@ describe("resolverContextoDeLlamada", () => {
       variables: {
         nombre_cliente: "Lucía",
         ultimo_servicio: "Corte y Mechas",
-        grabacion: "aceptada",
       },
     });
     // Solo servicios activos de ese negocio.
@@ -184,7 +182,6 @@ describe("resolverContextoDeLlamada", () => {
     });
 
     expect(contexto.grabar).toBe(false);
-    expect(contexto.variables.grabacion).toBe("rechazada");
     expect(contexto.saludo).not.toContain("se graba");
   });
 
@@ -228,6 +225,6 @@ describe("resolverContextoDeLlamada", () => {
 
     expect(mockedClienteFindUnique).not.toHaveBeenCalled();
     expect(mockedBookingFindFirst).not.toHaveBeenCalled();
-    expect(contexto.variables.grabacion).toBe("sin_preguntar");
+    expect(contexto.grabar).toBe(false);
   });
 });

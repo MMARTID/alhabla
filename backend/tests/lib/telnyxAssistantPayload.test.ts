@@ -488,7 +488,6 @@ describe("buildTelnyxAssistantPayload", () => {
     expect(payload.dynamicVariables).toEqual({
       nombre_cliente: "",
       ultimo_servicio: "",
-      grabacion: "sin_preguntar",
     });
   });
 

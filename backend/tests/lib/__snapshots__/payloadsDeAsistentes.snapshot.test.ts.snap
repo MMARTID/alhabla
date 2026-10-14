@@ -186,7 +186,6 @@ exports[`payloads de asistentes (instantáneas) > assistant de la recepcionista 
 exports[`payloads de asistentes (instantáneas) > assistant de la recepcionista, completo con transferencia y palabras clave 1`] = `
 {
   "dynamicVariables": {
-    "grabacion": "sin_preguntar",
     "nombre_cliente": "",
     "ultimo_servicio": "",
   },
@@ -606,7 +605,6 @@ exports[`payloads de asistentes (instantáneas) > assistant de la recepcionista,
 exports[`payloads de asistentes (instantáneas) > assistant de la recepcionista, mínimo (sin tools, voz Natural) 1`] = `
 {
   "dynamicVariables": {
-    "grabacion": "sin_preguntar",
     "nombre_cliente": "",
     "ultimo_servicio": "",
   },
@@ -983,7 +981,7 @@ Si te escriben en catalán, gallego, euskera o inglés, responde en ese idioma; 
 exports[`payloads de asistentes (instantáneas) > el JSON enviado es idéntico byte a byte (hash) 1`] = `
 {
   "gestor": "d42493dfb458dbe1ef8fa7fab6dbf284ec727a79d37293a97bff584963af6abf",
-  "recepcionista": "4a25faef46ad730f191619540ddfefcdb70a320e4e3b08dc4d08b3be45c12462",
+  "recepcionista": "6b588e4a7aae4fa44c8c559d40e4baf56d2729a013b20f8414ed02024f2ddac8",
 }
 `;
 
