@@ -623,7 +623,7 @@ describe("buildManagedAgentPrompt — idiomas", () => {
     });
 
     expect(prompt).toContain(
-      "En las llamadas, el saludo en español de España ya lo dice el sistema al descolgar y es el primer mensaje de la conversación: no lo repitas. Desde tu primera respuesta, contesta y continúa exclusivamente en el idioma en que te habla quien llama si es uno de estos: español de España, inglés, francés, alemán, italiano, portugués, neerlandés, ruso. Si cambia entre esos idiomas, acompaña el cambio sin pedirle que elija uno. Las frases que estas instrucciones ponen entre comillas para decírselas a quien llama están en castellano: dilas traducidas al idioma de la conversación. Los nombres de los servicios del catálogo también suelen estar en castellano y no son nombres propios: en otro idioma, dilos traducidos a ese idioma, no tal cual (salvo los que no tienen traducción, como «balayage»)."
+      "En las llamadas, el saludo ya lo dice el sistema al descolgar (en español de España o, si quien llama ya ha llamado antes, en el idioma en que habló) y es el primer mensaje de la conversación: no lo repitas. Desde tu primera respuesta, contesta y continúa exclusivamente en el idioma en que te habla quien llama si es uno de estos: español de España, inglés, francés, alemán, italiano, portugués, neerlandés, ruso. Si cambia entre esos idiomas, acompaña el cambio sin pedirle que elija uno. Las frases que estas instrucciones ponen entre comillas para decírselas a quien llama están en castellano: dilas traducidas al idioma de la conversación. Los nombres de los servicios del catálogo también suelen estar en castellano y no son nombres propios: en otro idioma, dilos traducidos a ese idioma, no tal cual (salvo los que no tienen traducción, como «balayage»)."
     );
     expect(prompt).not.toContain("Habla siempre en español de España");
   });
@@ -664,7 +664,7 @@ describe("buildManagedAgentPrompt — idiomas", () => {
     });
 
     expect(prompt).toContain(
-      "En las llamadas, el saludo en catalán ya lo dice el sistema al descolgar y es el primer mensaje de la conversación: no lo repitas. Desde tu primera respuesta, contesta y continúa exclusivamente en el idioma en que te habla quien llama si es uno de estos: español de España, catalán."
+      "En las llamadas, el saludo ya lo dice el sistema al descolgar (en catalán o, si quien llama ya ha llamado antes, en el idioma en que habló) y es el primer mensaje de la conversación: no lo repitas. Desde tu primera respuesta, contesta y continúa exclusivamente en el idioma en que te habla quien llama si es uno de estos: español de España, catalán."
     );
     expect(prompt).toContain(
       "si es uno de estos: español de España, catalán; también tu primera respuesta"
@@ -695,7 +695,7 @@ describe("buildManagedAgentPrompt — idiomas", () => {
       },
     });
 
-    expect(prompt).toContain("el saludo en inglés ya lo dice el sistema al descolgar");
+    expect(prompt).toContain("el saludo ya lo dice el sistema al descolgar (en inglés o, si quien llama ya ha llamado antes,");
     expect(prompt).toContain("si es uno de estos: español de España, inglés, francés, alemán, italiano, portugués, neerlandés, ruso.");
   });
 
@@ -709,7 +709,7 @@ describe("buildManagedAgentPrompt — idiomas", () => {
       },
     });
 
-    expect(prompt).toContain("el saludo en gallego ya lo dice el sistema al descolgar");
+    expect(prompt).toContain("el saludo ya lo dice el sistema al descolgar (en gallego o, si quien llama ya ha llamado antes,");
     expect(prompt).toContain(
       "si es uno de estos: español de España, inglés, francés, gallego, alemán, italiano, portugués, neerlandés, ruso."
     );
@@ -726,7 +726,7 @@ describe("buildManagedAgentPrompt — idiomas", () => {
     });
 
     expect(prompt).toContain(
-      "En las llamadas, el saludo en catalán ya lo dice el sistema al descolgar y es el primer mensaje de la conversación: no lo repitas. Desde tu primera respuesta, contesta y continúa exclusivamente en el idioma en que te habla quien llama si es uno de estos: español de España, inglés, francés, catalán, alemán, italiano, portugués, neerlandés, ruso."
+      "En las llamadas, el saludo ya lo dice el sistema al descolgar (en catalán o, si quien llama ya ha llamado antes, en el idioma en que habló) y es el primer mensaje de la conversación: no lo repitas. Desde tu primera respuesta, contesta y continúa exclusivamente en el idioma en que te habla quien llama si es uno de estos: español de España, inglés, francés, catalán, alemán, italiano, portugués, neerlandés, ruso."
     );
     expect(prompt).toContain(
       "Si quien llama usa formas valencianas o baleares del catalán, adáptate a ellas."
@@ -743,7 +743,7 @@ describe("buildManagedAgentPrompt — idiomas", () => {
       },
     });
 
-    expect(prompt).toContain("el saludo en alemán ya lo dice el sistema al descolgar");
+    expect(prompt).toContain("el saludo ya lo dice el sistema al descolgar (en alemán o, si quien llama ya ha llamado antes,");
     expect(prompt).toContain("si es uno de estos: español de España, inglés, francés, alemán, italiano, portugués, neerlandés, ruso.");
   });
 });

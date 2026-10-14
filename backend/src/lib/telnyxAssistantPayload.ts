@@ -11,8 +11,8 @@ import type {
 } from "telnyx/resources/ai/assistants/assistants.js";
 import { resolveManagedPromptTimezone } from "./managedAgentPrompt.js";
 import { VARIABLES_DE_LA_LLAMADA_POR_DEFECTO } from "./seccionesDelPrompt.js";
-import type { PerfilDeIdiomas } from "./idiomas/resolver.js";
-import { IDIOMAS } from "./idiomas/catalogo.js";
+import type { CooficialDeLaZona, PerfilDeIdiomas } from "./idiomas/resolver.js";
+import { CODIGOS_DE_IDIOMA, IDIOMAS } from "./idiomas/catalogo.js";
 import { IDIOMA_OBLIGATORIO } from "./idiomas/ajustes.js";
 
 /**
@@ -416,6 +416,14 @@ export function buildInformarAlNegocioTool(): DefinicionDeToolDeWebhook {
         },
         required: ["motivo"],
       },
+      // Para saludarle en su idioma la próxima vez (lib/idiomaDelCliente.ts).
+      idioma_del_cliente: {
+        type: "string",
+        enum: [...CODIGOS_DE_IDIOMA],
+        description: `El idioma en que habló quien llama la mayor parte de la llamada: ${CODIGOS_DE_IDIOMA.map(
+          (codigo) => `${codigo} ${IDIOMAS[codigo].nombreEnPrompt}`
+        ).join(", ")}. Si no llegó a hablar, no lo envíes.`,
+      },
       dudas_sin_respuesta: {
         type: "array",
         items: { type: "string" },
@@ -529,6 +537,24 @@ const AUDIO_DE_FONDO = {
   volume: 0.2,
 } as const;
 
+/**
+ * La voz de la cooficial de la zona (Marta o Sergio) con el idioma de
+ * Soniox: la del nodo «cooficial» del flujo y la de las llamadas de los
+ * clientes que hablan en ella, que empiezan ya con esa voz
+ * (lib/contextoDeLlamada.ts).
+ */
+export function vozDeLaCooficial(
+  cooficial: Pick<CooficialDeLaZona, "voz" | "iso">
+): NonNullable<FlowNodeReq["voice_settings"]> {
+  return {
+    voice: cooficial.voz.id,
+    // El idioma de la voz de Soniox; el SDK no lo declara.
+    language: cooficial.iso,
+    expressive_mode: false,
+    background_audio: AUDIO_DE_FONDO,
+  } as NonNullable<FlowNodeReq["voice_settings"]>;
+}
+
 /** «inglés, francés o alemán». */
 function enumerarConO(palabras: readonly string[]): string {
   return palabras.length < 2
@@ -583,14 +609,8 @@ export function flujoDeLaCooficial(
         instructions_mode: "append",
         tools_mode: "append",
         shared_tool_ids: [],
-        instructions: `## Idioma en este paso\n\nDesde ahora habla en ${lengua} con naturalidad; no repitas el saludo ni el aviso de IA ya dados, pero si es tu primera frase en ${lengua} di brevemente, en ${lengua}, que eres una inteligencia artificial. Si quien llama vuelve a hablarte en castellano, contéstale en castellano. Si habla en ${otros}, llama a la herramienta transition__a_inicial en ese mismo turno, sin decir nada antes, y contéstale después solo en su idioma. Usa transition__a_inicial solo para eso.`,
-        voice_settings: {
-          voice: cooficial.voz.id,
-          // El idioma de la voz de Soniox; el SDK no lo declara.
-          language: cooficial.iso,
-          expressive_mode: false,
-          background_audio: AUDIO_DE_FONDO,
-        } as FlowNodeReq["voice_settings"],
+        instructions: `## Idioma en este paso\n\nDesde ahora habla en ${lengua} con naturalidad; no repitas el saludo ni el aviso de IA ya dados, pero si aún no se ha dicho en ${lengua} que eres una inteligencia artificial (el saludo puede haberlo dicho ya en ${lengua}), dilo brevemente en tu primera frase. Si quien llama vuelve a hablarte en castellano, contéstale en castellano. Si habla en ${otros}, llama a la herramienta transition__a_inicial en ese mismo turno, sin decir nada antes, y contéstale después solo en su idioma. Usa transition__a_inicial solo para eso.`,
+        voice_settings: vozDeLaCooficial(cooficial),
       },
     ],
     edges: [

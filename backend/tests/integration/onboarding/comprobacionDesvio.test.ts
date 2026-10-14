@@ -306,6 +306,8 @@ describe("«Comprobar desvío» de punta a punta (integración)", () => {
         greeting: expect.stringContaining("inteligencia artificial"),
         dynamicVariables: { nombre_cliente: "", ultimo_servicio: "" },
         grabar: false,
+        // Sin idioma guardado: la voz del assistant.
+        voiceSettings: null,
       }
     );
     expect(await prisma.call.count({ where: { businessId } })).toBe(1);

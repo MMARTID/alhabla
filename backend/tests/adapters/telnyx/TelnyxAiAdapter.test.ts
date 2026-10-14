@@ -643,6 +643,47 @@ describe("TelnyxAiAdapter", () => {
       });
     });
 
+    it("con saludo, variables, voz y grabación de esa llamada", async () => {
+      mockAnswer.mockResolvedValue({});
+      const voz = {
+        voice: "Soniox.tts-rt-v2.Marta",
+        language: "ca",
+        expressive_mode: false,
+      };
+
+      await adapter.answerCallWithAssistant("call_ctrl_1", "assistant_123", {
+        greeting: "Hola, Lucía",
+        dynamicVariables: { nombre_cliente: "Lucía" },
+        voiceSettings: voz,
+        grabar: true,
+      });
+
+      expect(mockAnswer).toHaveBeenCalledWith("call_ctrl_1", {
+        assistant: {
+          id: "assistant_123",
+          greeting: "Hola, Lucía",
+          dynamic_variables: { nombre_cliente: "Lucía" },
+          voice_settings: voz,
+        },
+        client_state: undefined,
+        record: "record-from-answer",
+        record_format: "mp3",
+        record_channels: "dual",
+      });
+    });
+
+    it("sin voz propia, la del assistant: no manda voice_settings", async () => {
+      mockAnswer.mockResolvedValue({});
+
+      await adapter.answerCallWithAssistant("call_ctrl_1", "assistant_123", {
+        voiceSettings: null,
+      });
+
+      expect(mockAnswer.mock.calls[0][1].assistant).toEqual({
+        id: "assistant_123",
+      });
+    });
+
     it("cuelga una llamada que no se puede atender", async () => {
       mockHangup.mockResolvedValue({});
 

@@ -145,6 +145,9 @@ function resolverTranscripcion(
  * highlights?»). La otra la dio justo después de get_catalog, cuya
  * respuesta viene en castellano: de ahí la mención de las herramientas.
  *
+ * Desde el 14-10 el saludo a un cliente conocido va en el idioma en que
+ * habló la última vez (lib/contextoDeLlamada.ts): de ahí el paréntesis.
+ *
  * Los nombres de los servicios, por la llamada de producción del 14-10: en
  * catalán, Marta decía «el servei seria Peinado», con el nombre del
  * catálogo tal cual (con mayúscula parece un nombre propio), y sonaba raro.
@@ -168,7 +171,7 @@ export function instruccionesDeIdioma(
     .map((nota) => ` ${nota}`)
     .join("");
   return {
-    instruccion: `En las llamadas, el saludo en ${IDIOMAS[principal].nombreEnPrompt} ya lo dice el sistema al descolgar y es el primer mensaje de la conversación: no lo repitas. Desde tu primera respuesta, contesta y continúa exclusivamente en el idioma en que te habla quien llama si es uno de estos: ${lista}. Si cambia entre esos idiomas, acompaña el cambio sin pedirle que elija uno. Las frases que estas instrucciones ponen entre comillas para decírselas a quien llama están en castellano: dilas traducidas al idioma de la conversación. Los nombres de los servicios del catálogo también suelen estar en castellano y no son nombres propios: en otro idioma, dilos traducidos a ese idioma, no tal cual (salvo los que no tienen traducción, como «balayage»).${notas}`,
+    instruccion: `En las llamadas, el saludo ya lo dice el sistema al descolgar (en ${IDIOMAS[principal].nombreEnPrompt} o, si quien llama ya ha llamado antes, en el idioma en que habló) y es el primer mensaje de la conversación: no lo repitas. Desde tu primera respuesta, contesta y continúa exclusivamente en el idioma en que te habla quien llama si es uno de estos: ${lista}. Si cambia entre esos idiomas, acompaña el cambio sin pedirle que elija uno. Las frases que estas instrucciones ponen entre comillas para decírselas a quien llama están en castellano: dilas traducidas al idioma de la conversación. Los nombres de los servicios del catálogo también suelen estar en castellano y no son nombres propios: en otro idioma, dilos traducidos a ese idioma, no tal cual (salvo los que no tienen traducción, como «balayage»).${notas}`,
     recordatorio: `## Idioma\nContesta cada turno en el idioma en que te habla quien llama si es uno de estos: ${lista}; también tu primera respuesta, lo que digas después de usar una herramienta (aunque te conteste en castellano), los nombres de los servicios, el resumen de la reserva, la pregunta del WhatsApp y la despedida. No cambies de idioma por tu cuenta mientras siga hablando en el suyo.`,
   };
 }

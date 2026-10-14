@@ -535,6 +535,9 @@ export class TelnyxAiAdapter {
       /** Grabar desde que se contesta: solo con el permiso del cliente. MP3
        * a dos canales, como grababa el assistant (issue #280). */
       grabar?: boolean;
+      /** La voz de esta llamada en vez de la del assistant (la cooficial de
+       * la zona para quien habla en ella). */
+      voiceSettings?: VoiceSettingsInput | null;
     } = {}
   ): Promise<void> {
     const client = getTelnyxClient();
@@ -544,6 +547,9 @@ export class TelnyxAiAdapter {
         ...(options.greeting ? { greeting: options.greeting } : {}),
         ...(options.dynamicVariables
           ? { dynamic_variables: options.dynamicVariables }
+          : {}),
+        ...(options.voiceSettings
+          ? { voice_settings: options.voiceSettings }
           : {}),
       },
       client_state: options.clientState,

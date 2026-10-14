@@ -376,6 +376,9 @@ export async function handleCallInitiated(
         name: true,
         agentSettings: true,
         businessType: true,
+        // La zona (lib/idiomas/zona.ts): saludar en la cooficial.
+        address: true,
+        businessDetails: true,
         phone: true,
         telnyxPhoneNumber: true,
         ownerWhatsappNumber: true,
@@ -445,17 +448,34 @@ export async function handleCallInitiated(
       update: {},
     });
 
-    await telnyxAiAdapter.answerCallWithAssistant(
-      call_control_id,
-      agent.telnyxAssistantId,
-      contexto
-        ? {
-            greeting: contexto.saludo,
-            dynamicVariables: contexto.variables,
-            grabar: contexto.grabar,
-          }
-        : {}
-    );
+    const opciones = contexto
+      ? {
+          greeting: contexto.saludo,
+          dynamicVariables: contexto.variables,
+          grabar: contexto.grabar,
+          voiceSettings: contexto.voz,
+        }
+      : {};
+    try {
+      await telnyxAiAdapter.answerCallWithAssistant(
+        call_control_id,
+        agent.telnyxAssistantId,
+        opciones
+      );
+    } catch (error) {
+      if (!contexto?.voz) throw error;
+      // La voz de esta llamada (la cooficial de la zona) es una mejora: si
+      // Telnyx la rechaza, se contesta con la del assistant y su saludo, que
+      // va en el principal, antes que dejar la llamada sin atender.
+      console.error(
+        `[Telnyx] ${callLabel(call_control_id)}: Telnyx rechazó contestar con la voz ${contexto.voz.voice} (negocio ${business.id}); se contesta con la del assistant y su saludo: ${errorMessage(error)}`
+      );
+      await telnyxAiAdapter.answerCallWithAssistant(
+        call_control_id,
+        agent.telnyxAssistantId,
+        { dynamicVariables: contexto.variables, grabar: contexto.grabar }
+      );
+    }
 
     console.log(
       `[Telnyx] ${callLabel(call_control_id)} contestada con el assistant ${agent.telnyxAssistantId}`

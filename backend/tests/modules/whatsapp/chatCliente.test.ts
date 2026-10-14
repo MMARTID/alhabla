@@ -28,6 +28,7 @@ vi.mock("../../../src/lib/prisma.js", () => {
     prisma: {
       business: { findUnique: vi.fn() },
       booking: { findFirst: vi.fn() },
+      clienteDelNegocio: { findUnique: vi.fn() },
       clientConversation: {
         findUnique: vi.fn(),
         update: vi.fn(),
@@ -68,6 +69,7 @@ const mockedConvFindUnique = vi.mocked(prisma.clientConversation.findUnique);
 const mockedConvUpdate = vi.mocked(prisma.clientConversation.update);
 const mockedConvUpsert = vi.mocked(prisma.clientConversation.upsert);
 const mockedCallCreate = vi.mocked(prisma.call.create);
+const mockedClienteFindUnique = vi.mocked(prisma.clienteDelNegocio.findUnique);
 const mockedSentCount = vi.mocked(prisma.sentMessage.count);
 const mockedReclamar = vi.mocked(reclamarEnvio);
 const mockedEnviarTexto = vi.mocked(enviarTexto);
@@ -417,6 +419,54 @@ describe("conversarConRecepcionista", () => {
 
     expect(cuerpoEnviado()).toBe(
       "Peluquería Ana, te atiende su asistente de inteligencia artificial.\nMañana a las cinco tengo hueco. ¿Te lo reservo?"
+    );
+  });
+
+  it("el aviso va en el idioma en que habló la última vez", async () => {
+    mockedConvFindUnique.mockResolvedValueOnce(null);
+    mockedClienteFindUnique.mockResolvedValueOnce({ idioma: "en-GB" } as any);
+    const message = entrante();
+
+    await conversarConRecepcionista({
+      message,
+      businessId: "biz_1",
+      texto: message.text!,
+    });
+
+    expect(cuerpoEnviado()).toBe(
+      "Peluquería Ana, you're speaking with an artificial intelligence assistant.\nMañana a las cinco tengo hueco. ¿Te lo reservo?"
+    );
+    expect(mockedClienteFindUnique).toHaveBeenCalledWith({
+      where: {
+        businessId_telefono: { businessId: "biz_1", telefono: MOVIL },
+      },
+      select: { idioma: true },
+    });
+  });
+
+  it("en catalán solo si el negocio está en su zona", async () => {
+    mockedConvFindUnique.mockResolvedValue(null);
+    mockedClienteFindUnique.mockResolvedValue({ idioma: "ca-ES" } as any);
+    const message = entrante();
+
+    await conversarConRecepcionista({
+      message,
+      businessId: "biz_1",
+      texto: message.text!,
+    });
+    expect(cuerpoEnviado()).toMatch(/^Peluquería Ana, te atiende su asistente/);
+
+    mockedBizFindUnique.mockResolvedValue({
+      ...NEGOCIO,
+      address: "Carrer de Mallorca 1, 08001 Barcelona, Spain",
+    } as any);
+    await conversarConRecepcionista({
+      message: entrante({ id: "in_2" }),
+      businessId: "biz_1",
+      texto: message.text!,
+    });
+    expect(cuerpoEnviado(1)).toBe(
+      "Peluquería Ana, t'atén una intel·ligència artificial.\nMañana a las cinco tengo hueco. ¿Te lo reservo?"
     );
   });
 

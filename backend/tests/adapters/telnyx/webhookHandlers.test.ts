@@ -129,6 +129,7 @@ const mockedResolverContexto = vi.mocked(resolverContextoDeLlamada);
 const CONTEXTO = {
   saludo: "Negocio, te atiende su asistente de inteligencia artificial. ¿En qué te ayudo?",
   grabar: false,
+  voz: null,
   variables: {
     nombre_cliente: "",
     ultimo_servicio: "",
@@ -138,6 +139,7 @@ const CONTESTAR_CON_CONTEXTO = {
   greeting: CONTEXTO.saludo,
   dynamicVariables: CONTEXTO.variables,
   grabar: false,
+  voiceSettings: null,
 };
 const mockedEnqueueUsageReportJob = vi.mocked(enqueueUsageReportJob);
 const mockedComprobacionReciente = vi.mocked(comprobacionDeDesvioReciente);
@@ -298,6 +300,7 @@ describe("handleCallInitiated", () => {
     const conocido = {
       saludo: "Hola, Lucía, soy la asistente de inteligencia artificial de Peluquería Ana. La llamada se graba; si prefieres que no, dímelo. ¿Quieres repetir Corte o prefieres algo nuevo?",
       grabar: true,
+      voz: null,
       variables: {
         nombre_cliente: "Lucía",
         ultimo_servicio: "Corte",
@@ -307,6 +310,15 @@ describe("handleCallInitiated", () => {
 
     await handleCallInitiated(basePayload);
 
+    // La dirección decide la cooficial de la zona (saludo y voz).
+    expect(mockedBusinessFindUnique).toHaveBeenCalledWith(
+      expect.objectContaining({
+        select: expect.objectContaining({
+          address: true,
+          businessDetails: true,
+        }),
+      })
+    );
     expect(mockedResolverContexto).toHaveBeenCalledWith({
       business: negocio,
       telefono: "+34600000000",
@@ -323,8 +335,72 @@ describe("handleCallInitiated", () => {
         greeting: conocido.saludo,
         dynamicVariables: conocido.variables,
         grabar: true,
+        voiceSettings: null,
       }
     );
+  });
+
+  it("a quien habló en la cooficial de la zona le contesta ya con su voz", async () => {
+    mockedBusinessFindUnique.mockResolvedValue({
+      id: "biz1",
+      name: "Peluquería Ana",
+      agentSettings: {},
+      businessType: "peluqueria",
+      callsSuspendedAt: null,
+      paymentFailureSuspensionAt: null,
+      agents: [{ id: "agent1", telnyxAssistantId: "assistant_1" }],
+    } as any);
+    mockedCallUpsert.mockResolvedValue({} as any);
+    const voz = {
+      voice: "Soniox.tts-rt-v2.Marta",
+      language: "ca",
+      expressive_mode: false,
+    };
+    mockedResolverContexto.mockResolvedValue({
+      ...CONTEXTO,
+      saludo: "Peluquería Ana, t'atén una intel·ligència artificial. En què et puc ajudar?",
+      voz: voz as any,
+    });
+
+    await handleCallInitiated(basePayload);
+
+    expect(mockedAnswerCallWithAssistant).toHaveBeenCalledWith(
+      "call_ctrl_1",
+      "assistant_1",
+      expect.objectContaining({ voiceSettings: voz })
+    );
+  });
+
+  it("si Telnyx rechaza la voz de la llamada, contesta con la del assistant y su saludo", async () => {
+    mockedBusinessFindUnique.mockResolvedValue({
+      id: "biz1",
+      callsSuspendedAt: null,
+      paymentFailureSuspensionAt: null,
+      agents: [{ id: "agent1", telnyxAssistantId: "assistant_1" }],
+    } as any);
+    mockedCallUpsert.mockResolvedValue({} as any);
+    mockedResolverContexto.mockResolvedValue({
+      ...CONTEXTO,
+      grabar: true,
+      voz: { voice: "Soniox.tts-rt-v2.Marta", language: "ca" } as any,
+    });
+    mockedAnswerCallWithAssistant
+      .mockRejectedValueOnce(new Error("422 voice_settings"))
+      .mockResolvedValueOnce(undefined);
+    const errorLog = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const result = await handleCallInitiated(basePayload);
+
+    expect(result).toEqual({ success: true });
+    expect(mockedAnswerCallWithAssistant).toHaveBeenLastCalledWith(
+      "call_ctrl_1",
+      "assistant_1",
+      { dynamicVariables: CONTEXTO.variables, grabar: true }
+    );
+    expect(errorLog).toHaveBeenCalledWith(
+      expect.stringMatching(/rechazó contestar con la voz Soniox\.tts-rt-v2\.Marta \(negocio biz1\).*422/)
+    );
+    errorLog.mockRestore();
   });
 
   it("si no se puede saber quién llama, contesta con el saludo del assistant y sin grabar", async () => {
