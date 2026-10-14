@@ -2,11 +2,19 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import jwt from "jsonwebtoken";
 import { z } from "zod";
-import { cargarEnv, exigirUrlLocal, urlDeBdDeDev, variable } from "./entorno.js";
-import { firmarComoRetell, firmarComoTelnyx } from "./firmas.js";
-import { llamadaSimulada } from "./llamadasSimuladas.js";
+import { cargarEnv, urlDeBdDeDev, variable } from "./entorno.js";
+import {
+  borrarLlamadasSimuladas,
+  crearLlamadaSimulada,
+} from "./llamadasSimuladas.js";
 import { pararProxy, urlDeBdDeProd } from "./prod.js";
 import { ejecutarSoloLectura } from "./sqlDeSoloLectura.js";
+import {
+  BASE_RETELL_DEV,
+  BASE_TELNYX_SIMULACION,
+  enviarWebhookRetell,
+  enviarWebhookTelnyx,
+} from "./webhooks.js";
 
 /**
  * MCP de desarrollo de Alhabla (stdio, lo arranca Claude Code desde
@@ -15,15 +23,13 @@ import { ejecutarSoloLectura } from "./sqlDeSoloLectura.js";
  * - consultar_bd_dev / consultar_bd_prod: SQL de solo lectura.
  * - generar_jwt_dev: sesión de un usuario de dev para probar rutas con curl.
  * - simular_webhook_telnyx / simular_webhook_retell: peticiones firmadas
- *   como las del proveedor contra el backend local.
+ *   como las del proveedor contra el backend local (webhooks.ts).
+ * - borrar_llamadas_simuladas: limpia las llamadas que crean las anteriores.
  *
  * stdout es el canal del protocolo: todo log va a stderr.
  */
 
 const servidor = new McpServer({ name: "alhabla-dev", version: "1.0.0" });
-
-const BASE_TELNYX_SIMULACION = "http://localhost:3010";
-const BASE_RETELL_DEV = "http://localhost:3000";
 
 function respuesta(datos: unknown) {
   return {
@@ -155,28 +161,12 @@ servidor.registerTool(
     })
 );
 
-async function enviar(url: URL, cuerpo: string, cabeceras: Record<string, string>) {
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "content-type": "application/json", ...cabeceras },
-    body: cuerpo,
-  });
-  const texto = await res.text();
-  let cuerpoDeRespuesta: unknown = texto;
-  try {
-    cuerpoDeRespuesta = JSON.parse(texto);
-  } catch {
-    // No es JSON: se devuelve el texto tal cual.
-  }
-  return { status: res.status, respuesta: cuerpoDeRespuesta };
-}
-
 servidor.registerTool(
   "simular_webhook_telnyx",
   {
     title: "Simular un webhook firmado de Telnyx",
     description:
-      "POST firmado con Ed25519 (clave de simulación local) a una ruta /webhooks/telnyx… del backend de simulación (localhost:3010, servicio backend-sim de docker-compose, perfil sim). Para una tool de voz (ruta /webhooks/telnyx/tools/<tool>, cuerpo = argumentos de la tool) pasa businessId: crea o reutiliza una llamada simulada de ese negocio en la BD de dev y pone la cabecera x-alhabla-call-control-id. OJO: la tool se ejecuta de verdad (reserva en el calendario real del negocio, avisos por WhatsApp…).",
+      "POST firmado con Ed25519 (clave de simulación local) a una ruta /webhooks/telnyx… del backend de simulación (localhost:3010; se levanta con scripts/backend-sim.sh). Para una tool de voz (ruta /webhooks/telnyx/tools/<tool>, cuerpo = argumentos de la tool) pasa businessId: crea una llamada simulada NUEVA de ese negocio y pone la cabecera x-alhabla-call-control-id. Para seguir la misma conversación (check_availability y luego book_appointment) pasa en callControlId la `llamada` que devolvió la primera: una cita por llamada. La tool se ejecuta de verdad (la cita va al calendario real del negocio), pero backend-sim NO manda WhatsApp, SMS ni correos (ENVIOS_SIMULADOS): solo los registra en su log. Al acabar, borrar_llamadas_simuladas.",
     inputSchema: {
       ruta: z
         .string()
@@ -190,37 +180,25 @@ servidor.registerTool(
       callControlId: z
         .string()
         .optional()
-        .describe("Usa esta llamada en vez de crear una simulada"),
+        .describe("Sigue esta llamada en vez de crear una simulada"),
       cabeceras: z.record(z.string()).optional(),
       baseUrl: z.string().optional().describe(`Por defecto ${BASE_TELNYX_SIMULACION}`),
     },
   },
   ({ ruta, cuerpo, businessId, telefonoCliente, callControlId, cabeceras, baseUrl }) =>
     conErrores(async () => {
-      if (!/^\/webhooks\/telnyx(\/|$)/.test(ruta)) {
-        throw new Error("[MCP] La ruta tiene que empezar por /webhooks/telnyx");
-      }
       const env = cargarEnv();
-      const url = new URL(ruta, exigirUrlLocal(baseUrl ?? BASE_TELNYX_SIMULACION));
-
-      let llamada: { callId: string; creada: boolean } | undefined;
-      if (!callControlId && businessId) {
-        llamada = await llamadaSimulada(urlDeBdDeDev(env), businessId, telefonoCliente);
-      }
-      const idDeLlamada = callControlId ?? llamada?.callId;
-
-      const texto = JSON.stringify(cuerpo);
-      const { firma, marcaDeTiempo } = firmarComoTelnyx(
-        texto,
-        variable(env, "TELNYX_PRIVATE_KEY_SIMULACION")
-      );
-      const resultado = await enviar(url, texto, {
-        ...(idDeLlamada ? { "x-alhabla-call-control-id": idDeLlamada } : {}),
-        ...cabeceras,
-        "telnyx-signature-ed25519": firma,
-        "telnyx-timestamp": marcaDeTiempo,
+      return enviarWebhookTelnyx({
+        ruta,
+        cuerpo,
+        baseUrl,
+        cabeceras,
+        callControlId,
+        clavePrivada: variable(env, "TELNYX_PRIVATE_KEY_SIMULACION"),
+        crearLlamada: businessId
+          ? () => crearLlamadaSimulada(urlDeBdDeDev(env), businessId, telefonoCliente)
+          : undefined,
       });
-      return { url: url.toString(), llamada: idDeLlamada ?? null, llamadaCreada: llamada?.creada ?? false, ...resultado };
     })
 );
 
@@ -229,7 +207,7 @@ servidor.registerTool(
   {
     title: "Simular un webhook firmado de Retell",
     description:
-      "POST firmado como Retell (x-retell-signature con la RETELL_API_KEY de dev) a una ruta /webhooks/retell… del backend de dev (localhost:3000). Para tools: /webhooks/retell/tools/<retellAgentId>/<tool> con { call: { call_id }, args }.",
+      "POST firmado como Retell (x-retell-signature con la RETELL_API_KEY de dev) a una ruta /webhooks/retell… del backend de dev (localhost:3000). Para tools: /webhooks/retell/tools/<retellAgentId>/<tool> con { call: { call_id }, args }. Ojo: el backend de dev SÍ manda los WhatsApp, SMS y correos.",
     inputSchema: {
       ruta: z.string().describe("Ej.: /webhooks/retell/inbound"),
       cuerpo: z.record(z.unknown()),
@@ -237,16 +215,27 @@ servidor.registerTool(
     },
   },
   ({ ruta, cuerpo, baseUrl }) =>
-    conErrores(async () => {
-      if (!/^\/webhooks\/retell(\/|$)/.test(ruta)) {
-        throw new Error("[MCP] La ruta tiene que empezar por /webhooks/retell");
-      }
-      const env = cargarEnv();
-      const url = new URL(ruta, exigirUrlLocal(baseUrl ?? BASE_RETELL_DEV));
-      const texto = JSON.stringify(cuerpo);
-      const firma = await firmarComoRetell(texto, variable(env, "RETELL_API_KEY"));
-      return { url: url.toString(), ...(await enviar(url, texto, { "x-retell-signature": firma })) };
-    })
+    conErrores(async () =>
+      enviarWebhookRetell({
+        ruta,
+        cuerpo,
+        baseUrl,
+        apiKey: variable(cargarEnv(), "RETELL_API_KEY"),
+      })
+    )
+);
+
+servidor.registerTool(
+  "borrar_llamadas_simuladas",
+  {
+    title: "Borrar las llamadas simuladas",
+    description:
+      "Borra de la BD de dev las llamadas que creó simular_webhook_telnyx (callId sim-mcp-…), de un negocio o de todos, para que no salgan en el historial del panel. Conserva las que tienen una cita viva en el calendario (borrarla dejaría el evento huérfano) y las devuelve: cancélalas antes y vuelve a llamar.",
+    inputSchema: { businessId: z.string().optional() },
+    annotations: { destructiveHint: true },
+  },
+  ({ businessId }) =>
+    conErrores(() => borrarLlamadasSimuladas(urlDeBdDeDev(cargarEnv()), businessId))
 );
 
 process.on("exit", pararProxy);

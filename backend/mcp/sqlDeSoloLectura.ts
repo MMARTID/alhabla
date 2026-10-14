@@ -1,4 +1,4 @@
-import pg from "pg";
+import pg from "./pg.js";
 
 export type ResultadoDeConsulta = {
   columnas: string[];

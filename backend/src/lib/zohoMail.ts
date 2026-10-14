@@ -6,6 +6,7 @@ import {
   PermanentJobError,
   esFalloPermanentePorEstado,
 } from "./jobErrors.js";
+import { enviosSimulados, registrarEnvioSimulado } from "./enviosSimulados.js";
 
 const ZOHO_TIMEOUT_MS = 10_000;
 const ZOHO_ACCOUNTS_BASE_URL = "https://accounts.zoho.eu";
@@ -80,6 +81,15 @@ export async function sendZohoMail(input: {
   subject: string;
   html: string;
 }): Promise<void> {
+  if (enviosSimulados()) {
+    registrarEnvioSimulado(
+      "Correo",
+      input.toAddress,
+      `remitente=${input.fromAddress} asunto="${input.subject}"`
+    );
+    return;
+  }
+
   // Antes de pedir siquiera el token: si estamos fuera de producción y el
   // destinatario no está permitido, no se manda. No lanza —para el job es un
   // envío resuelto y no tiene sentido reintentarlo— pero deja un log

@@ -87,6 +87,14 @@ describe("ejecutarSoloLectura", () => {
     ).rejects.toThrow(/statement timeout/);
   });
 
+  it("lee los timestamp sin zona (los de Prisma) como UTC, no como hora local", async () => {
+    const { filas } = await ejecutarSoloLectura(
+      url,
+      "SELECT timestamp '2026-10-20 09:00:00' AS programado"
+    );
+    expect(filas[0]!.programado).toBe("2026-10-20T09:00:00.000Z");
+  });
+
   it("serializa fechas y textos largos", async () => {
     const { filas } = await ejecutarSoloLectura(
       url,

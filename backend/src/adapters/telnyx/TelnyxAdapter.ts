@@ -1,4 +1,8 @@
 import { getTelnyxClient } from "../../lib/telnyx.js";
+import {
+  enviosSimulados,
+  registrarEnvioSimulado,
+} from "../../lib/enviosSimulados.js";
 
 export interface AvailableNumber {
   phoneNumber: string;
@@ -195,6 +199,10 @@ export class TelnyxAdapter {
     text: string;
     messagingProfileId?: string;
   }): Promise<void> {
+    if (enviosSimulados()) {
+      registrarEnvioSimulado("SMS", input.to, `desde=${input.from} texto="${input.text}"`);
+      return;
+    }
     const client = getTelnyxClient();
     await client.messages.send({
       from: input.from,
