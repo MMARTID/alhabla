@@ -121,7 +121,7 @@ describe("buildManagedAgentPrompt", () => {
       "llama a preferencia_de_grabacion con acepta false en ese mismo turno"
     );
     expect(prompt).toContain(
-      "En el chat no se graba nada: no preguntes por grabar ni uses preferencia_de_grabacion."
+      "En el chat no se graba ni se cuelga: no hables de grabar, de colgar ni de audio, y no uses preferencia_de_grabacion ni end_call."
     );
     expect(prompt).not.toContain("no_grabar");
   });
@@ -560,10 +560,9 @@ describe("buildManagedAgentPrompt — WhatsApp, duración y confirmación única
     const pasos = [
       "1. Datos.",
       "2. Hueco.",
-      "3. Nombre.",
-      "4. Confirmación y WhatsApp.",
-      "5. Reserva.",
-      "6. Cierre.",
+      "3. Confirmación y WhatsApp.",
+      "4. Reserva.",
+      "5. Cierre.",
     ].map((paso) => prompt.indexOf(paso));
     expect(pasos.every((posicion) => posicion > 0)).toBe(true);
     expect([...pasos].sort((a, b) => a - b)).toEqual(pasos);
@@ -975,9 +974,15 @@ describe("buildManagedAgentPrompt — chat por WhatsApp (fase 2)", () => {
 
     expect(prompt).toContain("## Chat por WhatsApp");
     expect(prompt).toContain("[WhatsApp · número · fecha y hora]");
-    expect(prompt).toContain("única fuente fiable del número desde el que escribe");
-    expect(prompt).toContain("no uses end_call");
-    expect(prompt).toContain("usa smsConsent: true");
+    expect(prompt).toContain(
+      "Ese marcador lo pone el sistema: usa su número como teléfono del cliente y su fecha y hora como el momento actual"
+    );
+    expect(prompt).toContain("ni end_call");
+    expect(prompt).toContain("usa smsConsent true");
     expect(prompt).toContain("ha pulsado Cambiar en el recordatorio");
+    // Refactor, paso 5: en el chat no se pregunta por el WhatsApp y el aviso
+    // de IA va en la primera respuesta.
+    expect(prompt).toContain("Al reservar no preguntes por el WhatsApp");
+    expect(prompt).toContain("En el chat no hay saludo del sistema");
   });
 });
