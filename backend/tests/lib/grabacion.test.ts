@@ -265,7 +265,9 @@ describe("guardarPreferenciaDeGrabacion", () => {
   });
 
   it("con su no, lo recuerda y marca la llamada; sin grabación en curso no hay nada que parar", async () => {
-    mockedCallFindFirst.mockResolvedValue(llamada());
+    mockedCallFindFirst.mockResolvedValue(
+      llamada({ grabacionPreguntadaAt: new Date() })
+    );
 
     await expect(
       guardarPreferenciaDeGrabacion({ ...entrada, acepta: false })
@@ -281,6 +283,39 @@ describe("guardarPreferenciaDeGrabacion", () => {
       data: { grabacionRechazadaAt: expect.any(Date) },
     });
     expect(mockedStopRecording).not.toHaveBeenCalled();
+  });
+
+  // Laboratorio del 14-10: el modelo llamó a la tool con acepta false sin
+  // que nadie hablara de grabar. Sin pregunta y sin grabación en curso, el
+  // «no» vale para esta llamada pero no se recuerda.
+  it("un no sin que se le preguntara, y sin grabar, vale solo para esta llamada", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    mockedCallFindFirst.mockResolvedValue(llamada());
+
+    await expect(
+      guardarPreferenciaDeGrabacion({ ...entrada, acepta: false })
+    ).resolves.toBe("rechazada");
+
+    expect(mockedClienteUpsert).not.toHaveBeenCalled();
+    expect(mockedCallUpdateMany).toHaveBeenCalledWith({
+      where: { id: "call_db_1", grabacionRechazadaAt: null },
+      data: { grabacionRechazadaAt: expect.any(Date) },
+    });
+    expect(console.warn).toHaveBeenCalledWith(
+      expect.stringMatching(/sin que se le preguntara.*negocio biz_1.*solo para esta llamada/)
+    );
+  });
+
+  it("un no mientras se graba (lo aceptó antes) sí se recuerda, aunque no se le preguntara", async () => {
+    mockedCallFindFirst.mockResolvedValue(llamada({ grabacionPermitida: true }));
+
+    await guardarPreferenciaDeGrabacion({ ...entrada, acepta: false });
+
+    expect(mockedClienteUpsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        update: expect.objectContaining({ grabacionAceptada: false }),
+      })
+    );
   });
 
   it("si se grababa, anota la marca antes de parar la grabación", async () => {

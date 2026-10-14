@@ -157,6 +157,13 @@ export type ResultadoDeLaPreferencia = "aceptada" | "rechazada" | "sin_llamada";
  * Lo que contestó quien llama a «¿te parece bien que grabe tus llamadas?» (o que
  * pidió después que no se grabe). Se recuerda para sus próximas llamadas si
  * llama con su número; con número oculto solo vale para esta.
+ *
+ * Un «no» que no contesta a la pregunta, en una llamada que no se está
+ * grabando, vale solo para esta llamada: en el laboratorio del 14-10 el
+ * modelo llamó a la tool con acepta false 3 veces en 60 conversaciones sin
+ * que nadie hablara de grabar, y eso dejaba al cliente sin grabar para
+ * siempre y sin que se le volviera a preguntar. Si de verdad no quiere, lo
+ * dirá cuando se le pregunte en otra llamada.
  */
 export async function guardarPreferenciaDeGrabacion(input: {
   /** `Call.callId`: el call_control_id de Telnyx o el call_id de Retell. */
@@ -174,6 +181,7 @@ export async function guardarPreferenciaDeGrabacion(input: {
       voiceProvider: true,
       grabacionPermitida: true,
       grabacionRechazadaAt: true,
+      grabacionPreguntadaAt: true,
       business: {
         select: { phone: true, telnyxPhoneNumber: true, ownerWhatsappNumber: true },
       },
@@ -187,7 +195,15 @@ export async function guardarPreferenciaDeGrabacion(input: {
   }
 
   const telefono = telefonoDelCliente(call.fromNumber, call.business);
-  if (telefono) {
+  const noSinPregunta =
+    !input.acepta &&
+    !call.grabacionPreguntadaAt &&
+    call.grabacionPermitida !== true;
+  if (noSinPregunta) {
+    console.warn(
+      `[Grabación] ${input.etiqueta}: «no» a grabar sin que se le preguntara y sin grabación en curso (negocio ${input.businessId}); vale solo para esta llamada`
+    );
+  } else if (telefono) {
     const decision = {
       grabacionAceptada: input.acepta,
       grabacionDecididaAt: new Date(),
