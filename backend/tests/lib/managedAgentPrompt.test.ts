@@ -176,7 +176,9 @@ describe("buildManagedAgentPrompt", () => {
     });
 
     expect(prompt).toContain("sin volver a llamarla en la misma conversación");
-    expect(prompt).toContain("No repitas check_availability");
+    expect(prompt).toContain(
+      "No repitas la comprobación mientras no cambien servicio, día, hora o profesional."
+    );
     expect(prompt).toContain("suggestedNextSlot");
     expect(prompt).toContain("availabilityToken");
   });
@@ -519,7 +521,7 @@ describe("buildManagedAgentPrompt — WhatsApp, duración y confirmación única
     });
 
     expect(prompt).toContain(
-      "¿puedo enviarte la confirmación y un recordatorio por WhatsApp a este número?"
+      "pregunta si lo reservas y le envías la confirmación y un recordatorio por WhatsApp a este número"
     );
     expect(prompt).not.toContain("por SMS a este número");
   });
@@ -530,8 +532,10 @@ describe("buildManagedAgentPrompt — WhatsApp, duración y confirmación única
       settings: DEFAULT_AGENT_SETTINGS,
     });
 
-    expect(prompt).toContain("no le preguntes qué duración quiere");
-    expect(prompt).toContain("supera los 80 minutos");
+    expect(prompt).toContain(
+      "La duración es un dato interno de get_catalog: no la preguntes"
+    );
+    expect(prompt).toContain("pasa de 80 minutos");
   });
 
   it("instruye a no pedir confirmaciones sueltas de datos individuales", () => {
@@ -541,8 +545,33 @@ describe("buildManagedAgentPrompt — WhatsApp, duración y confirmación única
     });
 
     expect(prompt).toContain(
-      "No pidas confirmaciones sueltas de datos individuales"
+      "Mientras recoges datos no pidas confirmaciones sueltas"
     );
+  });
+
+  // Refactor, paso 3 (14-10): la reserva en pasos, con el resumen y el
+  // WhatsApp en un solo turno, la única confirmación. Medido por chat.
+  it("la reserva va en pasos, en orden, y aceptar una hora no es confirmarla", () => {
+    const prompt = buildManagedAgentPrompt({
+      businessName: "Barbería Ejemplo",
+      settings: DEFAULT_AGENT_SETTINGS,
+    });
+
+    const pasos = [
+      "1. Datos.",
+      "2. Hueco.",
+      "3. Nombre.",
+      "4. Confirmación y WhatsApp.",
+      "5. Reserva.",
+      "6. Cierre.",
+    ].map((paso) => prompt.indexOf(paso));
+    expect(pasos.every((posicion) => posicion > 0)).toBe(true);
+    expect([...pasos].sort((a, b) => a - b)).toEqual(pasos);
+    expect(prompt).toContain(
+      "aceptar una hora o una alternativa no lo es"
+    );
+    // Cada regla del flujo, una sola vez.
+    expect(prompt.match(/availabilityToken de la opción aceptada/g)).toHaveLength(1);
   });
 });
 
