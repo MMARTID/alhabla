@@ -540,7 +540,7 @@ function enumerarConO(palabras: readonly string[]): string {
  * La cooficial de la zona (lib/idiomas/zona.ts) en un solo assistant: la
  * transcripción (Soniox con su pista) la entiende desde el principio y un
  * nodo solo cambia la voz a la que la habla (Marta o Sergio). Es la
- * variante S del laboratorio con llamadas reales del 2026-10-15: catalán
+ * variante S del laboratorio con llamadas reales del 2026-10-14: catalán
  * perfecto y los mensajes del cliente guardados, con un segundo más de
  * espera en los turnos con consulta. Cambiar de transcripción en un nodo
  * (flux → Soniox) hacía que Telnyx dejara de guardar los mensajes del

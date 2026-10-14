@@ -299,7 +299,7 @@ describe("createTelnyxAssistantForAgent", () => {
   });
 
   // La cooficial de donde está el negocio (lib/idiomas/zona.ts, decisión
-  // del 2026-10-15): con el código postal de Cardedeu, Soniox entiende el
+  // del 2026-10-14): con el código postal de Cardedeu, Soniox entiende el
   // catalán desde el principio, atiende la voz Ultra del principal y un nodo
   // cambia a Marta.
   it("en Cataluña y saludando en español: Soniox con catalán, la voz Ultra, el nodo de Marta y el catalán en el prompt", async () => {

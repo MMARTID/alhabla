@@ -132,7 +132,7 @@ describe("payloads de asistentes (instantáneas)", () => {
     });
   }
 
-  // La cooficial de la zona (lib/idiomas/zona.ts, 2026-10-15): Soniox desde
+  // La cooficial de la zona (lib/idiomas/zona.ts, 2026-10-14): Soniox desde
   // el principio con la voz Ultra del principal y un nodo que cambia a
   // Marta.
   it("assistant de la recepcionista que saluda en español en Cataluña", () => {

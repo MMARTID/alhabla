@@ -97,7 +97,7 @@ export interface PerfilDeIdiomas {
  * duplicó (9,5 % frente a 4,7 %, tandas A3 y A4 del laboratorio,
  * 2026-10-05) sin contestar antes, y arrastraba palabras a otros idiomas
  * («metxes» → «metges», «tints» → «teen»). Con [es, ca] entendió bien el
- * inglés en las llamadas del 15-10 (variante S).
+ * inglés en las llamadas del 14-10 (variante S).
  */
 function resolverTranscripcion(
   idiomas: readonly CodigoDeIdioma[],

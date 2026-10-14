@@ -1651,7 +1651,7 @@ is now a **Cloud Scheduler** job hitting the same kind of endpoint every
        - En fisioterapia, estética y «otro», el saludo no nombra el servicio anterior.
      - **Grabación con permiso.** El assistant no graba por su cuenta (`recording_settings.enabled: false`).
        - Si el cliente ya aceptó, se graba desde que se contesta (`record: "record-from-answer"`, MP3 dual) y el saludo lo avisa.
-       - Si no se le ha preguntado, la recepcionista se lo pregunta mientras comprueba el primer servicio. Cuándo lo decide el backend, no el modelo (con la regla en el prompt volvía a preguntar a quien ya lo había aceptado): `tocaPreguntarPorGrabar` (`lib/grabacion.ts`) añade `pregunta_de_grabacion` a la primera respuesta limpia (sin `code`) de `get_catalog` o `check_availability` de la llamada y lo anota en `Call.grabacionPreguntadaAt`, una sola vez. Con su sí, la tool `preferencia_de_grabacion` guarda el permiso y hace `record_start`.
+       - Si no se le ha preguntado, la recepcionista se lo pregunta mientras comprueba la disponibilidad de lo que le piden. Cuándo lo decide el backend, no el modelo (con la regla en el prompt volvía a preguntar a quien ya lo había aceptado): `tocaPreguntarPorGrabar` (`lib/grabacion.ts`) añade `pregunta_de_grabacion` a la primera respuesta limpia (sin `code`) de `check_availability` de la llamada (no de `get_catalog`, que también se consulta para el horario o antes de pasar la llamada) y lo anota en `Call.grabacionPreguntadaAt`, una sola vez. Con su sí, la tool `preferencia_de_grabacion` guarda el permiso y hace `record_start`.
        - La supresión de ruido se pide en `call.answered`, no tras el `answer`: ahí Telnyx la rechazaba siempre con 90034.
        - Si dice que no, en cualquier momento, se marca `Call.grabacionRechazadaAt` y se hace `record_stop`. Entonces `handleCallRecordingSaved` no crea `Recording` y borra el audio en Telnyx, y este job retira la fila si ya estaba en cola.
        - `Call.grabacionPermitida` dice si se grababa al contestar, y el panel explica por qué no hay audio.
@@ -2581,13 +2581,16 @@ listas de idiomas ni decide por su cuenta:
       instrucción nueva, 13 de 13 primeras respuestas en el idioma del cliente y ningún saludo
       repetido: inglés, francés, alemán, italiano, portugués, castellano y catalán, con principal
       español y catalán.
-  - **La cooficial de la zona** (`zona.ts`, decisión del usuario del 15-10): un negocio que
+  - **La cooficial de la zona** (`zona.ts`, decisión del usuario del 14-10): un negocio que
     saluda en una lengua Ultra y está donde una lengua es cooficial también la habla.
     `cooficialDeLaZona` la saca de la provincia del código postal de `Business.address` y, si no
     lo lleva, del de `businessDetails` (la bienvenida lo rellena con la dirección de Places).
-    Provincias: catalán 08, 17, 25, 43, 07, 03, 12 y 46 (toda la Comunitat Valenciana, también sus
-    comarcas castellanohablantes); euskera 01, 20 y 48 (Navarra no); gallego 15, 27, 32 y 36. Los
-    números de Telnyx se compran todos en Barcelona: su prefijo no sirve.
+    Provincias: catalán 08, 17, 25, 43 y 07; euskera 01, 20 y 48; gallego 15, 27, 32 y 36. Ni la
+    Comunitat Valenciana (buena parte habla castellano, como Torrevieja) ni Navarra, por decisión
+    del usuario del 14-10. Solo cuenta un código de cinco cifras seguido del nombre del lugar
+    («08440 Cardedeu») en una línea que no nombra otro país: la bienvenida ofrece otros países y sus
+    códigos se confundirían (20123 Milano, 32801 Orlando). Los números de Telnyx se compran todos en
+    Barcelona: su prefijo no sirve.
     - Con zona (`AjustesDeIdioma.zona`), `resolverIdiomas` suma la cooficial a los idiomas (ocho,
       también en el prompt), pasa la transcripción a Soniox con las pistas del español, el
       principal y la cooficial, deja la voz Ultra del principal y da `cooficialDeLaZona`: Marta o
@@ -2597,7 +2600,7 @@ listas de idiomas ni decide por su cuenta:
       Las aristas son `llm` (en voz, tools `transition__a_cooficial` y `transition__a_inicial`; en
       el chat no hay y contesta directamente). Sin zona, `conversationFlow: null`, que borra un
       flujo anterior al actualizar (al crear no se manda).
-    - Es la variante S del laboratorio con llamadas reales del 15-10: catalán perfecto y los
+    - Es la variante S del laboratorio con llamadas reales del 14-10: catalán perfecto y los
       mensajes del cliente guardados, con un segundo más de espera en los turnos con consulta
       (3,7–3,9 s frente a 2,2–2,6). Descartadas: flux con un nodo que cambia a Soniox (Telnyx deja
       de guardar los mensajes del cliente y flux solo detectó el catalán una vez) y dos assistants

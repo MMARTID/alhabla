@@ -368,12 +368,13 @@ export function vistaPreviaDeIdiomas(
   const deLaZona = perfil.cooficialDeLaZona;
   if (deLaZona) {
     // La cooficial de donde está el negocio (lib/idiomas/zona.ts): Soniox
-    // desde el principio y un nodo que cambia la voz. Medido con llamadas
-    // reales el 2026-10-15 (variante S): unos 3,8 s en los turnos con
-    // consulta frente a 2,4 con flux.
+    // desde el principio y un nodo que cambia la voz. Más espera en todas
+    // las respuestas, también en castellano: 1,4–2 s frente a 0,9 con flux
+    // (2026-10-03) y 3,7–3,9 s frente a 2,2–2,6 en los turnos con consulta
+    // (variante S, 2026-10-14).
     const lengua = enMinusculas(deLaZona.idioma);
     avisos.push(
-      `Como el negocio está donde el ${lengua} es lengua oficial, también lo entiende y, si le hablan en ${lengua}, contesta en ${lengua} con la voz de ${deLaZona.voz.nombre}. A cambio tarda algo más en contestar: alrededor de un segundo más cuando consulta la agenda.`
+      `Como el negocio está donde el ${lengua} es lengua oficial, también lo entiende y, si le hablan en ${lengua}, contesta en ${lengua} con la voz de ${deLaZona.voz.nombre}. A cambio tarda algo más en contestar, también cuando le hablan en ${enMinusculas(oferta.obligatorio)}: entre medio segundo y un segundo y medio más por respuesta.`
     );
   } else if (!perfil.cooficial && cooficiales.length > 0) {
     avisos.push(

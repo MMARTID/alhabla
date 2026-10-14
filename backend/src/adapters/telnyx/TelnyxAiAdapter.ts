@@ -283,7 +283,7 @@ export class TelnyxAiAdapter {
     if (input.dynamicVariables !== undefined)
       payload.dynamic_variables = input.dynamicVariables;
     // null borra el flujo (documentación de workflows de Telnyx, y
-    // comprobado en vivo el 2026-10-15); el SDK no lo declara.
+    // comprobado en vivo el 2026-10-14); el SDK no lo declara.
     if (input.conversationFlow !== undefined)
       payload.conversation_flow = input.conversationFlow;
 

@@ -92,7 +92,7 @@ describe("resolverIdiomas — voz y transcripción", () => {
 });
 
 // La cooficial de donde está el negocio (lib/idiomas/zona.ts, decisión del
-// 2026-10-15): Soniox desde el principio y la voz Ultra del principal; la
+// 2026-10-14): Soniox desde el principio y la voz Ultra del principal; la
 // cooficial la contesta Marta o Sergio en un nodo del conversation_flow.
 describe("resolverIdiomas — la cooficial de la zona", () => {
   const conZona = (

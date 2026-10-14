@@ -238,6 +238,29 @@ describe("syncAgentToRetell — voiceGender", () => {
     expect(mockedGetAgent).toHaveBeenCalledWith("retell_agent_1", 7);
   });
 
+  // La cooficial de la zona (lib/idiomas/zona.ts): Retell atiende el
+  // principal y el español, pero la copia del panel es la de Telnyx.
+  it("en Cataluña, Retell atiende en español y la copia del panel lleva el catalán", async () => {
+    mockedBusinessFindUnique.mockResolvedValue({
+      name: "Salón de prueba",
+      address: "Av. Rei en Jaume, 231, 08440 Cardedeu, Barcelona, Spain",
+      businessDetails: null,
+      businessType: "peluqueria",
+      agentSettings: null,
+      orchestrator: "telnyx",
+      minAdvanceBookingMinutes: null,
+      maxAppointmentDurationMinutes: null,
+    } as any);
+
+    await syncAgentToRetell("biz_123");
+
+    const promptDeRetell = mockedUpdateLlm.mock.calls[0][1].generalPrompt;
+    expect(promptDeRetell).toContain("Habla siempre en español de España.");
+    expect(promptDeRetell).not.toContain("catalán");
+    const copia = mockedAgentUpdate.mock.calls[0][0].data.systemPrompt;
+    expect(copia).toContain("catalán");
+  });
+
   it("no actualiza un prompt editado a mano al sincronizar solo gestionados", async () => {
     mockedBusinessFindUnique.mockResolvedValue({
       name: "Negocio de prueba",

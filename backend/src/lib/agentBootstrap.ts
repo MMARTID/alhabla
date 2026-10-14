@@ -23,8 +23,10 @@ import { componerSaludo } from "./idiomas/catalogo.js";
 import {
   ajustesParaRetell,
   idiomaDeRetell,
+  resolverIdiomas,
   usaVozMultilingueEnRetell,
 } from "./idiomas/resolver.js";
+import { cooficialDeLaZona } from "./idiomas/zona.js";
 import { calendarService } from "../modules/calendar/service.js";
 import { crearAssistantYPromocionar } from "./telnyxAgentSync.js";
 import { listaDeEsperaDisponible } from "../modules/whatsapp/service.js";
@@ -811,6 +813,9 @@ export async function syncAgentToRetell(
     where: { id: businessId },
     select: {
       name: true,
+      // La cooficial de la zona, solo para la copia del panel (ver
+      // promptDelPanel): Retell atiende el principal y el español.
+      address: true,
       businessDetails: true,
       businessType: true,
       agentSettings: true,
@@ -899,6 +904,11 @@ export async function syncAgentToRetell(
       business,
       agentSettings.pasarLlamadas
     ),
+    // Con la cooficial de su zona, como el de telnyxAgentSync.ts.
+    idiomas: resolverIdiomas({
+      ...agentSettings,
+      zona: cooficialDeLaZona(business),
+    }).idiomas,
   });
 
   const postCallAnalysisData = buildPostCallAnalysisData(

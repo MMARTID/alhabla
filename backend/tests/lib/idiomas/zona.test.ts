@@ -23,7 +23,35 @@ describe("codigoPostal", () => {
   });
 
   it("con varios, el último: el código postal va detrás del número de la calle", () => {
-    expect(codigoPostal("Polígono 12345, nave 3, 46001 Valencia")).toBe("46001");
+    expect(codigoPostal("Polígono 12345 Nave 3, 46001 Valencia")).toBe("46001");
+  });
+
+  // Cifras sueltas del texto libre de businessDetails.
+  it("solo si le sigue el nombre del lugar", () => {
+    expect(codigoPostal("Más de 15000 clientes atendidos")).toBeNull();
+    expect(codigoPostal("Llevamos 15000 años")).toBeNull();
+  });
+
+  // La bienvenida ofrece otros países: sus códigos de cinco cifras se
+  // confundirían con provincias españolas (revisión del 2026-10-14).
+  it.each([
+    "Via Dante, 5, 20123 Milano MI, Italia",
+    "Jungfernstieg 1, 20095 Hamburg, Deutschland",
+    "Prager Str. 2, 01069 Dresden, Alemania",
+    "Cours Napoléon, 20000 Ajaccio, Francia",
+    "Av. Insurgentes 1, 03940 Ciudad de México, CDMX, México",
+    "100 Main St, 32801 Orlando, FL, Estados Unidos",
+    "Ringstraße 1, 01010 Wien, Österreich",
+  ])("fuera de España, null: %s", (direccion) => {
+    expect(codigoPostal(direccion)).toBeNull();
+  });
+
+  it("el país de otra línea no anula la de la dirección", () => {
+    expect(
+      codigoPostal(
+        "Peluquería con clientes de Francia\nCarrer Major 5, 08440 Cardedeu, Barcelona, España"
+      )
+    ).toBe("08440");
   });
 });
 
@@ -34,9 +62,6 @@ describe("cooficialDeLaZona", () => {
     ["25001 Lleida", "ca-ES"],
     ["43001 Tarragona", "ca-ES"],
     ["07001 Palma", "ca-ES"],
-    ["46001 València", "ca-ES"],
-    ["12001 Castelló", "ca-ES"],
-    ["03182 Torrevieja", "ca-ES"],
     ["48001 Bilbao", "eu-ES"],
     ["20001 Donostia", "eu-ES"],
     ["01001 Vitoria-Gasteiz", "eu-ES"],
@@ -48,9 +73,19 @@ describe("cooficialDeLaZona", () => {
     expect(cooficialDeLaZona({ address })).toBe(cooficial);
   });
 
-  it("fuera de esas provincias (Navarra incluida), null", () => {
-    expect(cooficialDeLaZona({ address: "28013 Madrid" })).toBeNull();
-    expect(cooficialDeLaZona({ address: "31001 Pamplona" })).toBeNull();
+  // Decisión del usuario del 2026-10-14: ni la Comunitat Valenciana (buena
+  // parte habla castellano, como Torrevieja) ni Navarra.
+  it.each([
+    "28013 Madrid",
+    "31001 Pamplona",
+    "46001 València",
+    "12001 Castelló",
+    "03182 Torrevieja",
+  ])("fuera de esas provincias, null: %s", (address) => {
+    expect(cooficialDeLaZona({ address })).toBeNull();
+  });
+
+  it("sin dirección ni detalles, null", () => {
     expect(cooficialDeLaZona({})).toBeNull();
   });
 
