@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import bcrypt from "bcryptjs";
 import { prisma } from "../../lib/prisma.js";
-import { getRedis } from "../../lib/redis.js";
+import { consumirClave, guardarClave } from "../../lib/almacenTemporal.js";
 import { enqueueEmailJob } from "../../lib/cloudTasks.js";
 import {
   passwordChangedEmail,
@@ -11,10 +11,11 @@ import { AccountActionError } from "./accountService.js";
 import { appUrl } from "../../lib/urls.js";
 
 /**
- * Recuperación de contraseña sin tabla nueva: el token vive en Redis con
- * caducidad, igual que el `state` de Google OAuth. Se guarda solo su hash —
- * un volcado de Redis no sirve para restablecer nada — y se consume con
- * `getdel`, así que cada enlace vale una única vez.
+ * Recuperación de contraseña sin tabla propia: el token vive en el almacén
+ * temporal (`claves_temporales`) con caducidad, igual que el `state` de
+ * Google OAuth. Se guarda solo su hash — un volcado de la tabla no sirve
+ * para restablecer nada — y se consume leyendo y borrando de una vez, así
+ * que cada enlace vale una única vez.
  */
 export const PASSWORD_RESET_TTL_SECONDS = 60 * 60;
 
@@ -42,7 +43,7 @@ export async function requestPasswordReset(email: string) {
   const normalizedEmail = email.trim().toLowerCase();
   const user = await prisma.user.findUnique({
     where: { email: normalizedEmail },
-    select: { id: true, email: true, tokenVersion: true },
+    select: { id: true, email: true, tokenVersion: true, businessId: true },
   });
 
   if (!user) return;
@@ -51,11 +52,11 @@ export async function requestPasswordReset(email: string) {
   // El enlace va atado a la versión de la contraseña de ahora: si después se
   // cambia (desde Ajustes o con otro enlace), todos los enlaces anteriores
   // dejan de valer aunque no hayan caducado. Antes seguían vivos una hora.
-  await getRedis().set(
+  await guardarClave(
     `${RESET_KEY_PREFIX}${hashToken(token)}`,
     `${user.id}:${user.tokenVersion}`,
-    "EX",
-    PASSWORD_RESET_TTL_SECONDS
+    PASSWORD_RESET_TTL_SECONDS * 1000,
+    { businessId: user.businessId }
   );
 
   const message = passwordResetEmail({ resetUrl: buildPasswordResetUrl(token) });
@@ -83,7 +84,7 @@ export async function resetPasswordWithToken(input: {
   token: string;
   newPassword: string;
 }) {
-  const guardado = await getRedis().getdel(
+  const guardado = await consumirClave(
     `${RESET_KEY_PREFIX}${hashToken(input.token)}`
   );
   // `<userId>:<tokenVersion>`. Los enlaces emitidos antes de este formato

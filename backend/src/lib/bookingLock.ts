@@ -1,4 +1,8 @@
-import { adquirirCerrojo, liberarCerrojo } from "./cerrojos.js";
+import {
+  adquirirCerrojo,
+  liberarCerrojo,
+  type ResultadoDeCerrojo,
+} from "./cerrojos.js";
 
 /** Primitiva genérica de lock distribuido. Desde el corte de Redis (PR A)
  * es un envoltorio de lib/cerrojos.ts: un arrendamiento en Postgres (más el
@@ -91,6 +95,20 @@ export async function acquireBookingLock(
   businessId: string
 ): Promise<string | null> {
   return acquireLock(
+    getBookingLockKey(businessId),
+    BOOKING_LOCK_TTL_MS,
+    BOOKING_LOCK_ACQUIRE_BUDGET_MS
+  );
+}
+
+/** Lo mismo que acquireBookingLock, pero distingue «otra reserva lo tiene»
+ * (`ocupado`) de «el almacén no respondió» (`error`): la recepcionista no
+ * debe decirle al cliente que hay otra reserva en curso cuando lo que ha
+ * fallado es Alhabla. */
+export async function adquirirCerrojoDeReserva(
+  businessId: string
+): Promise<ResultadoDeCerrojo> {
+  return adquirirCerrojo(
     getBookingLockKey(businessId),
     BOOKING_LOCK_TTL_MS,
     BOOKING_LOCK_ACQUIRE_BUDGET_MS

@@ -431,9 +431,13 @@ export const internalJobsRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.post(
     "/jobs/telnyx-health-check",
     opcionesDeJob,
-    async (_request, reply) => {
+    async (request, reply) => {
       try {
-        await telnyxHealthCheckJob();
+        const horaProgramada = request.headers["x-cloudscheduler-scheduletime"];
+        await telnyxHealthCheckJob({
+          horaProgramada:
+            typeof horaProgramada === "string" ? horaProgramada : undefined,
+        });
         return reply.send({ received: true });
       } catch (error) {
         if (error instanceof PermanentJobError) {

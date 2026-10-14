@@ -1,5 +1,5 @@
 import { prisma } from "../../lib/prisma.js";
-import { getRedis } from "../../lib/redis.js";
+import { guardarClave, leerClave } from "../../lib/almacenTemporal.js";
 import { errorMessage } from "../../lib/logUtils.js";
 import { timezoneOffsetMinutes } from "../../lib/voiceDateTime.js";
 import { formatScheduleForPrompt } from "../../lib/businessSchedule.js";
@@ -36,9 +36,10 @@ export interface GestorToolInvocationResult {
   body: unknown;
 }
 
-/** Clave de Redis con el turno en curso del dueño (chatDueno.ts la escribe
- * antes de llamar al assistant y la borra después): así `proponer_accion`
- * sabe a qué entrante y conversación pertenece la propuesta. */
+/** Clave del almacén temporal con el turno en curso del dueño (chatDueno.ts
+ * la escribe antes de llamar al assistant y la borra después): así
+ * `proponer_accion` sabe a qué entrante y conversación pertenece la
+ * propuesta. */
 export function claveDelTurno(businessId: string): string {
   return `gestor:turno:${businessId}`;
 }
@@ -56,7 +57,7 @@ interface TurnoEnCurso {
 
 async function turnoEnCurso(businessId: string): Promise<TurnoEnCurso | null> {
   try {
-    const raw = await getRedis().get(claveDelTurno(businessId));
+    const raw = await leerClave(claveDelTurno(businessId));
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<TurnoEnCurso>;
     return typeof parsed.inboundMessageId === "string" &&
@@ -563,11 +564,11 @@ async function proponerAccion(
     return { status: 200, body: { ok: false, motivo: propuesta.motivo } };
   }
   try {
-    await getRedis().set(
+    await guardarClave(
       claveDePropuesta(business.id),
       propuesta.accionId,
-      "EX",
-      TTL_TURNO_SEGUNDOS
+      TTL_TURNO_SEGUNDOS * 1000,
+      { businessId: business.id }
     );
   } catch (error) {
     console.error(

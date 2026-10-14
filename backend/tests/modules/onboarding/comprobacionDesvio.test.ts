@@ -1,6 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { prisma } from "../../../src/lib/prisma.js";
-import { getRedis } from "../../../src/lib/redis.js";
+import {
+  almacenEnMemoria,
+  clavesVivas,
+  entradaDelAlmacen,
+  reiniciarAlmacenEnMemoria,
+} from "../../helpers/almacenEnMemoria.js";
 import { telnyxAiAdapter } from "../../../src/adapters/telnyx/TelnyxAiAdapter.js";
 import {
   COMPROBACION_TTL_SEGUNDOS,
@@ -27,82 +32,34 @@ vi.mock("../../../src/lib/prisma.js", () => ({
   },
 }));
 
-vi.mock("../../../src/lib/redis.js", () => ({ getRedis: vi.fn() }));
+// Todo el estado de la comprobación vive en el almacén temporal de
+// Postgres: aquí, su versión en memoria, que caduca con Date.now().
+vi.mock(
+  "../../../src/lib/almacenTemporal.js",
+  async () =>
+    (await import("../../helpers/almacenEnMemoria.js")).almacenEnMemoria
+);
 
 vi.mock("../../../src/adapters/telnyx/TelnyxAiAdapter.js", () => ({
   telnyxAiAdapter: { dialCall: vi.fn() },
 }));
 
-/** Redis en memoria con lo justo que usa el módulo (SET EX/NX, GET, DEL,
- * INCR, EXPIRE y los hashes HSET/HSETNX/HGETALL). Los TTL se guardan para
- * poder afirmarlos, no se aplican. */
-function redisEnMemoria() {
-  const datos = new Map<string, string>();
-  const hashes = new Map<string, Map<string, string>>();
-  const ttls = new Map<string, number>();
-  const hash = (key: string) => {
-    let h = hashes.get(key);
-    if (!h) {
-      h = new Map();
-      hashes.set(key, h);
-    }
-    return h;
-  };
-  return {
-    datos,
-    hashes,
-    ttls,
-    set: vi.fn(async (key: string, value: string, ...args: unknown[]) => {
-      const nx = args.includes("NX");
-      if (nx && datos.has(key)) return null;
-      datos.set(key, value);
-      const exIndex = args.indexOf("EX");
-      if (exIndex >= 0) ttls.set(key, Number(args[exIndex + 1]));
-      return "OK";
-    }),
-    get: vi.fn(async (key: string) => datos.get(key) ?? null),
-    del: vi.fn(async (key: string) => {
-      const habia = datos.delete(key) || hashes.delete(key);
-      return habia ? 1 : 0;
-    }),
-    incr: vi.fn(async (key: string) => {
-      const siguiente = Number(datos.get(key) ?? 0) + 1;
-      datos.set(key, String(siguiente));
-      return siguiente;
-    }),
-    expire: vi.fn(async (key: string, segundos: number) => {
-      ttls.set(key, segundos);
-      return 1;
-    }),
-    hset: vi.fn(
-      async (key: string, ...args: [Record<string, string>] | string[]) => {
-        const h = hash(key);
-        if (typeof args[0] === "object") {
-          for (const [campo, valor] of Object.entries(args[0])) {
-            h.set(campo, String(valor));
-          }
-          return Object.keys(args[0]).length;
-        }
-        h.set(String(args[0]), String(args[1]));
-        return 1;
-      }
-    ),
-    hsetnx: vi.fn(async (key: string, campo: string, valor: string) => {
-      const h = hash(key);
-      if (h.has(campo)) return 0;
-      h.set(campo, valor);
-      return 1;
-    }),
-    hgetall: vi.fn(async (key: string) =>
-      Object.fromEntries(hashes.get(key) ?? new Map())
-    ),
-  };
+/** Lo que hay vivo en el almacén para una clave (texto o campos). */
+function valor(clave: string) {
+  const entrada = entradaDelAlmacen(clave);
+  return entrada && entrada.expiraEn > Date.now() ? entrada.valor : undefined;
 }
+
+/** Segundos de vida que le quedan a una clave recién escrita. */
+function segundosDeVida(clave: string) {
+  return Math.round((entradaDelAlmacen(clave)!.expiraEn - Date.now()) / 1000);
+}
+
+const LIMITE = "desvio:check:limite:biz_1";
 
 const mockedBusinessFindUnique = vi.mocked(prisma.business.findUnique);
 const mockedStateUpsert = vi.mocked(prisma.onboardingState.upsert);
 const mockedStateUpdateMany = vi.mocked(prisma.onboardingState.updateMany);
-const mockedGetRedis = vi.mocked(getRedis);
 const mockedDialCall = vi.mocked(telnyxAiAdapter.dialCall);
 
 const ALHABLA = "+34930453218";
@@ -120,15 +77,12 @@ function negocio(overrides: Record<string, unknown> = {}) {
   } as any;
 }
 
-let redis: ReturnType<typeof redisEnMemoria>;
-
 beforeEach(() => {
   vi.clearAllMocks();
   vi.spyOn(console, "log").mockImplementation(() => {});
   vi.spyOn(console, "warn").mockImplementation(() => {});
   vi.spyOn(console, "error").mockImplementation(() => {});
-  redis = redisEnMemoria();
-  mockedGetRedis.mockReturnValue(redis as any);
+  reiniciarAlmacenEnMemoria();
   mockedBusinessFindUnique.mockResolvedValue(negocio());
   mockedDialCall.mockResolvedValue({
     callControlId: "call_ctrl_out",
@@ -217,23 +171,30 @@ describe("iniciarComprobacionDeDesvio", () => {
 
     // Comprobación con TTL, turno del negocio reservado, puntero a la última
     // y contador por hora.
-    expect(redis.ttls.get(`desvio:check:${check.id}`)).toBe(
+    expect(segundosDeVida(`desvio:check:${check.id}`)).toBe(
       COMPROBACION_TTL_SEGUNDOS
     );
-    expect(redis.datos.get("desvio:check:negocio:biz_1")).toBe(check.id);
-    expect(redis.datos.get("desvio:check:ultima:biz_1")).toBe(check.id);
-    expect(redis.ttls.get("desvio:check:ultima:biz_1")).toBe(
+    expect(valor("desvio:check:negocio:biz_1")).toBe(check.id);
+    expect(valor("desvio:check:ultima:biz_1")).toBe(check.id);
+    expect(segundosDeVida("desvio:check:ultima:biz_1")).toBe(
       COMPROBACION_TTL_SEGUNDOS
     );
-    expect(redis.datos.get("desvio:check:limite:biz_1")).toBe("1");
-    expect(redis.ttls.get("desvio:check:limite:biz_1")).toBe(3600);
+    // Todo se borra con el negocio (ON DELETE CASCADE).
+    expect(entradaDelAlmacen(`desvio:check:${check.id}`)?.businessId).toBe(
+      "biz_1"
+    );
+    expect(await almacenEnMemoria.leerContador(LIMITE)).toBe(1);
+    expect(almacenEnMemoria.incrementarContador).toHaveBeenCalledWith(
+      LIMITE,
+      3_600_000
+    );
     await expect(comprobacionDeDesvioReciente("biz_1")).resolves.toBe(check.id);
   });
 
   it("guarda la comprobación ANTES de marcar: con desvío «todas» la entrante puede llegar antes de que dial() devuelva", async () => {
     let comprobacionAlMarcar: unknown = null;
     mockedDialCall.mockImplementation(async () => {
-      const id = redis.datos.get("desvio:check:ultima:biz_1");
+      const id = valor("desvio:check:ultima:biz_1") as string | undefined;
       comprobacionAlMarcar = id
         ? await obtenerComprobacionDeDesvio(id, "biz_1")
         : null;
@@ -321,7 +282,7 @@ describe("iniciarComprobacionDeDesvio", () => {
       expect(error.status).toBe(409);
     }
     expect(mockedDialCall).not.toHaveBeenCalled();
-    expect(redis.datos.size).toBe(0);
+    expect(clavesVivas()).toEqual([]);
 
     // Móvil y fijo geográfico sí.
     mockedBusinessFindUnique.mockResolvedValue(
@@ -341,7 +302,7 @@ describe("iniciarComprobacionDeDesvio", () => {
     expect(error.codigo).toBe("telefonia_no_configurada");
     expect(error.status).toBe(503);
     expect(mockedDialCall).not.toHaveBeenCalled();
-    expect(redis.datos.size).toBe(0);
+    expect(clavesVivas()).toEqual([]);
   });
 
   it("503 sin TELNYX_CALL_CONTROL_APP_ID, sin reservar nada", async () => {
@@ -351,7 +312,7 @@ describe("iniciarComprobacionDeDesvio", () => {
 
     expect(error.codigo).toBe("telefonia_no_configurada");
     expect(error.status).toBe(503);
-    expect(redis.datos.size).toBe(0);
+    expect(clavesVivas()).toEqual([]);
   });
 
   it("no pasa de tres comprobaciones por hora y negocio", async () => {
@@ -368,7 +329,7 @@ describe("iniciarComprobacionDeDesvio", () => {
     expect(error.status).toBe(429);
     expect(mockedDialCall).toHaveBeenCalledTimes(3);
     // El turno del negocio queda libre para cuando pase la hora.
-    expect(redis.datos.has("desvio:check:negocio:biz_1")).toBe(false);
+    expect(valor("desvio:check:negocio:biz_1")).toBeUndefined();
   });
 
   it("409 si ya hay una comprobación en marcha para el negocio", async () => {
@@ -382,7 +343,9 @@ describe("iniciarComprobacionDeDesvio", () => {
   });
 
   it("el límite es por negocio: otro negocio no se ve afectado", async () => {
-    redis.datos.set("desvio:check:limite:biz_1", "3");
+    for (let i = 0; i < 3; i++) {
+      await almacenEnMemoria.incrementarContador(LIMITE, 3_600_000);
+    }
     mockedBusinessFindUnique.mockResolvedValue(negocio({ id: "biz_2" }));
 
     const check = await iniciarComprobacionDeDesvio("biz_2");
@@ -398,12 +361,11 @@ describe("iniciarComprobacionDeDesvio", () => {
 
     expect(error.codigo).toBe("no_se_pudo_llamar");
     expect(error.status).toBe(502);
-    expect(redis.datos.has("desvio:check:negocio:biz_1")).toBe(false);
-    expect(redis.datos.has("desvio:check:limite:biz_1")).toBe(false);
-    // La comprobación que no llegó a salir no queda en Redis: ninguna
+    expect(valor("desvio:check:negocio:biz_1")).toBeUndefined();
+    expect(await almacenEnMemoria.leerContador(LIMITE)).toBe(0);
+    // La comprobación que no llegó a salir no queda en el almacén: ninguna
     // entrante posterior se le atribuiría.
-    expect(redis.datos.has("desvio:check:ultima:biz_1")).toBe(false);
-    expect(redis.hashes.size).toBe(0);
+    expect(clavesVivas()).toEqual([]);
     await expect(comprobacionDeDesvioReciente("biz_1")).resolves.toBeNull();
     expect(console.error).toHaveBeenCalledWith(
       expect.stringContaining("D38 sin outbound profile")
@@ -427,7 +389,9 @@ describe("obtenerComprobacionDeDesvio", () => {
     await expect(
       obtenerComprobacionDeDesvio("../desvio:check:negocio:biz_1", "biz_1")
     ).resolves.toBeNull();
-    expect(redis.get).not.toHaveBeenCalledWith(expect.stringContaining("../"));
+    expect(almacenEnMemoria.leerCampos).not.toHaveBeenCalledWith(
+      expect.stringContaining("../")
+    );
   });
 });
 
@@ -440,9 +404,9 @@ describe("resolución por los webhooks", () => {
     expect(resuelta?.id).toBe(check.id);
     expect(resuelta?.resultado).toEqual({ estado: "ok" });
     expect(resuelta?.resueltaAt).toEqual(expect.any(String));
-    expect(redis.datos.has("desvio:check:negocio:biz_1")).toBe(false);
+    expect(valor("desvio:check:negocio:biz_1")).toBeUndefined();
     // El puntero a la última comprobación se queda hasta caducar.
-    expect(redis.datos.get("desvio:check:ultima:biz_1")).toBe(check.id);
+    expect(valor("desvio:check:ultima:biz_1")).toBe(check.id);
     await expect(
       obtenerComprobacionDeDesvio(check.id, "biz_1")
     ).resolves.toMatchObject({ resultado: { estado: "ok" } });
@@ -483,7 +447,7 @@ describe("resolución por los webhooks", () => {
       estado: "fallo",
       motivo: "sin_desvio",
     });
-    expect(redis.datos.has("desvio:check:negocio:biz_1")).toBe(false);
+    expect(valor("desvio:check:negocio:biz_1")).toBeUndefined();
   });
 
   it("si alguien cogió la saliente, el fallo es «la has cogido» sea cual sea el hangup_cause", async () => {
@@ -523,7 +487,7 @@ describe("resolución por los webhooks", () => {
     ).resolves.toMatchObject({
       resultado: { estado: "fallo", motivo: "sin_desvio" },
     });
-    expect(redis.datos.has("desvio:check:negocio:biz_1")).toBe(false);
+    expect(valor("desvio:check:negocio:biz_1")).toBeUndefined();
 
     const resuelta = await registrarLlamadaDeComprobacionRecibida("biz_1");
 
@@ -537,16 +501,18 @@ describe("resolución por los webhooks", () => {
     );
   });
 
-  it("si el ok se escribe entre la lectura y la escritura del colgado, el colgado no lo pisa (HSETNX)", async () => {
+  it("si el ok se escribe entre la lectura y la escritura del colgado, el colgado no lo pisa (escritura condicional)", async () => {
     const check = await iniciarComprobacionDeDesvio("biz_1");
     // El colgado lee la comprobación sin resolver; antes de que escriba,
     // la entrante la marca ok.
-    const hgetallOriginal = redis.hgetall.getMockImplementation()!;
-    redis.hgetall.mockImplementationOnce(async (key: string) => {
-      const antes = await hgetallOriginal(key);
-      await registrarLlamadaDeComprobacionRecibida("biz_1");
-      return antes;
-    });
+    const leerOriginal = almacenEnMemoria.leerCampos.getMockImplementation()!;
+    almacenEnMemoria.leerCampos.mockImplementationOnce(
+      async (clave: string) => {
+        const antes = await leerOriginal(clave);
+        await registrarLlamadaDeComprobacionRecibida("biz_1");
+        return antes;
+      }
+    );
 
     const resuelta = await registrarSalienteColgada(check.id, "timeout");
 

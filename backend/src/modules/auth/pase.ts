@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { getRedis } from "../../lib/redis.js";
+import { consumirClave, guardarClave } from "../../lib/almacenTemporal.js";
 import { errorMessage } from "../../lib/logUtils.js";
 
 /**
@@ -7,9 +7,10 @@ import { errorMessage } from "../../lib/logUtils.js";
  * (docs/historico/PLAN-APP-DOMINIO.md § 3). La sesión es un JWT en
  * `localStorage`, que no
  * se comparte entre alhabla.ai y app.alhabla.ai: `POST /auth/register`
- * devuelve, además del token, un código aleatorio que vive 60 s en Redis y
+ * devuelve, además del token, un código aleatorio que vive 60 s en el
+ * almacén temporal de Postgres (`claves_temporales`) y
  * muere al canjearse (`POST /auth/pase/canjear`). Así el JWT nunca viaja en
- * una URL. Crear el pase es best-effort: si Redis no está, el registro sigue
+ * una URL. Crear el pase es best-effort: si el almacén falla, el registro sigue
  * devolviendo el token de siempre.
  */
 
@@ -30,11 +31,11 @@ export async function crearPase(user: {
 }): Promise<string | null> {
   const codigo = randomBytes(PASE_BYTES).toString("hex");
   try {
-    await getRedis().set(
+    await guardarClave(
       clave(codigo),
       JSON.stringify({ id: user.id, businessId: user.businessId }),
-      "EX",
-      PASE_TTL_SEGUNDOS
+      PASE_TTL_SEGUNDOS * 1000,
+      { businessId: user.businessId }
     );
     return codigo;
   } catch (error) {
@@ -51,7 +52,7 @@ export async function canjearPase(
   codigo: string
 ): Promise<{ id: string; businessId: string } | null> {
   if (!esPaseConFormatoValido(codigo)) return null;
-  const raw = await getRedis().getdel(clave(codigo));
+  const raw = await consumirClave(clave(codigo));
   if (!raw) return null;
   try {
     const datos = JSON.parse(raw) as { id?: unknown; businessId?: unknown };

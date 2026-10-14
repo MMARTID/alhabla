@@ -14,6 +14,10 @@ import {
   releaseBookingLock,
 } from "../../src/lib/bookingLock.js";
 import { buildCalendarIdempotencyKey } from "../../src/lib/calendarIdempotency.js";
+import {
+  almacenEnMemoria,
+  reiniciarAlmacenEnMemoria,
+} from "../helpers/almacenEnMemoria.js";
 
 vi.mock("../../src/lib/cloudTasks.js", () => ({
   enqueueRetryBookingJob: vi.fn(),
@@ -55,13 +59,12 @@ vi.mock("../../src/lib/bookingLock.js", () => ({
   releaseBookingLock: vi.fn(),
 }));
 
-const { mockRedisClient } = vi.hoisted(() => ({
-  mockRedisClient: { del: vi.fn().mockResolvedValue(1) },
-}));
-
-vi.mock("../../src/lib/redis.js", () => ({
-  getRedis: () => mockRedisClient,
-}));
+// La caché de voz vive en el almacén temporal de Postgres: aquí, su
+// versión en memoria, para mirar la clave exacta que se borra.
+vi.mock(
+  "../../src/lib/almacenTemporal.js",
+  async () => (await import("../helpers/almacenEnMemoria.js")).almacenEnMemoria
+);
 
 const mockedLeadFindUnique = vi.mocked(prisma.lead.findUnique);
 const mockedEnqueueRetryBookingJob = vi.mocked(enqueueRetryBookingJob);
@@ -157,7 +160,7 @@ describe("processRetryFailedBookingJob", () => {
       calendarAvailabilityKnown: true,
     });
     mockedReleaseBookingLock.mockResolvedValue(undefined);
-    mockRedisClient.del.mockResolvedValue(1);
+    reiniciarAlmacenEnMemoria();
     mockedBusinessUpdate.mockResolvedValue({} as any);
     mockedLeadUpdate.mockResolvedValue({} as any);
   });
@@ -493,7 +496,9 @@ describe("processRetryFailedBookingJob", () => {
         }),
       })
     );
-    expect(mockRedisClient.del).toHaveBeenCalledWith("voice_config:biz_1");
+    expect(almacenEnMemoria.borrarClave).toHaveBeenCalledWith(
+      "voice_config:biz_1"
+    );
     // abandonLead usa prisma.lead.update directamente (fuera de la
     // transacción del camino feliz), no el tx.lead.update mockeado como
     // mockLeadUpdate.

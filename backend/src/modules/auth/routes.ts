@@ -6,7 +6,7 @@ import jwt from "jsonwebtoken";
 import { OAuth2Client } from "google-auth-library";
 import { z } from "zod";
 import { prisma } from "../../lib/prisma.js";
-import { getRedis } from "../../lib/redis.js";
+import { consumirClave, guardarClave } from "../../lib/almacenTemporal.js";
 import { createBusinessAgent } from "../../lib/agentBootstrap.js";
 import { detectVoiceOrchestrator } from "../../lib/voiceOrchestrator.js";
 import {
@@ -34,8 +34,8 @@ const GOOGLE_SESSION_COOKIE = "alhabla_google_session";
 // puede iniciar SU PROPIA autorización de Google (obtiene un `state` válido
 // de /auth/google), y hacer que la víctima complete el callback con ese
 // `state` (link/imagen manipulados): el `state` en sí sigue siendo válido en
-// Redis, así que el callback termina autenticando al navegador de la
-// víctima en la cuenta del atacante (login CSRF) — cualquier dato que la
+// el almacén temporal, así que el callback termina autenticando al navegador
+// de la víctima en la cuenta del atacante (login CSRF) — cualquier dato que la
 // víctima introduzca después queda en la cuenta del atacante, no en la suya.
 const GOOGLE_OAUTH_STATE_COOKIE = "alhabla_google_oauth_state";
 
@@ -517,11 +517,10 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
           termsAccepted: request.query.acceptedTerms === "true",
           intent,
         });
-        await getRedis().set(
+        await guardarClave(
           `auth:google:state:${state}`,
           stateValue,
-          "EX",
-          GOOGLE_AUTH_STATE_TTL_SECONDS
+          GOOGLE_AUTH_STATE_TTL_SECONDS * 1000
         );
         // Cookie de un solo uso ligada a este navegador — el callback exige que
         // coincida con el `state` recibido, para que no valga completarlo desde
@@ -579,7 +578,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
           return reply.redirect(`${callbackUrl}?error=invalid_state`);
         }
 
-        const validState = await getRedis().getdel(
+        const validState = await consumirClave(
           `auth:google:state:${state}`
         );
         if (!validState) {
@@ -636,11 +635,11 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
         }
 
         const sessionId = randomBytes(32).toString("base64url");
-        await getRedis().set(
+        await guardarClave(
           `auth:google:session:${sessionId}`,
           createToken(user),
-          "EX",
-          GOOGLE_SESSION_TTL_SECONDS
+          GOOGLE_SESSION_TTL_SECONDS * 1000,
+          { businessId: user.businessId }
         );
         setGoogleSessionCookie(reply, sessionId, GOOGLE_SESSION_TTL_SECONDS);
         return reply.redirect(callbackUrl);
@@ -675,7 +674,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
           });
       }
 
-      const token = await getRedis().getdel(`auth:google:session:${sessionId}`);
+      const token = await consumirClave(`auth:google:session:${sessionId}`);
       if (!token) {
         return reply
           .status(401)
@@ -703,11 +702,10 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
           termsAccepted: request.query.acceptedTerms === "true",
           intent,
         });
-        await getRedis().set(
+        await guardarClave(
           `auth:facebook:state:${state}`,
           stateValue,
-          "EX",
-          FACEBOOK_AUTH_STATE_TTL_SECONDS
+          FACEBOOK_AUTH_STATE_TTL_SECONDS * 1000
         );
         setCookie(
           reply,
@@ -763,7 +761,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
           return reply.redirect(`${callbackUrl}?error=invalid_state`);
         }
 
-        const validState = await getRedis().getdel(
+        const validState = await consumirClave(
           `auth:facebook:state:${state}`
         );
         if (!validState) {
@@ -850,11 +848,11 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
         }
 
         const sessionId = randomBytes(32).toString("base64url");
-        await getRedis().set(
+        await guardarClave(
           `auth:facebook:session:${sessionId}`,
           createToken(user),
-          "EX",
-          FACEBOOK_SESSION_TTL_SECONDS
+          FACEBOOK_SESSION_TTL_SECONDS * 1000,
+          { businessId: user.businessId }
         );
         setFacebookSessionCookie(reply, sessionId, FACEBOOK_SESSION_TTL_SECONDS);
         return reply.redirect(callbackUrl);
@@ -886,7 +884,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
           .send({ error: "Facebook session is missing or expired" });
       }
 
-      const token = await getRedis().getdel(
+      const token = await consumirClave(
         `auth:facebook:session:${sessionId}`
       );
       if (!token) {

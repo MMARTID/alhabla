@@ -41,7 +41,7 @@ también por WhatsApp con el dueño y con sus clientes.
 | App (`frontend/`, app.alhabla.ai) | Next.js 16, React 19, Tailwind CSS, TanStack Query |
 | Web pública (`web/`, alhabla.ai) | Next.js 16, React 19, Tailwind CSS, blog en MDX |
 | Base de datos | PostgreSQL 15 + Prisma |
-| Caché | Redis 7 (Memorystore), en retirada: los cerrojos y el límite de peticiones van en Postgres desde el PR #277 |
+| Caché | Postgres (`claves_temporales`, `contadores`, `cerrojos`) desde los PR #277 y PR B; Redis 7 (Memorystore) solo como espejo de los cerrojos mientras exista `REDIS_URL` |
 | Colas | Cloud Tasks / Cloud Scheduler (jobs HTTP internos, sin BullMQ) |
 | Voz | Telnyx AI Assistants (primario), Retell.ai (respaldo) |
 | WhatsApp | Telnyx (WhatsApp Business Platform de Meta) |
@@ -162,8 +162,8 @@ graph TD
     CTS[[Cloud Tasks / Cloud Scheduler<br/>jobs en segundo plano]]
 
     subgraph VPC["Infraestructura privada (VPC, Direct VPC egress)"]
-        SQL[(Cloud SQL<br/>Postgres, también cerrojos<br/>y límite de peticiones)]
-        REDIS[(Memorystore<br/>Redis, caché; en retirada)]
+        SQL[(Cloud SQL<br/>Postgres, también cerrojos,<br/>límites y estado temporal)]
+        REDIS[(Memorystore<br/>Redis, espejo de los cerrojos; en retirada)]
     end
 
     SM[[Secret Manager]]
@@ -172,7 +172,7 @@ graph TD
     EXT[Retell · Stripe<br/>Google · Microsoft · Zoho]
 
     CR_API -->|socket Unix| SQL
-    CR_API -->|caché| REDIS
+    CR_API -->|cerrojos, modo compatibilidad| REDIS
     CR_API -->|encola vía HTTP| CTS
     CTS -->|POST /internal/jobs/*| CR_API
     CR_API -.->|secretos| SM
@@ -195,7 +195,7 @@ graph TD
 │   │   │                   #   calendar, calls, demo, gestor, internal, onboarding, phone, places,
 │   │   │                   #   recordings, voiceTools, webhooksRetell, webhooksTelnyx, whatsapp, retellSimulation
 │   │   ├── adapters/       # Retell, Telnyx (voz, WhatsApp), calendarios (Google, Outlook, CalDAV)
-│   │   ├── lib/            # prisma, redis, cloudTasks, availability, urls, gestorPayload…
+│   │   ├── lib/            # prisma, almacenTemporal, cerrojos, cloudTasks, availability, urls…
 │   │   ├── jobs/           # lógica de los jobs en segundo plano (invocados vía Cloud Tasks/Scheduler)
 │   │   └── config/         # constantes
 │   ├── prisma/             # schema y migraciones

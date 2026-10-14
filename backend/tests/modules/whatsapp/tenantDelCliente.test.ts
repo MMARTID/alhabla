@@ -1,6 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { prisma } from "../../../src/lib/prisma.js";
-import { getRedis } from "../../../src/lib/redis.js";
+import {
+  almacenEnMemoria,
+  reiniciarAlmacenEnMemoria,
+} from "../../helpers/almacenEnMemoria.js";
 import {
   guardarEleccion,
   negociosDelCliente,
@@ -15,14 +18,15 @@ vi.mock("../../../src/lib/prisma.js", () => ({
   },
 }));
 
-vi.mock("../../../src/lib/redis.js", () => ({
-  getRedis: vi.fn(),
-}));
+// La elección del cliente vive en el almacén temporal de Postgres: aquí, su
+// versión en memoria.
+vi.mock("../../../src/lib/almacenTemporal.js", async () =>
+  (await import("../../helpers/almacenEnMemoria.js")).almacenEnMemoria
+);
 
 const mockedBookingFindMany = vi.mocked(prisma.booking.findMany);
 const mockedSentMessage = vi.mocked(prisma.sentMessage.findUnique);
 const mockedInbound = vi.mocked(prisma.inboundMessage.findFirst);
-const redis = { get: vi.fn(), set: vi.fn() };
 
 const TELEFONO = "+34600111222";
 const PELUQUERIA = { id: "biz_pelu", name: "Peluquería Alhambra" };
@@ -36,9 +40,7 @@ function conReservasEn(...negocios: Array<{ id: string; name: string }>) {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.mocked(getRedis).mockReturnValue(redis as never);
-  redis.get.mockResolvedValue(null);
-  redis.set.mockResolvedValue("OK");
+  reiniciarAlmacenEnMemoria();
   mockedSentMessage.mockResolvedValue(null);
   mockedInbound.mockResolvedValue(null);
 });
@@ -101,7 +103,7 @@ describe("resolverNegocioDelCliente", () => {
 
   it("respeta lo que el cliente eligió cuando se le preguntó", async () => {
     conReservasEn(PELUQUERIA, BARBERIA);
-    redis.get.mockResolvedValue(BARBERIA.id);
+    await guardarEleccion(TELEFONO, BARBERIA.id);
 
     expect(await resolverNegocioDelCliente(TELEFONO, null)).toEqual({
       tipo: "unico",
@@ -113,7 +115,7 @@ describe("resolverNegocioDelCliente", () => {
   // Defensa: una clave vieja no puede colar un negocio que ya no es suyo.
   it("descarta una elección guardada de un negocio en el que ya no tiene citas", async () => {
     conReservasEn(PELUQUERIA, BARBERIA);
-    redis.get.mockResolvedValue("biz_de_otro");
+    await guardarEleccion(TELEFONO, "biz_de_otro");
 
     expect(await resolverNegocioDelCliente(TELEFONO, null)).toMatchObject({
       tipo: "ambiguo",
@@ -139,9 +141,10 @@ describe("resolverNegocioDelCliente", () => {
     });
   });
 
-  it("si Redis no responde se sigue sin romper", async () => {
+  it("si el almacén no responde se sigue sin romper", async () => {
     conReservasEn(PELUQUERIA);
-    redis.get.mockRejectedValue(new Error("Redis caído"));
+    almacenEnMemoria.leerClave.mockRejectedValue(new Error("Postgres caído"));
+    almacenEnMemoria.guardarClave.mockRejectedValue(new Error("Postgres caído"));
 
     expect(await resolverNegocioDelCliente(TELEFONO, null)).toMatchObject({
       tipo: "unico",
