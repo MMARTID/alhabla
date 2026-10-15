@@ -30,10 +30,28 @@ PIEZAS="arranque app web panel"
 USUARIO="gui/$(id -u)"
 
 quitar_agentes() {
-  local pieza
+  local pieza i
   for pieza in $PIEZAS; do
     launchctl bootout "$USUARIO/ai.alhabla.dev.$pieza" >/dev/null 2>&1 || true
   done
+  # bootout no espera a que el proceso (next dev) termine: cargarlo otra vez
+  # mientras se cierra da «Bootstrap failed: 5: Input/output error».
+  for pieza in $PIEZAS; do
+    for i in $(seq 1 30); do
+      launchctl print "$USUARIO/ai.alhabla.dev.$pieza" >/dev/null 2>&1 || break
+      sleep 0.5
+    done
+  done
+}
+
+cargar_agente() {
+  local pieza=$1 i
+  for i in 1 2 3 4 5; do
+    launchctl bootstrap "$USUARIO" "$AGENTES/ai.alhabla.dev.$pieza.plist" 2>/dev/null && return 0
+    sleep 2
+  done
+  echo "No se pudo cargar ai.alhabla.dev.$pieza: launchctl bootstrap $USUARIO $AGENTES/ai.alhabla.dev.$pieza.plist" >&2
+  return 1
 }
 
 if [ "${1:-}" = "quitar" ]; then
@@ -122,9 +140,11 @@ PY
 fi
 
 quitar_agentes
+fallos=0
 for pieza in $PIEZAS; do
-  launchctl bootstrap "$USUARIO" "$AGENTES/ai.alhabla.dev.$pieza.plist"
+  cargar_agente "$pieza" || fallos=1
 done
+[ "$fallos" = 0 ] || exit 1
 
 echo "Instalado. Arrancando el entorno: sigue el log en $LOGS/entorno.log"
 echo "  App:   http://localhost:3001"
