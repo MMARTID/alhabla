@@ -2,7 +2,9 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import jwt from "jsonwebtoken";
 import { z } from "zod";
+import { avisosDeCuerpo, catalogoDeToolsDeVoz } from "./catalogoDeTools.js";
 import { cargarEnv, urlDeBdDeDev, variable } from "./entorno.js";
+import { leerEnviosSimulados } from "./enviosSimulados.js";
 import {
   borrarLlamadasSimuladas,
   crearLlamadaSimulada,
@@ -25,6 +27,9 @@ import {
  * - simular_webhook_telnyx / simular_webhook_retell: peticiones firmadas
  *   como las del proveedor contra el backend local (webhooks.ts).
  * - borrar_llamadas_simuladas: limpia las llamadas que crean las anteriores.
+ * - listar_tools_voz: las tools de voz con sus argumentos, sacadas del código
+ *   que las registra en Telnyx.
+ * - ver_envios_simulados: los WhatsApp/SMS/correos que backend-sim no envió.
  *
  * stdout es el canal del protocolo: todo log va a stderr.
  */
@@ -166,7 +171,7 @@ servidor.registerTool(
   {
     title: "Simular un webhook firmado de Telnyx",
     description:
-      "POST firmado con Ed25519 (clave de simulación local) a una ruta /webhooks/telnyx… del backend de simulación (localhost:3010; se levanta con scripts/backend-sim.sh). Para una tool de voz (ruta /webhooks/telnyx/tools/<tool>, cuerpo = argumentos de la tool) pasa businessId: crea una llamada simulada NUEVA de ese negocio y pone la cabecera x-alhabla-call-control-id. Para seguir la misma conversación (check_availability y luego book_appointment) pasa en callControlId la `llamada` que devolvió la primera: una cita por llamada. La tool se ejecuta de verdad (la cita va al calendario real del negocio), pero backend-sim NO manda WhatsApp, SMS ni correos (ENVIOS_SIMULADOS): solo los registra en su log. Al acabar, borrar_llamadas_simuladas.",
+      "POST firmado con Ed25519 (clave de simulación local) a una ruta /webhooks/telnyx… del backend de simulación (localhost:3010; se levanta con scripts/backend-sim.sh). Para una tool de voz (ruta /webhooks/telnyx/tools/<tool>, cuerpo = argumentos de la tool) pasa businessId: crea una llamada simulada NUEVA de ese negocio y pone la cabecera x-alhabla-call-control-id. Para seguir la misma conversación (check_availability y luego book_appointment) pasa en callControlId la `llamada` que devolvió la primera: una cita por llamada. La tool se ejecuta de verdad (la cita va al calendario real del negocio), pero backend-sim NO manda WhatsApp, SMS ni correos (ENVIOS_SIMULADOS): solo los registra en su log. Los argumentos de cada tool salen en listar_tools_voz; si al cuerpo le falta alguno obligatorio o sobra uno, la respuesta trae `avisos`. Lo que backend-sim no envió se ve con ver_envios_simulados. Al acabar, borrar_llamadas_simuladas.",
     inputSchema: {
       ruta: z
         .string()
@@ -188,7 +193,7 @@ servidor.registerTool(
   ({ ruta, cuerpo, businessId, telefonoCliente, callControlId, cabeceras, baseUrl }) =>
     conErrores(async () => {
       const env = cargarEnv();
-      return enviarWebhookTelnyx({
+      const resultado = await enviarWebhookTelnyx({
         ruta,
         cuerpo,
         baseUrl,
@@ -199,7 +204,63 @@ servidor.registerTool(
           ? () => crearLlamadaSimulada(urlDeBdDeDev(env), businessId, telefonoCliente)
           : undefined,
       });
+      // Solo si hay algo que avisar: no ensucia las respuestas buenas.
+      const avisos = avisosDeCuerpo(new URL(ruta, "http://x").pathname, cuerpo);
+      return avisos.length > 0 ? { ...resultado, avisos } : resultado;
     })
+);
+
+servidor.registerTool(
+  "listar_tools_voz",
+  {
+    title: "Listar las tools de voz",
+    description:
+      "Las tools que el assistant de Telnyx llama por webhook (get_catalog, check_availability, book_appointment…) con su ruta, sus argumentos, cuáles son obligatorios y un cuerpo de ejemplo. Salen del mismo código que las registra en Telnyx. Úsalo antes de simular_webhook_telnyx para no adivinar los nombres de los argumentos.",
+    inputSchema: {
+      nombre: z
+        .string()
+        .optional()
+        .describe("Solo esta tool (p. ej. check_availability)"),
+    },
+    annotations: { readOnlyHint: true },
+  },
+  ({ nombre }) =>
+    conErrores(async () => {
+      const catalogo = catalogoDeToolsDeVoz();
+      const tools = nombre
+        ? catalogo.filter((tool) => tool.nombre === nombre)
+        : catalogo;
+      if (nombre && tools.length === 0) {
+        throw new Error(
+          `[MCP] No hay ninguna tool de voz «${nombre}»; las hay: ${catalogo.map((tool) => tool.nombre).join(", ")}`
+        );
+      }
+      return tools;
+    })
+);
+
+servidor.registerTool(
+  "ver_envios_simulados",
+  {
+    title: "Ver los envíos simulados",
+    description:
+      "Los WhatsApp, SMS y correos que backend-sim NO envió (ENVIOS_SIMULADOS=1) y solo registró en su log: canal, destino y detalle. Sirve para comprobar que una tool simulada (book_appointment, notify_when_available…) avisó a quien tocaba. Lee `docker logs` de alhabla_backend_sim.",
+    inputSchema: {
+      desde: z
+        .string()
+        .optional()
+        .describe('Ventana de tiempo: "10m", "2h", "30s" o fecha ISO. Por defecto 30m'),
+      canal: z.enum(["WhatsApp", "SMS", "Correo"]).optional(),
+      destino: z
+        .string()
+        .optional()
+        .describe("Filtra por destino (contiene este texto)"),
+      limite: z.number().int().min(1).max(500).optional(),
+    },
+    annotations: { readOnlyHint: true },
+  },
+  ({ desde, canal, destino, limite }) =>
+    conErrores(() => leerEnviosSimulados({ desde, canal, destino, limite }))
 );
 
 servidor.registerTool(
