@@ -436,6 +436,13 @@ checkout PRINCIPAL aunque se lance desde un worktree (`git rev-parse --git-commo
 | `simular_webhook_telnyx` | POST firmado Ed25519 a `/webhooks/telnyx…` de `backend-sim` (:3010). Con `businessId` crea una fila de `calls` NUEVA (`sim-mcp-<uuid>`) y pone `x-alhabla-call-control-id`; para seguir la misma conversación se pasa su `callControlId` (una cita por llamada: `bookings.callId` es único) | Solo localhost y la ruta YA RESUELTA dentro de `/webhooks/telnyx` (un `../` no sale); firma con `TELNYX_PRIVATE_KEY_SIMULACION`, que ningún otro backend acepta |
 | `simular_webhook_retell` | POST con `x-retell-signature` (HMAC con la `RETELL_API_KEY` de dev) a `/webhooks/retell…` de `backend-dev` (:3000) | Solo localhost y la ruta resuelta dentro de `/webhooks/retell` |
 | `borrar_llamadas_simuladas` | Borra las `sim-mcp-…` (de un negocio o de todas) para que no salgan en el historial del panel | Conserva y devuelve las que tienen una cita viva con evento en el calendario: borrarla dejaría el evento huérfano |
+| `describir_tabla` | Tablas de dev o prod con su modelo de Prisma y filas aproximadas; con `tabla` (nombre real o modelo: `Booking`), columnas con tipo/NULL/defecto, índices y claves foráneas (`mcp/esquema.ts`) | Las mismas que `consultar_bd_*`; en prod, consultas una tras otra (el rol de lectura admite 2 conexiones) |
+| `ver_logs_prod` | Cloud Logging de `alhabla-api` en orden: busca a la vez en `textPayload` (`console.*`) y `jsonPayload.msg`/`err.message` (Fastify), quita «incoming request»/«request completed»; `soloErrores` mira stderr y el nivel de pino (`console.error` no trae `severity`). Devuelve el filtro usado (`mcp/logsDeProd.ts`) | Solo lectura con las credenciales de gcloud del Mac; fechas validadas antes de entrar al filtro y textos escapados |
+| `ver_peticiones_prod` | Peticiones HTTP (método, estado, ruta, latencia, revisión), por defecto sin `/health`, `/internal/` ni OPTIONS | Igual |
+| `estado_prod` | Revisión que sirve, tráfico, commit de la imagen, máximo de instancias del servicio (11) y de la plantilla, `/health`, tareas por cola de Cloud Tasks, jobs del Scheduler con fallo o en pausa, últimos 3 deploys y si producción sirve el último bueno (`mcp/estadoDeProd.ts`) | Solo lectura; cada parte por separado (si una falla, sale su error) |
+| `ver_assistant_telnyx` | GET del assistant (por id o por el agente del negocio, dev o prod): modelo, saludo, tools con URL y timeout, voz, transcripción, variables, nodos del flujo, grabación; `buscar` dice dónde aparece un texto en toda la configuración (`mcp/telnyx.ts`) | Solo GET; la clave (dev: `.env`; prod: Secret Manager `TELNYX_API_KEY`) nunca sale en la respuesta |
+| `ver_conversacion_telnyx` | Mensajes en orden con las tools llamadas y lo que devolvieron, por `conversationId`, por llamada (`calls.providerConversationId`), la del Gestor (`businesses.ownerConversationId`) o la del chat de un cliente (`client_conversations`) | Igual; lee hasta 1.000 mensajes (los más recientes) |
+| `lanzar_job_prod` | `gcloud scheduler jobs run` de `telnyx-reconciler`, `cleanup-zombie-calls` o `retry-stuck-recordings`, espera su intento (hasta 2 min) y devuelve resultado y logs (`mcp/jobsDeProd.ts`) | Lista cerrada: no lanza los que mandan correos o WhatsApp, borran grabaciones, suspenden cuentas, reportan a Stripe ni el health-check (contaría para el failover) |
 
 Las tools simuladas se ejecutan de verdad: `book_appointment` reserva en el calendario real del
 negocio de dev. Lo que **no** sale desde `backend-sim` son los WhatsApp, SMS y correos:
@@ -444,7 +451,11 @@ negocio de dev. Lo que **no** sale desde `backend-sim` son los WhatsApp, SMS y c
 manda; en producción se ignora aunque esté puesto. `simular_webhook_retell` va al backend de dev,
 que sí envía. Antes de firmar, las dos herramientas de webhooks comprueban que hay backend
 escuchando y, si no, dicen cómo levantarlo. Las consultas leen las columnas `timestamp` sin zona
-de Prisma como UTC (`mcp/pg.ts`); `pg` las tomaba por hora local y desplazaba todas las horas. Las claves de simulación se generan con
+de Prisma como UTC (`mcp/pg.ts`); `pg` las tomaba por hora local y desplazaba todas las horas. Lo de producción y Telnyx enmascara por defecto los
+teléfonos E.164 (deja el prefijo y las 3 últimas cifras; `mostrarTelefonos: true` los enseña): los de
+los clientes salen en logs, conversaciones y tools. Revertir datos de producción sin el panel = escribir
+en la BD (no hay herramienta de escritura, a propósito) y lanzar el reconciliador con `lanzar_job_prod`,
+que sincroniza Telnyx con la configuración de producción. Las claves de simulación se generan con
 `cd backend && npx tsx mcp/generarClavesDeSimulacion.ts` y van al `.env` de la raíz. La
 verificación de firmas del backend no se toca: el MCP firma como el proveedor.
 

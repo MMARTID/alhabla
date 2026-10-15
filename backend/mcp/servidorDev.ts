@@ -5,12 +5,21 @@ import { z } from "zod";
 import { avisosDeCuerpo, catalogoDeToolsDeVoz } from "./catalogoDeTools.js";
 import { cargarEnv, urlDeBdDeDev, variable } from "./entorno.js";
 import { leerEnviosSimulados } from "./enviosSimulados.js";
+import { describirTabla } from "./esquema.js";
+import { estadoDeProd } from "./estadoDeProd.js";
+import {
+  JOBS_QUE_NO,
+  JOBS_QUE_SE_PUEDEN_LANZAR,
+  lanzarJobDeProd,
+} from "./jobsDeProd.js";
+import { leerLogsDeProd, leerPeticionesDeProd } from "./logsDeProd.js";
 import {
   borrarLlamadasSimuladas,
   crearLlamadaSimulada,
 } from "./llamadasSimuladas.js";
 import { pararProxy, urlDeBdDeProd } from "./prod.js";
 import { ejecutarSoloLectura } from "./sqlDeSoloLectura.js";
+import { urlDeBd, verAssistant, verConversacion } from "./telnyx.js";
 import {
   BASE_RETELL_DEV,
   BASE_TELNYX_SIMULACION,
@@ -30,6 +39,14 @@ import {
  * - listar_tools_voz: las tools de voz con sus argumentos, sacadas del código
  *   que las registra en Telnyx.
  * - ver_envios_simulados: los WhatsApp/SMS/correos que backend-sim no envió.
+ * - describir_tabla: tablas, columnas, índices y claves de dev o producción.
+ * - ver_logs_prod / ver_peticiones_prod: Cloud Logging de alhabla-api.
+ * - estado_prod: revisión, imagen, /health, colas, jobs y último deploy.
+ * - ver_assistant_telnyx / ver_conversacion_telnyx: GET a Telnyx AI.
+ * - lanzar_job_prod: solo los jobs del Scheduler que se pueden repetir.
+ *
+ * Lo de producción y Telnyx enmascara los teléfonos salvo que se pida lo
+ * contrario (privacidad.ts).
  *
  * stdout es el canal del protocolo: todo log va a stderr.
  */
@@ -297,6 +314,170 @@ servidor.registerTool(
   },
   ({ businessId }) =>
     conErrores(() => borrarLlamadasSimuladas(urlDeBdDeDev(cargarEnv()), businessId))
+);
+
+const entorno = z
+  .enum(["dev", "prod"])
+  .describe(
+    "dev: Postgres de Docker y la clave de Telnyx del .env; prod: Cloud SQL y Secret Manager"
+  );
+const mostrarTelefonos = z
+  .boolean()
+  .optional()
+  .describe(
+    "Por defecto los teléfonos +34… salen enmascarados (las 3 últimas cifras)"
+  );
+
+servidor.registerTool(
+  "describir_tabla",
+  {
+    title: "Describir una tabla",
+    description:
+      "Sin tabla: todas las tablas de la BD (dev o prod) con su modelo de Prisma y las filas aproximadas. Con tabla (nombre real como bookings o modelo de Prisma como Booking): columnas con tipo, si admite NULL y valor por defecto, índices y claves foráneas. Es el esquema REAL de esa BD, útil antes de escribir SQL para consultar_bd_*.",
+    inputSchema: { entorno, tabla: z.string().optional() },
+    annotations: { readOnlyHint: true },
+  },
+  ({ entorno: cual, tabla }) =>
+    conErrores(async () => describirTabla(await urlDeBd(cual), tabla))
+);
+
+servidor.registerTool(
+  "ver_logs_prod",
+  {
+    title: "Ver los logs de producción",
+    description:
+      "Cloud Logging de alhabla-api, de la más vieja a la más nueva. Busca el texto en console.* (textPayload) y en el logger de Fastify (jsonPayload.msg y err.message) a la vez, y quita el ruido de «incoming request»/«request completed» y del log de peticiones. soloErrores mira stderr y el nivel de pino, porque console.error no trae severity. Devuelve también el filtro usado, por si hay que afinarlo. Para peticiones HTTP: ver_peticiones_prod.",
+    inputSchema: {
+      texto: z
+        .union([z.string(), z.array(z.string())])
+        .optional()
+        .describe("Texto a buscar (p. ej. «[Gestor]»); con varios, basta uno"),
+      desde: z
+        .string()
+        .optional()
+        .describe('"30m", "2h", "1d" o fecha ISO. Por defecto 1h'),
+      hasta: z.string().optional().describe("Igual que desde"),
+      soloErrores: z.boolean().optional(),
+      revision: z.string().optional().describe("p. ej. alhabla-api-00251-xz7"),
+      incluirRuido: z.boolean().optional(),
+      limite: z
+        .number()
+        .int()
+        .min(1)
+        .max(1000)
+        .optional()
+        .describe("Por defecto 100"),
+      mostrarTelefonos,
+    },
+    annotations: { readOnlyHint: true, openWorldHint: true },
+  },
+  (opciones) => conErrores(() => leerLogsDeProd(opciones))
+);
+
+servidor.registerTool(
+  "ver_peticiones_prod",
+  {
+    title: "Ver las peticiones HTTP de producción",
+    description:
+      "Peticiones a alhabla-api (método, estado, ruta, latencia, revisión), de la más vieja a la más nueva. Por defecto sin /health, /internal/ ni OPTIONS. Sirve para saber qué hizo el panel (p. ej. ruta «/booking-settings/professionals» y metodo PATCH) o qué falló (estadoMinimo 400).",
+    inputSchema: {
+      ruta: z.string().optional().describe("Texto que contiene la URL"),
+      metodo: z.string().optional(),
+      estadoMinimo: z.number().int().optional(),
+      desde: z
+        .string()
+        .optional()
+        .describe('"30m", "2h", "1d" o fecha ISO. Por defecto 1h'),
+      hasta: z.string().optional(),
+      incluirInternas: z.boolean().optional(),
+      limite: z.number().int().min(1).max(1000).optional(),
+      mostrarTelefonos,
+    },
+    annotations: { readOnlyHint: true, openWorldHint: true },
+  },
+  (opciones) => conErrores(() => leerPeticionesDeProd(opciones))
+);
+
+servidor.registerTool(
+  "estado_prod",
+  {
+    title: "Estado de producción",
+    description:
+      "Foto de producción: revisión que sirve y su tráfico, imagen (commit), máximo de instancias del servicio y de la plantilla (tiene que ser 11), condiciones que no están bien, /health, tareas por cola de Cloud Tasks, jobs del Scheduler cuyo último intento falló o en pausa, los 3 últimos deploys del backend y si producción sirve el último que salió bien. Para comprobar un merge o un «¿va todo bien?».",
+    inputSchema: {},
+    annotations: { readOnlyHint: true, openWorldHint: true },
+  },
+  () => conErrores(() => estadoDeProd())
+);
+
+servidor.registerTool(
+  "ver_assistant_telnyx",
+  {
+    title: "Ver un assistant de Telnyx",
+    description:
+      "GET de un assistant de Telnyx AI por su id o por el negocio (el de su agente). Por defecto un resumen: modelo, saludo, tamaño de las instrucciones, tools con su URL y timeout, voz, transcripción, variables dinámicas, nodos del flujo, grabación… Con buscar, además, dónde aparece ese texto en TODA la configuración (p. ej. el nombre de un profesional). completo devuelve el JSON entero con las cadenas largas recortadas.",
+    inputSchema: {
+      entorno,
+      assistantId: z.string().optional(),
+      businessId: z.string().optional(),
+      buscar: z.string().optional(),
+      completo: z.boolean().optional(),
+      mostrarTelefonos,
+    },
+    annotations: { readOnlyHint: true, openWorldHint: true },
+  },
+  (opciones) => conErrores(() => verAssistant(opciones))
+);
+
+servidor.registerTool(
+  "ver_conversacion_telnyx",
+  {
+    title: "Ver una conversación de Telnyx",
+    description:
+      "Mensajes de una conversación de Telnyx AI en orden, con las tools que llamó el modelo (nombre y argumentos) y lo que devolvieron. Se elige con conversationId, con llamada (id de la Call, su callId o el id del proveedor: la conversación de esa llamada de voz), con businessId (la del dueño con el Gestor) o con businessId + telefonoCliente (el chat de WhatsApp de ese cliente). ultimos limita a los N más recientes (60 por defecto); buscar filtra los mensajes que contienen un texto.",
+    inputSchema: {
+      entorno,
+      conversationId: z.string().optional(),
+      llamada: z.string().optional(),
+      businessId: z.string().optional(),
+      telefonoCliente: z.string().optional().describe("E.164, con businessId"),
+      ultimos: z.number().int().min(1).max(1000).optional(),
+      buscar: z.string().optional(),
+      conResultadosDeTools: z
+        .boolean()
+        .optional()
+        .describe("Por defecto true: incluye lo que devolvió cada tool"),
+      mostrarTelefonos,
+    },
+    annotations: { readOnlyHint: true, openWorldHint: true },
+  },
+  (opciones) => conErrores(() => verConversacion(opciones))
+);
+
+servidor.registerTool(
+  "lanzar_job_prod",
+  {
+    title: "Lanzar un job de producción",
+    description: `Ejecuta YA un job del Cloud Scheduler de producción (gcloud scheduler jobs run), espera a que termine (hasta 2 min) y devuelve su resultado y sus logs. Solo los que se pueden repetir sin efectos: ${Object.entries(
+      JOBS_QUE_SE_PUEDEN_LANZAR
+    )
+      .map(([job, { queHace }]) => `${job} (${queHace})`)
+      .join("; ")}. No se lanzan: ${Object.entries(JOBS_QUE_NO)
+      .map(([job, motivo]) => `${job} (${motivo})`)
+      .join("; ")}.`,
+    inputSchema: {
+      job: z.enum(
+        Object.keys(JOBS_QUE_SE_PUEDEN_LANZAR) as [string, ...string[]]
+      ),
+    },
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+  },
+  ({ job }) => conErrores(() => lanzarJobDeProd(job))
 );
 
 process.on("exit", pararProxy);

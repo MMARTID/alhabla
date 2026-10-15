@@ -1,8 +1,6 @@
-import { execFile, spawn, type ChildProcess } from "node:child_process";
+import { spawn, type ChildProcess } from "node:child_process";
 import { createServer } from "node:net";
-import { promisify } from "node:util";
-
-const ejecutar = promisify(execFile);
+import { PROYECTO, REGION, leerSecreto as leerSecretoDeGcloud } from "./gcloud.js";
 
 /**
  * Lectura de la BD de PRODUCCIÓN desde el Mac, con dos barreras:
@@ -18,8 +16,7 @@ const ejecutar = promisify(execFile);
  * con esas mismas credenciales (`--gcloud-auth`). El proxy se arranca la
  * primera vez que hace falta y muere con el MCP.
  */
-const PROYECTO = "project-84381467-a606-4b71-a6e";
-const INSTANCIA = `${PROYECTO}:europe-west1:alhabla-db`;
+const INSTANCIA = `${PROYECTO}:${REGION}:alhabla-db`;
 const BASE_DE_DATOS = "alhabla";
 export const USUARIO_DE_LECTURA = "alhabla_lectura";
 export const SECRETO_DE_LECTURA = "DB_LECTURA_PASSWORD";
@@ -35,18 +32,10 @@ export async function urlDeBdDeProd(): Promise<string> {
 
 async function leerSecreto(nombre: string): Promise<string> {
   try {
-    const { stdout } = await ejecutar("gcloud", [
-      "secrets",
-      "versions",
-      "access",
-      "latest",
-      `--secret=${nombre}`,
-      `--project=${PROYECTO}`,
-    ]);
-    return stdout.trim();
+    return await leerSecretoDeGcloud(nombre);
   } catch (error) {
     throw new Error(
-      `[MCP] No se pudo leer el secreto ${nombre} con gcloud: ${(error as Error).message}`,
+      `[MCP] No se pudo leer el secreto ${nombre} con gcloud: ${(error as Error).message.replace(/^\[MCP\] /, "")}`,
       { cause: error }
     );
   }
