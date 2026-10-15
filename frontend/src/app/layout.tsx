@@ -4,6 +4,7 @@ import "./globals.css";
 import { Providers } from "@/components/providers";
 import { AppShell } from "@/components/app-shell";
 import { AnaliticaDeLaApp } from "@/components/analitica-de-la-app";
+import { FranjaDev } from "@/components/franja-dev";
 import { defaultDescription, noindexMetadata, siteName, siteUrl } from "@/lib/seo";
 import { SCRIPT_DE_TEMA } from "@/lib/tema-inicial";
 import { SeguidorDelTema } from "@/lib/tema";
@@ -87,6 +88,7 @@ export default function RootLayout({
           <AppShell>{children}</AppShell>
         </Providers>
         <AnaliticaDeLaApp />
+        <FranjaDev />
       </body>
     </html>
   );

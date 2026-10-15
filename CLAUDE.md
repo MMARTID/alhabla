@@ -122,7 +122,29 @@ cd web && npm run dev        # la web pública, Next.js :3002
 
 docker compose --profile dev up   # backend + postgres + redis + cloudflared (desde la raíz)
 scripts/backend-sim.sh            # backend-sim :3010, destino de los webhooks de Telnyx simulados (también desde un worktree)
+
+scripts/dev/instalar.sh           # una vez en el Mac: entorno de desarrollo fijo al iniciar sesión
+scripts/dev/entorno.sh estado     # qué enseña el entorno fijo y qué responde
 ```
+
+## Entorno de desarrollo (desde 2026-10-15)
+
+Hay **un solo** entorno de desarrollo y es fijo: `~/.alhabla-dev` (worktree que ninguna sesión edita)
+con el backend de dev en Docker (`:3000`), la app (`:3001`) y la web (`:3002`), por defecto en el
+último `main`. Arranca solo al iniciar sesión en el Mac (LaunchAgents `ai.alhabla.dev.*`: Docker
+oculto, `main` al día, migraciones y la app en el navegador) y el panel `http://localhost:3005` dice
+qué enseña, qué responde, los PR abiertos y producción. La app lleva una pastilla «DEV · rama ·
+commit» que solo existe ahí. Reglas para las sesiones:
+
+- **Nunca** levantes `backend-dev` desde tu worktree (`docker compose up` fuera de `~/.alhabla-dev`) ni
+  ocupes `:3001`/`:3002`: tus vistas previas (`.claude/launch.json`) van a `:3101`/`:3102` contra el
+  backend fijo. Si el panel o `estado_dev` dicen `backendFueraDeSitio`, alguien lo hizo: devuélvelo
+  con `ver_en_dev`.
+- Para que el usuario vea tu cambio **antes de fusionar**: push de la rama y MCP `ver_en_dev` (o el
+  botón «Ver en dev» del panel); dale `http://localhost:3001`. Al acabar, `ver_en_dev main`.
+- Las migraciones de esa rama se aplican a la BD de dev (`botbook`), que es compartida.
+
+Detalle en `AGENTS.md` § Entorno de desarrollo fijo.
 
 ## Estructura
 

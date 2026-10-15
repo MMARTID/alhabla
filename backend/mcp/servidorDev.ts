@@ -20,6 +20,7 @@ import {
 import { pararProxy, urlDeBdDeProd } from "./prod.js";
 import { ejecutarSoloLectura } from "./sqlDeSoloLectura.js";
 import { urlDeBd, verAssistant, verConversacion } from "./telnyx.js";
+import { estadoDelEntorno, verRamaEnDev } from "./panel/entornoDev.js";
 import {
   BASE_RETELL_DEV,
   BASE_TELNYX_SIMULACION,
@@ -44,6 +45,8 @@ import {
  * - estado_prod: revisión, imagen, /health, colas, jobs y último deploy.
  * - ver_assistant_telnyx / ver_conversacion_telnyx: GET a Telnyx AI.
  * - lanzar_job_prod: solo los jobs del Scheduler que se pueden repetir.
+ * - estado_dev / ver_en_dev: el entorno de desarrollo fijo
+ *   (scripts/dev/entorno.sh): qué enseña y ponerlo en otra rama.
  *
  * Lo de producción y Telnyx enmascara los teléfonos salvo que se pida lo
  * contrario (privacidad.ts).
@@ -478,6 +481,38 @@ servidor.registerTool(
     },
   },
   ({ job }) => conErrores(() => lanzarJobDeProd(job))
+);
+
+servidor.registerTool(
+  "estado_dev",
+  {
+    title: "Estado del entorno de desarrollo fijo",
+    description:
+      "Qué rama enseña el entorno de desarrollo fijo (~/.alhabla-dev: backend :3000, app :3001, web :3002), su commit, si va por detrás de main, si se está cambiando de rama, si cada pieza responde y si el backend de dev sigue montado donde debe (backendFueraDeSitio: otra sesión lo levantó desde su worktree). Lo mismo que el panel http://localhost:3005.",
+    inputSchema: {},
+    annotations: { readOnlyHint: true },
+  },
+  () => conErrores(() => estadoDelEntorno())
+);
+
+servidor.registerTool(
+  "ver_en_dev",
+  {
+    title: "Enseñar una rama en el entorno de desarrollo",
+    description:
+      "Pone el entorno de desarrollo fijo en una rama YA SUBIDA a origin (o «main», o el número de un PR) para que el usuario la vea en http://localhost:3001 antes de fusionar: cambia la carpeta fija, instala dependencias si cambiaron, aplica las migraciones a la BD de dev y reinicia backend, app y web. Va en segundo plano (uno o dos minutos): sigue con estado_dev. Es el único entorno de dev: al acabar, vuelve a «main». Nunca levantes backend-dev desde tu worktree.",
+    inputSchema: {
+      rama: z.string().describe("Rama de origin, «main» o número de PR"),
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false },
+  },
+  ({ rama }) =>
+    conErrores(async () => {
+      verRamaEnDev(rama);
+      return {
+        mensaje: `Poniendo el entorno de desarrollo en ${rama}. Tarda uno o dos minutos; sigue con estado_dev y luego da al usuario http://localhost:3001.`,
+      };
+    })
 );
 
 process.on("exit", pararProxy);

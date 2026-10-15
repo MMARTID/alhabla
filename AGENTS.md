@@ -416,9 +416,53 @@ docker compose --profile prod up
 
 - Backend exposed on `localhost:3000`
 - Prisma Studio exposed on `localhost:5555`
-- The app (`localhost:3001`) and the public site (`localhost:3002`) are not in Compose: run them with `npm run dev`
+- The app (`localhost:3001`) and the public site (`localhost:3002`) are not in Compose: on the owner's Mac they run from the fixed dev environment (§ Entorno de desarrollo fijo, below); session previews use `:3101`/`:3102`
 - The dev profile adds `cloudflared`, a named Cloudflare tunnel exposing `backend-dev` at `https://dev-api.alhabla.ai` (`CLOUDFLARE_TUNNEL_TOKEN`)
 - The `sim` profile adds `backend-sim` (`localhost:3010`): the same dev backend and database, but trusting a locally generated Ed25519 key (`TELNYX_PUBLIC_KEY_SIMULACION`) instead of Telnyx's. It is the target of the Telnyx webhooks signed by the dev MCP below; `backend-dev` still accepts only real Telnyx signatures. Start it with `scripts/backend-sim.sh` (stop: `scripts/backend-sim.sh parar`), which works the same from the main checkout or a worktree: it links the main `.env`, uses project `asistai` and the override, and `--no-deps` so the running Postgres/Redis are reused. It mounts `backend/` of the checkout it is launched from
+
+### Entorno de desarrollo fijo (`scripts/dev/`, desde 2026-10-15)
+
+Antes, lo que corría en dev dependía de la última sesión que lo tocó: `backend-dev` montado sobre
+el worktree de otra sesión, el checkout principal en una rama de feature cualquiera, la app y la web
+apagadas salvo en la vista previa de alguna sesión. El dueño no veía nada hasta producción. Ahora hay
+dos carpetas fijas, worktrees que ninguna sesión edita:
+
+- **`~/.alhabla-dev`, lo que se enseña:** de ella salen `backend-dev` (Compose, proyecto `asistai`, con
+  el `.env` y el override del checkout principal enlazados), la app (`:3001`) y la web (`:3002`). Por
+  defecto en `origin/main`; `scripts/dev/entorno.sh ver <rama|main|nº de PR>` la pone en otra rama ya
+  subida a origin.
+- **`~/.alhabla-mcp`, las herramientas, siempre en `main`:** el MCP `alhabla-dev`, `scripts/dev/` y el
+  panel. Así el arranque y el panel funcionan aunque la rama que se enseña sea anterior a ellos.
+
+`scripts/dev/instalar.sh` (una vez) crea las carpetas, escribe cuatro LaunchAgents en
+`~/Library/LaunchAgents` y los carga: `ai.alhabla.dev.arranque` (al iniciar sesión: `entorno.sh
+arrancar`: abre Docker Desktop oculto con `open -g -j`, pone las herramientas y lo que se enseña en el
+último `main`, `npm ci` de app y web solo si cambió su lock, `docker compose up` del perfil dev —
+`--build --renew-anon-volumes` si cambió el lock del backend, `--force-recreate` si cambió el schema —,
+`prisma migrate deploy` dentro de `backend-dev` y abre `http://localhost:3001`) y `ai.alhabla.dev.app`,
+`.web` y `.panel` (`scripts/dev/servir.sh`, `KeepAlive`). Mientras `entorno.sh` cambia de rama deja
+el cerrojo `~/Library/Caches/alhabla-dev/actualizando` y la app y la web esperan; al acabar las
+reinicia (`launchctl kickstart -k`). `entorno.sh parar` deja la marca `parado` (launchd las
+relanzaría). También pone `OpenUIOnStartupDisabled` en los ajustes de Docker Desktop. Logs en
+`~/Library/Logs/alhabla-dev/{entorno,app,web,panel}.log`. `instalar.sh quitar` quita el arranque.
+Para probar cambios de estos scripts antes de fusionarlos: un worktree de la rama como herramientas
+(`ALHABLA_HERRAMIENTAS_DIR`) y `ALHABLA_HERRAMIENTAS_FIJAS=1`, que no lo pasa a `main`.
+
+- **Pastilla «DEV · rama · commit»** (`frontend/src/components/franja-dev.tsx`): solo si existe
+  `NEXT_PUBLIC_DEV_RAMA`, que pone `servir.sh`; ni producción ni las vistas previas la tienen. Enlaza
+  al panel.
+- **Panel `http://localhost:3005`** (`backend/mcp/panel/`): qué rama enseña y si va por detrás de
+  `main`, el estado de backend, app, web, Postgres, Redis, túnel y `backend-sim` (con reiniciar),
+  los PR abiertos con «Ver en dev», producción (`estado_prod` y errores de 24 h) y los envíos
+  simulados. Avisa en rojo de la mezcla: si `backend-dev` monta `/app` desde otra carpeta
+  (`backendFueraDeSitio`). Solo escucha en `127.0.0.1`, rechaza cualquier `Host` que no sea
+  `localhost:3005`/`127.0.0.1:3005` (DNS rebinding) y las acciones (`POST /api/ver`,
+  `/api/reiniciar`) exigen el `Origin` del panel y cuerpo JSON; la rama se valida antes de pasarla
+  al script.
+- **Vistas previas de las sesiones** (`.claude/launch.json`): `:3101` (app) y `:3102` (web), contra
+  el backend fijo; el login con Google no funciona ahí (sus URIs de redirección son las de `:3001`).
+- **MCP:** `estado_dev` y `ver_en_dev` hacen lo mismo que el panel desde una sesión, sin `git` fuera
+  de su worktree.
 
 ### MCP de desarrollo (`backend/mcp/`, desde 2026-10-14)
 

@@ -1,0 +1,327 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Alhabla · Desarrollo</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%238b5cf6'/%3E%3Ctext x='16' y='22' font-size='16' font-family='system-ui' font-weight='700' fill='white' text-anchor='middle'%3ED%3C/text%3E%3C/svg%3E">
+<style>
+  :root {
+    --lienzo: #fafafa; --superficie: #ffffff; --tinta: #0a0a0a; --apagado: #52525b;
+    --tenue: #a1a1aa; --linea: #e5e5e5; --linea-suave: #f0f0f0; --morado: #8b5cf6;
+    --morado-tinta: #6d28d9; --lavado: #f3eeff; --exito: #2c7334; --exito-fondo: #edf7ee;
+    --error: #c53030; --error-fondo: #fdecec; --aviso: #806012; --aviso-fondo: #fdf6e1;
+    --sombra: 0 1px 2px rgba(10,10,10,.04);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --lienzo: #0b0b0e; --superficie: #141418; --tinta: #f4f4f5; --apagado: #a1a1aa;
+      --tenue: #71717a; --linea: #27272a; --linea-suave: #1c1c21; --morado: #a78bfa;
+      --morado-tinta: #c4b5fd; --lavado: #1f1830; --exito: #6fcf7d; --exito-fondo: #12261a;
+      --error: #f87171; --error-fondo: #2a1414; --aviso: #e8c15a; --aviso-fondo: #2a2312;
+      --sombra: none;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--lienzo); color: var(--tinta);
+    font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  }
+  a { color: inherit; }
+  code, .mono { font-family: ui-monospace, monospace; font-size: 12.5px; }
+  header {
+    display: flex; align-items: center; justify-content: space-between; gap: 16px;
+    padding: 16px 24px; border-bottom: 1px solid var(--linea); background: var(--superficie);
+    position: sticky; top: 0; z-index: 2;
+  }
+  .marca { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 15px; }
+  .marca i { width: 26px; height: 26px; border-radius: 8px; background: var(--morado); display: inline-block; }
+  .marca span { color: var(--apagado); font-weight: 500; }
+  nav { display: flex; gap: 6px; flex-wrap: wrap; }
+  nav a {
+    text-decoration: none; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--linea);
+    color: var(--apagado); font-size: 13px;
+  }
+  nav a:hover { color: var(--tinta); border-color: var(--tenue); }
+  main { max-width: 1180px; margin: 0 auto; padding: 24px; display: grid; gap: 16px; grid-template-columns: repeat(12, 1fr); }
+  .panel {
+    background: var(--superficie); border: 1px solid var(--linea); border-radius: 24px;
+    padding: 20px 22px; box-shadow: var(--sombra); grid-column: span 12; min-width: 0;
+  }
+  .mitad { grid-column: span 6; }
+  @media (max-width: 900px) { .mitad { grid-column: span 12; } main { padding: 16px; } header { padding: 14px 16px; } }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--apagado); margin: 0 0 14px; font-weight: 600; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .rama { font-size: 26px; font-weight: 700; letter-spacing: -.01em; word-break: break-all; }
+  .sub { color: var(--apagado); }
+  .fila { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .entre { justify-content: space-between; }
+  .boton {
+    border: 1px solid var(--linea); background: var(--superficie); color: var(--tinta);
+    border-radius: 10px; padding: 7px 12px; font: inherit; font-size: 13px; cursor: pointer; text-decoration: none;
+    display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
+  }
+  .boton:hover { border-color: var(--tenue); }
+  .boton.primario { background: var(--tinta); color: var(--superficie); border-color: var(--tinta); }
+  .boton.morado { background: var(--lavado); color: var(--morado-tinta); border-color: transparent; font-weight: 600; }
+  .boton:disabled { opacity: .45; cursor: default; }
+  .insignia { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 12px; font-weight: 600; background: var(--linea-suave); color: var(--apagado); }
+  .insignia.ok { background: var(--exito-fondo); color: var(--exito); }
+  .insignia.fallo { background: var(--error-fondo); color: var(--error); }
+  .insignia.aviso, .insignia.pendiente { background: var(--aviso-fondo); color: var(--aviso); }
+  .insignia.morado { background: var(--lavado); color: var(--morado-tinta); }
+  .aviso {
+    border-radius: 14px; padding: 12px 14px; margin-top: 14px; display: flex; gap: 12px; align-items: flex-start; justify-content: space-between; flex-wrap: wrap;
+  }
+  .aviso.urgente { background: var(--error-fondo); color: var(--error); }
+  .aviso.info { background: var(--aviso-fondo); color: var(--aviso); }
+  .aviso p { margin: 0; flex: 1 1 320px; }
+  ul.lista { list-style: none; margin: 0; padding: 0; }
+  ul.lista li { padding: 10px 0; border-top: 1px solid var(--linea-suave); display: flex; gap: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+  ul.lista li:first-child { border-top: 0; padding-top: 0; }
+  .punto { width: 9px; height: 9px; border-radius: 50%; flex: none; background: var(--tenue); }
+  .punto.ok { background: var(--exito); } .punto.caido { background: var(--error); }
+  .nombre { display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .nombre b { font-weight: 600; }
+  .detalle { color: var(--apagado); font-size: 12.5px; }
+  .pr-titulo { font-weight: 600; text-decoration: none; }
+  .pr-titulo:hover { text-decoration: underline; }
+  .datos { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; margin-bottom: 14px; }
+  .dato { background: var(--lienzo); border: 1px solid var(--linea-suave); border-radius: 14px; padding: 10px 12px; }
+  .dato small { display: block; color: var(--apagado); font-size: 12px; }
+  .dato strong { font-size: 15px; word-break: break-all; }
+  pre.registro {
+    margin: 0; max-height: 260px; overflow: auto; background: var(--lienzo); border: 1px solid var(--linea-suave);
+    border-radius: 14px; padding: 12px; white-space: pre-wrap; word-break: break-word;
+  }
+  table { width: 100%; border-collapse: collapse; }
+  td, th { text-align: left; padding: 7px 8px 7px 0; border-top: 1px solid var(--linea-suave); vertical-align: top; }
+  th { color: var(--apagado); font-weight: 500; font-size: 12.5px; border-top: 0; }
+  .vacio { color: var(--apagado); }
+  .cargando { color: var(--apagado); font-style: italic; }
+  #toast {
+    position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(20px); opacity: 0;
+    background: var(--tinta); color: var(--superficie); padding: 10px 16px; border-radius: 12px; transition: .2s; max-width: 90vw;
+  }
+  #toast.visible { opacity: 1; transform: translateX(-50%); }
+</style>
+</head>
+<body>
+<header>
+  <div class="marca"><i></i>Alhabla <span>· desarrollo</span></div>
+  <nav>
+    <a href="http://localhost:3001" target="_blank">App dev</a>
+    <a href="http://localhost:3002" target="_blank">Web dev</a>
+    <a href="https://app.alhabla.ai" target="_blank">App producción</a>
+    <a href="https://github.com/MMARTID/botbook/pulls" target="_blank">GitHub</a>
+  </nav>
+</header>
+
+<main>
+  <section class="panel" id="viendo"><p class="cargando">Mirando el entorno…</p></section>
+
+  <section class="panel mitad">
+    <h2>Servicios <span class="detalle" id="servicios-hora"></span></h2>
+    <ul class="lista" id="servicios"><li class="cargando">Comprobando…</li></ul>
+  </section>
+
+  <section class="panel mitad">
+    <h2>Pull requests abiertos <button class="boton" onclick="cargarPrs()">Actualizar</button></h2>
+    <ul class="lista" id="prs"><li class="cargando">Preguntando a GitHub…</li></ul>
+  </section>
+
+  <section class="panel">
+    <h2>Producción <button class="boton" onclick="cargarProduccion()">Actualizar</button></h2>
+    <div id="produccion"><p class="cargando">Preguntando a Google Cloud…</p></div>
+  </section>
+
+  <section class="panel mitad">
+    <h2>Envíos simulados (24 h) <button class="boton" onclick="cargarEnvios()">Actualizar</button></h2>
+    <p class="detalle" style="margin-top:-6px">WhatsApp, SMS y correos que el backend de simulación no mandó.</p>
+    <div id="envios"><p class="cargando">Leyendo…</p></div>
+  </section>
+
+  <section class="panel mitad">
+    <h2>Registro del entorno</h2>
+    <pre class="registro mono" id="registro">…</pre>
+  </section>
+</main>
+<div id="toast"></div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let estado = null;
+
+function esc(texto) {
+  return String(texto ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+function hace(fechaIso) {
+  if (!fechaIso) return "";
+  const s = Math.round((Date.now() - new Date(fechaIso)) / 1000);
+  if (s < 60) return "hace un momento";
+  if (s < 3600) return `hace ${Math.round(s / 60)} min`;
+  if (s < 86400) return `hace ${Math.round(s / 3600)} h`;
+  return `hace ${Math.round(s / 86400)} d`;
+}
+function hora(fechaIso) {
+  return fechaIso ? new Date(fechaIso).toLocaleString("es-ES", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "";
+}
+function aviso(texto) {
+  const t = $("toast"); t.textContent = texto; t.classList.add("visible");
+  clearTimeout(aviso.temporizador); aviso.temporizador = setTimeout(() => t.classList.remove("visible"), 4000);
+}
+async function pedir(ruta, cuerpo) {
+  const opciones = cuerpo
+    ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(cuerpo) }
+    : {};
+  const respuesta = await fetch(ruta, opciones);
+  const datos = await respuesta.json();
+  if (!respuesta.ok) throw new Error(datos.error || `HTTP ${respuesta.status}`);
+  return datos;
+}
+
+async function verRama(rama) {
+  try { aviso((await pedir("/api/ver", { rama })).mensaje); setTimeout(cargarEstado, 1500); }
+  catch (e) { aviso(e.message); }
+}
+async function reiniciarPieza(pieza, boton) {
+  if (boton) boton.disabled = true;
+  try { aviso((await pedir("/api/reiniciar", { pieza })).mensaje); }
+  catch (e) { aviso(e.message); }
+  finally { if (boton) boton.disabled = false; setTimeout(cargarEstado, 2000); }
+}
+
+function pintarViendo(e) {
+  const enMain = e.rama === "main";
+  const detras = e.commitsDetrasDeMain;
+  let html = `
+    <div class="fila entre">
+      <div>
+        <h2 style="margin-bottom:6px">Qué enseña ahora el entorno de desarrollo</h2>
+        <div class="rama">${esc(e.rama ?? "¿?")} ${enMain ? '<span class="insignia ok" style="vertical-align:middle">main</span>' : '<span class="insignia morado" style="vertical-align:middle">rama</span>'}</div>
+        <div class="sub"><code>${esc(e.commit ?? "")}</code> ${esc(e.asunto ?? "")} · ${esc(hace(e.fecha))}</div>
+      </div>
+      <div class="fila">
+        <a class="boton primario" href="http://localhost:3001" target="_blank">Abrir la app</a>
+        ${enMain ? "" : `<button class="boton" onclick="verRama('main')">Volver a main</button>`}
+        ${enMain && detras > 0 ? `<button class="boton" onclick="verRama('main')">Traer lo último de main</button>` : ""}
+      </div>
+    </div>`;
+  if (enMain && detras > 0) {
+    html += `<div class="aviso info"><p>Hay ${detras} commit${detras === 1 ? "" : "s"} nuevo${detras === 1 ? "" : "s"} en main que el entorno aún no enseña.</p></div>`;
+  }
+  if (e.actualizando) {
+    html += `<div class="aviso info"><p>Cambiando de rama: instalando, migrando y reiniciando. Tarda uno o dos minutos; el registro de abajo dice por dónde va.</p></div>`;
+  }
+  if (e.parado) {
+    html += `<div class="aviso info"><p>El entorno está parado.</p><button class="boton" onclick="verRama('${esc(e.rama ?? "main")}')">Arrancarlo</button></div>`;
+  }
+  if (e.backendFueraDeSitio) {
+    html += `<div class="aviso urgente"><p><b>Mezcla:</b> el backend de dev está montado sobre <code>${esc(e.backendMontadoEn)}</code>, no sobre el entorno fijo. Lo que ves en la app usa el backend de esa carpeta (otra sesión lo movió).</p>
+      <button class="boton" onclick="verRama('${esc(e.rama ?? "main")}')">Volver a ponerlo aquí</button></div>`;
+  }
+  $("viendo").innerHTML = html;
+}
+
+function pintarServicios(e) {
+  const reiniciables = { backend: "Reiniciar", app: "Reiniciar", web: "Reiniciar", sim: "Levantar" };
+  $("servicios").innerHTML = e.piezas.map((p) => `
+    <li>
+      <div class="nombre"><span class="punto ${p.estado}"></span>
+        <div><b>${esc(p.nombre)}</b>${p.url ? ` <a class="detalle" href="${esc(p.url)}" target="_blank">${esc(p.url.replace(/^https?:\/\//, ""))}</a>` : ""}
+        ${p.detalle ? `<div class="detalle">${esc(p.detalle)}</div>` : ""}</div>
+      </div>
+      ${reiniciables[p.id] && !(p.id === "sim" && p.estado === "ok") ? `<button class="boton" onclick="reiniciarPieza('${p.id}', this)">${reiniciables[p.id]}</button>` : ""}
+    </li>`).join("");
+  $("servicios-hora").textContent = new Date().toLocaleTimeString("es-ES");
+}
+
+async function cargarEstado() {
+  try {
+    estado = await pedir("/api/estado");
+    pintarViendo(estado);
+    pintarServicios(estado);
+    const { lineas } = await pedir("/api/registro");
+    const pre = $("registro");
+    const abajo = pre.scrollTop + pre.clientHeight >= pre.scrollHeight - 10;
+    pre.textContent = lineas.length ? lineas.join("\n") : "Sin registro todavía.";
+    if (abajo) pre.scrollTop = pre.scrollHeight;
+  } catch (e) {
+    $("viendo").innerHTML = `<div class="aviso urgente"><p>No pude leer el estado: ${esc(e.message)}</p></div>`;
+  }
+}
+
+async function cargarPrs() {
+  $("prs").innerHTML = `<li class="cargando">Preguntando a GitHub…</li>`;
+  try {
+    const prs = await pedir("/api/prs");
+    if (!prs.length) { $("prs").innerHTML = `<li class="vacio">No hay PR abiertos.</li>`; return; }
+    const ci = { ok: "CI bien", fallo: "CI falla", pendiente: "CI en marcha" };
+    $("prs").innerHTML = prs.map((pr) => `
+      <li>
+        <div style="min-width:0;flex:1 1 240px">
+          <a class="pr-titulo" href="${esc(pr.url)}" target="_blank">#${pr.numero} ${esc(pr.titulo)}</a>
+          <div class="detalle"><code>${esc(pr.rama)}</code> · ${esc(hace(pr.actualizado))}
+            ${pr.ci ? ` · <span class="insignia ${pr.ci}">${ci[pr.ci]}</span>` : ""}
+            ${pr.borrador ? ' · <span class="insignia">borrador</span>' : ""}</div>
+        </div>
+        ${estado && estado.rama === pr.rama
+          ? '<span class="insignia morado">Se está viendo</span>'
+          : `<button class="boton morado" onclick="verRama('${esc(pr.rama)}')">Ver en dev</button>`}
+      </li>`).join("");
+  } catch (e) {
+    $("prs").innerHTML = `<li class="vacio">No pude leer los PR: ${esc(e.message)}</li>`;
+  }
+}
+
+function pintarProduccion(p) {
+  const s = p.servicio || {};
+  const salud = p.salud && p.salud.cuerpo && p.salud.cuerpo.dependencies;
+  const colas = Array.isArray(p.colas) ? p.colas.filter((c) => c.tareas > 0) : [];
+  const conFallo = p.jobs && p.jobs.conFallo ? p.jobs.conFallo : [];
+  const ultimo = Array.isArray(p.despliegues) ? p.despliegues[0] : null;
+  const errores = p.errores && p.errores.lineas ? p.errores.lineas.slice().reverse() : [];
+  let html = `<div class="datos">
+    <div class="dato"><small>Revisión que sirve</small><strong>${esc(s.revisionLista || s.error || "¿?")}</strong></div>
+    <div class="dato"><small>Commit</small><strong class="mono">${esc((s.commit || "").slice(0, 7))}</strong>
+      ${p.sirveElUltimoDeployBueno === true ? ' <span class="insignia ok">último deploy</span>' : p.sirveElUltimoDeployBueno === false ? ' <span class="insignia aviso">no es el último</span>' : ""}</div>
+    <div class="dato"><small>/health</small><strong>${salud ? Object.entries(salud).map(([k, v]) => `<span class="insignia ${v === "ok" ? "ok" : "fallo"}">${esc(k)}</span>`).join(" ") : esc(p.salud && p.salud.error || "¿?")}</strong></div>
+    <div class="dato"><small>Máximo de instancias</small><strong>${esc(s.maxInstanciasDelServicio ?? "¿?")}</strong> ${s.maxInstanciasDelServicio === "11" ? '<span class="insignia ok">bien</span>' : '<span class="insignia fallo">revisar</span>'}</div>
+    <div class="dato"><small>Último deploy</small><strong>${ultimo ? `${esc(ultimo.resultado || ultimo.estado)} · ${esc(hace(ultimo.creado))}` : "¿?"}</strong></div>
+    <div class="dato"><small>Tareas en cola</small><strong>${colas.length ? colas.map((c) => `${esc(c.cola)}: ${c.tareas}`).join(", ") : "ninguna"}</strong></div>
+  </div>`;
+  if (conFallo.length) {
+    html += `<div class="aviso urgente"><p>Jobs con el último intento fallido: ${conFallo.map((j) => `<b>${esc(j.job)}</b> (${esc(j.fallo.mensaje || j.fallo.codigo)})`).join(", ")}</p></div>`;
+  }
+  html += `<h2 style="margin-top:16px">Errores y avisos de las últimas 24 h</h2>`;
+  html += errores.length
+    ? `<table><tr><th style="width:120px">Cuándo</th><th>Mensaje</th></tr>${errores.map((l) => `<tr><td class="detalle">${esc(hora(l.hora))}</td><td class="mono">${esc(l.mensaje)}${l.error ? `<div class="detalle">${esc(l.error)}</div>` : ""}</td></tr>`).join("")}</table>`
+    : `<p class="vacio">${p.errores && p.errores.error ? esc(p.errores.error) : "Ninguno. 🎉"}</p>`;
+  $("produccion").innerHTML = html;
+}
+
+async function cargarProduccion() {
+  $("produccion").innerHTML = `<p class="cargando">Preguntando a Google Cloud…</p>`;
+  try { pintarProduccion(await pedir("/api/produccion")); }
+  catch (e) { $("produccion").innerHTML = `<p class="vacio">No pude leer producción: ${esc(e.message)}</p>`; }
+}
+
+async function cargarEnvios() {
+  $("envios").innerHTML = `<p class="cargando">Leyendo…</p>`;
+  try {
+    const { envios } = await pedir("/api/envios");
+    $("envios").innerHTML = envios.length
+      ? `<table><tr><th>Cuándo</th><th>Canal</th><th>Destino</th><th>Detalle</th></tr>${envios.slice().reverse().map((e) => `<tr><td class="detalle">${esc(hora(e.momento))}</td><td>${esc(e.canal)}</td><td class="mono">${esc(e.destino)}</td><td class="detalle">${esc(e.detalle)}</td></tr>`).join("")}</table>`
+      : `<p class="vacio">Nada en las últimas 24 h.</p>`;
+  } catch (e) {
+    $("envios").innerHTML = `<p class="vacio">${esc(e.message.replace(/^\[MCP\] /, ""))}</p>`;
+  }
+}
+
+cargarEstado().then(cargarPrs);
+cargarProduccion();
+cargarEnvios();
+setInterval(cargarEstado, 5000);
+setInterval(cargarPrs, 60000);
+</script>
+</body>
+</html>
