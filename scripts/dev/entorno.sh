@@ -179,7 +179,15 @@ case "$accion" in
   arrancar)
     registro "--- Arranque del entorno de desarrollo ---"
     esperar_docker || exit 1
+    herramientas_antes=$(git -C "$HERRAMIENTAS" rev-parse HEAD 2>/dev/null)
     actualizar_herramientas
+    # Este arranque ya tiene en memoria la versión vieja de este script: si
+    # las herramientas han cambiado, se relanza con la nueva (sin volver a
+    # actualizarlas), para que un cambio aquí valga desde el primer arranque.
+    if [ "$herramientas_antes" != "$(git -C "$HERRAMIENTAS" rev-parse HEAD 2>/dev/null)" ]; then
+      registro "Herramientas actualizadas: se sigue con la versión nueva del arranque"
+      ALHABLA_HERRAMIENTAS_FIJAS=1 exec /bin/bash "$HERRAMIENTAS/scripts/dev/entorno.sh" arrancar
+    fi
     if git -C "$DIR" fetch -q origin 2>>"$LOGS/entorno.log"; then
       poner_en origin/main main || exit 1
     else
