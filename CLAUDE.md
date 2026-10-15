@@ -132,7 +132,7 @@ scripts/dev/entorno.sh estado     # qué enseña el entorno fijo y qué responde
 Hay **un solo** entorno de desarrollo y es fijo: `~/.alhabla-dev` (worktree que ninguna sesión edita)
 con el backend de dev en Docker (`:3000`), la app (`:3001`) y la web (`:3002`), por defecto en el
 último `main`. Arranca solo al iniciar sesión en el Mac (LaunchAgents `ai.alhabla.dev.*`: Docker
-oculto, `main` al día, migraciones y la app en el navegador) y el panel `http://localhost:3005` dice
+oculto, `main` al día, migraciones y la app en Chrome) y el panel `http://localhost:3005` dice
 qué enseña, qué responde, los PR abiertos y producción. La app lleva una pastilla «DEV · rama ·
 commit» que solo existe ahí. Reglas para las sesiones:
 

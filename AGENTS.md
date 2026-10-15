@@ -439,7 +439,7 @@ dos carpetas fijas, worktrees que ninguna sesión edita:
 arrancar`: abre Docker Desktop oculto con `open -g -j`, pone las herramientas y lo que se enseña en el
 último `main`, `npm ci` de app y web solo si cambió su lock, `docker compose up` del perfil dev —
 `--build --renew-anon-volumes` si cambió el lock del backend, `--force-recreate` si cambió el schema —,
-`prisma migrate deploy` dentro de `backend-dev` y abre `http://localhost:3001`) y `ai.alhabla.dev.app`,
+`prisma migrate deploy` dentro de `backend-dev` y abre `http://localhost:3001` en Chrome, o en `ALHABLA_DEV_NAVEGADOR`) y `ai.alhabla.dev.app`,
 `.web` y `.panel` (`scripts/dev/servir.sh`, `KeepAlive`). Mientras `entorno.sh` cambia de rama deja
 el cerrojo `~/Library/Caches/alhabla-dev/actualizando` y la app y la web esperan; al acabar las
 reinicia (`launchctl kickstart -k`). `entorno.sh parar` deja la marca `parado` (launchd las

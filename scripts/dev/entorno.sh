@@ -74,6 +74,12 @@ esperar_docker() {
   return 1
 }
 
+# En Chrome (preferencia del dueño, 15-10); ALHABLA_DEV_NAVEGADOR lo cambia.
+# Si ese navegador no está, el del sistema.
+abrir_en_navegador() {
+  open -a "${ALHABLA_DEV_NAVEGADOR:-Google Chrome}" "$1" 2>/dev/null || open "$1"
+}
+
 esperar_url() {
   local url=$1 intentos=${2:-60} i
   for i in $(seq 1 "$intentos"); do
@@ -184,7 +190,7 @@ case "$accion" in
     fi
     if esperar_url "$URL_APP" 80; then
       registro "Listo: $URL_APP"
-      [ "${ALHABLA_DEV_SIN_NAVEGADOR:-}" = "1" ] || open "$URL_APP"
+      [ "${ALHABLA_DEV_SIN_NAVEGADOR:-}" = "1" ] || abrir_en_navegador "$URL_APP"
     else
       registro "La app no respondió; mira $LOGS/app.log"
     fi
