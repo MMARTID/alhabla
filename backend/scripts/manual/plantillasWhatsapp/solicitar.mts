@@ -10,7 +10,11 @@
  * Editar una plantilla aprobada la devuelve a revisión: mientras tanto no se
  * puede enviar y la cascada de `elegirPlantillaCliente` cae a la anterior
  * aprobada (`confirmacion_cita`, `recordatorio_cita`…). Meta deja editar una
- * aprobada como mucho 10 veces al mes.
+ * aprobada como mucho 10 veces al mes y una vez al día, y la rechaza con
+ * 2388039 («Message Template Status Can't Be Changed») mientras hay otro
+ * idioma del mismo nombre en revisión (16-10: las 35 traducciones recién
+ * creadas): primero las nuevas, y las ediciones cuando Meta las resuelva
+ * (`--idioma es --enviar`).
  *
  * Telnyx no tiene borradores: `POST /v2/whatsapp/message_templates` manda la
  * plantilla a revisión de Meta en el acto, y una plantilla `PENDING` no se
@@ -23,7 +27,7 @@
  *   npx tsx scripts/manual/plantillasWhatsapp/solicitar.mts --nombre hueco_libre --enviar
  *
  * Salta las que ya existen en el WABA con el mismo nombre e idioma, salvo las
- * marcadas `editar`, que se editan (`PATCH /v2/whatsapp_message_templates/{id}`).
+ * marcadas `editar`, que se editan (`PATCH /v2/whatsapp/message_templates/{id}`).
  * Después de enviar, `sincronizarWhatsapp.mts` las vuelca en
  * `WhatsappTemplate`.
  * Requiere TELNYX_API_KEY y WHATSAPP_WABA_ID (UUID del WABA en Telnyx).
@@ -49,7 +53,9 @@ interface Argumentos {
 }
 
 const API = "https://api.telnyx.com/v2/whatsapp/message_templates";
-const API_EDITAR = "https://api.telnyx.com/v2/whatsapp_message_templates";
+// La de la documentación del SDK (`/v2/whatsapp_message_templates/{id}`) da
+// 404; la que existe es la misma ruta de la lista con el id (16-10).
+const API_EDITAR = API;
 
 function leerArgumentos(argv: string[]): Argumentos {
   const args: Argumentos = { enviar: false };
