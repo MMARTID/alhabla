@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { resolveInicioDeSemana } from "../../src/jobs/sendWeeklySummary.js";
+import {
+  resolveInicioDeSemana,
+  resolverSemanaDelResumen,
+} from "../../src/jobs/sendWeeklySummary.js";
 
 /** Cómo se ve ese instante en el reloj de Madrid. */
 function enMadrid(fecha: Date): string {
@@ -53,5 +56,43 @@ describe("resolveInicioDeSemana", () => {
     const inicio = resolveInicioDeSemana(new Date("2026-01-04T22:30:00Z"));
 
     expect(enMadrid(inicio)).toContain("29/12/2025");
+  });
+});
+
+describe("resolverSemanaDelResumen", () => {
+  it("el lunes a las 08:00 resume la semana que acaba de terminar", () => {
+    // Lunes 12 de octubre de 2026, 08:00 en Madrid (06:00Z): la hora a la
+    // que lo lanza Cloud Scheduler. Antes resumía del 12 al 19 (futuro).
+    const { inicio, fin, lunesActual } = resolverSemanaDelResumen(
+      new Date("2026-10-12T06:00:00Z")
+    );
+
+    expect(enMadrid(inicio)).toContain("05/10/2026");
+    expect(enMadrid(inicio)).toContain("00:00");
+    expect(enMadrid(fin)).toContain("12/10/2026");
+    expect(enMadrid(fin)).toContain("00:00");
+    expect(lunesActual.getTime()).toBe(fin.getTime());
+  });
+
+  it("la semana del cambio de hora de octubre dura 169 horas", () => {
+    // Lunes 26 de octubre: la semana del 19 al 26 tiene el domingo 25 con
+    // una hora de más.
+    const { inicio, fin } = resolverSemanaDelResumen(
+      new Date("2026-10-26T07:00:00Z")
+    );
+
+    expect(enMadrid(inicio)).toContain("19/10/2026");
+    expect(enMadrid(inicio)).toContain("00:00");
+    expect(enMadrid(fin)).toContain("26/10/2026");
+    expect((fin.getTime() - inicio.getTime()) / 3_600_000).toBe(169);
+  });
+
+  it("la semana del cambio de hora de marzo dura 167 horas", () => {
+    const { inicio, fin } = resolverSemanaDelResumen(
+      new Date("2026-03-30T06:00:00Z")
+    );
+
+    expect(enMadrid(inicio)).toContain("23/03/2026");
+    expect((fin.getTime() - inicio.getTime()) / 3_600_000).toBe(167);
   });
 });

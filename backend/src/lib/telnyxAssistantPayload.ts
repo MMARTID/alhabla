@@ -736,8 +736,10 @@ export function buildTelnyxAssistantPayload(
     // por preferencia del usuario, no por ahorro. La única palanca real de
     // coste es la duración de la llamada.
     model: "openai/gpt-5.6-luna",
-    // Kimi-K2.6 como fallback: a diferencia de Gemini, es un modelo
-    // alojado por Telnyx (como el propio gpt-5.6-luna) — no exige una
+    // gpt-5.6-luna NO lo aloja Telnyx: `GET /v2/ai/models` lo da con
+    // `owned_by: "openai"`, así que la conversación sale a OpenAI (fuera del
+    // EEE; docs/auditorias/2026-10-16-pipelines-ue-y-datos.md). Kimi-K2.6,
+    // el fallback, sí es de Telnyx (`owned_by: "Telnyx"`): no exige una
     // Integration Secret propia, y es el modelo ya validado con llamadas
     // reales antes de este cambio.
     fallbackConfig: { model: "moonshotai/Kimi-K2.6" },

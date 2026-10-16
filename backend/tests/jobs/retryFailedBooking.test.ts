@@ -292,7 +292,10 @@ describe("processRetryFailedBookingJob", () => {
           durationMinutes: 30,
           professionalId: "pro_1",
           serviceIds: ["service_1"],
+          // Sin el nombre, la cita recuperada salía anónima en el panel.
+          clientName: "Ana García",
         }),
+        update: expect.objectContaining({ clientName: "Ana García" }),
       })
     );
     expect(mockLeadUpdate).toHaveBeenCalledWith({
@@ -328,6 +331,28 @@ describe("processRetryFailedBookingJob", () => {
           },
         }),
       })
+    );
+  });
+
+  it("no reserva a ciegas si el calendario externo sigue sin poder leerse: lanza para que Cloud Tasks reintente", async () => {
+    mockedLeadFindUnique.mockResolvedValue(buildLead() as any);
+    mockedCallFindUnique.mockResolvedValue({ businessId: "biz_1" } as any);
+    mockedBusinessFindUnique.mockResolvedValue(buildBusiness() as any);
+    // Así contesta getBusyIntervals cuando Google da un error al leer.
+    mockedGetBusyIntervals.mockResolvedValue({
+      intervals: [],
+      calendarAvailabilityKnown: false,
+    } as any);
+
+    await expect(processRetryFailedBookingJob({ leadId })).rejects.toThrow(
+      "Calendario ilegible"
+    );
+    expect(mockedBookAppointment).not.toHaveBeenCalled();
+    expect(mockUpsert).not.toHaveBeenCalled();
+    expect(mockLeadUpdate).not.toHaveBeenCalled();
+    expect(mockedReleaseBookingLock).toHaveBeenCalledWith(
+      "biz_1",
+      "lock-token"
     );
   });
 
