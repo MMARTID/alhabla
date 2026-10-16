@@ -81,6 +81,10 @@ describe("passwordResetService", () => {
 
       expect(mockedEnqueueEmailJob).toHaveBeenCalledTimes(1);
       const job = mockedEnqueueEmailJob.mock.calls[0][0];
+      // Clave por petición, sin el token ni su hash.
+      expect(mockedEnqueueEmailJob.mock.calls[0][1]).toMatch(
+        /^restablecer-user_123-[0-9a-f]{16}$/
+      );
       expect(job.fromAlias).toBe("support");
       expect(job.toAddress).toBe("cliente@example.com");
       expect(job.subject).toContain("Restablece tu contraseña");
@@ -134,7 +138,8 @@ describe("passwordResetService", () => {
           fromAlias: "support",
           toAddress: "cliente@example.com",
           subject: "Tu contraseña de Alhabla ha cambiado",
-        })
+        }),
+        "contrasena-cambiada-user_123-3"
       );
       // Sale con la versión nueva para emitir el token de la sesión. El
       // enlace de este caso es del formato antiguo, sin versión: sigue

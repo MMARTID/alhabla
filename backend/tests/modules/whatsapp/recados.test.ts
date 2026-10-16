@@ -21,6 +21,8 @@ vi.mock("../../../src/lib/prisma.js", () => ({
     lead: { create: vi.fn(), findFirst: vi.fn(), update: vi.fn() },
     booking: { findFirst: vi.fn() },
     user: { findFirst: vi.fn() },
+    $transaction: vi.fn(),
+    $executeRaw: vi.fn(),
   },
 }));
 vi.mock("../../../src/lib/cloudTasks.js", () => ({
@@ -46,6 +48,8 @@ const mockedEmail = vi.mocked(enqueueEmailJob);
 const mockedRevisarEscalada = vi.mocked(enqueueRevisarEscaladaJob);
 const mockedLeerIntento = vi.mocked(leerIntentoDeReservaFallido);
 const mockedBookingFindFirst = vi.mocked(prisma.booking.findFirst);
+const mockedTransaction = vi.mocked(prisma.$transaction);
+const mockedExecuteRaw = vi.mocked(prisma.$executeRaw);
 
 const NEGOCIO = {
   id: "biz_1",
@@ -78,6 +82,10 @@ beforeEach(() => {
   mockedRevisarEscalada.mockResolvedValue(undefined);
   mockedLeerIntento.mockResolvedValue(null);
   mockedBookingFindFirst.mockResolvedValue(null);
+  // El lead del recado se crea en una transacción con cerrojo por llamada.
+  mockedTransaction.mockImplementation((async (fn: (tx: unknown) => unknown) =>
+    fn(prisma)) as never);
+  mockedExecuteRaw.mockResolvedValue(1);
 });
 
 describe("normalización", () => {
@@ -348,7 +356,9 @@ describe("procesarInformeFinal", () => {
     });
     expect(mockedAvisar).toHaveBeenCalledTimes(1);
 
-    // Con el recado ya guardado, otro informe con recado no vuelve a avisar.
+    // Con el recado ya guardado (y su lead), otro informe con recado no
+    // vuelve a avisar.
+    mockedLeadFindFirst.mockResolvedValue({ id: "lead_1", data: {} } as never);
     yaHabiaInforme();
     mockedCallFindUnique.mockResolvedValue(
       llamadaConInforme({
@@ -532,6 +542,8 @@ describe("procesarInformeFinal", () => {
       .mockResolvedValueOnce({ count: 0 }) // otro informe se adelantó
       .mockResolvedValue({ count: 1 });
     const GUARDADO_B = new Date("2026-10-07T10:00:01Z");
+    // El otro informe trajo el recado y creó su lead.
+    mockedLeadFindFirst.mockResolvedValue({ id: "lead_otro", data: {} } as never);
     mockedCallFindUnique
       .mockResolvedValueOnce(
         llamadaConInforme({ resultado: "RESOLVED", recado: null })
@@ -718,7 +730,8 @@ describe("escalada por fallo técnico sin recado", () => {
     expect(resultado.outcome).toBe("actualizado");
     expect(mockedRevisarEscalada).toHaveBeenCalledWith(
       { callId: "call_row", intento: 1 },
-      expect.any(Date)
+      expect.any(Date),
+      undefined // la cadena de la escalada, sin sufijo
     );
   });
 
@@ -818,7 +831,8 @@ describe("escalada por fallo técnico sin recado", () => {
 
       expect(mockedRevisarEscalada).toHaveBeenCalledWith(
         { callId: "call_row", intento: 4 },
-        expect.any(Date)
+        expect.any(Date),
+        undefined // la cadena de la escalada, sin sufijo
       );
       expect(mockedLeadCreate).not.toHaveBeenCalled();
     });
@@ -835,15 +849,17 @@ describe("escalada por fallo técnico sin recado", () => {
           mockedLeadFindFirst.mockResolvedValue({ id: "lead_previo" } as never),
       },
       {
-        caso: "el informe ya trae recado (revisión repetida por Cloud Tasks)",
-        preparar: () =>
+        caso: "el informe ya trae recado con su lead (revisión repetida por Cloud Tasks)",
+        preparar: () => {
           mockedCallFindUnique.mockResolvedValue({
             ...LLAMADA_TERMINADA,
             postCallReport: {
               ...INFORME_FALLO,
               recado: { motivo: "Quería reservar Corte…", nombre: "Daniel" },
             },
-          } as never),
+          } as never);
+          mockedLeadFindFirst.mockResolvedValue({ id: "lead_previo" } as never);
+        },
       },
       {
         caso: "el informe final ya no es de fallo técnico",
@@ -871,7 +887,8 @@ describe("escalada por fallo técnico sin recado", () => {
       expect(mockedLeadCreate).not.toHaveBeenCalled();
       expect(mockedRevisarEscalada).toHaveBeenCalledWith(
         { callId: "call_row", intento: 2 },
-        expect.any(Date)
+        expect.any(Date),
+        undefined // la cadena de la escalada, sin sufijo
       );
     });
 
@@ -881,5 +898,169 @@ describe("escalada por fallo técnico sin recado", () => {
       await expect(revisarEscaladaSinRecado("call_row")).rejects.toThrow("BD caída");
       expect(mockedAvisar).not.toHaveBeenCalled();
     });
+
+    it("si el lead del recado que crea no se puede guardar, lanza (Cloud Tasks la repite) y la repetición lo recupera del informe", async () => {
+      mockedLeadCreate.mockRejectedValueOnce(new Error("BD caída"));
+
+      await expect(revisarEscaladaSinRecado("call_row")).rejects.toThrow("BD caída");
+      expect(mockedAvisar).not.toHaveBeenCalled();
+      const escrito = (
+        mockedUpdateMany.mock.calls[0][0] as {
+          data: { postCallReport: Record<string, unknown> };
+        }
+      ).data.postCallReport;
+
+      // La repetición encuentra el recado ya escrito en el informe y sin lead.
+      mockedUpdateMany.mockClear();
+      mockedCallFindUnique.mockResolvedValue({
+        ...LLAMADA_TERMINADA,
+        postCallReport: escrito,
+      } as never);
+      await revisarEscaladaSinRecado("call_row");
+
+      expect(mockedUpdateMany).not.toHaveBeenCalled();
+      expect(mockedLeadCreate).toHaveBeenCalledTimes(2);
+      expect(mockedAvisar).toHaveBeenCalledTimes(1);
+      expect(mockedAvisar).toHaveBeenCalledWith(
+        expect.objectContaining({
+          leadId: "lead_1",
+          clientPhone: "+34600999888",
+          quiereQueLeLlamen: true,
+        })
+      );
+    });
+  });
+});
+
+// Hallazgo 5 de la auditoría del 16-10 (pipelines): si `lead.create` fallaba,
+// el recado quedaba en el informe pero nadie volvía a crearlo: el informe
+// siguiente ya no lo traía como nuevo y la revisión lo daba por hecho.
+describe("recado sin lead", () => {
+  const INFORME_CON_RECADO = {
+    resultado: "LEAD_CAPTURED",
+    motivo_escalada: "NO_APLICA",
+    recado: {
+      nombre: "María",
+      telefono: "612 345 678",
+      motivo: "Que la llamen por el balayage",
+      quiere_que_le_llamen: true,
+    },
+  };
+  const RECADO_GUARDADO = {
+    nombre: "María",
+    telefono: "+34612345678",
+    motivo: "Que la llamen por el balayage",
+    quiere_que_le_llamen: true,
+  };
+
+  it("si falla lead.create en el primer informe, no avisa y programa la revisión que lo recupera", async () => {
+    mockedLeadCreate.mockRejectedValueOnce(new Error("BD caída"));
+
+    const resultado = await procesarInformeFinal({
+      business: NEGOCIO,
+      callControlId: "v3:abc",
+      params: INFORME_CON_RECADO,
+    });
+
+    expect(resultado).toEqual({ outcome: "guardado", leadId: null });
+    expect(mockedAvisar).not.toHaveBeenCalled();
+    // Con nombre propio: no la absorbe una revisión de escalada anterior.
+    expect(mockedRevisarEscalada).toHaveBeenCalledWith(
+      { callId: "call_row", intento: 1 },
+      expect.any(Date),
+      "recado"
+    );
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringContaining("se programa su recuperación")
+    );
+  });
+
+  it("el informe siguiente recupera el recado del anterior que se quedó sin lead, y no lo duplica si ya existe", async () => {
+    mockedUpdateMany
+      .mockResolvedValueOnce({ count: 0 }) // el reclamo del primero
+      .mockResolvedValue({ count: 1 }); // la combinación
+    mockedCallFindUnique.mockResolvedValue({
+      ...CALL_SIN_INSIGHTS,
+      businessId: NEGOCIO.id,
+      postCallReport: {
+        resultado: "LEAD_CAPTURED",
+        recado: RECADO_GUARDADO,
+      },
+      postCallReportAt: new Date("2026-10-16T10:00:00Z"),
+    } as never);
+
+    const resultado = await procesarInformeFinal({
+      business: NEGOCIO,
+      callControlId: "v3:abc",
+      params: { resultado: "RESOLVED", servicio_pedido: "Balayage" },
+    });
+
+    expect(resultado).toEqual({
+      outcome: "duplicado-con-recado",
+      leadId: "lead_1",
+    });
+    // Dentro de la transacción, con el cerrojo de la llamada.
+    expect(mockedExecuteRaw).toHaveBeenCalledTimes(1);
+    expect(mockedExecuteRaw.mock.calls[0].slice(1)).toEqual(["recado:call_row"]);
+    expect(mockedLeadCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          callId: "call_row",
+          type: "message",
+          data: expect.objectContaining({
+            clientName: "María",
+            clientPhone: "+34612345678",
+            motivo: "Que la llamen por el balayage",
+          }),
+        }),
+      })
+    );
+    expect(mockedAvisar).toHaveBeenCalledTimes(1);
+
+    // Con el lead ya creado (otro informe lo creó a la vez), no se duplica.
+    mockedLeadCreate.mockClear();
+    mockedAvisar.mockClear();
+    mockedLeadFindFirst.mockResolvedValue({ id: "lead_1", data: {} } as never);
+    mockedUpdateMany
+      .mockResolvedValueOnce({ count: 0 })
+      .mockResolvedValue({ count: 1 });
+    const otro = await procesarInformeFinal({
+      business: NEGOCIO,
+      callControlId: "v3:abc",
+      params: { resultado: "RESOLVED", servicio_pedido: "Mechas" },
+    });
+    expect(otro).toEqual({ outcome: "actualizado", leadId: null });
+    expect(mockedLeadCreate).not.toHaveBeenCalled();
+    expect(mockedAvisar).not.toHaveBeenCalled();
+  });
+
+  it("la revisión recupera un recado del informe sin lead aunque la escalada no sea técnica", async () => {
+    mockedCallFindUnique.mockResolvedValue({
+      id: "call_row",
+      callId: "v3:abc",
+      status: "COMPLETED",
+      fromNumber: "+34600999888",
+      postCallReport: {
+        resultado: "LEAD_CAPTURED",
+        motivo_escalada: "NO_APLICA",
+        recado: RECADO_GUARDADO,
+      },
+      postCallReportAt: new Date("2026-10-16T10:00:00Z"),
+      business: NEGOCIO,
+    } as never);
+
+    await revisarEscaladaSinRecado("call_row");
+
+    expect(mockedLeadCreate).toHaveBeenCalledTimes(1);
+    expect(mockedAvisar).toHaveBeenCalledWith(
+      expect.objectContaining({
+        leadId: "lead_1",
+        clientName: "María",
+        clientPhone: "+34612345678",
+        motivo: "Que la llamen por el balayage",
+      })
+    );
+    // Lo escrito en el informe no se toca.
+    expect(mockedUpdateMany).not.toHaveBeenCalled();
   });
 });

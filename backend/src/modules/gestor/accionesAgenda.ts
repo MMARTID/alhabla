@@ -1311,9 +1311,12 @@ const avisarCliente: AccionDelGestor<AvisarCliente> = {
     }
     const cliente = cita.clientName?.trim() || "el cliente";
     if (params.tipo === "confirmacion") {
+      // Sufijo por petición: con la clave de la confirmación de la llamada
+      // el reenvío sería «ya enviado» (o tarea repetida) y no saldría.
       const r = await programarMensajesAlCliente({
         bookingId: cita.id,
         etiqueta,
+        sufijoConfirmacion: `g${meta.accionId}`,
       });
       if (r.confirmacion !== "programada") {
         return {

@@ -1,11 +1,17 @@
-import { Readable, Transform } from "stream";
+import { pipeline, Readable, Transform } from "stream";
 import { prisma } from "../lib/prisma.js";
 import { uploadRecording } from "../lib/storage.js";
 import { ProcessRecordingJob } from "../lib/jobTypes.js";
 import { PermanentJobError } from "../lib/jobErrors.js";
 import { telnyxAiAdapter } from "../adapters/telnyx/TelnyxAiAdapter.js";
 
-const RECORDING_DOWNLOAD_TIMEOUT_MS = 5 * 60_000;
+// Un solo plazo para todo el job (descarga con sus redirects, la URL nueva
+// de Telnyx y la subida a R2), por debajo de los 180 s con los que Cloud
+// Tasks da la tarea por perdida y la repite (`dispatchDeadline` en
+// lib/cloudTasks.ts). Con los 5 min de antes, la primera seguía bajando el
+// audio mientras la segunda empezaba. Una llamada dura como mucho 10 min:
+// ~2,4 MB en MP3, ~19 MB en el WAV de antes del issue #280.
+const PLAZO_DEL_JOB_MS = 150_000;
 const MAX_RECORDING_BYTES = 200 * 1024 * 1024;
 const MAX_RECORDING_REDIRECTS = 5;
 
@@ -30,6 +36,29 @@ class DescargaRechazadaError extends Error {
     super(`Failed to download recording: ${statusText || status}`);
     this.name = "DescargaRechazadaError";
   }
+}
+
+/**
+ * Fallo que no se arregla repitiendo: el audio pasa del tamaño máximo o la
+ * URL no se puede descargar (esquema o destino no permitidos). La grabación
+ * se marca irrecuperable y la tarea sale de la cola; antes volvía cada
+ * 15 min (retryStuckRecordings) durante los 30 días de retención.
+ */
+class GrabacionNoRecuperableError extends Error {
+  constructor(
+    message: string,
+    readonly reason: "recording_too_large" | "recording_url_not_allowed"
+  ) {
+    super(message);
+    this.name = "GrabacionNoRecuperableError";
+  }
+}
+
+function demasiadoGrande(): GrabacionNoRecuperableError {
+  return new GrabacionNoRecuperableError(
+    "Recording exceeds the maximum accepted size",
+    "recording_too_large"
+  );
 }
 
 /**
@@ -90,6 +119,7 @@ async function marcarIrrecuperable(callId: string, motivo: string): Promise<void
  */
 export async function processRecordingJob(data: ProcessRecordingJob): Promise<void> {
   console.log(`[Job] Processing recording for call ${data.callId}`);
+  const plazo = AbortSignal.timeout(PLAZO_DEL_JOB_MS);
 
   try {
     const { callId, externalUrl } = data;
@@ -135,46 +165,18 @@ export async function processRecordingJob(data: ProcessRecordingJob): Promise<vo
     }
 
     console.log(`[Job] Downloading recording from: ${externalUrl}`);
-    let recording: Awaited<ReturnType<typeof downloadRecording>>;
     try {
-      recording = await downloadRecording(externalUrl);
+      await copiarAR2(call, pendingRecording.providerLegId, externalUrl, plazo);
     } catch (error) {
-      if (!(error instanceof DescargaRechazadaError) || !esUrlAgotada(error.status)) {
+      if (!(error instanceof GrabacionNoRecuperableError)) {
         throw error;
       }
-      const urlNueva =
-        call.voiceProvider === "telnyx"
-          ? await pedirUrlNuevaATelnyx(callId, pendingRecording.providerLegId, externalUrl)
-          : null;
-      if (!urlNueva) {
-        const motivo = `El proveedor respondió ${error.status} al descargar y no hay grabación que volver a pedir`;
-        await marcarIrrecuperable(callId, motivo);
-        throw new PermanentJobError(
-          `[Job] Grabación de ${callId} irrecuperable: ${motivo}`,
-          "recording_unavailable"
-        );
-      }
-      console.log(`[Job] URL caducada (${error.status}); Telnyx ha dado una nueva para ${callId}`);
-      recording = await downloadRecording(urlNueva);
+      await marcarIrrecuperable(callId, error.message);
+      throw new PermanentJobError(
+        `[Job] Grabación de ${callId} irrecuperable (negocio ${call.businessId}): ${error.message}`,
+        error.reason
+      );
     }
-
-    // El negocio sale de la fila Call, no del payload del job: si ambos no
-    // coincidieran, guardar bajo el prefijo del payload dejaría el audio de
-    // un negocio colgando del espacio de otro.
-    const storageKey = `recordings/${call.businessId}/${callId}.mp3`;
-    console.log(`[Job] Uploading to storage with key: ${storageKey}`);
-
-    const storageUrl = await uploadRecording(
-      storageKey,
-      recording.stream,
-      recording.contentType,
-      recording.contentLength
-    );
-
-    await prisma.recording.update({
-      where: { callId },
-      data: { storageKey, storageUrl },
-    });
 
     console.log(`[Job] Recording successfully processed for call ${callId}`);
   } catch (error) {
@@ -190,6 +192,71 @@ export async function processRecordingJob(data: ProcessRecordingJob): Promise<vo
 }
 
 /**
+ * Descarga el audio (con una URL nueva de Telnyx si la guardada caducó), lo
+ * sube a R2 y anota la clave. Todo dentro de `plazo`.
+ */
+async function copiarAR2(
+  call: { id: string; businessId: string; voiceProvider: string | null },
+  providerLegId: string | null,
+  externalUrl: string,
+  plazo: AbortSignal
+): Promise<void> {
+  const callId = call.id;
+  let recording: Awaited<ReturnType<typeof downloadRecording>>;
+  try {
+    recording = await downloadRecording(externalUrl, plazo);
+  } catch (error) {
+    if (!(error instanceof DescargaRechazadaError) || !esUrlAgotada(error.status)) {
+      throw error;
+    }
+    const urlNueva =
+      call.voiceProvider === "telnyx"
+        ? await pedirUrlNuevaATelnyx(callId, providerLegId, externalUrl)
+        : null;
+    if (!urlNueva) {
+      const motivo = `El proveedor respondió ${error.status} al descargar y no hay grabación que volver a pedir`;
+      await marcarIrrecuperable(callId, motivo);
+      throw new PermanentJobError(
+        `[Job] Grabación de ${callId} irrecuperable: ${motivo}`,
+        "recording_unavailable"
+      );
+    }
+    console.log(`[Job] URL caducada (${error.status}); Telnyx ha dado una nueva para ${callId}`);
+    recording = await downloadRecording(urlNueva, plazo);
+  }
+
+  // El negocio sale de la fila Call, no del payload del job: si ambos no
+  // coincidieran, guardar bajo el prefijo del payload dejaría el audio de
+  // un negocio colgando del espacio de otro.
+  const storageKey = `recordings/${call.businessId}/${callId}.mp3`;
+  console.log(`[Job] Uploading to storage with key: ${storageKey}`);
+
+  // El SDK de S3 hace `body.pipe(peticion)`, que no le pasa los errores
+  // del audio: si el límite de tamaño corta a mitad de la subida, el PUT
+  // se quedaba esperando bytes y el error, sin nadie que lo escuchara,
+  // tumbaba el proceso. Se escucha aquí y aborta la subida.
+  const falloDelAudio = new AbortController();
+  recording.stream.on("error", (error) => falloDelAudio.abort(error));
+  let storageUrl: string;
+  try {
+    storageUrl = await uploadRecording(
+      storageKey,
+      recording.stream,
+      recording.contentType,
+      recording.contentLength,
+      AbortSignal.any([plazo, falloDelAudio.signal])
+    );
+  } catch (error) {
+    throw falloDelAudio.signal.aborted ? falloDelAudio.signal.reason : error;
+  }
+
+  await prisma.recording.update({
+    where: { callId },
+    data: { storageKey, storageUrl },
+  });
+}
+
+/**
  * La URL de la grabación llega dentro de webhooks firmados de Retell/Telnyx,
  * pero este job la descarga desde dentro de la red de Cloud Run: si alguna
  * vez llegara una URL manipulada, un `fetch` sin filtro sería una vía directa
@@ -202,11 +269,17 @@ function assertDescargaPermitida(url: string): URL {
   try {
     destino = new URL(url);
   } catch {
-    throw new Error("La URL de la grabación no es válida");
+    throw new GrabacionNoRecuperableError(
+      "La URL de la grabación no es válida",
+      "recording_url_not_allowed"
+    );
   }
 
   if (destino.protocol !== "https:") {
-    throw new Error(`Esquema no permitido para descargar la grabación: ${destino.protocol}`);
+    throw new GrabacionNoRecuperableError(
+      `Esquema no permitido para descargar la grabación: ${destino.protocol}`,
+      "recording_url_not_allowed"
+    );
   }
 
   const host = destino.hostname.toLowerCase();
@@ -220,13 +293,16 @@ function assertDescargaPermitida(url: string): URL {
     host.startsWith("[fd") ||
     host.startsWith("[fe80");
   if (esIpPrivada) {
-    throw new Error(`Destino no permitido para descargar la grabación: ${host}`);
+    throw new GrabacionNoRecuperableError(
+      `Destino no permitido para descargar la grabación: ${host}`,
+      "recording_url_not_allowed"
+    );
   }
 
   return destino;
 }
 
-async function downloadRecording(url: string): Promise<{
+async function downloadRecording(url: string, plazo: AbortSignal): Promise<{
   stream: Readable;
   contentType: string;
   contentLength?: number;
@@ -237,7 +313,7 @@ async function downloadRecording(url: string): Promise<{
   let destino = assertDescargaPermitida(url);
   let response = await fetch(destino, {
     redirect: "manual",
-    signal: AbortSignal.timeout(RECORDING_DOWNLOAD_TIMEOUT_MS),
+    signal: plazo,
   });
   for (let salto = 0; salto < MAX_RECORDING_REDIRECTS && esRedirect(response); salto += 1) {
     const location = response.headers.get("location");
@@ -247,7 +323,7 @@ async function downloadRecording(url: string): Promise<{
     destino = assertDescargaPermitida(new URL(location, destino).toString());
     response = await fetch(destino, {
       redirect: "manual",
-      signal: AbortSignal.timeout(RECORDING_DOWNLOAD_TIMEOUT_MS),
+      signal: plazo,
     });
   }
   if (esRedirect(response)) {
@@ -263,7 +339,7 @@ async function downloadRecording(url: string): Promise<{
   const declaredLength = Number(response.headers.get("content-length"));
   const hasDeclaredLength = Number.isFinite(declaredLength) && declaredLength > 0;
   if (hasDeclaredLength && declaredLength > MAX_RECORDING_BYTES) {
-    throw new Error("Recording exceeds the maximum accepted size");
+    throw demasiadoGrande();
   }
 
   let downloadedBytes = 0;
@@ -271,7 +347,7 @@ async function downloadRecording(url: string): Promise<{
     transform(chunk, _encoding, callback) {
       downloadedBytes += Buffer.byteLength(chunk);
       if (downloadedBytes > MAX_RECORDING_BYTES) {
-        callback(new Error("Recording exceeds the maximum accepted size"));
+        callback(demasiadoGrande());
         return;
       }
       callback(null, chunk);
@@ -279,8 +355,12 @@ async function downloadRecording(url: string): Promise<{
   });
 
   const source = Readable.fromWeb(response.body as import("stream/web").ReadableStream);
+  // `pipeline` y no `pipe`: un corte a mitad de la descarga (red o plazo)
+  // llega al limitador como error, que copiarAR2 escucha. Con `pipe` el
+  // error del origen no tenía quien lo escuchara y tumbaba el proceso.
+  pipeline(source, sizeLimiter, () => undefined);
   return {
-    stream: source.pipe(sizeLimiter),
+    stream: sizeLimiter,
     contentType: response.headers.get("content-type") || "audio/mpeg",
     // Sin esto, uploadRecording() no puede fijar ContentLength en el PUT a
     // R2 y la carga en streaming falla (ver storage.ts) — no se pasa
