@@ -2,14 +2,16 @@
 
 import { BadgeCheck } from "lucide-react";
 import { useCupoDeFundador } from "@/lib/cupo-fundador";
-import { formatPlanPrice, type Plan } from "@/lib/plans";
+import { formatPlanPrice, formatPriceWithVat, type Plan } from "@/lib/plans";
 
 /**
- * El precio de una tarjeta de plan. Mientras quedan plazas de fundador, el
- * precio vigente va tachado y al lado el de fundador, que es el que cobra el
- * checkout (billing/service.ts usa el mismo recuento). Sin plazas, o si la
- * consulta falla, solo el precio vigente: nunca se anuncia un descuento que
- * quizá ya no existe.
+ * El precio de una tarjeta de plan: la cuota sin IVA en grande, «+ IVA/mes»
+ * al lado y el total con IVA debajo, que es lo que el checkout cobra
+ * (los precios de Stripe son «exclusive»). Mientras quedan plazas de
+ * fundador, el precio vigente va tachado y al lado el de fundador, que es el
+ * que cobra el checkout (billing/service.ts usa el mismo recuento). Sin
+ * plazas, o si la consulta falla, solo el precio vigente: nunca se anuncia un
+ * descuento que quizá ya no existe.
  */
 export function PrecioDePlan({
   plan,
@@ -28,10 +30,13 @@ export function PrecioDePlan({
 
   if (!cupo) {
     return (
-      <p className={`${cifra} font-black tracking-tight ${principal}`}>
-        {formatPlanPrice(plan.price)}
-        <span className={`text-base font-medium ${apagado}`}>/mes</span>
-      </p>
+      <div>
+        <p className={`${cifra} font-black tracking-tight ${principal}`}>
+          {formatPlanPrice(plan.price)}
+          <span className={`text-base font-medium ${apagado}`}> + IVA/mes</span>
+        </p>
+        <p className={`mt-1 text-sm font-medium ${apagado}`}>{formatPriceWithVat(plan.price)}</p>
+      </div>
     );
   }
 
@@ -45,9 +50,10 @@ export function PrecioDePlan({
         <span className={`${cifra} font-black tracking-tight ${principal}`}>
           <span className="sr-only">Ahora </span>
           {formatPlanPrice(plan.founderPrice)}
-          <span className={`text-base font-medium ${apagado}`}>/mes</span>
+          <span className={`text-base font-medium ${apagado}`}> + IVA/mes</span>
         </span>
       </p>
+      <p className={`mt-1 text-sm font-medium ${apagado}`}>{formatPriceWithVat(plan.founderPrice)}</p>
       <span
         className={`mt-2 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${
           oscuro ? "bg-white/10 text-[#ddd6fe]" : "bg-[#f3eeff] text-[#6d28d9] ring-1 ring-inset ring-[#ddd6fe]"

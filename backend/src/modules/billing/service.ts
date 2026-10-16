@@ -11,6 +11,7 @@ import { provisionPhoneNumber } from "../phone/service.js";
 import {
   getAllFounderPriceIds,
   getFounderPriceId,
+  isFounderPriceId,
   getPlanByPriceId,
   getPriceId,
   getUsagePriceId,
@@ -33,11 +34,11 @@ import { invalidarCacheDeVoz } from "../../lib/voiceConfigCache.js";
 
 const CHECKOUT_TRIAL_DAYS = 7;
 /**
- * Precio de fundador (subida de precios 2026-10): los primeros
- * FOUNDER_SLOTS_TOTAL negocios en contratar CUALQUIER plan —no por plan—
- * pagan el precio anterior a la subida, de por vida. Cuenta negocios que
- * alguna vez tuvieron un precio de fundador y no baja si cancelan: es "los
- * primeros en llegar", no "mantener siempre 15 activos".
+ * Precio de fundador: los primeros FOUNDER_SLOTS_TOTAL negocios en contratar
+ * CUALQUIER plan —no por plan— pagan el precio de fundador de por vida
+ * (tabla 2026-10-16: 39/99/199 € + IVA). Cuenta los negocios que están en un
+ * precio de fundador vigente; al cambiar la tabla se migran al nuevo para que
+ * sigan contando.
  */
 const FOUNDER_SLOTS_TOTAL = 15;
 const PAYMENT_FAILURE_SUSPENSION_DAYS = 7;
@@ -161,6 +162,7 @@ export async function getBillingSummary(businessId: string) {
     cancelAtPeriodEnd: business.subscriptionCancelAtPeriodEnd,
     includedMinutes: plan?.includedMinutes ?? null,
     extraMinuteCents: plan?.extraMinuteCents ?? null,
+    precioDeFundador: isFounderPriceId(business.stripePriceId),
     consumedMinutes,
     effectivePlanId,
     maxProfessionals: planLimits.maxProfessionals,
@@ -369,17 +371,16 @@ export async function createCheckoutSession(input: {
     line_items: [{ price: priceId, quantity: 1 }, { price: usagePriceId }],
     payment_method_collection: "always",
     allow_promotion_codes: true,
-    // IVA (desde el 2026-10-08): el aviso legal dice que los precios lo
-    // incluyen, pero hasta ahora las facturas no lo desglosaban. Stripe Tax
-    // lo calcula con el registro de España dado de alta en la cuenta (sin
-    // registro saldría a 0) y, como los precios no fijan tax_behavior, con
-    // el de los ajustes de impuestos: «inferred_by_currency», que en euros
-    // es IVA incluido (79 € = 65,29 € + 13,71 € de IVA). La suscripción que
-    // crea el checkout lo hereda, así que las renovaciones y los minutos
-    // extra también lo llevan. customer_update.address «auto» es requisito
-    // de automatic_tax con un cliente ya creado. Con un NIF-IVA de otro país
-    // de la UE (tax_id_collection) Stripe aplica la inversión del sujeto
-    // pasivo.
+    // IVA: Stripe Tax lo calcula con el registro de España dado de alta en
+    // la cuenta (sin registro saldría a 0). Desde la tabla del 2026-10-16
+    // los precios llevan tax_behavior «exclusive»: 59 € + 21 % = 71,39 €,
+    // como dicen la web y el aviso legal. Los precios anteriores no lo
+    // fijaban y heredaban «inferred_by_currency», que en euros es IVA
+    // incluido. La suscripción que crea el checkout lo hereda, así que las
+    // renovaciones y los minutos extra también lo llevan.
+    // customer_update.address «auto» es requisito de automatic_tax con un
+    // cliente ya creado. Con un NIF-IVA de otro país de la UE
+    // (tax_id_collection) Stripe aplica la inversión del sujeto pasivo.
     automatic_tax: { enabled: true },
     tax_id_collection: { enabled: true },
     customer_update: { address: "auto", name: "auto" },

@@ -6,9 +6,9 @@ describe("Aviso legal", () => {
   it("muestra la fecha de actualización en español", () => {
     render(<AvisoLegalPage />);
 
-    const fecha = screen.getByText("13 de octubre de 2026");
+    const fecha = screen.getByText("16 de octubre de 2026");
     expect(fecha.tagName).toBe("TIME");
-    expect(fecha).toHaveAttribute("datetime", "2026-10-13");
+    expect(fecha).toHaveAttribute("datetime", "2026-10-16");
   });
 
   it("enlaza en el índice cada apartado, con su título y sin anclas rotas", () => {
@@ -49,5 +49,12 @@ describe("Aviso legal", () => {
     expect(screen.getByText(/se te pide un método de pago/)).toHaveTextContent(
       /se cobra automáticamente el plan que hayas elegido/
     );
+  });
+});
+
+describe("Aviso legal: precios", () => {
+  it("dice que los precios no incluyen el IVA, como la página de planes", () => {
+    render(<AvisoLegalPage />);
+    expect(screen.getByText(/no incluyen el IVA/)).toBeInTheDocument();
   });
 });

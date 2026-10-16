@@ -546,7 +546,21 @@ describe("getBillingSummary", () => {
 
     expect(result).not.toBeNull();
     expect(result?.consumedMinutes).toBe(3); // 125s → ceil(125/60) = 3
-    expect(result?.includedMinutes).toBe(150);
+    expect(result?.includedMinutes).toBe(200);
+    expect(result?.precioDeFundador).toBe(false);
+  });
+
+  it("marca el precio de fundador para que la app enseñe lo que paga", async () => {
+    process.env.STRIPE_PRICE_INICIO_FOUNDER = "price_test_founder_inicio";
+    mockedBusinessFindUnique.mockResolvedValue(
+      buildBusiness({ stripePriceId: "price_test_founder_inicio" }) as any
+    );
+    mockedCallAggregate.mockResolvedValue({ _sum: { durationSecs: 0 } } as any);
+
+    const result = await getBillingSummary(businessId);
+
+    expect(result?.planId).toBe("inicio");
+    expect(result?.precioDeFundador).toBe(true);
   });
 });
 

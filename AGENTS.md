@@ -67,7 +67,7 @@ Most modules are a folder containing a `routes.ts` file (and optionally `service
 | `recordings` | *(none)* | Yes | Recording metadata, review notes |
 | `calendar` | `/calendar` | Yes* | Google/Outlook OAuth, Apple/CalDAV sign-in with credentials, list events, book appointments. **CalDAV is user-supplied URL territory**: since 2026-09-24 every request the adapter makes goes through `fetchSoloPublico` (`lib/destinoPublico.ts`) — https only, DNS resolved and rejected if any address is private/loopback/link-local/CGNAT, redirects followed by hand so a 302 cannot bounce into the VPC, and `calendarId` on `POST /calendar/select` must be one of the discovered calendars. This is not theoretical: `alhabla-api` has egress into the VPC (Direct VPC egress since 2026-10-10; a Serverless VPC Access connector with `private-ranges-only` egress before), so private ranges really are reachable from the container. |
 | `bookings` | `/booking-settings` | Yes | CRUD de servicios y profesionales, asignaciones y capacidad de reserva; las retiradas son lógicas. Desde el 2026-10-02 (`citasDelPanel.ts`, sin prefijo) la agenda del panel mueve, cancela y avisa: `POST /business/me/bookings/:id/mover { fechaHora, profesionalId?, soloComprobar? }` (la misma `moverReserva` que `mover_cita` del Gestor: hueco real bajo el candado, evento nuevo antes de borrar el viejo), `POST .../cancelar` (`cancelarReserva` con `cancelledBy: "owner_panel"`, sin aviso #4 al dueño) y `POST .../avisar { tipo: cambio\|cancelacion }` (`avisar_cliente`); mover y cancelar devuelven `avisoAlCliente` si se le puede escribir por WhatsApp |
-| `billing` | `/billing` | Yes* | Stripe checkout, portal, subscription summary, webhooks. Since 2026-10: current prices 79/179/349 € and a founder price (69/149/299 €, `STRIPE_PRICE_*_FOUNDER`) for the first 15 businesses on any plan — `estadoDelCupoDeFundador()` counts them and decides the checkout price; public `GET /billing/fundadores` (no auth, `{ total, restantes, disponible }`, cached 60 s) lets the web show the discount only while seats remain. Extra minutes: one Stripe meter (`alhabla_call_minutes`, sum, `stripe_customer_id`) and per-plan graduated metered prices whose free tier MUST equal `includedMinutes` in `catalog.ts` (150/500/1100 since 2026-10-02) — `processUsageReport` sends every consumed minute and Stripe's first tier is what makes them free |
+| `billing` | `/billing` | Yes* | Stripe checkout, portal, subscription summary, webhooks. Since 2026-10-16: current prices 59/139/269 € + IVA (Stripe prices with `tax_behavior: "exclusive"`) and a founder price (39/99/199 € + IVA, `STRIPE_PRICE_*_FOUNDER`) for the first 15 businesses on any plan; prices of earlier tables stay recognised through `STRIPE_PRICES_ANTERIORES_*` (comma-separated) but an earlier founder price no longer counts for the cupo, so founders are migrated to the new founder price when the table changes; `getBillingSummary` returns `precioDeFundador` so the app shows what the business really pays — `estadoDelCupoDeFundador()` counts them and decides the checkout price; public `GET /billing/fundadores` (no auth, `{ total, restantes, disponible }`, cached 60 s) lets the web show the discount only while seats remain. Extra minutes: one Stripe meter (`alhabla_call_minutes`, sum, `stripe_customer_id`) and per-plan graduated metered prices whose free tier MUST equal `includedMinutes` in `catalog.ts` (200/600/1500 since 2026-10-16) — `processUsageReport` sends every consumed minute and Stripe's first tier is what makes them free |
 | `phone` | `/phone` | Yes | Telnyx phone number status, manual provisioning retry |
 | `places` | *(none)* | Yes | Google Places autocomplete & details |
 | `onboarding` | *(none)* | Yes | Onboarding state: progress, dismiss, complete, confirm call forwarding |
@@ -297,7 +297,7 @@ the content: each project keeps what it needs.
   Spanish copy.
 - `types.ts` — Domain types: `Business`, `AgentSettings`, `Agent`, `Call`, `BillingSummary`,
   `BookingSettings`, `OnboardingState`, `ForwardingCheck`, the Gestor types, etc.
-- `plans.ts` — Static plan definitions: Inicio (69€/100min), Pro (149€/400min), Scale (299€/1000min).
+- `plans.ts` — Static plan definitions, prices without IVA: Inicio (59 €/200 min), Pro (139 €/600 min), Scale (269 €/1.500 min); `formatPriceWithVat` shows the total with 21 % IVA and `PRECIO_DESDE` the «Desde 59 € + IVA/mes» used in the blog and OG images.
   Identical copy of `web/src/lib/plans.ts`, which renders the pricing; the app uses it in
   `/ajustes/facturacion`. Also exports `TRIAL_DAYS` and `TRIAL_REASSURANCE`; `TRIAL_DAYS` must match
   `CHECKOUT_TRIAL_DAYS` in `backend/src/modules/billing/service.ts`, which is what Stripe actually
@@ -518,7 +518,7 @@ Copy `.env.example` to `.env` and fill in all required secrets. Key groups:
 | **Retell** | `RETELL_API_KEY`, `RETELL_BASE_URL` |
 | **Demo (landing)** | `TELNYX_DEMO_ASSISTANT_ID` (genérico), `TELNYX_DEMO_<NICHO>_ASSISTANT_ID` (por nicho: `PELUQUERIA`, `CENTRO_ESTETICA`, `SALON_UNAS` —sin Ñ, Cloud Run solo admite `[A-Za-z0-9_]`—, `BARBERIA`, `FISIOTERAPIA`), `TELNYX_DEMO_MAX_DURATION_SECONDS` |
 | **JWT** | `JWT_SECRET` — required; server exits if missing |
-| **Stripe** | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_INICIO`, `STRIPE_PRICE_PRO`, `STRIPE_PRICE_SCALE`, `STRIPE_PRICE_EXTRA_INICIO`/`_PRO`/`_SCALE` (metered extra minutes), `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` |
+| **Stripe** | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_INICIO`, `STRIPE_PRICE_PRO`, `STRIPE_PRICE_SCALE`, `STRIPE_PRICE_*_FOUNDER`, `STRIPE_PRICES_ANTERIORES_*` (comma-separated, optional), `STRIPE_PRICE_EXTRA_INICIO`/`_PRO`/`_SCALE` (metered extra minutes), `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` |
 | **Google Calendar OAuth** | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI` |
 | **Outlook Calendar OAuth** | `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET`, `MICROSOFT_REDIRECT_URI` |
 | **Google Login OAuth** | `GOOGLE_AUTH_CLIENT_ID`, `GOOGLE_AUTH_CLIENT_SECRET`, `GOOGLE_AUTH_REDIRECT_URI` |
@@ -2319,15 +2319,18 @@ Lo que el plan dejó fuera del código (rescatado al archivarlo en `docs/histori
 
 - Uses **Stripe Checkout Sessions** (embedded UI mode) for subscription sign-ups.
 - Plans are defined in `backend/src/modules/billing/catalog.ts`:
-  - `inicio` — 150 min included, 0.45€/min extra.
-  - `pro` — 500 min included, 0.40€/min extra (featured).
-  - `scale` — 1100 min included, 0.35€/min extra.
-- Each plan maps to a `STRIPE_PRICE_*` environment variable.
+  - `inicio` — 59 € + IVA, 200 min included, 0.30€/min + IVA extra.
+  - `pro` — 139 € + IVA, 600 min included, 0.25€/min + IVA extra (featured).
+  - `scale` — 269 € + IVA, 1500 min included, 0.20€/min + IVA extra.
+- Each plan maps to `STRIPE_PRICE_*` (current), `STRIPE_PRICE_*_FOUNDER` (current founder price),
+  `STRIPE_PRICES_ANTERIORES_*` (comma-separated prices of earlier tables, still recognised) and
+  `STRIPE_PRICE_EXTRA_*` (metered extra minutes) environment variables.
 - **IVA (desde el 2026-10-08):** el checkout lleva `automatic_tax: { enabled: true }`; Stripe Tax lo
   calcula con el registro de España de la cuenta (`taxreg_1UOEtxCpwKBbcYrvvbWyqW34` en live; también hay
-  uno en el sandbox). Los precios no fijan `tax_behavior` y los ajustes de impuestos lo infieren por moneda:
-  en euros es **IVA incluido**, como dice el aviso legal (79 € = 65,29 € + 13,71 € de IVA), así que el
-  total no cambia. La suscripción lo hereda (renovaciones y minutos extra) y con un NIF-IVA de otro país
+  uno en el sandbox). **Desde la tabla del 2026-10-16 los precios llevan `tax_behavior: "exclusive"`:**
+  la web y el aviso legal dicen «59 € + IVA» y el checkout cobra 71,39 €. Los precios anteriores no lo
+  fijaban y los ajustes de impuestos lo inferían por moneda (en euros, IVA incluido: 79 € = 65,29 € +
+  13,71 €). La suscripción lo hereda (renovaciones y minutos extra) y con un NIF-IVA de otro país
   de la UE se aplica la inversión del sujeto pasivo. Coste: 0,5 % por cobro con IVA (Stripe Tax Basic).
   Las suscripciones anteriores siguen sin IVA hasta activarles `automatic_tax` a mano.
 - New subscriptions get a 7-day trial (`CHECKOUT_TRIAL_DAYS = 7`).

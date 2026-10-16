@@ -18,7 +18,7 @@ import { SectionErrorState } from "@/components/section-card";
 import { useBusiness } from "@/components/providers";
 import { formatPrice } from "@/lib/format";
 import { webUrl } from "@/lib/web-url";
-import { plans } from "@/lib/plans";
+import { formatPlanPrice, formatPriceWithVat, plans } from "@/lib/plans";
 import type { SubscriptionStatus } from "@/lib/types";
 
 const STATUS_LABELS: Record<SubscriptionStatus, string> = {
@@ -82,6 +82,7 @@ export default function BillingSettingsPage() {
 
   const data = summary.data;
   const plan = plans.find((candidate) => candidate.id === data?.planId);
+  const cuota = plan ? (data?.precioDeFundador ? plan.founderPrice : plan.price) : null;
   const status = data?.status ?? null;
   const suspendido = Boolean(business?.callsSuspendedAt);
 
@@ -147,8 +148,18 @@ export default function BillingSettingsPage() {
                   <div className="min-w-0">
                     <h2 className="text-2xl font-semibold text-tinta sm:text-3xl">
                       Plan {plan.name}
-                      <span className="ml-2 text-base font-medium text-muted">{plan.price} €/mes</span>
+                      {cuota !== null ? (
+                        <span className="ml-2 text-base font-medium text-muted">
+                          {formatPlanPrice(cuota)} + IVA/mes
+                        </span>
+                      ) : null}
                     </h2>
+                    {cuota !== null ? (
+                      <p className="mt-1 text-sm text-muted">
+                        {formatPriceWithVat(cuota)}
+                        {data?.precioDeFundador ? " · precio de fundador" : ""}
+                      </p>
+                    ) : null}
                   </div>
                   {status ? (
                     <span
@@ -214,7 +225,7 @@ export default function BillingSettingsPage() {
                         {excedente > 0 ? (
                           <span className="font-medium text-error">
                             Llevas {excedente} min de más
-                            {costeExtra ? ` (${formatPrice(costeExtra)} extra)` : ""}.
+                            {costeExtra ? ` (${formatPrice(costeExtra)} + IVA extra)` : ""}.
                           </span>
                         ) : (
                           `Te quedan ${incluidos - consumidos} minutos incluidos.`
@@ -222,7 +233,7 @@ export default function BillingSettingsPage() {
                         {data.extraMinuteCents != null ? (
                           <>
                             {" "}
-                            Cada minuto por encima cuesta {formatPrice(data.extraMinuteCents)}.
+                            Cada minuto por encima cuesta {formatPrice(data.extraMinuteCents)} + IVA.
                           </>
                         ) : null}
                       </p>

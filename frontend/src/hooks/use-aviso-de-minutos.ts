@@ -25,7 +25,7 @@ export function useMinutesWarning() {
   if (remainingPct > 25) return null;
 
   const extraPrice = data.extraMinuteCents != null
-    ? `${(data.extraMinuteCents / 100).toFixed(2).replace(".", ",")}€/min`
+    ? `${(data.extraMinuteCents / 100).toFixed(2).replace(".", ",")} €/min + IVA`
     : null;
 
   return {
