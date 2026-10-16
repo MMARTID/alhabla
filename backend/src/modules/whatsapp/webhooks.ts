@@ -9,6 +9,7 @@ import {
   actualizarEstadoEnvio,
   audienciaDelNumero,
   avisarCambioDeListaDeEspera,
+  incorporarPlantillasNuevas,
   type EstadoEntrega,
 } from "./service.js";
 import { enrutarEntrante } from "./router.js";
@@ -823,8 +824,11 @@ export async function handleTemplateStatusEvent(
     },
   });
   if (updated.count === 0) {
+    // Una plantilla nueva (otra versión u otro idioma) que aún no tenía
+    // fila: se da de alta desde el WABA, ya con su estado.
+    const creadas = await incorporarPlantillasNuevas();
     console.warn(
-      `[WhatsApp] ${data.event_type} para una plantilla que no está en WhatsappTemplate (${JSON.stringify(where)}); ejecuta scripts/manual/sincronizarWhatsapp.mts`
+      `[WhatsApp] ${data.event_type} para una plantilla que no estaba en WhatsappTemplate (${JSON.stringify(where)}); incorporadas desde el WABA: ${creadas}`
     );
   } else {
     console.log(

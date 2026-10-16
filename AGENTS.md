@@ -864,6 +864,18 @@ el `fetch` equivalente. **Nunca desde un route handler**: todo pasa por
   aprobada (la confirmación solo con `Business.placeId`) → aprobada actual → variable
   `WHATSAPP_TEMPLATE_*_NAME` → `SIN_PLANTILLA`; antes de cada clave `refrescarPlantilla` (≤ 1
   llamada al WABA/día/clave), así una v2 aprobada entra sola en ≤ 24 h sin deploy.
+  **Versiones (16-10):** una plantilla aprobada nunca se edita para cambiarle el texto. Editar la
+  devuelve a revisión (mientras tanto no se envía), Meta lo limita a una vez al día y lo rechaza con
+  2388039 si hay otro idioma del mismo nombre pendiente. Se crea con otro nombre y la cascada prueba
+  `VERSIONES_*` de la más nueva a la más vieja: `confirmacion_cita_v3` → `_v2`, `recordatorio_cita_v3`
+  → `_v2`, `cambio_cita_cliente_v2` → `cambio_cita_cliente`, `cancelacion_cita_cliente_v2` → …,
+  `hueco_libre_v2` → `hueco_libre`. Las nuevas (título, negocio en negrita, una línea con emoji por
+  dato) y sus traducciones están en `scripts/manual/plantillasWhatsapp/plantillas.json`. Las traducciones
+  van con el nombre de la versión anterior, porque se enviaron antes. Se solicitan con
+  `solicitar.mts --enviar`. El backend todavía no elige por idioma. Las filas nuevas las crea solo
+  `incorporarPlantillasNuevas()` (service.ts): la llama el reconciliador diario y, si llega un
+  `whatsapp.template.*` de una plantilla sin fila, el webhook. La clave es el nombre si es único, y
+  ya no hace falta `sincronizarWhatsapp.mts` para cada versión nueva.
   `programarMensajesAlCliente({ bookingId })` encola la confirmación
   (`booking-<id>-confirmacion-<epochSeg>-<huella>`) y, con plan Pro/Scale y > 24 h, el recordatorio
   (`booking-<id>-recordatorio-<epochSeg>-<huella>`; la huella son 8 hex del sha256 del E.164 de

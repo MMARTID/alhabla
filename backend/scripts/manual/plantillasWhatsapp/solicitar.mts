@@ -1,8 +1,18 @@
 /**
- * Solicita a Meta (vía Telnyx) las plantillas de WhatsApp traducidas de
- * `traducciones.json`: las vigentes en español (al cliente en catalán,
- * inglés, francés, alemán, italiano, portugués y neerlandés; al dueño solo
- * en catalán). Meta no admite euskera ni gallego en plantillas.
+ * Solicita a Meta (vía Telnyx) las plantillas de WhatsApp de
+ * `plantillas.json`. Las del cliente llevan cabecera, el negocio en negrita
+ * y una línea con emoji por dato (estilo elegido por el usuario el 16-10), en
+ * español y en catalán, inglés, francés, alemán, italiano, portugués y
+ * neerlandés. Las del dueño, solo en catalán. Meta no admite euskera ni
+ * gallego en plantillas.
+ *
+ * Una versión nueva de una plantilla aprobada se crea con OTRO nombre
+ * (`_v3`, `_v2`), nunca editándola: editar la devuelve a revisión (mientras
+ * tanto no se puede enviar), Meta lo limita a una vez al día y lo rechaza con
+ * 2388039 («Message Template Status Can't Be Changed») mientras haya otro
+ * idioma del mismo nombre pendiente. La cascada de `elegirPlantillaCliente`
+ * (mensajesCliente › VERSIONES_*) elige la más nueva aprobada y, hasta
+ * entonces, la de antes.
  *
  * Telnyx no tiene borradores: `POST /v2/whatsapp/message_templates` manda la
  * plantilla a revisión de Meta en el acto, y una plantilla `PENDING` no se
@@ -14,8 +24,9 @@
  *   npx tsx scripts/manual/plantillasWhatsapp/solicitar.mts --idioma ca
  *   npx tsx scripts/manual/plantillasWhatsapp/solicitar.mts --nombre hueco_libre --enviar
  *
- * Salta las que ya existen en el WABA con el mismo nombre e idioma. Después
- * de enviar, `sincronizarWhatsapp.mts` las vuelca en `WhatsappTemplate`.
+ * Salta las que ya existen en el WABA con el mismo nombre e idioma. Después de
+ * enviar, `sincronizarWhatsapp.mts` las vuelca en `WhatsappTemplate`: sin su
+ * fila, el código no las ve.
  * Requiere TELNYX_API_KEY y WHATSAPP_WABA_ID (UUID del WABA en Telnyx).
  */
 import { readFileSync } from "node:fs";
@@ -93,7 +104,7 @@ async function main(): Promise<void> {
     throw new Error("Faltan TELNYX_API_KEY o WHATSAPP_WABA_ID");
   }
 
-  const ruta = fileURLToPath(new URL("./traducciones.json", import.meta.url));
+  const ruta = fileURLToPath(new URL("./plantillas.json", import.meta.url));
   const { plantillas } = JSON.parse(readFileSync(ruta, "utf8")) as {
     plantillas: Plantilla[];
   };
@@ -106,17 +117,19 @@ async function main(): Promise<void> {
   const existentes = (await telnyx(
     apiKey,
     `${API}?waba_id=${encodeURIComponent(wabaId)}&page%5Bsize%5D=250`
-  )) as { data: Array<{ name: string; language: string; status: string }> };
+  )) as {
+    data: Array<{ id: string; name: string; language: string; status: string }>;
+  };
   const yaEstan = new Map(
-    existentes.data.map((t) => [`${t.name}/${t.language}`, t.status])
+    existentes.data.map((t) => [`${t.name}/${t.language}`, t])
   );
 
   let enviadas = 0;
   for (const p of elegidas) {
     const clave = `${p.name}/${p.language}`;
-    const estado = yaEstan.get(clave);
-    if (estado) {
-      console.log(`= ${clave}: ya existe (${estado}), se salta`);
+    const existente = yaEstan.get(clave);
+    if (existente) {
+      console.log(`= ${clave}: ya existe (${existente.status}), se salta`);
       continue;
     }
     const errores = erroresDeMeta(p);
