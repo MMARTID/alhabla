@@ -1,20 +1,18 @@
 /**
  * Solicita a Meta (vía Telnyx) las plantillas de WhatsApp de
  * `plantillas.json`. Las del cliente llevan cabecera, el negocio en negrita
- * y una línea con emoji por dato (estilo elegido por el usuario el 16-10):
- * en español EDITAN las aprobadas (mismo nombre y mismos parámetros, así el
- * código no cambia) y en catalán, inglés, francés, alemán, italiano,
- * portugués y neerlandés son nuevas. Las del dueño, solo en catalán. Meta no
- * admite euskera ni gallego en plantillas.
+ * y una línea con emoji por dato (estilo elegido por el usuario el 16-10), en
+ * español y en catalán, inglés, francés, alemán, italiano, portugués y
+ * neerlandés. Las del dueño, solo en catalán. Meta no admite euskera ni
+ * gallego en plantillas.
  *
- * Editar una plantilla aprobada la devuelve a revisión: mientras tanto no se
- * puede enviar y la cascada de `elegirPlantillaCliente` cae a la anterior
- * aprobada (`confirmacion_cita`, `recordatorio_cita`…). Meta deja editar una
- * aprobada como mucho 10 veces al mes y una vez al día, y la rechaza con
- * 2388039 («Message Template Status Can't Be Changed») mientras hay otro
- * idioma del mismo nombre en revisión (16-10: las 35 traducciones recién
- * creadas): primero las nuevas, y las ediciones cuando Meta las resuelva
- * (`--idioma es --enviar`).
+ * Una versión nueva de una plantilla aprobada se crea con OTRO nombre
+ * (`_v3`, `_v2`), nunca editándola: editar la devuelve a revisión (mientras
+ * tanto no se puede enviar), Meta lo limita a una vez al día y lo rechaza con
+ * 2388039 («Message Template Status Can't Be Changed») mientras haya otro
+ * idioma del mismo nombre pendiente. La cascada de `elegirPlantillaCliente`
+ * (mensajesCliente › VERSIONES_*) elige la más nueva aprobada y, hasta
+ * entonces, la de antes.
  *
  * Telnyx no tiene borradores: `POST /v2/whatsapp/message_templates` manda la
  * plantilla a revisión de Meta en el acto, y una plantilla `PENDING` no se
@@ -26,10 +24,9 @@
  *   npx tsx scripts/manual/plantillasWhatsapp/solicitar.mts --idioma ca
  *   npx tsx scripts/manual/plantillasWhatsapp/solicitar.mts --nombre hueco_libre --enviar
  *
- * Salta las que ya existen en el WABA con el mismo nombre e idioma, salvo las
- * marcadas `editar`, que se editan (`PATCH /v2/whatsapp/message_templates/{id}`).
- * Después de enviar, `sincronizarWhatsapp.mts` las vuelca en
- * `WhatsappTemplate`.
+ * Salta las que ya existen en el WABA con el mismo nombre e idioma. Después de
+ * enviar, `sincronizarWhatsapp.mts` las vuelca en `WhatsappTemplate`: sin su
+ * fila, el código no las ve.
  * Requiere TELNYX_API_KEY y WHATSAPP_WABA_ID (UUID del WABA en Telnyx).
  */
 import { readFileSync } from "node:fs";
@@ -41,8 +38,6 @@ interface Plantilla {
   category: "UTILITY" | "MARKETING";
   audiencia: "cliente" | "negocio";
   parameter_format: "NAMED";
-  /** Ya existe aprobada en el WABA: se edita en vez de crearla. */
-  editar?: boolean;
   components: Array<{ type: string; text?: string }>;
 }
 
@@ -53,9 +48,6 @@ interface Argumentos {
 }
 
 const API = "https://api.telnyx.com/v2/whatsapp/message_templates";
-// La de la documentación del SDK (`/v2/whatsapp_message_templates/{id}`) da
-// 404; la que existe es la misma ruta de la lista con el id (16-10).
-const API_EDITAR = API;
 
 function leerArgumentos(argv: string[]): Argumentos {
   const args: Argumentos = { enviar: false };
@@ -136,12 +128,8 @@ async function main(): Promise<void> {
   for (const p of elegidas) {
     const clave = `${p.name}/${p.language}`;
     const existente = yaEstan.get(clave);
-    if (existente && !p.editar) {
+    if (existente) {
       console.log(`= ${clave}: ya existe (${existente.status}), se salta`);
-      continue;
-    }
-    if (!existente && p.editar) {
-      console.error(`✗ ${clave}: marcada para editar pero no existe en el WABA`);
       continue;
     }
     const errores = erroresDeMeta(p);
@@ -149,39 +137,11 @@ async function main(): Promise<void> {
       console.error(`✗ ${clave}: ${errores.join("; ")}`);
       continue;
     }
-    if (existente) {
-      // Meta solo deja editar APPROVED, REJECTED o PAUSED.
-      if (!["APPROVED", "REJECTED", "PAUSED"].includes(existente.status)) {
-        console.error(
-          `✗ ${clave}: está ${existente.status}; Meta no deja editarla así`
-        );
-        continue;
-      }
-      if (!args.enviar) {
-        console.log(
-          `· ${clave} (${existente.status}): se editaría y volvería a revisión`
-        );
-        continue;
-      }
-      try {
-        await telnyx(apiKey, `${API_EDITAR}/${existente.id}`, {
-          method: "PATCH",
-          body: JSON.stringify({ components: p.components }),
-        });
-        enviadas += 1;
-        console.log(`✓ ${clave}: editada, vuelve a revisión de Meta`);
-      } catch (error) {
-        console.error(
-          `✗ ${clave}: ${error instanceof Error ? error.message : String(error)}`
-        );
-      }
-      continue;
-    }
     if (!args.enviar) {
       console.log(`· ${clave} (${p.category}, ${p.audiencia}): se solicitaría`);
       continue;
     }
-    // `audiencia` y `editar` son nuestras: no van a Meta.
+    // `audiencia` es nuestra (para el filtro y la vista previa): no va a Meta.
     const { name, language, category, parameter_format, components } = p;
     try {
       const res = (await telnyx(apiKey, API, {

@@ -8,7 +8,10 @@ import {
 } from "../../src/lib/telnyxAgentSync.js";
 import { acquireLock, releaseLock } from "../../src/lib/bookingLock.js";
 import { sendZohoMail } from "../../src/lib/zohoMail.js";
-import { refrescarPlantillasConClave } from "../../src/modules/whatsapp/service.js";
+import {
+  incorporarPlantillasNuevas,
+  refrescarPlantillasConClave,
+} from "../../src/modules/whatsapp/service.js";
 
 vi.mock("../../src/lib/prisma.js", () => ({
   prisma: {
@@ -36,6 +39,7 @@ vi.mock("../../src/lib/zohoMail.js", () => ({
 }));
 
 vi.mock("../../src/modules/whatsapp/service.js", () => ({
+  incorporarPlantillasNuevas: vi.fn().mockResolvedValue(0),
   refrescarPlantillasConClave: vi.fn(),
 }));
 
@@ -107,6 +111,8 @@ describe("telnyxReconcilerJob", () => {
     const result = await telnyxReconcilerJob();
 
     expect(mockedRefrescarPlantillas).toHaveBeenCalledTimes(1);
+    // Antes de refrescar, se dan de alta las plantillas nuevas del WABA.
+    expect(vi.mocked(incorporarPlantillasNuevas)).toHaveBeenCalledTimes(1);
     expect(mockedRefrescarPlantillas.mock.invocationCallOrder[0]).toBeLessThan(
       mockedSync.mock.invocationCallOrder[0]
     );

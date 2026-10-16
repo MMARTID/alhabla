@@ -1,9 +1,9 @@
 {
   "generado": "2026-10-16",
-  "nota": "Plantillas al cliente con cabecera, negritas y emojis (es = edición de las aprobadas; resto, nuevas) y del dueño en catalán. Sin enviar a Meta.",
+  "nota": "Plantillas al cliente con cabecera, negritas y emojis y del dueño en catalán. En español van con nombre nuevo (confirmacion_cita_v3, recordatorio_cita_v3, *_v2): la cascada de mensajesCliente elige la más nueva aprobada. Las traducciones conservan el nombre de la versión española anterior (ya enviadas el 16-10).",
   "plantillas": [
     {
-      "name": "confirmacion_cita_v2",
+      "name": "confirmacion_cita_v3",
       "language": "es",
       "category": "UTILITY",
       "audiencia": "cliente",
@@ -55,8 +55,7 @@
             }
           ]
         }
-      ],
-      "editar": true
+      ]
     },
     {
       "name": "confirmacion_cita_v2",
@@ -444,7 +443,7 @@
       ]
     },
     {
-      "name": "recordatorio_cita_v2",
+      "name": "recordatorio_cita_v3",
       "language": "es",
       "category": "UTILITY",
       "audiencia": "cliente",
@@ -492,8 +491,7 @@
             }
           ]
         }
-      ],
-      "editar": true
+      ]
     },
     {
       "name": "recordatorio_cita_v2",
@@ -853,7 +851,7 @@
       ]
     },
     {
-      "name": "cambio_cita_cliente",
+      "name": "cambio_cita_cliente_v2",
       "language": "es",
       "category": "UTILITY",
       "audiencia": "cliente",
@@ -901,8 +899,7 @@
             }
           ]
         }
-      ],
-      "editar": true
+      ]
     },
     {
       "name": "cambio_cita_cliente",
@@ -1262,7 +1259,7 @@
       ]
     },
     {
-      "name": "cancelacion_cita_cliente",
+      "name": "cancelacion_cita_cliente_v2",
       "language": "es",
       "category": "UTILITY",
       "audiencia": "cliente",
@@ -1302,8 +1299,7 @@
             }
           ]
         }
-      ],
-      "editar": true
+      ]
     },
     {
       "name": "cancelacion_cita_cliente",
@@ -1607,7 +1603,7 @@
       ]
     },
     {
-      "name": "hueco_libre",
+      "name": "hueco_libre_v2",
       "language": "es",
       "category": "MARKETING",
       "audiencia": "cliente",
@@ -1647,8 +1643,7 @@
             }
           ]
         }
-      ],
-      "editar": true
+      ]
     },
     {
       "name": "hueco_libre",
