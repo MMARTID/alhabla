@@ -10,7 +10,6 @@ import {
   InformeFinalSchema,
   combinarInformes,
   normalizarDudas,
-  normalizarTelefonoDeRecado,
   procesarInformeFinal,
   revisarEscaladaSinRecado,
 } from "../../../src/modules/whatsapp/recados.js";
@@ -89,15 +88,6 @@ beforeEach(() => {
 });
 
 describe("normalización", () => {
-  it("normaliza el teléfono del recado a E.164 o lo descarta", () => {
-    expect(normalizarTelefonoDeRecado("612 345 678")).toBe("+34612345678");
-    expect(normalizarTelefonoDeRecado("+34 612-345-678")).toBe("+34612345678");
-    expect(normalizarTelefonoDeRecado("0034612345678")).toBe("+34612345678");
-    expect(normalizarTelefonoDeRecado("el de siempre")).toBeNull();
-    expect(normalizarTelefonoDeRecado("")).toBeNull();
-    expect(normalizarTelefonoDeRecado(null)).toBeNull();
-  });
-
   it("acepta recado nulo, vacío o sin motivo como «sin recado»", () => {
     expect(
       InformeFinalSchema.parse({ resultado: "RESOLVED", recado: null }).recado

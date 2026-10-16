@@ -25,6 +25,8 @@ import { RetryFailedBookingJob } from "../lib/jobTypes.js";
 import { avisarCitaRecuperada } from "../modules/whatsapp/avisosNegocio.js";
 import { programarMensajesAlCliente } from "../modules/whatsapp/mensajesCliente.js";
 import { whatsappAdapter } from "../adapters/whatsapp/WhatsAppAdapter.js";
+import { anularLaCitaCambiada } from "../modules/bookings/reservaModificada.js";
+import { isValidE164Phone, normalizarTelefono } from "../lib/phone.js";
 
 interface PendingBookingData {
   clientName: string;
@@ -38,6 +40,9 @@ interface PendingBookingData {
   smsConsent?: boolean;
   /** Desde el 16-10-2026; los leads anteriores no lo traen (= voz). */
   createdVia?: string;
+  /** La cita que el cliente cambiaba (voiceTools/service.ts): se anula solo
+   * si la nueva acaba entrando. */
+  replacesBookingId?: string | null;
 }
 
 function isValidAppointmentDuration(value: unknown): value is number {
@@ -95,7 +100,7 @@ export async function processRetryFailedBookingJob(
 
   const call = await prisma.call.findUnique({
     where: { id: lead.callId },
-    select: { businessId: true, fromNumber: true },
+    select: { businessId: true, fromNumber: true, voiceProvider: true },
   });
   if (!call) {
     throw new Error(
@@ -241,6 +246,20 @@ export async function processRetryFailedBookingJob(
       return;
     }
 
+    // Cambio de cita: la que cambia no cuenta como ocupada (puede solaparse
+    // con la nueva) y se anula solo si la nueva entra. Si ya no está activa
+    // (el cliente o el dueño la cancelaron), no hay nada que anular.
+    const citaCambiada = data_.replacesBookingId
+      ? await prisma.booking.findFirst({
+          where: {
+            id: data_.replacesBookingId,
+            call: { businessId: call.businessId },
+            isCancelled: false,
+          },
+          select: { id: true, externalEventId: true },
+        })
+      : null;
+
     // El fallo original pudo haber sido de calendario, pero entre ese
     // momento y este reintento (a veces minutos u horas más tarde) el
     // horario pudo cambiar, el hueco pudo ocuparse, o la antelación mínima
@@ -322,6 +341,14 @@ export async function processRetryFailedBookingJob(
       calendarAvailabilityKnown:
         normalizedExternalBusy.calendarAvailabilityKnown,
       calendarOrigin: origenDeCalendario(conexion),
+      ...(citaCambiada
+        ? {
+            excluir: {
+              bookingId: citaCambiada.id,
+              externalEventId: citaCambiada.externalEventId,
+            },
+          }
+        : {}),
     });
     if (!availability.available) {
       await abandonLead(
@@ -334,9 +361,14 @@ export async function processRetryFailedBookingJob(
       verifiedProfessionalId ?? availability.availableProfessionals[0]?.id;
 
     // Igual que en la reserva en vivo: si el cliente no dio un teléfono
-    // distinto, se usa el de la llamada.
+    // distinto, se usa el de la llamada, si es un teléfono (con número
+    // oculto el evento decía «Teléfono: anonymous»). El del lead se
+    // normaliza: los anteriores al 16-10 se guardaban tal cual los dictaba.
     const effectiveClientPhone =
-      data_.clientPhone ?? call.fromNumber ?? undefined;
+      normalizarTelefono(data_.clientPhone) ??
+      (call.fromNumber && isValidE164Phone(call.fromNumber)
+        ? call.fromNumber
+        : undefined);
 
     let result: unknown;
     try {
@@ -438,6 +470,17 @@ export async function processRetryFailedBookingJob(
         (result as { htmlLink?: string })?.htmlLink ?? "n/d"
       }`
     );
+
+    if (citaCambiada && reserva?.id) {
+      await anularLaCitaCambiada({
+        businessId: call.businessId,
+        citaAnteriorId: citaCambiada.id,
+        nuevaReservaId: reserva.id,
+        cancelledBy:
+          call.voiceProvider === "whatsapp" ? "client_chat" : "client_voice",
+        etiqueta: `lead ${leadId}`,
+      });
+    }
 
     // El dueño recibió el aviso de cita pendiente: que sepa que ya entró.
     // Solo dentro de la ventana de 24 h (sin plantilla propia); nunca lanza.

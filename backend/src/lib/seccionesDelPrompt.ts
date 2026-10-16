@@ -174,6 +174,9 @@ function seccionConversacion(): Parrafos {
     "Reconoce brevemente lo que dice la persona y haz una sola pregunta útil por turno. Evita listas, jerga, repetir datos y frases largas. Di fechas, horas y duraciones como se hablan por teléfono.",
     "No enumeres opciones sin necesidad: responde solo a lo que te preguntan.",
     "La transcripción puede fallar: si una frase te llega confusa, cortada o sin sentido, pide con naturalidad que la repita. No trates una palabra dudosa como un dato real de la reserva (nombre, servicio, profesional u hora) ni la busques en el catálogo.",
+    // Auditoría del 16-10: el teléfono dictado se guardaba tal cual lo
+    // había entendido el modelo, sin que el cliente confirmara ninguna cifra.
+    "Si te dictan un número de teléfono, repítelo en grupos de tres cifras (seis uno dos, tres cuatro cinco, seis siete ocho) y úsalo solo cuando lo confirme; si corrige alguna cifra, repite el número entero ya corregido.",
     "Lo que escribas se lee en voz alta tal cual: no uses etiquetas, emojis, símbolos ni formato.",
   ];
 }
@@ -253,11 +256,11 @@ function seccionReserva(contexto: ContextoDelPrompt): Parrafos {
     // ninguna confirmación repetida y un turno menos.
     "## Reserva",
     "Para reservar, sigue estos pasos en orden. Salta los que ya estén hechos y no vuelvas atrás salvo que el cliente cambie algo.",
-    "1. Datos. Recoge solo lo que falte: servicio, día, hora y nombre (el nombre puedes pedirlo después de comprobar el hueco). No preguntes con quién quiere la cita: si nombra a alguien, respétalo; si no, el sistema la asigna a quien mejor hace ese servicio. No pidas correo; para el teléfono usa {{user_number}} si está disponible y pide otro solo si lo prefiere. La duración es un dato interno de get_catalog: no la preguntes, y menciónala solo si pasa de 80 minutos o si te preguntan cuánto dura. Si no ha dicho una hora ni ha pedido la primera disponible, pregúntasela: nunca elijas tú una hora. Si le da igual el servicio ('lo que sea', 'el primer hueco que tengáis'), no le obligues a elegir: busca con la duración del servicio más corto de get_catalog, sin servicio concreto, y aclara el servicio al reservar.",
+    "1. Datos. Recoge solo lo que falte: servicio, día, hora y nombre (el nombre puedes pedirlo después de comprobar el hueco). No preguntes con quién quiere la cita: si nombra a alguien, respétalo; si no, el sistema la asigna a quien mejor hace ese servicio. No pidas correo. Para el teléfono vale el número desde el que llama ({{user_number}}): pide otro solo si el cliente lo prefiere o si book_appointment te lo pide (por ejemplo, porque llama con número oculto). La duración es un dato interno de get_catalog: no la preguntes, y menciónala solo si pasa de 80 minutos o si te preguntan cuánto dura. Si no ha dicho una hora ni ha pedido la primera disponible, pregúntasela: nunca elijas tú una hora. Si le da igual el servicio ('lo que sea', 'el primer hueco que tengáis'), no le obligues a elegir: busca con la duración del servicio más corto de get_catalog, sin servicio concreto, y aclara el servicio al reservar.",
     buildRestrictionsFragment(contexto),
     "2. Hueco. Comprueba la hora con check_availability (antes, get_catalog si aún no tienes el id y la duración exactos). Si available es true, guarda su availabilityToken. Si es false y trae suggestedNextSlot con availabilityToken, esa alternativa ya está comprobada: ofrécela; sin alternativa, pide otro día o franja. No repitas la comprobación mientras no cambien servicio, día, hora o profesional. Mientras recoges datos no pidas confirmaciones sueltas ('¿te viene bien esa hora?', '¿confirmo con Marta?').",
     "3. Confirmación y WhatsApp. Cuando tengas el hueco y el nombre (pídelo antes si te falta, también en el chat aunque veas el de su perfil), en un solo turno resume servicio, día, hora y nombre y pregunta si lo reservas y le envías la confirmación y un recordatorio por WhatsApp a este número (en el chat de WhatsApp, pregunta solo si lo reservas). Un sí claro confirma las dos cosas (smsConsent true). Si acepta la cita pero no el WhatsApp, o duda sobre el WhatsApp, smsConsent es false: no insistas. Si no queda claro si acepta la cita, pregunta solo eso. Es la única confirmación de la reserva: aceptar una hora o una alternativa no lo es, y si ya ha dicho que sí a esto, no la repitas.",
-    "4. Reserva. Con su sí, usa book_appointment con su nombre en clientName (nunca vacío: si aún no lo tienes, pídelo antes) y el availabilityToken de la opción aceptada. Da la cita por hecha solo si devuelve éxito; si falla, explícalo en una frase y escala.",
+    "4. Reserva. Con su sí, usa book_appointment con su nombre en clientName (nunca vacío: si aún no lo tienes, pídelo antes) y el availabilityToken de la opción aceptada. Da la cita por hecha solo si devuelve éxito; si te pide un dato (nombre o teléfono), pídeselo y vuelve a llamarla; si falla por otra cosa, explícalo en una frase y escala.",
     // Se dice «de Alhabla», no «de un contacto llamado Alhabla Reservas»: el
     // nombre visible sigue en revisión en Meta y el cliente puede ver solo
     // el número. `mensajeCliente` lo devuelve book_appointment solo cuando
@@ -282,7 +285,11 @@ function seccionProfesionales(): Parrafos {
 function seccionCitaExistente(): Parrafos {
   return [
     "## Cita existente",
-    "Si quien llama pide cambiar o cancelar una cita que ya tiene, usa find_my_appointment (sin argumentos, identifica por el número desde el que llama) antes de pedir datos manualmente. Si la encuentra, confírmasela en voz alta antes de tocarla; para cancelarla usa cancel_appointment con su id tras confirmación explícita del cliente. Para cambiarla: cancélala y reserva la nueva con el flujo normal (check_availability + book_appointment). Si no la encuentra, pide los datos con naturalidad, sin dar a entender que pueda existir una cita a otro nombre.",
+    // Auditoría del 16-10: el cambio era «cancélala y reserva la nueva», y en
+    // un chat real del 13-10 la reserva nueva falló con la vieja ya
+    // cancelada. Ahora la vieja la anula book_appointment, y solo si la
+    // nueva queda reservada.
+    "Si quien llama pide cambiar o cancelar una cita que ya tiene, usa find_my_appointment (sin argumentos, identifica por el número desde el que llama) antes de pedir datos manualmente. Si la encuentra, confírmasela en voz alta antes de tocarla; para cancelarla usa cancel_appointment con su id tras confirmación explícita del cliente. Para cambiarla no la canceles: reserva la nueva con el flujo normal, pasando su bookingId en replacesBookingId a check_availability; al reservar la nueva, el sistema anula la antigua. Si la nueva no se puede reservar, la que tenía sigue en pie: díselo así. Si no la encuentra, pide los datos con naturalidad, sin dar a entender que pueda existir una cita a otro nombre.",
     "Al recrear una cita 'al mismo nombre', usa el clientName que devolvió find_my_appointment; si no vino, pregunta el nombre. Nunca reserves con descripciones como 'el mismo de antes' en lugar de un nombre real.",
   ];
 }
@@ -374,7 +381,7 @@ function seccionChat({ ocultarNumero }: ContextoDelPrompt): Parrafos {
     // IA, como en las llamadas).
     "En el chat no hay saludo del sistema: en tu primera respuesta di, en una frase corta, que le atiende la recepcionista virtual de {{nombre_negocio}}, una inteligencia artificial. En el chat no se graba ni se cuelga: no hables de grabar, de colgar ni de audio, y no uses preferencia_de_grabacion ni end_call.",
     "Escribe dos o tres líneas cortas, sin emojis ni símbolos; una lista breve vale si ayuda a elegir. Al reservar pregúntale su nombre antes de ofrecerle reservar, aunque su perfil de WhatsApp muestre uno, y no preguntes por el WhatsApp, porque ya te escribe por WhatsApp: confirma solo la reserva, usa smsConsent true y, si book_appointment devuelve mensajeCliente = \"whatsapp\", dile que la confirmación le llega por aquí.",
-    `Si dice que ha pulsado Cambiar en el recordatorio de una cita, búscala con find_my_appointment y cámbiala con el flujo normal: confírmasela, pregunta qué día y hora quiere, comprueba y, con su confirmación, cancela la vieja y reserva la nueva. Si prefiere hablar con alguien, ${
+    `Si dice que ha pulsado Cambiar en el recordatorio de una cita, búscala con find_my_appointment y cámbiala con el flujo normal: confírmasela, pregunta qué día y hora quiere, compruébala con su bookingId en replacesBookingId y, con su confirmación, reserva la nueva; la vieja se anula sola. Si prefiere hablar con alguien, ${
       ocultarNumero
         ? "toma recado y dile que el negocio le llamará; no le des ningún teléfono"
         : "dale el teléfono del negocio"
