@@ -5,7 +5,6 @@ import { planAllows, resolvePlanId } from "../lib/planFeatures.js";
 import { appUrl } from "../lib/urls.js";
 import { SIN_CALLS_DEL_GESTOR } from "../lib/citasDelDueno.js";
 
-const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 const PAGE_SIZE = 100;
 /** Negocios que se procesan a la vez. Cloud Tasks da 10 minutos a la
  * petición: en serie, unos cientos de negocios con 4 consultas cada uno se
@@ -15,12 +14,6 @@ const CONCURRENCIA = 5;
 /** El resumen se manda a negocios españoles; la ventana se ancla a su día. */
 const TIMEZONE_RESUMEN = "Europe/Madrid";
 
-/**
- * Inicio de la semana que se resume: el lunes a las 00:00 de Madrid anterior
- * a la ejecución. Anclar la ventana (en vez de usar "ahora menos 7 días") es
- * lo que hace que dos ejecuciones del mismo lunes produzcan exactamente el
- * mismo contenido y que la marca de "ya enviado" sirva de algo.
- */
 /**
  * Desfase de una zona respecto a UTC en un instante concreto, sin depender de
  * la zona en la que corra el proceso. `toLocaleString` + `new Date` no sirve
@@ -65,10 +58,10 @@ function medianocheLocal(fecha: string, timeZone: string): Date {
 }
 
 /**
- * Inicio de la semana que se resume: el lunes a las 00:00 de Madrid anterior
- * a la ejecución. Anclar la ventana (en vez de usar "ahora menos 7 días") es
- * lo que hace que dos ejecuciones del mismo lunes produzcan exactamente el
- * mismo contenido y que la marca de "ya enviado" sirva de algo.
+ * El lunes a las 00:00 de Madrid de la semana en la que cae `ahora` (un lunes
+ * cualquiera, ese mismo lunes). Anclar la ventana (en vez de usar "ahora
+ * menos 7 días") es lo que hace que dos ejecuciones del mismo lunes produzcan
+ * exactamente el mismo contenido y que la marca de "ya enviado" sirva de algo.
  */
 export function resolveInicioDeSemana(ahora: Date): Date {
   const partes = new Intl.DateTimeFormat("en-CA", {
@@ -103,6 +96,32 @@ export function resolveInicioDeSemana(ahora: Date): Date {
 }
 
 /**
+ * La semana que se resume es la que acaba de terminar: del lunes anterior a
+ * las 00:00 hasta este lunes a las 00:00 (sin incluirlo). Cloud Scheduler lo
+ * lanza el lunes a las 08:00; hasta el 2026-10-16 la ventana era la semana
+ * que EMPIEZA ese lunes, así que solo cubría sus primeras ocho horas y el
+ * resumen salía a ceros y se omitía (05-10 y 12-10 en producción, con 20
+ * llamadas la semana anterior).
+ *
+ * `lunesActual` es la marca de la ejecución: el reclamo de
+ * `weeklySummarySentAt` y el id de la tarea se comparan contra él, no contra
+ * el inicio de la ventana, para que el envío de esta semana no bloquee el de
+ * la siguiente. El fin es el lunes actual y no inicio + 7 días: la semana del
+ * cambio de hora tiene 167 o 169 horas.
+ */
+export function resolverSemanaDelResumen(ahora: Date): {
+  inicio: Date;
+  fin: Date;
+  lunesActual: Date;
+} {
+  const lunesActual = resolveInicioDeSemana(ahora);
+  // Un instante antes del lunes cae en la semana anterior: su lunes es el
+  // inicio, sin restar horas a mano.
+  const inicio = resolveInicioDeSemana(new Date(lunesActual.getTime() - 1));
+  return { inicio, fin: lunesActual, lunesActual };
+}
+
+/**
  * Resumen semanal por email (feature de Pro/Scale). Lo dispara Cloud
  * Scheduler los lunes por la mañana contra /internal/jobs/send-weekly-summaries;
  * recorre los negocios con suscripción viva cuyo plan incluye la feature y
@@ -119,8 +138,11 @@ export async function sendWeeklySummaryJob(): Promise<{
   sent: number;
   skipped: number;
 }> {
-  const weekStart = resolveInicioDeSemana(new Date());
-  const weekEnd = new Date(weekStart.getTime() + WEEK_MS);
+  const {
+    inicio: weekStart,
+    fin: weekEnd,
+    lunesActual,
+  } = resolverSemanaDelResumen(new Date());
 
   const frontendUrl = appUrl();
 
@@ -160,7 +182,13 @@ export async function sendWeeklySummaryJob(): Promise<{
       const lote = businesses.slice(i, i + CONCURRENCIA);
       const resultados = await Promise.all(
         lote.map((business) =>
-          enviarResumenDeNegocio(business, weekStart, weekEnd, frontendUrl)
+          enviarResumenDeNegocio(
+            business,
+            weekStart,
+            weekEnd,
+            lunesActual,
+            frontendUrl
+          )
         )
       );
       for (const enviado of resultados) {
@@ -190,6 +218,7 @@ async function enviarResumenDeNegocio(
   },
   weekStart: Date,
   weekEnd: Date,
+  lunesActual: Date,
   frontendUrl: string
 ): Promise<boolean> {
   const email = business.users[0]?.email;
@@ -250,7 +279,7 @@ async function enviarResumenDeNegocio(
         id: business.id,
         OR: [
           { weeklySummarySentAt: null },
-          { weeklySummarySentAt: { lt: weekStart } },
+          { weeklySummarySentAt: { lt: lunesActual } },
         ],
       },
       data: { weeklySummarySentAt: marca },
@@ -282,7 +311,7 @@ async function enviarResumenDeNegocio(
         // Identificador estable: si Cloud Tasks recibe dos veces la misma
         // tarea (o el job se reintenta antes de que la marca se haya
         // guardado), la segunda se descarta por id repetido.
-        `weekly-summary-${business.id}-${weekStart.toISOString().slice(0, 10)}`
+        `weekly-summary-${business.id}-${lunesActual.toISOString().slice(0, 10)}`
       );
     } catch (error) {
       // Sin correo encolado, la semana no puede quedar marcada como enviada:

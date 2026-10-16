@@ -136,6 +136,41 @@ describe("sendWeeklySummaryJob", () => {
     });
   });
 
+  it("el lunes a las 08:00 cuenta la semana pasada y reclama contra el lunes actual", async () => {
+    vi.useFakeTimers();
+    // Lunes 12 de octubre de 2026 a las 08:00 de Madrid, cuando lo lanza
+    // Cloud Scheduler.
+    vi.setSystemTime(new Date("2026-10-12T06:00:00Z"));
+    try {
+      mockedFindMany.mockResolvedValue([buildBusiness()] as any);
+
+      await sendWeeklySummaryJob();
+
+      const lunesPasado = new Date("2026-10-04T22:00:00Z");
+      const esteLunes = new Date("2026-10-11T22:00:00Z");
+      expect(mockedCallAggregate.mock.calls[0][0]?.where?.startedAt).toEqual({
+        gte: lunesPasado,
+        lt: esteLunes,
+      });
+      expect(mockedBusinessUpdateMany.mock.calls[0][0].where).toEqual({
+        id: "biz_1",
+        OR: [
+          { weeklySummarySentAt: null },
+          { weeklySummarySentAt: { lt: esteLunes } },
+        ],
+      });
+      expect(mockedEnqueueEmail.mock.calls[0][1]).toBe(
+        "weekly-summary-biz_1-2026-10-11"
+      );
+      // El asunto acaba en el domingo, el último día que se cuenta.
+      expect(mockedEnqueueEmail.mock.calls[0][0].subject).toContain(
+        "5 de octubre – 11 de octubre"
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("encola el correo con un identificador estable por negocio y semana", async () => {
     mockedFindMany.mockResolvedValue([buildBusiness()] as any);
 

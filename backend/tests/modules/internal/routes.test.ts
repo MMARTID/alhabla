@@ -181,6 +181,63 @@ describe("internalJobsRoutes", () => {
       expect(response.statusCode).toBe(400);
       expect(mockedProcessSendWhatsappJob).toHaveBeenCalledTimes(4);
     });
+
+    // Las dos formas exactas que encola programarAvisoAlCliente (botón
+    // «Avisar» del panel y avisar_cliente del Gestor). Hasta el 2026-10-16
+    // el esquema las rechazaba con 400 y el aviso no salía nunca.
+    it("acepta los avisos de cambio (con programedAtMs) y de cancelación (sin él)", async () => {
+      mockedProcessSendWhatsappJob.mockResolvedValue(undefined);
+
+      const cambio = {
+        proposito: "cambio",
+        bookingId: "booking_1",
+        programedAtMs: 1_800_000_000_000,
+        toNumber: "+34600111222",
+        businessId: "biz_1",
+        audience: "client",
+        idempotencyKey: "booking-booking_1-cambio-1790000000",
+      };
+      let response = await fastify.inject({
+        method: "POST",
+        url: "/jobs/send-whatsapp",
+        payload: cambio,
+      });
+      expect(response.statusCode).toBe(200);
+      expect(mockedProcessSendWhatsappJob).toHaveBeenLastCalledWith(cambio);
+
+      const cancelacion = {
+        proposito: "cancelacion",
+        bookingId: "booking_1",
+        toNumber: "+34600111222",
+        businessId: "biz_1",
+        audience: "client",
+        idempotencyKey: "booking-booking_1-cancelacion-1790000000",
+      };
+      response = await fastify.inject({
+        method: "POST",
+        url: "/jobs/send-whatsapp",
+        payload: cancelacion,
+      });
+      expect(response.statusCode).toBe(200);
+      expect(mockedProcessSendWhatsappJob).toHaveBeenLastCalledWith(
+        cancelacion
+      );
+
+      // Un cambio sin la hora con la que se encoló, o un aviso sin reserva,
+      // sigue siendo 400.
+      for (const payload of [
+        { ...cambio, programedAtMs: undefined },
+        { ...cancelacion, bookingId: undefined },
+      ]) {
+        response = await fastify.inject({
+          method: "POST",
+          url: "/jobs/send-whatsapp",
+          payload,
+        });
+        expect(response.statusCode).toBe(400);
+      }
+      expect(mockedProcessSendWhatsappJob).toHaveBeenCalledTimes(2);
+    });
   });
 
   describe("POST /jobs/process-recording", () => {

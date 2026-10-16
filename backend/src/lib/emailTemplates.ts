@@ -271,7 +271,10 @@ export function weeklySummaryEmail(input: {
     month: "long",
     timeZone: "Europe/Madrid",
   });
-  const range = `${formatter.format(input.weekStart)} – ${formatter.format(input.weekEnd)}`;
+  // `weekEnd` es el lunes siguiente a las 00:00, que no entra: el último día
+  // que se cuenta es el domingo anterior.
+  const ultimoDia = new Date(input.weekEnd.getTime() - 1);
+  const range = `${formatter.format(input.weekStart)} – ${formatter.format(ultimoDia)}`;
   const subject = `Tu semana en Alhabla (${range}) — ${input.businessName}`;
 
   const statRow = (label: string, value: string) => `

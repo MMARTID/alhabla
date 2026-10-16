@@ -1,4 +1,8 @@
-import type { FastifyBaseLogger, FastifyPluginAsync } from "fastify";
+import type {
+  FastifyBaseLogger,
+  FastifyPluginAsync,
+  FastifyReply,
+} from "fastify";
 import { z } from "zod";
 import { PermanentJobError } from "../../lib/jobErrors.js";
 import { processRecordingJob } from "../../jobs/processRecording.js";
@@ -109,7 +113,13 @@ const SendWhatsappLegadoSchema = z.object({
 // lead y elige la plantilla aprobada en el momento del envío.
 const SendWhatsappPorPropositoSchema = z
   .object({
-    proposito: z.enum(["confirmacion", "recordatorio", "hueco_libre"]),
+    proposito: z.enum([
+      "confirmacion",
+      "recordatorio",
+      "hueco_libre",
+      "cambio",
+      "cancelacion",
+    ]),
     bookingId: z.string().optional(),
     leadId: z.string().optional(),
     programedAtMs: z.number().int().optional(),
@@ -120,11 +130,17 @@ const SendWhatsappPorPropositoSchema = z
     sinV2: z.boolean().optional(),
     saltos: z.number().int().min(0).max(12).optional(),
   })
+  // `cambio` y `cancelacion` son los avisos que pide el dueño
+  // (programarAvisoAlCliente): una cancelación va sin `programedAtMs`, porque
+  // la reserva ya está cancelada y no hay hora que comparar. Hasta el
+  // 2026-10-16 el enum no los tenía y Cloud Tasks recibía 400 en cada aviso
+  // (5 de 5 en producción) mientras al dueño se le decía «Le aviso».
   .refine(
     (d) =>
       d.proposito === "hueco_libre"
         ? !!d.leadId
-        : !!d.bookingId && d.programedAtMs !== undefined,
+        : !!d.bookingId &&
+          (d.proposito === "cancelacion" || d.programedAtMs !== undefined),
     { message: "Falta bookingId+programedAtMs o leadId" }
   );
 
@@ -163,6 +179,29 @@ async function purgarSinLanzar(
   }
 }
 
+/**
+ * Responde 400 a un payload que no pasa el esquema y lo deja en el log con la
+ * ruta, los errores de Zod y las claves recibidas (sin valores: llevan
+ * teléfonos). Sin este log, un 400 solo se veía en el registro de peticiones
+ * y Cloud Tasks lo repetía en silencio (así pasó desapercibido tres semanas
+ * que los avisos de cambio y cancelación al cliente nunca salían).
+ */
+function payloadInvalido(
+  log: FastifyBaseLogger,
+  reply: FastifyReply,
+  ruta: string,
+  body: unknown,
+  error: z.ZodError
+) {
+  const claves =
+    body && typeof body === "object" ? Object.keys(body).sort() : [];
+  log.error(
+    { ruta, errores: error.errors, claves },
+    `[Job] ${ruta}: payload rechazado por el esquema; Cloud Tasks lo repetirá sin arreglarlo`
+  );
+  return reply.status(400).send({ error: error.errors });
+}
+
 // Endpoints invocados por Cloud Tasks/Cloud Scheduler (no por negocios ni
 // desde el frontend) — ver plugins/internalAuth.ts para la verificación del
 // token OIDC. Cloud Tasks reintenta automáticamente cualquier respuesta que
@@ -193,7 +232,13 @@ export const internalJobsRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.send({ received: true });
       } catch (error) {
         if (error instanceof z.ZodError) {
-          return reply.status(400).send({ error: error.errors });
+          return payloadInvalido(
+            fastify.log,
+            reply,
+            "/jobs/process-recording",
+            request.body,
+            error
+          );
         }
         // Un fallo definitivo (destinatario inválido, plantilla no aprobada,
         // número rechazado) se responde 200: devolver 500 solo conseguía que
@@ -221,7 +266,13 @@ export const internalJobsRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.send({ received: true });
       } catch (error) {
         if (error instanceof z.ZodError) {
-          return reply.status(400).send({ error: error.errors });
+          return payloadInvalido(
+            fastify.log,
+            reply,
+            "/jobs/recordar-recado",
+            request.body,
+            error
+          );
         }
         fastify.log.error({ err: error }, "recordar-recado job failed");
         return reply.status(500).send({ error: "Job processing failed" });
@@ -239,7 +290,13 @@ export const internalJobsRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.send({ received: true });
       } catch (error) {
         if (error instanceof z.ZodError) {
-          return reply.status(400).send({ error: error.errors });
+          return payloadInvalido(
+            fastify.log,
+            reply,
+            "/jobs/revisar-escalada",
+            request.body,
+            error
+          );
         }
         fastify.log.error({ err: error }, "revisar-escalada job failed");
         return reply.status(500).send({ error: "Job processing failed" });
@@ -257,7 +314,13 @@ export const internalJobsRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.send({ received: true });
       } catch (error) {
         if (error instanceof z.ZodError) {
-          return reply.status(400).send({ error: error.errors });
+          return payloadInvalido(
+            fastify.log,
+            reply,
+            "/jobs/recuperar-transcripcion",
+            request.body,
+            error
+          );
         }
         fastify.log.error({ err: error }, "recuperar-transcripcion job failed");
         return reply.status(500).send({ error: "Job processing failed" });
@@ -275,7 +338,13 @@ export const internalJobsRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.send({ received: true });
       } catch (error) {
         if (error instanceof z.ZodError) {
-          return reply.status(400).send({ error: error.errors });
+          return payloadInvalido(
+            fastify.log,
+            reply,
+            "/jobs/retry-failed-booking",
+            request.body,
+            error
+          );
         }
         // Un fallo definitivo (destinatario inválido, plantilla no aprobada,
         // número rechazado) se responde 200: devolver 500 solo conseguía que
@@ -303,7 +372,13 @@ export const internalJobsRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.send({ received: true });
       } catch (error) {
         if (error instanceof z.ZodError) {
-          return reply.status(400).send({ error: error.errors });
+          return payloadInvalido(
+            fastify.log,
+            reply,
+            "/jobs/send-email",
+            request.body,
+            error
+          );
         }
         // Un fallo definitivo (destinatario inválido, plantilla no aprobada,
         // número rechazado) se responde 200: devolver 500 solo conseguía que
@@ -331,7 +406,13 @@ export const internalJobsRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.send({ received: true });
       } catch (error) {
         if (error instanceof z.ZodError) {
-          return reply.status(400).send({ error: error.errors });
+          return payloadInvalido(
+            fastify.log,
+            reply,
+            "/jobs/send-sms",
+            request.body,
+            error
+          );
         }
         // Un fallo definitivo (destinatario inválido, plantilla no aprobada,
         // número rechazado) se responde 200: devolver 500 solo conseguía que
@@ -361,7 +442,13 @@ export const internalJobsRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.send({ received: true });
       } catch (error) {
         if (error instanceof z.ZodError) {
-          return reply.status(400).send({ error: error.errors });
+          return payloadInvalido(
+            fastify.log,
+            reply,
+            "/jobs/send-whatsapp",
+            request.body,
+            error
+          );
         }
         // Un fallo definitivo (destinatario inválido, plantilla no aprobada,
         // número rechazado) se responde 200: devolver 500 solo conseguía que
@@ -514,7 +601,15 @@ export const internalJobsRoutes: FastifyPluginAsync = async (fastify) => {
         await processUsageReportJob(ReportUsageSchema.parse(request.body));
         return reply.send({ received: true });
       } catch (error) {
-        if (error instanceof z.ZodError) return reply.status(400).send({ error: error.errors });
+        if (error instanceof z.ZodError) {
+          return payloadInvalido(
+            fastify.log,
+            reply,
+            "/jobs/report-usage",
+            request.body,
+            error
+          );
+        }
         if (error instanceof PermanentJobError) {
           fastify.log.warn(
             { err: error, reason: error.reason },

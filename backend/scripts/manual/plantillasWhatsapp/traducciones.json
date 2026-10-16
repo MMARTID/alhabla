@@ -1,0 +1,1826 @@
+{
+  "generado": "2026-10-16",
+  "nota": "Traducciones de las plantillas vigentes en español. Sin enviar a Meta.",
+  "plantillas": [
+    {
+      "name": "confirmacion_cita_v2",
+      "language": "ca",
+      "category": "UTILITY",
+      "audiencia": "cliente",
+      "parameter_format": "NAMED",
+      "components": [
+        {
+          "type": "BODY",
+          "text": "Hola, sóc Alhabla i gestiono les reserves de {{negocio_nombre}}. La teva cita per a {{servicio}} queda confirmada el {{cita}}. Si l'has de canviar, truca al negoci al {{negocio_telefono}} i t'atendrà la recepcionista.",
+          "example": {
+            "body_text_named_params": [
+              {
+                "param_name": "negocio_nombre",
+                "example": "Perruqueria Anna"
+              },
+              {
+                "param_name": "servicio",
+                "example": "tall i pentinat, amb la Laura"
+              },
+              {
+                "param_name": "cita",
+                "example": "dijous 24 de setembre a les 17:00"
+              },
+              {
+                "param_name": "negocio_telefono",
+                "example": "930 000 000"
+              }
+            ]
+          }
+        },
+        {
+          "type": "BUTTONS",
+          "buttons": [
+            {
+              "type": "QUICK_REPLY",
+              "text": "Desar contacte"
+            },
+            {
+              "type": "URL",
+              "text": "Com arribar-hi",
+              "url": "https://www.google.com/maps/search/?api=1&query=place_id:{{1}}",
+              "example": [
+                "ChIJrTLr-GyuEmsRBfy61i59si0"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "confirmacion_cita_v2",
+      "language": "en",
+      "category": "UTILITY",
+      "audiencia": "cliente",
+      "parameter_format": "NAMED",
+      "components": [
+        {
+          "type": "BODY",
+          "text": "Hi, I'm Alhabla and I handle bookings for {{negocio_nombre}}. Your appointment for {{servicio}} is confirmed for {{cita}}. If you need to change it, call the business on {{negocio_telefono}} and the receptionist will help you.",
+          "example": {
+            "body_text_named_params": [
+              {
+                "param_name": "negocio_nombre",
+                "example": "Anna's Hair Salon"
+              },
+              {
+                "param_name": "servicio",
+                "example": "cut and blow-dry, with Laura"
+              },
+              {
+                "param_name": "cita",
+                "example": "Thursday 24 September at 17:00"
+              },
+              {
+                "param_name": "negocio_telefono",
+                "example": "+34 930 000 000"
+              }
+            ]
+          }
+        },
+        {
+          "type": "BUTTONS",
+          "buttons": [
+            {
+              "type": "QUICK_REPLY",
+              "text": "Save contact"
+            },
+            {
+              "type": "URL",
+              "text": "Get directions",
+              "url": "https://www.google.com/maps/search/?api=1&query=place_id:{{1}}",
+              "example": [
+                "ChIJrTLr-GyuEmsRBfy61i59si0"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "confirmacion_cita_v2",
+      "language": "fr",
+      "category": "UTILITY",
+      "audiencia": "cliente",
+      "parameter_format": "NAMED",
+      "components": [
+        {
+          "type": "BODY",
+          "text": "Bonjour, je suis Alhabla et je gère les réservations de {{negocio_nombre}}. Votre rendez-vous pour {{servicio}} est confirmé le {{cita}}. Pour le modifier, appelez l'établissement au {{negocio_telefono}} : la réceptionniste vous répondra.",
+          "example": {
+            "body_text_named_params": [
+              {
+                "param_name": "negocio_nombre",
+                "example": "Salon de coiffure Anna"
+              },
+              {
+                "param_name": "servicio",
+                "example": "coupe et brushing, avec Laura"
+              },
+              {
+                "param_name": "cita",
+                "example": "jeudi 24 septembre à 17h00"
+              },
+              {
+                "param_name": "negocio_telefono",
+                "example": "+34 930 000 000"
+              }
+            ]
+          }
+        },
+        {
+          "type": "BUTTONS",
+          "buttons": [
+            {
+              "type": "QUICK_REPLY",
+              "text": "Enregistrer le contact"
+            },
+            {
+              "type": "URL",
+              "text": "Itinéraire",
+              "url": "https://www.google.com/maps/search/?api=1&query=place_id:{{1}}",
+              "example": [
+                "ChIJrTLr-GyuEmsRBfy61i59si0"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "confirmacion_cita_v2",
+      "language": "de",
+      "category": "UTILITY",
+      "audiencia": "cliente",
+      "parameter_format": "NAMED",
+      "components": [
+        {
+          "type": "BODY",
+          "text": "Hallo, ich bin Alhabla und verwalte die Termine von {{negocio_nombre}}. Ihr Termin für {{servicio}} ist bestätigt: {{cita}}. Wenn Sie ihn ändern möchten, rufen Sie bitte unter {{negocio_telefono}} an, die Rezeption hilft Ihnen gern.",
+          "example": {
+            "body_text_named_params": [
+              {
+                "param_name": "negocio_nombre",
+                "example": "Friseursalon Anna"
+              },
+              {
+                "param_name": "servicio",
+                "example": "Schneiden und Föhnen, bei Laura"
+              },
+              {
+                "param_name": "cita",
+                "example": "Donnerstag, 24. September, um 17:00 Uhr"
+              },
+              {
+                "param_name": "negocio_telefono",
+                "example": "+34 930 000 000"
+              }
+            ]
+          }
+        },
+        {
+          "type": "BUTTONS",
+          "buttons": [
+            {
+              "type": "QUICK_REPLY",
+              "text": "Kontakt speichern"
+            },
+            {
+              "type": "URL",
+              "text": "Route anzeigen",
+              "url": "https://www.google.com/maps/search/?api=1&query=place_id:{{1}}",
+              "example": [
+                "ChIJrTLr-GyuEmsRBfy61i59si0"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "confirmacion_cita_v2",
+      "language": "it",
+      "category": "UTILITY",
+      "audiencia": "cliente",
+      "parameter_format": "NAMED",
+      "components": [
+        {
+          "type": "BODY",
+          "text": "Ciao, sono Alhabla e gestisco le prenotazioni di {{negocio_nombre}}. Il tuo appuntamento per {{servicio}} è confermato per {{cita}}. Se devi cambiarlo, chiama il {{negocio_telefono}} e ti risponderà la receptionist.",
+          "example": {
+            "body_text_named_params": [
+              {
+                "param_name": "negocio_nombre",
+                "example": "Parrucchiere Anna"
+              },
+              {
+                "param_name": "servicio",
+                "example": "taglio e piega, con Laura"
+              },
+              {
+                "param_name": "cita",
+                "example": "giovedì 24 settembre alle 17:00"
+              },
+              {
+                "param_name": "negocio_telefono",
+                "example": "+34 930 000 000"
+              }
+            ]
+          }
+        },
+        {
+          "type": "BUTTONS",
+          "buttons": [
+            {
+              "type": "QUICK_REPLY",
+              "text": "Salva contatto"
+            },
+            {
+              "type": "URL",
+              "text": "Come arrivare",
+              "url": "https://www.google.com/maps/search/?api=1&query=place_id:{{1}}",
+              "example": [
+                "ChIJrTLr-GyuEmsRBfy61i59si0"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "confirmacion_cita_v2",
+      "language": "pt_PT",
+      "category": "UTILITY",
+      "audiencia": "cliente",
+      "parameter_format": "NAMED",
+      "components": [
+        {
+          "type": "BODY",
+          "text": "Olá, sou a Alhabla e faço a gestão das marcações de {{negocio_nombre}}. A sua marcação para {{servicio}} está confirmada para {{cita}}. Se precisar de a alterar, ligue para o {{negocio_telefono}} e a rececionista ajuda-o.",
+          "example": {
+            "body_text_named_params": [
+              {
+                "param_name": "negocio_nombre",
+                "example": "Cabeleireiro Ana"
+              },
+              {
+                "param_name": "servicio",
+                "example": "corte e brushing, com a Laura"
+              },
+              {
+                "param_name": "cita",
+                "example": "quinta-feira, 24 de setembro, às 17:00"
+              },
+              {
+                "param_name": "negocio_telefono",
+                "example": "+34 930 000 000"
+              }
+            ]
+          }
+        },
+        {
+          "type": "BUTTONS",
+          "buttons": [
+            {
+              "type": "QUICK_REPLY",
+              "text": "Guardar contacto"
+            },
+            {
+              "type": "URL",
+              "text": "Como chegar",
+              "url": "https://www.google.com/maps/search/?api=1&query=place_id:{{1}}",
+              "example": [
+                "ChIJrTLr-GyuEmsRBfy61i59si0"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "confirmacion_cita_v2",
+      "language": "nl",
+      "category": "UTILITY",
+      "audiencia": "cliente",
+      "parameter_format": "NAMED",
+      "components": [
+        {
+          "type": "BODY",
+          "text": "Hallo, ik ben Alhabla en ik beheer de afspraken van {{negocio_nombre}}. Je afspraak voor {{servicio}} is bevestigd op {{cita}}. Wil je die wijzigen? Bel dan naar {{negocio_telefono}}, de receptioniste helpt je graag.",
+          "example": {
+            "body_text_named_params": [
+              {
+                "param_name": "negocio_nombre",
+                "example": "Kapsalon Anna"
+              },
+              {
+                "param_name": "servicio",
+                "example": "knippen en föhnen, bij Laura"
+              },
+              {
+                "param_name": "cita",
+                "example": "donderdag 24 september om 17:00"
+              },
+              {
+                "param_name": "negocio_telefono",
+                "example": "+34 930 000 000"
+              }
+            ]
+          }
+        },
+        {
+          "type": "BUTTONS",
+          "buttons": [
+            {
+              "type": "QUICK_REPLY",
+              "text": "Contact opslaan"
+            },
+            {
+              "type": "URL",
+              "text": "Routebeschrijving",
+              "url": "https://www.google.com/maps/search/?api=1&query=place_id:{{1}}",
+              "example": [
+                "ChIJrTLr-GyuEmsRBfy61i59si0"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "recordatorio_cita_v2",
+      "language": "ca",
+      "category": "UTILITY",
+      "audiencia": "cliente",
+      "parameter_format": "NAMED",
+      "components": [
+        {
+          "type": "BODY",
+          "text": "Hola, t'escrivim des de {{negocio_nombre}} per recordar-te la teva cita de {{servicio}} demà, {{cita}}. Digues-nos si la mantens o si l'has d'anul·lar o canviar.",
+          "example": {
+            "body_text_named_params": [
+              {
+                "param_name": "negocio_nombre",
+                "example": "Perruqueria Anna"
+              },
+              {
+                "param_name": "servicio",
+                "example": "tall"
+              },
+              {
+                "param_name": "cita",
+                "example": "dijous 24 de setembre a les 17:00"
+              }
+            ]
+          }
+        },
+        {
+          "type": "BUTTONS",
+          "buttons": [
+            {
+              "type": "QUICK_REPLY",
+              "text": "Confirmo"
+            },
+            {
+              "type": "QUICK_REPLY",
+              "text": "Anul·lar"
+            },
+            {
+              "type": "QUICK_REPLY",
+              "text": "Canviar"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "recordatorio_cita_v2",
+      "language": "en",
+      "category": "UTILITY",
+      "audiencia": "cliente",
+      "parameter_format": "NAMED",
+      "components": [
+        {
+          "type": "BODY",
+          "text": "Hi, this is {{negocio_nombre}} reminding you of your {{servicio}} appointment tomorrow, {{cita}}. Let us know if you're keeping it or if you need to cancel or change it.",
+          "example": {
+            "body_text_named_params": [
+              {
+                "param_name": "negocio_nombre",
+                "example": "Anna's Hair Salon"
+              },
+              {
+                "param_name": "servicio",
+                "example": "haircut"
+              },
+              {
+                "param_name": "cita",
+                "example": "Thursday 24 September at 17:00"
+              }
+            ]
+          }
+        },
+        {
+          "type": "BUTTONS",
+          "buttons": [
+            {
+              "type": "QUICK_REPLY",
+              "text": "I'll be there"
+            },
+            {
+              "type": "QUICK_REPLY",
+              "text": "Cancel"
+            },
+            {
+              "type": "QUICK_REPLY",
+              "text": "Change"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "recordatorio_cita_v2",
+      "language": "fr",
+      "category": "UTILITY",
+      "audiencia": "cliente",
+      "parameter_format": "NAMED",
+      "components": [
+        {
+          "type": "BODY",
+          "text": "Bonjour, {{negocio_nombre}} vous rappelle votre rendez-vous pour {{servicio}} demain, {{cita}}. Dites-nous si vous le maintenez ou si vous souhaitez l'annuler ou le modifier.",
+          "example": {
+            "body_text_named_params": [
+              {
+                "param_name": "negocio_nombre",
+                "example": "Salon de coiffure Anna"
+              },
+              {
+                "param_name": "servicio",
+                "example": "une coupe"
+              },
+              {
+                "param_name": "cita",
+                "example": "jeudi 24 septembre à 17h00"
+              }
+            ]
+          }
+        },
+        {
+          "type": "BUTTONS",
+          "buttons": [
+            {
+              "type": "QUICK_REPLY",
+              "text": "Je confirme"
+            },
+            {
+              "type": "QUICK_REPLY",
+              "text": "Annuler"
+            },
+            {
+              "type": "QUICK_REPLY",
+              "text": "Modifier"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "recordatorio_cita_v2",
+      "language": "de",
+      "category": "UTILITY",
+      "audiencia": "cliente",
+      "parameter_format": "NAMED",
+      "components": [
+        {
+          "type": "BODY",
+          "text": "Hallo, hier ist {{negocio_nombre}}. Wir erinnern Sie an Ihren Termin für {{servicio}} morgen, {{cita}}. Bitte sagen Sie uns, ob Sie ihn wahrnehmen oder absagen bzw. verschieben möchten.",
+          "example": {
+            "body_text_named_params": [
+              {
+                "param_name": "negocio_nombre",
+                "example": "Friseursalon Anna"
+              },
+              {
+                "param_name": "servicio",
+                "example": "Haarschnitt"
+              },
+              {
+                "param_name": "cita",
+                "example": "Donnerstag, 24. September, um 17:00 Uhr"
+              }
+            ]
+          }
+        },
+        {
+          "type": "BUTTONS",
+          "buttons": [
+            {
+              "type": "QUICK_REPLY",
+              "text": "Ich komme"
+            },
+            {
+              "type": "QUICK_REPLY",
+              "text": "Absagen"
+            },
+            {
+              "type": "QUICK_REPLY",
+              "text": "Verschieben"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "recordatorio_cita_v2",
+      "language": "it",
+      "category": "UTILITY",
+      "audiencia": "cliente",
+      "parameter_format": "NAMED",
+      "components": [
+        {
+          "type": "BODY",
+          "text": "Ciao, ti scriviamo da {{negocio_nombre}} per ricordarti il tuo appuntamento per {{servicio}} domani, {{cita}}. Facci sapere se lo confermi o se devi disdirlo o spostarlo.",
+          "example": {
+            "body_text_named_params": [
+              {
+                "param_name": "negocio_nombre",
+                "example": "Parrucchiere Anna"
+              },
+              {
+                "param_name": "servicio",
+                "example": "taglio"
+              },
+              {
+                "param_name": "cita",
+                "example": "giovedì 24 settembre alle 17:00"
+              }
+            ]
+          }
+        },
+        {
+          "type": "BUTTONS",
+          "buttons": [
+            {
+              "type": "QUICK_REPLY",
+              "text": "Confermo"
+            },
+            {
+              "type": "QUICK_REPLY",
+              "text": "Disdici"
+            },
+            {
+              "type": "QUICK_REPLY",
+              "text": "Sposta"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "recordatorio_cita_v2",
+      "language": "pt_PT",
+      "category": "UTILITY",
+      "audiencia": "cliente",
+      "parameter_format": "NAMED",
+      "components": [
+        {
+          "type": "BODY",
+          "text": "Olá, escrevemos de {{negocio_nombre}} para lhe lembrar a sua marcação de {{servicio}} amanhã, {{cita}}. Diga-nos se a mantém ou se precisa de a cancelar ou alterar.",
+          "example": {
+            "body_text_named_params": [
+              {
+                "param_name": "negocio_nombre",
+                "example": "Cabeleireiro Ana"
+              },
+              {
+                "param_name": "servicio",
+                "example": "corte"
+              },
+              {
+                "param_name": "cita",
+                "example": "quinta-feira, 24 de setembro, às 17:00"
+              }
+            ]
+          }
+        },
+        {
+          "type": "BUTTONS",
+          "buttons": [
+            {
+              "type": "QUICK_REPLY",
+              "text": "Confirmo"
+            },
+            {
+              "type": "QUICK_REPLY",
+              "text": "Cancelar"
+            },
+            {
+              "type": "QUICK_REPLY",
+              "text": "Alterar"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "recordatorio_cita_v2",
+      "language": "nl",
+      "category": "UTILITY",
+      "audiencia": "cliente",
+      "parameter_format": "NAMED",
+      "components": [
+        {
+          "type": "BODY",
+          "text": "Hallo, {{negocio_nombre}} herinnert je aan je afspraak voor {{servicio}} morgen, {{cita}}. Laat je ons weten of je komt, of dat je wilt annuleren of verzetten?",
+          "example": {
+            "body_text_named_params": [
+              {
+                "param_name": "negocio_nombre",
+                "example": "Kapsalon Anna"
+              },
+              {
+                "param_name": "servicio",
+                "example": "knippen"
+              },
+              {
+                "param_name": "cita",
+                "example": "donderdag 24 september om 17:00"
+              }
+            ]
+          }
+        },
+        {
+          "type": "BUTTONS",
+          "buttons": [
+            {
+              "type": "QUICK_REPLY",
+              "text": "Ik kom"
+            },
+            {
+              "type": "QUICK_REPLY",
+              "text": "Annuleren"
+            },
+            {
+              "type": "QUICK_REPLY",
+              "text": "Verzetten"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "cambio_cita_cliente",
+      "language": "ca",
+      "category": "UTILITY",
+      "audiencia": "cliente",
+      "parameter_format": "NAMED",
+      "components": [
+        {
+          "type": "BODY",
+          "text": "Hola, {{negocio_nombre}} ha mogut la teva cita de {{servicio}} a una hora nova: {{cita}}. Si no et va bé, truca al {{negocio_telefono}} i en busquem una altra.",
+          "example": {
+            "body_text_named_params": [
+              {
+                "param_name": "negocio_nombre",
+                "example": "Perruqueria Anna"
+              },
+              {
+                "param_name": "servicio",
+                "example": "tall"
+              },
+              {
+                "param_name": "cita",
+                "example": "divendres 25 de setembre a les 18:00"
+              },
+              {
+                "param_name": "negocio_telefono",
+                "example": "930 000 000"
+              }
+            ]
+          }
+        },
+        {
+          "type": "BUTTONS",
+          "buttons": [
+            {
+              "type": "QUICK_REPLY",
+              "text": "D'acord"
+            },
+            {
+              "type": "QUICK_REPLY",
+              "text": "No em va bé"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "cambio_cita_cliente",
+      "language": "en",
+      "category": "UTILITY",
+      "audiencia": "cliente",
+      "parameter_format": "NAMED",
+      "components": [
+        {
+          "type": "BODY",
+          "text": "Hi, {{negocio_nombre}} has moved your {{servicio}} appointment to a new time: {{cita}}. If that doesn't suit you, call {{negocio_telefono}} and we'll find another one.",
+          "example": {
+            "body_text_named_params": [
+              {
+                "param_name": "negocio_nombre",
+                "example": "Anna's Hair Salon"
+              },
+              {
+                "param_name": "servicio",
+                "example": "haircut"
+              },
+              {
+                "param_name": "cita",
+                "example": "Friday 25 September at 18:00"
+              },
+              {
+                "param_name": "negocio_telefono",
+                "example": "+34 930 000 000"
+              }
+            ]
+          }
+        },
+        {
+          "type": "BUTTONS",
+          "buttons": [
+            {
+              "type": "QUICK_REPLY",
+              "text": "OK"
+            },
+            {
+              "type": "QUICK_REPLY",
+              "text": "Doesn't suit me"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "cambio_cita_cliente",
+      "language": "fr",
+      "category": "UTILITY",
+      "audiencia": "cliente",
+      "parameter_format": "NAMED",
+      "components": [
+        {
+          "type": "BODY",
+          "text": "Bonjour, {{negocio_nombre}} a déplacé votre rendez-vous pour {{servicio}} à un nouvel horaire : {{cita}}. Si cela ne vous convient pas, appelez le {{negocio_telefono}} et nous en trouverons un autre.",
+          "example": {
+            "body_text_named_params": [
+              {
+                "param_name": "negocio_nombre",
+                "example": "Salon de coiffure Anna"
+              },
+              {
+                "param_name": "servicio",
+                "example": "une coupe"
+              },
+              {
+                "param_name": "cita",
+                "example": "vendredi 25 septembre à 18h00"
+              },
+              {
+                "param_name": "negocio_telefono",
+                "example": "+34 930 000 000"
+              }
+            ]
+          }
+        },
+        {
+          "type": "BUTTONS",
+          "buttons": [
+            {
+              "type": "QUICK_REPLY",
+              "text": "D'accord"
+            },
+            {
+              "type": "QUICK_REPLY",
+              "text": "Ça ne me va pas"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "cambio_cita_cliente",
+      "language": "de",
+      "category": "UTILITY",
+      "audiencia": "cliente",
+      "parameter_format": "NAMED",
+      "components": [
+        {
+          "type": "BODY",
+          "text": "Hallo, {{negocio_nombre}} hat Ihren Termin für {{servicio}} verlegt. Neuer Termin: {{cita}}. Falls das nicht passt, rufen Sie unter {{negocio_telefono}} an und wir finden einen anderen.",
+          "example": {
+            "body_text_named_params": [
+              {
+                "param_name": "negocio_nombre",
+                "example": "Friseursalon Anna"
+              },
+              {
+                "param_name": "servicio",
+                "example": "Haarschnitt"
+              },
+              {
+                "param_name": "cita",
+                "example": "Freitag, 25. September, um 18:00 Uhr"
+              },
+              {
+                "param_name": "negocio_telefono",
+                "example": "+34 930 000 000"
+              }
+            ]
+          }
+        },
+        {
+          "type": "BUTTONS",
+          "buttons": [
+            {
+              "type": "QUICK_REPLY",
+              "text": "In Ordnung"
+            },
+            {
+              "type": "QUICK_REPLY",
+              "text": "Passt mir nicht"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "cambio_cita_cliente",
+      "language": "it",
+      "category": "UTILITY",
+      "audiencia": "cliente",
+      "parameter_format": "NAMED",
+      "components": [
+        {
+          "type": "BODY",
+          "text": "Ciao, {{negocio_nombre}} ha spostato il tuo appuntamento per {{servicio}} a un nuovo orario: {{cita}}. Se non ti va bene, chiama il {{negocio_telefono}} e ne cerchiamo un altro.",
+          "example": {
+            "body_text_named_params": [
+              {
+                "param_name": "negocio_nombre",
+                "example": "Parrucchiere Anna"
+              },
+              {
+                "param_name": "servicio",
+                "example": "taglio"
+              },
+              {
+                "param_name": "cita",
+                "example": "venerdì 25 settembre alle 18:00"
+              },
+              {
+                "param_name": "negocio_telefono",
+                "example": "+34 930 000 000"
+              }
+            ]
+          }
+        },
+        {
+          "type": "BUTTONS",
+          "buttons": [
+            {
+              "type": "QUICK_REPLY",
+              "text": "Va bene"
+            },
+            {
+              "type": "QUICK_REPLY",
+              "text": "Non mi va bene"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "cambio_cita_cliente",
+      "language": "pt_PT",
+      "category": "UTILITY",
+      "audiencia": "cliente",
+      "parameter_format": "NAMED",
+      "components": [
+        {
+          "type": "BODY",
+          "text": "Olá, {{negocio_nombre}} mudou a sua marcação de {{servicio}} para uma nova hora: {{cita}}. Se não lhe der jeito, ligue para o {{negocio_telefono}} e procuramos outra.",
+          "example": {
+            "body_text_named_params": [
+              {
+                "param_name": "negocio_nombre",
+                "example": "Cabeleireiro Ana"
+              },
+              {
+                "param_name": "servicio",
+                "example": "corte"
+              },
+              {
+                "param_name": "cita",
+                "example": "sexta-feira, 25 de setembro, às 18:00"
+              },
+              {
+                "param_name": "negocio_telefono",
+                "example": "+34 930 000 000"
+              }
+            ]
+          }
+        },
+        {
+          "type": "BUTTONS",
+          "buttons": [
+            {
+              "type": "QUICK_REPLY",
+              "text": "Está bem"
+            },
+            {
+              "type": "QUICK_REPLY",
+              "text": "Não me dá jeito"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "cambio_cita_cliente",
+      "language": "nl",
+      "category": "UTILITY",
+      "audiencia": "cliente",
+      "parameter_format": "NAMED",
+      "components": [
+        {
+          "type": "BODY",
+          "text": "Hallo, {{negocio_nombre}} heeft je afspraak voor {{servicio}} verplaatst naar een nieuw tijdstip: {{cita}}. Komt dat niet uit? Bel {{negocio_telefono}}, dan zoeken we een ander moment.",
+          "example": {
+            "body_text_named_params": [
+              {
+                "param_name": "negocio_nombre",
+                "example": "Kapsalon Anna"
+              },
+              {
+                "param_name": "servicio",
+                "example": "knippen"
+              },
+              {
+                "param_name": "cita",
+                "example": "vrijdag 25 september om 18:00"
+              },
+              {
+                "param_name": "negocio_telefono",
+                "example": "+34 930 000 000"
+              }
+            ]
+          }
+        },
+        {
+          "type": "BUTTONS",
+          "buttons": [
+            {
+              "type": "QUICK_REPLY",
+              "text": "Prima"
+            },
+            {
+              "type": "QUICK_REPLY",
+              "text": "Komt niet uit"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "cancelacion_cita_cliente",
+      "language": "ca",
+      "category": "UTILITY",
+      "audiencia": "cliente",
+      "parameter_format": "NAMED",
+      "components": [
+        {
+          "type": "BODY",
+          "text": "Hola, {{negocio_nombre}} ha hagut d'anul·lar la teva cita del {{cita}}. Disculpa les molèsties. Si vols demanar una altra hora, truca al {{negocio_telefono}} i t'atendrà la recepcionista.",
+          "example": {
+            "body_text_named_params": [
+              {
+                "param_name": "negocio_nombre",
+                "example": "Perruqueria Anna"
+              },
+              {
+                "param_name": "cita",
+                "example": "dijous 24 de setembre a les 17:00"
+              },
+              {
+                "param_name": "negocio_telefono",
+                "example": "930 000 000"
+              }
+            ]
+          }
+        },
+        {
+          "type": "BUTTONS",
+          "buttons": [
+            {
+              "type": "QUICK_REPLY",
+              "text": "D'acord"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "cancelacion_cita_cliente",
+      "language": "en",
+      "category": "UTILITY",
+      "audiencia": "cliente",
+      "parameter_format": "NAMED",
+      "components": [
+        {
+          "type": "BODY",
+          "text": "Hi, unfortunately {{negocio_nombre}} has had to cancel your appointment on {{cita}}. We're sorry for the inconvenience. To book another time, call {{negocio_telefono}} and the receptionist will help you.",
+          "example": {
+            "body_text_named_params": [
+              {
+                "param_name": "negocio_nombre",
+                "example": "Anna's Hair Salon"
+              },
+              {
+                "param_name": "cita",
+                "example": "Thursday 24 September at 17:00"
+              },
+              {
+                "param_name": "negocio_telefono",
+                "example": "+34 930 000 000"
+              }
+            ]
+          }
+        },
+        {
+          "type": "BUTTONS",
+          "buttons": [
+            {
+              "type": "QUICK_REPLY",
+              "text": "OK"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "cancelacion_cita_cliente",
+      "language": "fr",
+      "category": "UTILITY",
+      "audiencia": "cliente",
+      "parameter_format": "NAMED",
+      "components": [
+        {
+          "type": "BODY",
+          "text": "Bonjour, {{negocio_nombre}} a dû annuler votre rendez-vous du {{cita}}. Veuillez nous excuser pour la gêne occasionnée. Pour prendre un autre rendez-vous, appelez le {{negocio_telefono}} : la réceptionniste vous répondra.",
+          "example": {
+            "body_text_named_params": [
+              {
+                "param_name": "negocio_nombre",
+                "example": "Salon de coiffure Anna"
+              },
+              {
+                "param_name": "cita",
+                "example": "jeudi 24 septembre à 17h00"
+              },
+              {
+                "param_name": "negocio_telefono",
+                "example": "+34 930 000 000"
+              }
+            ]
+          }
+        },
+        {
+          "type": "BUTTONS",
+          "buttons": [
+            {
+              "type": "QUICK_REPLY",
+              "text": "D'accord"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "cancelacion_cita_cliente",
+      "language": "de",
+      "category": "UTILITY",
+      "audiencia": "cliente",
+      "parameter_format": "NAMED",
+      "components": [
+        {
+          "type": "BODY",
+          "text": "Hallo, {{negocio_nombre}} musste Ihren Termin am {{cita}} leider absagen. Wir bitten um Entschuldigung. Für einen neuen Termin rufen Sie bitte unter {{negocio_telefono}} an, die Rezeption hilft Ihnen gern.",
+          "example": {
+            "body_text_named_params": [
+              {
+                "param_name": "negocio_nombre",
+                "example": "Friseursalon Anna"
+              },
+              {
+                "param_name": "cita",
+                "example": "Donnerstag, 24. September, um 17:00 Uhr"
+              },
+              {
+                "param_name": "negocio_telefono",
+                "example": "+34 930 000 000"
+              }
+            ]
+          }
+        },
+        {
+          "type": "BUTTONS",
+          "buttons": [
+            {
+              "type": "QUICK_REPLY",
+              "text": "In Ordnung"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "cancelacion_cita_cliente",
+      "language": "it",
+      "category": "UTILITY",
+      "audiencia": "cliente",
+      "parameter_format": "NAMED",
+      "components": [
+        {
+          "type": "BODY",
+          "text": "Ciao, {{negocio_nombre}} ha dovuto annullare il tuo appuntamento di {{cita}}. Ci scusiamo per il disagio. Se vuoi prenotare un altro orario, chiama il {{negocio_telefono}} e ti risponderà la receptionist.",
+          "example": {
+            "body_text_named_params": [
+              {
+                "param_name": "negocio_nombre",
+                "example": "Parrucchiere Anna"
+              },
+              {
+                "param_name": "cita",
+                "example": "giovedì 24 settembre alle 17:00"
+              },
+              {
+                "param_name": "negocio_telefono",
+                "example": "+34 930 000 000"
+              }
+            ]
+          }
+        },
+        {
+          "type": "BUTTONS",
+          "buttons": [
+            {
+              "type": "QUICK_REPLY",
+              "text": "Va bene"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "cancelacion_cita_cliente",
+      "language": "pt_PT",
+      "category": "UTILITY",
+      "audiencia": "cliente",
+      "parameter_format": "NAMED",
+      "components": [
+        {
+          "type": "BODY",
+          "text": "Olá, {{negocio_nombre}} teve de cancelar a sua marcação de {{cita}}. Lamentamos o incómodo. Se quiser marcar outra hora, ligue para o {{negocio_telefono}} e a rececionista ajuda-o.",
+          "example": {
+            "body_text_named_params": [
+              {
+                "param_name": "negocio_nombre",
+                "example": "Cabeleireiro Ana"
+              },
+              {
+                "param_name": "cita",
+                "example": "quinta-feira, 24 de setembro, às 17:00"
+              },
+              {
+                "param_name": "negocio_telefono",
+                "example": "+34 930 000 000"
+              }
+            ]
+          }
+        },
+        {
+          "type": "BUTTONS",
+          "buttons": [
+            {
+              "type": "QUICK_REPLY",
+              "text": "Está bem"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "cancelacion_cita_cliente",
+      "language": "nl",
+      "category": "UTILITY",
+      "audiencia": "cliente",
+      "parameter_format": "NAMED",
+      "components": [
+        {
+          "type": "BODY",
+          "text": "Hallo, {{negocio_nombre}} heeft je afspraak van {{cita}} helaas moeten annuleren. Excuses voor het ongemak. Wil je een nieuwe afspraak maken? Bel {{negocio_telefono}}, de receptioniste helpt je graag.",
+          "example": {
+            "body_text_named_params": [
+              {
+                "param_name": "negocio_nombre",
+                "example": "Kapsalon Anna"
+              },
+              {
+                "param_name": "cita",
+                "example": "donderdag 24 september om 17:00"
+              },
+              {
+                "param_name": "negocio_telefono",
+                "example": "+34 930 000 000"
+              }
+            ]
+          }
+        },
+        {
+          "type": "BUTTONS",
+          "buttons": [
+            {
+              "type": "QUICK_REPLY",
+              "text": "Prima"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "hueco_libre",
+      "language": "ca",
+      "category": "MARKETING",
+      "audiencia": "cliente",
+      "parameter_format": "NAMED",
+      "components": [
+        {
+          "type": "BODY",
+          "text": "Hola, t'escrivim des de {{negocio_nombre}} perquè ha quedat lliure l'hora que ens vas demanar: {{cita}}. Digues-nos si la vols i te la reservem.",
+          "example": {
+            "body_text_named_params": [
+              {
+                "param_name": "negocio_nombre",
+                "example": "Perruqueria Anna"
+              },
+              {
+                "param_name": "cita",
+                "example": "dijous 24 de setembre a les 12:00"
+              }
+            ]
+          }
+        },
+        {
+          "type": "BUTTONS",
+          "buttons": [
+            {
+              "type": "QUICK_REPLY",
+              "text": "Sí, reserva-la"
+            },
+            {
+              "type": "QUICK_REPLY",
+              "text": "Ja no"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "hueco_libre",
+      "language": "en",
+      "category": "MARKETING",
+      "audiencia": "cliente",
+      "parameter_format": "NAMED",
+      "components": [
+        {
+          "type": "BODY",
+          "text": "Hi, this is {{negocio_nombre}}: the time you asked us for is now free: {{cita}}. Let us know if you want it and we'll book it for you.",
+          "example": {
+            "body_text_named_params": [
+              {
+                "param_name": "negocio_nombre",
+                "example": "Anna's Hair Salon"
+              },
+              {
+                "param_name": "cita",
+                "example": "Thursday 24 September at 12:00"
+              }
+            ]
+          }
+        },
+        {
+          "type": "BUTTONS",
+          "buttons": [
+            {
+              "type": "QUICK_REPLY",
+              "text": "Yes, book it"
+            },
+            {
+              "type": "QUICK_REPLY",
+              "text": "No, thanks"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "hueco_libre",
+      "language": "fr",
+      "category": "MARKETING",
+      "audiencia": "cliente",
+      "parameter_format": "NAMED",
+      "components": [
+        {
+          "type": "BODY",
+          "text": "Bonjour, ici {{negocio_nombre}} : le créneau que vous nous aviez demandé s'est libéré : {{cita}}. Dites-nous si vous le voulez et nous le réservons à votre nom.",
+          "example": {
+            "body_text_named_params": [
+              {
+                "param_name": "negocio_nombre",
+                "example": "Salon de coiffure Anna"
+              },
+              {
+                "param_name": "cita",
+                "example": "jeudi 24 septembre à 12h00"
+              }
+            ]
+          }
+        },
+        {
+          "type": "BUTTONS",
+          "buttons": [
+            {
+              "type": "QUICK_REPLY",
+              "text": "Oui, réservez-le"
+            },
+            {
+              "type": "QUICK_REPLY",
+              "text": "Non merci"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "hueco_libre",
+      "language": "de",
+      "category": "MARKETING",
+      "audiencia": "cliente",
+      "parameter_format": "NAMED",
+      "components": [
+        {
+          "type": "BODY",
+          "text": "Hallo, hier ist {{negocio_nombre}}: Der gewünschte Termin ist frei geworden: {{cita}}. Sagen Sie uns, ob Sie ihn möchten, dann reservieren wir ihn für Sie.",
+          "example": {
+            "body_text_named_params": [
+              {
+                "param_name": "negocio_nombre",
+                "example": "Friseursalon Anna"
+              },
+              {
+                "param_name": "cita",
+                "example": "Donnerstag, 24. September, um 12:00 Uhr"
+              }
+            ]
+          }
+        },
+        {
+          "type": "BUTTONS",
+          "buttons": [
+            {
+              "type": "QUICK_REPLY",
+              "text": "Ja, reservieren"
+            },
+            {
+              "type": "QUICK_REPLY",
+              "text": "Nein, danke"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "hueco_libre",
+      "language": "it",
+      "category": "MARKETING",
+      "audiencia": "cliente",
+      "parameter_format": "NAMED",
+      "components": [
+        {
+          "type": "BODY",
+          "text": "Ciao, ti scriviamo da {{negocio_nombre}} perché si è liberato l'orario che ci avevi chiesto: {{cita}}. Facci sapere se lo vuoi e lo prenotiamo a tuo nome.",
+          "example": {
+            "body_text_named_params": [
+              {
+                "param_name": "negocio_nombre",
+                "example": "Parrucchiere Anna"
+              },
+              {
+                "param_name": "cita",
+                "example": "giovedì 24 settembre alle 12:00"
+              }
+            ]
+          }
+        },
+        {
+          "type": "BUTTONS",
+          "buttons": [
+            {
+              "type": "QUICK_REPLY",
+              "text": "Sì, prenotalo"
+            },
+            {
+              "type": "QUICK_REPLY",
+              "text": "No, grazie"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "hueco_libre",
+      "language": "pt_PT",
+      "category": "MARKETING",
+      "audiencia": "cliente",
+      "parameter_format": "NAMED",
+      "components": [
+        {
+          "type": "BODY",
+          "text": "Olá, escrevemos de {{negocio_nombre}} porque ficou livre a hora que nos pediu: {{cita}}. Diga-nos se a quer e reservamo-la em seu nome.",
+          "example": {
+            "body_text_named_params": [
+              {
+                "param_name": "negocio_nombre",
+                "example": "Cabeleireiro Ana"
+              },
+              {
+                "param_name": "cita",
+                "example": "quinta-feira, 24 de setembro, às 12:00"
+              }
+            ]
+          }
+        },
+        {
+          "type": "BUTTONS",
+          "buttons": [
+            {
+              "type": "QUICK_REPLY",
+              "text": "Sim, reserve"
+            },
+            {
+              "type": "QUICK_REPLY",
+              "text": "Já não"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "hueco_libre",
+      "language": "nl",
+      "category": "MARKETING",
+      "audiencia": "cliente",
+      "parameter_format": "NAMED",
+      "components": [
+        {
+          "type": "BODY",
+          "text": "Hallo, {{negocio_nombre}} hier: het tijdstip waar je om vroeg is vrijgekomen: {{cita}}. Laat je weten of je het wilt? Dan reserveren we het op jouw naam.",
+          "example": {
+            "body_text_named_params": [
+              {
+                "param_name": "negocio_nombre",
+                "example": "Kapsalon Anna"
+              },
+              {
+                "param_name": "cita",
+                "example": "donderdag 24 september om 12:00"
+              }
+            ]
+          }
+        },
+        {
+          "type": "BUTTONS",
+          "buttons": [
+            {
+              "type": "QUICK_REPLY",
+              "text": "Ja, reserveer"
+            },
+            {
+              "type": "QUICK_REPLY",
+              "text": "Nee, dank je"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "nueva_reserva_negocio",
+      "language": "ca",
+      "category": "UTILITY",
+      "audiencia": "negocio",
+      "parameter_format": "NAMED",
+      "components": [
+        {
+          "type": "BODY",
+          "text": "Nova cita a {{negocio_nombre}}. La recepcionista ha reservat {{cliente_nombre}} per a {{servicio}} el {{cita}}. Ja és a la teva agenda, no has de fer res.",
+          "example": {
+            "body_text_named_params": [
+              {
+                "param_name": "negocio_nombre",
+                "example": "Perruqueria Anna"
+              },
+              {
+                "param_name": "cliente_nombre",
+                "example": "Marta"
+              },
+              {
+                "param_name": "servicio",
+                "example": "tall, amb la Laura"
+              },
+              {
+                "param_name": "cita",
+                "example": "dijous 24 de setembre a les 17:00"
+              }
+            ]
+          }
+        },
+        {
+          "type": "BUTTONS",
+          "buttons": [
+            {
+              "type": "QUICK_REPLY",
+              "text": "D'acord"
+            },
+            {
+              "type": "QUICK_REPLY",
+              "text": "Agenda d'avui"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "cancelacion_negocio",
+      "language": "ca",
+      "category": "UTILITY",
+      "audiencia": "negocio",
+      "parameter_format": "NAMED",
+      "components": [
+        {
+          "type": "BODY",
+          "text": "Anul·lació a {{negocio_nombre}}: {{cliente_nombre}} ha anul·lat la seva cita del {{cita}}. Aquest forat queda lliure a la teva agenda.",
+          "example": {
+            "body_text_named_params": [
+              {
+                "param_name": "negocio_nombre",
+                "example": "Perruqueria Anna"
+              },
+              {
+                "param_name": "cliente_nombre",
+                "example": "Laura"
+              },
+              {
+                "param_name": "cita",
+                "example": "dijous 24 de setembre a les 17:00"
+              }
+            ]
+          }
+        },
+        {
+          "type": "BUTTONS",
+          "buttons": [
+            {
+              "type": "QUICK_REPLY",
+              "text": "D'acord"
+            },
+            {
+              "type": "QUICK_REPLY",
+              "text": "Avisar qui esperava"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "recado_negocio",
+      "language": "ca",
+      "category": "UTILITY",
+      "audiencia": "negocio",
+      "parameter_format": "NAMED",
+      "components": [
+        {
+          "type": "BODY",
+          "text": "Tens un encàrrec a {{negocio_nombre}}. Ha trucat {{cliente_nombre}} des del {{cliente_telefono}} i demana el següent: {{motivo}}. Prem un botó quan l'hagis atès.",
+          "example": {
+            "body_text_named_params": [
+              {
+                "param_name": "negocio_nombre",
+                "example": "Perruqueria Anna"
+              },
+              {
+                "param_name": "cliente_nombre",
+                "example": "Maria"
+              },
+              {
+                "param_name": "cliente_telefono",
+                "example": "612 345 678"
+              },
+              {
+                "param_name": "motivo",
+                "example": "vol saber si feu balayage i que la truquis"
+              }
+            ]
+          }
+        },
+        {
+          "type": "BUTTONS",
+          "buttons": [
+            {
+              "type": "QUICK_REPLY",
+              "text": "Atès"
+            },
+            {
+              "type": "QUICK_REPLY",
+              "text": "Recorda-m'ho demà"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "cita_pendiente_negocio",
+      "language": "ca",
+      "category": "UTILITY",
+      "audiencia": "negocio",
+      "parameter_format": "NAMED",
+      "components": [
+        {
+          "type": "BODY",
+          "text": "Atenció a {{negocio_nombre}}: la cita de {{cliente_nombre}} el {{cita}} es va reservar per telèfon però no ha entrat al teu calendari perquè {{motivo}}. Tria què vols fer-ne.",
+          "example": {
+            "body_text_named_params": [
+              {
+                "param_name": "negocio_nombre",
+                "example": "Perruqueria Anna"
+              },
+              {
+                "param_name": "cliente_nombre",
+                "example": "Joan"
+              },
+              {
+                "param_name": "cita",
+                "example": "dijous 24 de setembre a les 17:00"
+              },
+              {
+                "param_name": "motivo",
+                "example": "la connexió amb el teu calendari havia caducat"
+              }
+            ]
+          }
+        },
+        {
+          "type": "BUTTONS",
+          "buttons": [
+            {
+              "type": "QUICK_REPLY",
+              "text": "La vaig apuntar jo"
+            },
+            {
+              "type": "QUICK_REPLY",
+              "text": "Reintentar"
+            },
+            {
+              "type": "QUICK_REPLY",
+              "text": "Reconnectar"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "alerta_operativa_negocio",
+      "language": "ca",
+      "category": "UTILITY",
+      "audiencia": "negocio",
+      "parameter_format": "NAMED",
+      "components": [
+        {
+          "type": "BODY",
+          "text": "Avís d'Alhabla per a {{negocio_nombre}}: {{texto}}. Ho pots revisar des dels ajustos del teu tauler.",
+          "example": {
+            "body_text_named_params": [
+              {
+                "param_name": "negocio_nombre",
+                "example": "Perruqueria Anna"
+              },
+              {
+                "param_name": "texto",
+                "example": "el teu calendari de Google s'ha desconnectat i les cites noves no s'hi desen"
+              }
+            ]
+          }
+        },
+        {
+          "type": "BUTTONS",
+          "buttons": [
+            {
+              "type": "URL",
+              "text": "Anar a Ajustos",
+              "url": "https://alhabla.ai/ajustes/{{1}}",
+              "example": [
+                "calendario"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "bienvenida_negocio",
+      "language": "ca",
+      "category": "MARKETING",
+      "audiencia": "negocio",
+      "parameter_format": "NAMED",
+      "components": [
+        {
+          "type": "BODY",
+          "text": "Sóc Alhabla, la recepcionista de {{negocio_nombre}}. Prem per rebre aquí les teves reserves, encàrrecs i avisos.",
+          "example": {
+            "body_text_named_params": [
+              {
+                "param_name": "negocio_nombre",
+                "example": "Perruqueria Anna"
+              }
+            ]
+          }
+        },
+        {
+          "type": "BUTTONS",
+          "buttons": [
+            {
+              "type": "QUICK_REPLY",
+              "text": "Activar avisos"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "cierre_del_dia",
+      "language": "ca",
+      "category": "MARKETING",
+      "audiencia": "negocio",
+      "parameter_format": "NAMED",
+      "components": [
+        {
+          "type": "BODY",
+          "text": "Resum del dia a {{negocio_nombre}}. Avui la teva recepcionista ha atès {{resumen_hoy}}. Per a demà tens {{resumen_manana}}. Que descansis.",
+          "example": {
+            "body_text_named_params": [
+              {
+                "param_name": "negocio_nombre",
+                "example": "Perruqueria Anna"
+              },
+              {
+                "param_name": "resumen_hoy",
+                "example": "9 trucades, 6 cites i 1 encàrrec"
+              },
+              {
+                "param_name": "resumen_manana",
+                "example": "11 cites, la primera a les 9:30"
+              }
+            ]
+          }
+        },
+        {
+          "type": "BUTTONS",
+          "buttons": [
+            {
+              "type": "QUICK_REPLY",
+              "text": "Veure demà"
+            },
+            {
+              "type": "QUICK_REPLY",
+              "text": "Silenciar"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -8,6 +8,7 @@ import {
   origenDeCalendario,
   resolverConexionDeCalendario,
   SELECT_CONEXION_DE_CALENDARIO,
+  usaCalendarioExterno,
 } from "../modules/calendar/conexion.js";
 import { DESCRIPTORES_DE_PROVEEDOR } from "../adapters/calendar/CalendarProvider.js";
 import { proveedorDesdeErrorDeReconexion } from "../adapters/calendar/errors.js";
@@ -283,6 +284,25 @@ export async function processRetryFailedBookingJob(
       ? { intervals: externalBusy, calendarAvailabilityKnown: false }
       : externalBusy;
 
+    // Igual que la reserva en vivo: con un calendario externo que no se pudo
+    // leer, no se reserva a ciegas. checkAvailability ignora la ocupación
+    // externa cuando no se conoce, así que sin esta guarda la cita podía
+    // entrar encima de una que el dueño apuntó a mano. Se lanza para que
+    // Cloud Tasks lo reintente más tarde (el cerrojo se suelta en el
+    // finally); si se agotan los reintentos, la reserva sigue pendiente y el
+    // dueño ya tiene el aviso de cita pendiente.
+    if (
+      usaCalendarioExterno(conexion) &&
+      !normalizedExternalBusy.calendarAvailabilityKnown
+    ) {
+      console.warn(
+        `[Job] Lead ${leadId} (negocio ${call.businessId}): el calendario de ${DESCRIPTORES_DE_PROVEEDOR[conexion.provider].nombreCorto} sigue sin poder leerse; no se reserva a ciegas, se reintentará`
+      );
+      throw new Error(
+        `Calendario ilegible al reintentar la reserva del lead ${leadId}`
+      );
+    }
+
     const availability = await checkAvailability({
       businessId: call.businessId,
       schedule: business.schedule,
@@ -367,6 +387,7 @@ export async function processRetryFailedBookingJob(
           numberPeople: 1,
           professionalId: resolvedProfessionalId ?? undefined,
           serviceIds: data_.serviceIds ?? [],
+          clientName: data_.clientName,
           clientPhone: effectiveClientPhone,
           createdVia: "voice",
           externalEventId: (result as { id?: string })?.id ?? undefined,
@@ -378,6 +399,7 @@ export async function processRetryFailedBookingJob(
           durationMinutes: data_.durationMinutes,
           professionalId: resolvedProfessionalId ?? undefined,
           serviceIds: data_.serviceIds ?? [],
+          clientName: data_.clientName,
           clientPhone: effectiveClientPhone,
           externalEventId: (result as { id?: string })?.id ?? undefined,
           externalCalendarProvider: conexion.provider,
