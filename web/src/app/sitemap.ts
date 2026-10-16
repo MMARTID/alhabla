@@ -1,6 +1,6 @@
 import type { MetadataRoute } from "next";
 import { listarArticulos, urlAbsolutaDeImagen } from "@/lib/blog";
-import { absoluteUrl } from "@/lib/seo";
+import { absoluteUrl, escaparXml } from "@/lib/seo";
 import { CITY_SLUGS } from "@/lib/city-landings";
 
 const NICHOS = ["peluqueria", "centro-de-estetica", "salon-de-unas", "barberia", "fisioterapia"] as const;
@@ -51,7 +51,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
       lastModified: new Date(`${a.actualizado ?? a.fecha}T08:00:00Z`),
       changeFrequency: "monthly" as const,
       priority: 0.5,
-      ...(a.imagen ? { images: [urlAbsolutaDeImagen(a.imagen)] } : {}),
+      ...(a.imagen ? { images: [escaparXml(urlAbsolutaDeImagen(a.imagen))] } : {}),
     })),
     ...["/legal/aviso-legal", "/legal/privacidad"].map((path) => ({
       url: absoluteUrl(path),
