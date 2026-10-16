@@ -145,7 +145,8 @@
   --success: #2c7334;
   --success-surface: #ecf7ec;
   --warning: #9f7a15;
-  --error: #c53030;
+  /* Sin `--error` aquí: es un token (canales RGB, arriba) y esta línea, que
+     va después, lo pisaba con un hex; `text-error` quedaba en negro. */
 }
 
 body {
