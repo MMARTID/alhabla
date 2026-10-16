@@ -46,16 +46,23 @@ async function verifyCurrentPassword(
   }
 }
 
-async function enqueueAccountEmail(input: {
-  toAddress: string;
-  subject: string;
-  html: string;
-}) {
+async function enqueueAccountEmail(
+  input: {
+    toAddress: string;
+    subject: string;
+    html: string;
+  },
+  /** Nombre de la tarea y clave del envío: un reintento no lo duplica. */
+  taskId: string
+) {
   try {
-    await enqueueEmailJob({
-      fromAlias: "support",
-      ...input,
-    });
+    await enqueueEmailJob(
+      {
+        fromAlias: "support",
+        ...input,
+      },
+      taskId
+    );
   } catch (error) {
     // El correo es una confirmación secundaria: una caída de Zoho o Cloud
     // Tasks nunca debe deshacer un cambio de contraseña ni dejar una cuenta
@@ -95,7 +102,10 @@ export async function changeAccountPassword(input: {
   });
 
   const email = passwordChangedEmail();
-  await enqueueAccountEmail({ toAddress: user.email, ...email });
+  await enqueueAccountEmail(
+    { toAddress: user.email, ...email },
+    `contrasena-cambiada-${user.id}-${actualizado.tokenVersion}`
+  );
 
   // La versión nueva vuelve a la ruta para que emita un token que la lleve:
   // sin él, quien cambia la contraseña se quedaba también fuera.
@@ -250,5 +260,8 @@ export async function deleteAccount(input: {
   await prisma.business.delete({ where: { id: business.id } });
 
   const email = accountDeletedEmail({ businessName: business.name });
-  await enqueueAccountEmail({ toAddress: user.email, ...email });
+  await enqueueAccountEmail(
+    { toAddress: user.email, ...email },
+    `cuenta-borrada-${business.id}`
+  );
 }

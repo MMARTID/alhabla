@@ -711,6 +711,8 @@ el `fetch` equivalente. **Nunca desde un route handler**: todo pasa por
   <epoch ms>` / `entrante:<id>:<tipo>`. `reclamarEnvio(channel, key, extra?)` acepta un tercer
   argumento para que la fila nazca con `businessId/audience/toNumber/callbackData/kind`; si el
   `statuses[]` se adelanta al registro, la fila `adhoc:<id>` se **fusiona** con esos datos.
+- `delivery_unconfirmed` (salió y el operador no confirmó la entrega) cuenta como `sent` en
+  `mapEstadoTelnyx` desde el 16-10: antes se descartaba con aviso y se perdía su coste.
 - 131026 (el destinatario no tiene WhatsApp) llega ASÍNCRONO como fallo de entrega
   (`statuses[].failed` con `errors[].code` o `message.finalized` `delivery_failed`), nunca en
   la respuesta del envío: `actualizarEstadoEnvio` marca `ownerWhatsappUnreachableAt` solo si el
@@ -720,7 +722,8 @@ el `fetch` equivalente. **Nunca desde un route handler**: todo pasa por
   `server.ts` lo descarta como duplicado sin reprocesar nada, así que una fila guardada y no
   enrutada (proceso muerto) la recoge `handleWhatsappMessages` al inicio de cualquier evento
   posterior (`handledAt null`, >2 min y <7 d, reclamo atómico con `handler:
-  "reintento:en-curso"`, 20 por pasada). Si el volumen crece se mueve a Cloud Scheduler.
+  "reintento:en-curso:<n>"`, 20 por pasada, como mucho 3 reintentos por fila; después `handler:
+  "reintento:agotado"` con su último `error`). Si el volumen crece se mueve a Cloud Scheduler.
 - El nombre real del evento `whatsapp.template.*` no está verificado (fase 0): el `default:`
   del switch de `/webhooks/telnyx` avisa con `warn` de cualquier `whatsapp.*`/`message.*` sin
   handler, y el GET refresca la plantilla cada 24 h por `listTemplates`.
@@ -825,7 +828,12 @@ el `fetch` equivalente. **Nunca desde un route handler**: todo pasa por
   (E.164 o null)/motivo/quiereQueLeLlamen/callControlId`) ⇒ aviso #2 `avisarRecado`
   (botones «Atendido» · «Recuérdamelo mañana»; plantilla `recado_negocio` con
   `negocio_nombre/cliente_nombre/cliente_telefono/motivo`; respaldo `messageLeadEmail` al
-  primer usuario del negocio, clave `recado-<leadId>`).
+  primer usuario del negocio, clave `recado-<leadId>`). **Un lead `message` por llamada**
+  (`crearLeadDelRecado`, 2026-10-16): se crea en una transacción con
+  `pg_advisory_xact_lock(hashtext('recado:<Call.id>'))` y solo si la llamada no tiene ya uno.
+  Si `lead.create` falla, el recado sigue en `postCallReport` y se programa `revisar-escalada`,
+  que lo recupera; también lo recupera el informe siguiente (`completarInforme`). Antes se
+  perdía: el informe siguiente ya no lo traía como nuevo y la revisión lo daba por hecho.
 - Botones (`router.ts` › `botonDeRecado`): «Atendido» ⇒ `resolvedAt`; «Recuérdamelo mañana» ⇒
   `Lead.snoozedUntil` = 09:00 del día siguiente en la zona del negocio y job
   `recordar-recado` (`jobs/recordarRecado.ts`, ruta `/internal/jobs/recordar-recado`, cola
@@ -843,8 +851,10 @@ el `fetch` equivalente. **Nunca desde un route handler**: todo pasa por
   2 min: el informe puede llegar a mitad de llamada). La revisión se reprograma mientras la
   llamada siga en curso (hasta 8) y, si al final sigue `FALLO_TECNICO` sin recado, sin cita
   activa y sin `Lead` `message`, guarda el recado en `postCallReport` (con la `postCallReportAt`
-  leída: idempotente) y crea el lead + aviso #2 con el teléfono de la llamada. En dev corre en
-  el proceso tras la misma espera.
+  leída: idempotente) y crea el lead + aviso #2 con el teléfono de la llamada. Si el informe ya
+  trae recado y la llamada no tiene lead (falló su creación), lo crea con ese recado, sea cual
+  sea el motivo de la escalada. Si el lead no se puede crear, lanza para que Cloud Tasks la
+  repita. En dev corre en el proceso tras la misma espera.
 
 **Código (fase 1, PR 4 — lado cliente, 2026-09-20).**
 - `modules/whatsapp/mensajesCliente.ts`: todo lo que sale al CLIENTE por plantilla. Parámetros
@@ -858,8 +868,12 @@ el `fetch` equivalente. **Nunca desde un route handler**: todo pasa por
   `WHATSAPP_TEMPLATE_*_NAME` → `SIN_PLANTILLA`; antes de cada clave `refrescarPlantilla` (≤ 1
   llamada al WABA/día/clave), así una v2 aprobada entra sola en ≤ 24 h sin deploy.
   `programarMensajesAlCliente({ bookingId })` encola la confirmación
-  (`booking-<id>-confirmacion-<epochSeg>`) y, con plan Pro/Scale y > 24 h, el recordatorio
-  (`booking-<id>-recordatorio-<epochSeg>`; a más de 29 d se programa a 29 d y el job se reencola
+  (`booking-<id>-confirmacion-<epochSeg>-<huella>`) y, con plan Pro/Scale y > 24 h, el recordatorio
+  (`booking-<id>-recordatorio-<epochSeg>-<huella>`; la huella son 8 hex del sha256 del E.164 de
+  destino, `lib/clavesDeMensajes.ts`, desde el 16-10: sin ella, corregir el teléfono y volver a
+  reservar a la misma hora chocaba con la tarea del número viejo y no salía nada; el reenvío del
+  Gestor, `avisar_cliente`, añade `-g<accionId>` a la confirmación para que salga otra vez; a
+  más de 29 d se programa a 29 d y el job se reencola
   con taskId `-s<n>`, máximo 12 saltos, conservando esa clave en el payload: `enqueueWhatsappJob`
   solo pone `idempotencyKey = taskId` cuando el payload no trae una, así la fila final de
   `sent_messages` lleva la clave documentada); devuelve si la confirmación quedó programada (sin
@@ -945,9 +959,10 @@ el `fetch` equivalente. **Nunca desde un route handler**: todo pasa por
   130429/131048 tier, 40008, 131026); siempre `console.error` con plantilla, negocio, destino y
   código; `cliente:confirmacion` ⇒ `clientNotifiedAt: null` y, si era la v2 y el código es
   132000/132001/132012/132015/132016, encola UNA vez el respaldo con `sinV2: true` (sale
-  `confirmacion_cita`), con taskId `booking-<id>-confirmacion-<epochSeg>-respaldo` derivado de la
-  RESERVA (si el `statuses[]` se adelantó al registro la fila es `adhoc:<wamid>` y Cloud Tasks
-  rechazaría los `:`); `cliente:hueco` ⇒ reabre el lead (`notifiedAt null`, `notifiedVia
+  `confirmacion_cita`), con taskId `<clave de la fila>-respaldo` (conserva la huella y el sufijo
+  del Gestor) o, si el `statuses[]` se adelantó al registro y la fila es `adhoc:<wamid>` (Cloud
+  Tasks rechazaría los `:`), `booking-<id>-confirmacion-<epochSeg>-<huella>-respaldo` derivado de
+  la RESERVA y del destino; `cliente:hueco` ⇒ reabre el lead (`notifiedAt null`, `notifiedVia
   ninguna:meta:<código>`, `resolvedAt null`) salvo 131026 (`sin_whatsapp`) o si ya respondió;
   `recordatorio`/`contacto` solo log. `SentMessage.templateName/templateLanguage` se escriben
   también al enviar por `{ id }` (campos opcionales nuevos de `EnvioPlantilla`).
@@ -1734,6 +1749,19 @@ is now a **Cloud Scheduler** job hitting the same kind of endpoint every
      (route answers 200, task leaves the queue). 5xx/network errors still propagate so
      Cloud Tasks retries. Background: ~50 simulation-battery recordings from 14–16 Sep
      looped every 15 min for two days (~8,000 failing requests/day) before this.
+   - **Failures retrying cannot fix (2026-10-16):** audio over 200 MB (declared or counted
+     while streaming) and a URL that is not https or points at an internal host are marked
+     unrecoverable the same way (`PermanentJobError` `recording_too_large` /
+     `recording_url_not_allowed`). Before, they came back every 15 min for the 30 days of
+     retention.
+   - **One deadline for the whole job: 150 s** (`PLAZO_DEL_JOB_MS`), below the 180 s
+     `dispatchDeadline` after which Cloud Tasks retries the task. It covers the download with
+     its redirects, the fresh Telnyx URL and the PUT to R2 (`uploadRecording` takes an
+     `abortSignal`). The old 5-minute download timeout let a second attempt start while the
+     first was still downloading. The audio goes through `stream.pipeline`, and an error in it
+     aborts the PUT: with `pipe`, a cut mid-download (or the size limit tripping) had no
+     listener and crashed the process, and the S3 SDK's `body.pipe(request)` left the PUT
+     waiting for bytes.
    - `filter[call_control_id]` on `GET /v2/recordings` is documented by the SDK but
      **ignored by the API** (returns an empty list — verified against the live account
      2026-09-17). Only `call_leg_id`/`call_session_id` filters work; the adapter no
@@ -1770,11 +1798,12 @@ is now a **Cloud Scheduler** job hitting the same kind of endpoint every
    - Retries a `book_appointment` that failed during a live call for a probably-transient reason (`BOOK_APPOINTMENT_FAILED`, `CALENDAR_TIMEOUT`, `CALENDAR_RATE_LIMITED`, or an unclassified error) — enqueued by `capturePendingBookingLead`/`enqueueRetryFailedBooking` in `voiceTools/service.ts`. Not enqueued for `*_RECONNECT_REQUIRED` failures, since retrying doesn't help until the business reconnects the calendar manually.
    - Loads the pending booking from the `Lead` row (`type: "pending_booking"`) by `leadId`, re-fetches the business's calendar tokens fresh (never trusts stale tokens from the original failed attempt), calls `calendarService.bookAppointment()` again, and on success creates the `Booking` row and sets `Lead.resolvedAt`.
    - Cloud Tasks queue `retry-failed-booking`: 4 attempts, exponential backoff 30s base (the caller already hung up — there's no live request waiting, so a few minutes of backoff is fine).
-   - No customer-facing notification exists yet when a retry succeeds in the background — it only becomes visible via the dashboard.
+   - **Consent and channel (2026-10-16):** the lead stores `smsConsent` and `createdVia` (the tool's channel, `voice` or `client_chat`) and the job copies them to the `Booking`; leads from before that have neither (no consent, `voice`). After booking, with WhatsApp configured, it calls `programarMensajesAlCliente`: the client gets the confirmation (and reminder) under the same conditions as a live booking. Before, the recovered booking was saved without consent, always as `voice`, and the client was never told.
 
 3. **`send-email`** (`backend/src/lib/zohoMail.ts`, `backend/src/lib/emailTemplates.ts`)
    - Sends the welcome email (`checkout.session.completed`, from `welcome@alhabla.ai`) and the payment-failed email (`invoice.payment_failed`, from `support@alhabla.ai`) — see `billing/service.ts`. Both are Zoho Mail aliases of one authenticated account; sending goes through Zoho Mail's REST API (OAuth 2.0, refresh token) rather than SMTP.
    - Cloud Tasks queue `send-email`: 4 attempts, exponential backoff 5s base.
+   - **Every email carries a `taskId` (2026-10-16)**, which is also the job's idempotency key, so a redelivered task does not send it twice: `bienvenida-<checkout session>`, `pago-fallido-<invoice>`, `baja-<business>-<claim ms>`, `aviso-de-minutos-<period>`, `reserva-pendiente-<lead>`, `contrasena-cambiada-<user>-<tokenVersion>`, `cuenta-borrada-<business>`, `restablecer-<user>-<random>` (never the token or its hash: task names show up in the console), plus the ones that already had one (`weekly-summary-…`, `recado-<lead>`, `alerta-…`).
 
 4. **`send-sms`** (`backend/src/adapters/telnyx/TelnyxAdapter.ts` — `sendSms`)
    - **Owner notice (since 2026-10-10): SMS is only the fallback of the WhatsApp notice #1.** After a successful `book_appointment`, `avisarNuevaReserva` goes first; only if it returns `via: "ninguna"` without `deliberado` (owner disabled the notice, already sent, inactive business are deliberate) does `avisarNuevaReservaPorSms` enqueue an SMS — to the owner's mobile (`ownerWhatsappNumber`, read fresh from the DB), **never to `business.phone`**: since "Usar Alhabla como número principal" (`customerLineType = "alhabla"`), `phone` IS the Alhabla number, and the old code sent an SMS from the Alhabla number to itself (`40305 Invalid 'from' address` + 4 Cloud Tasks retries after every booking in INFINITY, 2026-10-09/10). With a landline as `phone` it went to a number that can't receive SMS anyway. Never blocks the booking; every skip logs business/provider/reason (`console.error`).
@@ -1825,6 +1854,11 @@ is now a **Cloud Scheduler** job hitting the same kind of endpoint every
      `process-recording`), and before scanning marks as unrecoverable any un-copied
      recording older than `RECORDING_RETENTION_DAYS` (30): neither Retell nor Telnyx
      keeps the audio beyond that, so re-enqueueing it only produced 403s forever.
+   - **Cap (2026-10-16):** each re-enqueue counts in `contadores`
+     (`grabacion-reencolada:<Recording.id>`); after 96 (24 h of sweeps, each with the 5
+     attempts of the queue) the row is marked unrecoverable with a `console.error` naming
+     recording, call and business. The audio is still at the provider: clearing
+     `processingFailedAt` puts it back in the sweep.
 
 7. **Recording purge** (`backend/src/jobs/purgeOldRecordings.ts`) — added 2026-09-17
    - `POST /internal/jobs/purge-old-recordings`. **Needs a Cloud Scheduler job
@@ -1846,7 +1880,9 @@ is now a **Cloud Scheduler** job hitting the same kind of endpoint every
      honoured.
    - **Call text purge** (`backend/src/jobs/purgarTextoDeLlamadas.ts`) — added
      2026-10-02, runs in the same endpoint right after the audio purge, so it
-     needs no Cloud Scheduler job of its own. Once a call is older than
+     needs no Cloud Scheduler job of its own. Since 2026-10-16 each purge has
+     its own `try`: the text (GDPR) runs even if the audio purge throws, and
+     the endpoint answers 500 at the end if either failed. Once a call is older than
      `CALL_TEXT_RETENTION_DAYS` (default 90, the figure the privacy policy
      publishes) it deletes the `Transcript` row, nulls `Call.summary` and
      `Call.postCallReport`, and deletes `InboundMessage` rows (received

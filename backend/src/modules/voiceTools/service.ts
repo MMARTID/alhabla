@@ -920,6 +920,10 @@ async function capturePendingBookingLead(args: {
   professionalId?: string;
   failureCode: string;
   callLabel: string;
+  /** Consentimiento del resumen: sin él la cita recuperada no se confirma. */
+  smsConsent: boolean;
+  /** Canal de la tool (`canalDeLaTool`), para el `createdVia` del Booking. */
+  createdVia: "voice" | "client_chat";
 }): Promise<string | null> {
   try {
     const call = args.resolvedCall;
@@ -944,6 +948,8 @@ async function capturePendingBookingLead(args: {
           serviceIds: args.serviceIds ?? [],
           professionalId: args.professionalId ?? null,
           failureCode: args.failureCode,
+          smsConsent: args.smsConsent,
+          createdVia: args.createdVia,
         },
       },
       select: { id: true },
@@ -970,6 +976,7 @@ async function capturePendingBookingLead(args: {
         email: () =>
           avisarDeReservaPendiente({
             businessId: args.businessId,
+            leadId: lead.id,
             clientName: args.clientName,
             clientPhone: args.clientPhone ?? null,
             startDateTime: args.startDateTime,
@@ -978,6 +985,7 @@ async function capturePendingBookingLead(args: {
     } else {
       void avisarDeReservaPendiente({
         businessId: args.businessId,
+        leadId: lead.id,
         clientName: args.clientName,
         clientPhone: args.clientPhone ?? null,
         startDateTime: args.startDateTime,
@@ -1000,6 +1008,7 @@ async function capturePendingBookingLead(args: {
  */
 async function avisarDeReservaPendiente(args: {
   businessId: string;
+  leadId: string;
   clientName: string;
   clientPhone: string | null;
   startDateTime: string;
@@ -1044,7 +1053,10 @@ async function avisarDeReservaPendiente(args: {
       panelUrl: `${frontendUrl}/`,
     });
 
-    await enqueueEmailJob({ fromAlias: "support", toAddress: email, subject, html });
+    await enqueueEmailJob(
+      { fromAlias: "support", toAddress: email, subject, html },
+      `reserva-pendiente-${args.leadId}`
+    );
   } catch (error) {
     // Un aviso que no sale no puede tumbar la captura del lead, que es lo
     // que de verdad salva la cita.
@@ -1558,6 +1570,8 @@ async function executeBookAppointment(
         professionalId,
         failureCode: reconnectCode,
         callLabel,
+        smsConsent,
+        createdVia: canalDeLaTool(callId),
       });
       return {
         success: true,
@@ -1656,6 +1670,8 @@ async function executeBookAppointment(
         professionalId: verifiedProfessionalId,
         failureCode: codigoDelCerrojo,
         callLabel,
+        smsConsent,
+        createdVia: canalDeLaTool(callId),
       });
       if (leadId) {
         await enqueueRetryFailedBooking(leadId);
@@ -1769,6 +1785,8 @@ async function executeBookAppointment(
             availability.availableProfessionals[0]?.id,
           failureCode: "CALENDAR_UNAVAILABLE",
           callLabel,
+          smsConsent,
+          createdVia: canalDeLaTool(callId),
         });
         if (leadCalendarioIlegible) {
           await enqueueRetryFailedBooking(leadCalendarioIlegible);
@@ -2136,6 +2154,8 @@ async function executeBookAppointment(
             professionalId: resolvedProfessionalId,
             failureCode: codigoReconexion,
             callLabel,
+            smsConsent,
+            createdVia: canalDeLaTool(callId),
           });
 
           return {
@@ -2180,6 +2200,8 @@ async function executeBookAppointment(
           professionalId: resolvedProfessionalId,
           failureCode: code,
           callLabel,
+          smsConsent,
+          createdVia: canalDeLaTool(callId),
         });
         if (leadId) {
           await enqueueRetryFailedBooking(leadId);

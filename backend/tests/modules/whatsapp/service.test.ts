@@ -1175,10 +1175,26 @@ describe("efectos de entrega sobre los envíos al cliente (PR 4)", () => {
         audience: "client",
         sinV2: true,
       },
-      {
-        taskId: `booking-booking_1-confirmacion-${Math.floor(CITA.getTime() / 1000)}-respaldo`,
-      }
+      // De la clave de la fila: conserva la huella del destino (y el
+      // sufijo de un reenvío del Gestor).
+      { taskId: "booking-booking_1-confirmacion-1-respaldo" }
     );
+
+    // Reenvío del Gestor: su respaldo no choca con el de la confirmación.
+    mockedEnqueue.mockClear();
+    mockedSentFindUnique.mockResolvedValue({
+      ...filaCliente,
+      idempotencyKey: "booking-booking_1-confirmacion-1-gacc_1",
+    } as never);
+    await actualizarEstadoEnvio({
+      providerMessageId: "msg-4",
+      status: "failed",
+      at,
+      errorCode: "132012",
+    });
+    expect(mockedEnqueue.mock.calls[0][1]).toEqual({
+      taskId: "booking-booking_1-confirmacion-1-gacc_1-respaldo",
+    });
 
     // La fila del respaldo rechazada: solo limpia y loguea.
     mockedEnqueue.mockClear();
@@ -1208,7 +1224,7 @@ describe("efectos de entrega sobre los envíos al cliente (PR 4)", () => {
     expect(mockedEnqueue).not.toHaveBeenCalled();
   });
 
-  it("si el statuses[] se adelantó al registro (fila adhoc:<wamid>), el respaldo se encola igual con un taskId válido para Cloud Tasks (solo [A-Za-z0-9_-]) derivado de la reserva", async () => {
+  it("si el statuses[] se adelantó al registro (fila adhoc:<wamid>), el respaldo se encola igual con un taskId válido para Cloud Tasks (solo [A-Za-z0-9_-]) derivado de la reserva y del destino", async () => {
     mockedSentFindUnique.mockResolvedValue({
       ...filaCliente,
       idempotencyKey:
@@ -1226,8 +1242,9 @@ describe("efectos de entrega sobre los envíos al cliente (PR 4)", () => {
     expect(mockedEnqueue).toHaveBeenCalledTimes(1);
     const taskId = (mockedEnqueue.mock.calls[0][1] as { taskId: string })
       .taskId;
+    // 8 primeros hex de sha256("+34600111222").
     expect(taskId).toBe(
-      `booking-booking_1-confirmacion-${Math.floor(CITA.getTime() / 1000)}-respaldo`
+      `booking-booking_1-confirmacion-${Math.floor(CITA.getTime() / 1000)}-cb24629d-respaldo`
     );
     expect(taskId).toMatch(/^[A-Za-z0-9_-]+$/);
   });

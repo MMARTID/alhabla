@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { prisma } from "../../../src/lib/prisma.js";
+import { claveDeMensajeAlCliente } from "../../../src/lib/clavesDeMensajes.js";
 import { resetDb } from "../helpers/db.js";
 import {
   createTestBusiness,
@@ -182,7 +183,7 @@ describe("lado cliente por WhatsApp (integración)", () => {
     mockedCancelEvent.mockResolvedValue({ resultado: "borrado" });
   });
 
-  it("(1) reserva por voz con consentimiento ⇒ fila SentMessage booking-<id>-confirmacion-<epoch> con callbackData cliente:confirmacion:<id>, templateName escrito y Booking.clientNotifiedAt", async () => {
+  it("(1) reserva por voz con consentimiento ⇒ fila SentMessage booking-<id>-confirmacion-<epoch>-<huella> con callbackData cliente:confirmacion:<id>, templateName escrito y Booking.clientNotifiedAt", async () => {
     const business = await negocioConDueno();
     await createTestProfessional(business.id);
     const call = await createTestCall(business.id, { fromNumber: MOVIL });
@@ -207,12 +208,16 @@ describe("lado cliente por WhatsApp (integración)", () => {
     });
     expect(booking.createdVia).toBe("voice");
     expect(booking.clientNotifiedAt).not.toBeNull();
-    const epoch = Math.floor(booking.programedAt.getTime() / 1000);
     const fila = await prisma.sentMessage.findUniqueOrThrow({
       where: {
         channel_idempotencyKey: {
           channel: "whatsapp",
-          idempotencyKey: `booking-${booking.id}-confirmacion-${epoch}`,
+          idempotencyKey: claveDeMensajeAlCliente(
+            booking.id,
+            "confirmacion",
+            booking.programedAt.getTime(),
+            MOVIL
+          ),
         },
       },
     });
@@ -587,8 +592,12 @@ describe("lado cliente por WhatsApp (integración)", () => {
     const booking = await prisma.booking.findUniqueOrThrow({
       where: { callId: call.id },
     });
-    const epoch = Math.floor(booking.programedAt.getTime() / 1000);
-    const clave = `booking-${booking.id}-confirmacion-${epoch}`;
+    const clave = claveDeMensajeAlCliente(
+      booking.id,
+      "confirmacion",
+      booking.programedAt.getTime(),
+      MOVIL
+    );
     const original = await prisma.sentMessage.findUniqueOrThrow({
       where: {
         channel_idempotencyKey: { channel: "whatsapp", idempotencyKey: clave },
