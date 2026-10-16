@@ -101,6 +101,8 @@ describe("accountService", () => {
         toAddress: "cliente@example.com",
         subject: "Tu contraseña de Alhabla ha cambiado",
       }),
+      // Con la versión nueva: un reintento de la tarea no lo duplica.
+      "contrasena-cambiada-user_123-2",
     );
   });
 
@@ -146,6 +148,7 @@ describe("accountService", () => {
         toAddress: "cliente@example.com",
         subject: "Cuenta eliminada — Peluquería Norte",
       }),
+      "cuenta-borrada-business_123",
     );
   });
 

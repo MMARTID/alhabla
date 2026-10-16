@@ -23,6 +23,8 @@ import {
 import { acquireBookingLock, releaseBookingLock } from "../lib/bookingLock.js";
 import { RetryFailedBookingJob } from "../lib/jobTypes.js";
 import { avisarCitaRecuperada } from "../modules/whatsapp/avisosNegocio.js";
+import { programarMensajesAlCliente } from "../modules/whatsapp/mensajesCliente.js";
+import { whatsappAdapter } from "../adapters/whatsapp/WhatsAppAdapter.js";
 import { anularLaCitaCambiada } from "../modules/bookings/reservaModificada.js";
 import { isValidE164Phone, normalizarTelefono } from "../lib/phone.js";
 
@@ -34,6 +36,10 @@ interface PendingBookingData {
   durationMinutes: number;
   serviceIds?: string[] | null;
   professionalId?: string | null;
+  /** Desde el 16-10-2026; los leads anteriores no lo traen (= sin permiso). */
+  smsConsent?: boolean;
+  /** Desde el 16-10-2026; los leads anteriores no lo traen (= voz). */
+  createdVia?: string;
   /** La cita que el cliente cambiaba (voiceTools/service.ts): se anula solo
    * si la nueva acaba entrando. */
   replacesBookingId?: string | null;
@@ -409,8 +415,15 @@ export async function processRetryFailedBookingJob(
       throw error;
     }
 
-    const reservaRecuperada = await prisma.$transaction(async (tx) => {
-      const reserva = await tx.booking.upsert({
+    // Como la reserva en vivo: el consentimiento del resumen y el canal de
+    // la tool. Antes la cita recuperada nacía sin permiso (nunca se le
+    // confirmaba al cliente) y siempre como `voice`, aunque viniera del chat.
+    const smsConsent = data_.smsConsent === true;
+    const createdVia =
+      data_.createdVia === "client_chat" ? "client_chat" : "voice";
+
+    const reserva = await prisma.$transaction(async (tx) => {
+      const guardada = await tx.booking.upsert({
         where: { callId: lead.callId },
         create: {
           callId: lead.callId,
@@ -421,7 +434,8 @@ export async function processRetryFailedBookingJob(
           serviceIds: data_.serviceIds ?? [],
           clientName: data_.clientName,
           clientPhone: effectiveClientPhone,
-          createdVia: "voice",
+          smsConsent,
+          createdVia,
           externalEventId: (result as { id?: string })?.id ?? undefined,
           externalCalendarProvider: conexion.provider,
           externalCalendarId: conexion.calendarId,
@@ -433,6 +447,7 @@ export async function processRetryFailedBookingJob(
           serviceIds: data_.serviceIds ?? [],
           clientName: data_.clientName,
           clientPhone: effectiveClientPhone,
+          smsConsent,
           externalEventId: (result as { id?: string })?.id ?? undefined,
           externalCalendarProvider: conexion.provider,
           externalCalendarId: conexion.calendarId,
@@ -447,7 +462,7 @@ export async function processRetryFailedBookingJob(
         where: { id: lead.id },
         data: { resolvedAt: new Date() },
       });
-      return reserva;
+      return guardada;
     });
 
     console.log(
@@ -456,11 +471,11 @@ export async function processRetryFailedBookingJob(
       }`
     );
 
-    if (citaCambiada && reservaRecuperada?.id) {
+    if (citaCambiada && reserva?.id) {
       await anularLaCitaCambiada({
         businessId: call.businessId,
         citaAnteriorId: citaCambiada.id,
-        nuevaReservaId: reservaRecuperada.id,
+        nuevaReservaId: reserva.id,
         cancelledBy:
           call.voiceProvider === "whatsapp" ? "client_chat" : "client_voice",
         etiqueta: `lead ${leadId}`,
@@ -477,6 +492,16 @@ export async function processRetryFailedBookingJob(
       clientName: data_.clientName,
       startDateTime: startDate,
     });
+
+    // La recepcionista le dijo que se la confirmaría: confirmación (y
+    // recordatorio) por WhatsApp con las mismas condiciones que en vivo
+    // (consentimiento, número válido, sin STOP). Nunca lanza.
+    if (whatsappAdapter.isConfigured()) {
+      await programarMensajesAlCliente({
+        bookingId: reserva.id,
+        etiqueta: `retry-failed-booking ${leadId}`,
+      });
+    }
   } finally {
     await releaseBookingLock(call.businessId, lockToken);
   }

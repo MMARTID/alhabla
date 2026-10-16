@@ -210,7 +210,11 @@ export async function enqueueRecordarRecadoJob(
  */
 export async function enqueueRevisarEscaladaJob(
   payload: RevisarEscaladaJob,
-  scheduleTime: Date
+  scheduleTime: Date,
+  /** Otra cadena de revisiones de la misma llamada (`recado`: recuperar un
+   * recado sin lead), con nombre propio para que no la absorba una
+   * revisión de escalada que ya usó `escalada-<id>-1`. */
+  sufijo?: string
 ): Promise<void> {
   const intento = payload.intento ?? 1;
   if (!IS_PRODUCTION) {
@@ -239,7 +243,7 @@ export async function enqueueRevisarEscaladaJob(
       queue: "send-whatsapp",
       path: "/internal/jobs/revisar-escalada",
       payload: { ...payload, intento },
-      taskId: `escalada-${payload.callId}-${intento}`,
+      taskId: `escalada-${payload.callId}-${intento}${sufijo ? `-${sufijo}` : ""}`,
       scheduleTime,
     });
   } catch (error) {

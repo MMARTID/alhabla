@@ -15,6 +15,7 @@ import {
 import { checkAvailability } from "../../../src/lib/availability.js";
 import { calendarService } from "../../../src/modules/calendar/service.js";
 import {
+  enqueueEmailJob,
   enqueueRetryBookingJob,
   enqueueSmsJob,
   enqueueWhatsappJob,
@@ -110,6 +111,7 @@ vi.mock("../../../src/lib/cloudTasks.js", () => ({
   enqueueRetryBookingJob: vi.fn(),
   enqueueSmsJob: vi.fn(),
   enqueueWhatsappJob: vi.fn(),
+  enqueueEmailJob: vi.fn(),
 }));
 
 // Los avisos al dueño por WhatsApp (PR 3) tienen sus propios tests; aquí
@@ -633,6 +635,43 @@ describe("executeVoiceTool book_appointment — agenda ocupada por otra reserva"
         leadId: "lead_1",
         failureCode: "BOOKING_LOCK_TIMEOUT",
       })
+    );
+  });
+
+  it("la cita pendiente guarda el consentimiento y el canal de la tool, para que el reintento los copie al Booking", async () => {
+    mockedAdquirirCerrojo.mockResolvedValueOnce({ estado: "ocupado" });
+    const base = buildBookAppointmentInput();
+    await executeVoiceTool({
+      ...base,
+      callId: "whatsapp:chat:conv_1",
+      params: { ...base.params, smsConsent: true },
+    });
+    expect(mockedLeadCreate.mock.calls[0][0].data.data).toEqual(
+      expect.objectContaining({ smsConsent: true, createdVia: "client_chat" })
+    );
+
+    mockedLeadCreate.mockClear();
+    mockedAdquirirCerrojo.mockResolvedValueOnce({ estado: "ocupado" });
+    await executeVoiceTool(buildBookAppointmentInput({ callId: "call_vapi_1" }));
+    expect(mockedLeadCreate.mock.calls[0][0].data.data).toEqual(
+      expect.objectContaining({ smsConsent: false, createdVia: "voice" })
+    );
+  });
+
+  it("el correo de respaldo de la cita pendiente lleva taskId por lead", async () => {
+    mockedAdquirirCerrojo.mockResolvedValueOnce({ estado: "ocupado" });
+    await executeVoiceTool(buildBookAppointmentInput({ callId: "call_vapi_1" }));
+    const { email } = vi.mocked(avisarCitaPendiente).mock.calls[0][0];
+    mockedBusinessFindUnique.mockResolvedValue({
+      ...buildBusiness(),
+      users: [{ email: "dueno@example.com" }],
+    } as any);
+
+    await email();
+
+    expect(vi.mocked(enqueueEmailJob)).toHaveBeenCalledWith(
+      expect.objectContaining({ toAddress: "dueno@example.com" }),
+      "reserva-pendiente-lead_1"
     );
   });
 

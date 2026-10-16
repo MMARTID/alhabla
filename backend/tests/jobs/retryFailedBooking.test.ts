@@ -14,6 +14,8 @@ import {
   releaseBookingLock,
 } from "../../src/lib/bookingLock.js";
 import { buildCalendarIdempotencyKey } from "../../src/lib/calendarIdempotency.js";
+import { programarMensajesAlCliente } from "../../src/modules/whatsapp/mensajesCliente.js";
+import { whatsappAdapter } from "../../src/adapters/whatsapp/WhatsAppAdapter.js";
 import {
   almacenEnMemoria,
   reiniciarAlmacenEnMemoria,
@@ -25,6 +27,14 @@ vi.mock("../../src/lib/cloudTasks.js", () => ({
 }));
 vi.mock("../../src/modules/whatsapp/avisosNegocio.js", () => ({
   avisarCitaRecuperada: vi.fn().mockResolvedValue({ via: "interactivo" }),
+}));
+vi.mock("../../src/modules/whatsapp/mensajesCliente.js", () => ({
+  programarMensajesAlCliente: vi
+    .fn()
+    .mockResolvedValue({ confirmacion: "programada" }),
+}));
+vi.mock("../../src/adapters/whatsapp/WhatsAppAdapter.js", () => ({
+  whatsappAdapter: { isConfigured: vi.fn().mockReturnValue(true) },
 }));
 // La anulación de la cita que se cambia tiene sus tests en
 // reservaModificada.test.ts.
@@ -91,6 +101,8 @@ const mockedCheckBookingRestrictions = vi.mocked(checkBookingRestrictions);
 const mockedCheckAvailability = vi.mocked(checkAvailability);
 const mockedAcquireBookingLock = vi.mocked(acquireBookingLock);
 const mockedReleaseBookingLock = vi.mocked(releaseBookingLock);
+const mockedProgramarMensajes = vi.mocked(programarMensajesAlCliente);
+const mockedWhatsappConfigurado = vi.mocked(whatsappAdapter.isConfigured);
 
 const leadId = "lead_1";
 const pendingBookingData = {
@@ -130,7 +142,9 @@ describe("processRetryFailedBookingJob", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockUpsert = vi.fn().mockResolvedValue({});
+    mockUpsert = vi.fn().mockResolvedValue({ id: "booking_1" });
+    mockedWhatsappConfigurado.mockReturnValue(true);
+    mockedProgramarMensajes.mockResolvedValue({ confirmacion: "programada" });
     mockLeadUpdate = vi.fn().mockResolvedValue({});
     mockedTransaction.mockImplementation(async (callback: any) =>
       callback({
@@ -421,6 +435,58 @@ describe("processRetryFailedBookingJob", () => {
         update: expect.objectContaining({ clientPhone: "+34611222333" }),
       })
     );
+  });
+
+  it("copia al Booking el consentimiento y el canal del lead (chat del cliente) y programa la confirmación al cliente", async () => {
+    mockedLeadFindUnique.mockResolvedValue(
+      buildLead({
+        data: {
+          ...pendingBookingData,
+          smsConsent: true,
+          createdVia: "client_chat",
+        },
+      }) as any
+    );
+    mockedCallFindUnique.mockResolvedValue({ businessId: "biz_1" } as any);
+    mockedBusinessFindUnique.mockResolvedValue(buildBusiness() as any);
+
+    await processRetryFailedBookingJob({ leadId });
+
+    expect(mockUpsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({
+          smsConsent: true,
+          createdVia: "client_chat",
+        }),
+        update: expect.objectContaining({ smsConsent: true }),
+      })
+    );
+    expect(mockedProgramarMensajes).toHaveBeenCalledWith({
+      bookingId: "booking_1",
+      etiqueta: `retry-failed-booking ${leadId}`,
+    });
+
+    // Lead de antes del arreglo (sin los campos): sin permiso y por voz;
+    // sin WhatsApp configurado no se programa nada.
+    vi.clearAllMocks();
+    mockUpsert.mockResolvedValue({ id: "booking_1" });
+    mockedWhatsappConfigurado.mockReturnValue(false);
+    mockedLeadFindUnique.mockResolvedValue(buildLead() as any);
+    mockedCallFindUnique.mockResolvedValue({ businessId: "biz_1" } as any);
+    mockedBusinessFindUnique.mockResolvedValue(buildBusiness() as any);
+    mockedAcquireBookingLock.mockResolvedValue("lock-token");
+
+    await processRetryFailedBookingJob({ leadId });
+
+    expect(mockUpsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({
+          smsConsent: false,
+          createdVia: "voice",
+        }),
+      })
+    );
+    expect(mockedProgramarMensajes).not.toHaveBeenCalled();
   });
 
   it("la reserva recuperada nace con createdVia voice, resetea la cancelación en update y usa buildCalendarIdempotencyKey de lib/calendarIdempotency", async () => {

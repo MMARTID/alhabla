@@ -849,7 +849,7 @@ describe("avisar_cliente", () => {
     ).toContain("solo cabe avisar de la cancelación");
   });
 
-  it("al confirmar anota el consentimiento (y el móvil nuevo) y programa la confirmación o el aviso", async () => {
+  it("al confirmar anota el consentimiento (y el móvil nuevo) y programa la confirmación (con sufijo por petición, para que el reenvío salga) o el aviso", async () => {
     mockedBookingFindFirst.mockResolvedValue(CITA as never);
     mockedProgramarMensajes.mockResolvedValue({ confirmacion: "programada" });
     const r = await ejecutar("avisar_cliente", {
@@ -862,7 +862,10 @@ describe("avisar_cliente", () => {
       data: { smsConsent: true, clientPhone: "+34600999888" },
     });
     expect(mockedProgramarMensajes).toHaveBeenCalledWith(
-      expect.objectContaining({ bookingId: "b_1" })
+      expect.objectContaining({
+        bookingId: "b_1",
+        sufijoConfirmacion: `g${META.accionId}`,
+      })
     );
     expect(r).toMatchObject({
       ok: true,

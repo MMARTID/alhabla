@@ -15,6 +15,8 @@ import { attachUsagePricesJob } from "../../../src/jobs/attachUsagePrices.js";
 import { retryUsageReportsJob } from "../../../src/jobs/retryUsageReports.js";
 import { purgarCaducados } from "../../../src/lib/almacenTemporal.js";
 import { telnyxHealthCheckJob } from "../../../src/jobs/telnyxHealthCheck.js";
+import { purgeOldRecordingsJob } from "../../../src/jobs/purgeOldRecordings.js";
+import { purgarTextoDeLlamadasJob } from "../../../src/jobs/purgarTextoDeLlamadas.js";
 
 vi.mock("../../../src/jobs/processRecording.js", () => ({
   processRecordingJob: vi.fn(),
@@ -50,6 +52,12 @@ vi.mock("../../../src/jobs/retryUsageReports.js", () => ({
 vi.mock("../../../src/jobs/telnyxHealthCheck.js", () => ({
   telnyxHealthCheckJob: vi.fn(),
 }));
+vi.mock("../../../src/jobs/purgeOldRecordings.js", () => ({
+  purgeOldRecordingsJob: vi.fn(),
+}));
+vi.mock("../../../src/jobs/purgarTextoDeLlamadas.js", () => ({
+  purgarTextoDeLlamadasJob: vi.fn(),
+}));
 // La purga del estado temporal (cerrojos, contadores) corre dentro de
 // cleanup-zombie-calls; aquí no hay base de datos.
 vi.mock("../../../src/lib/almacenTemporal.js", () => ({
@@ -71,6 +79,8 @@ const mockedAttachUsagePricesJob = vi.mocked(attachUsagePricesJob);
 const mockedRetryUsageReportsJob = vi.mocked(retryUsageReportsJob);
 const mockedPurgarCaducados = vi.mocked(purgarCaducados);
 const mockedTelnyxHealthCheckJob = vi.mocked(telnyxHealthCheckJob);
+const mockedPurgeOldRecordingsJob = vi.mocked(purgeOldRecordingsJob);
+const mockedPurgarTextoJob = vi.mocked(purgarTextoDeLlamadasJob);
 
 describe("internalJobsRoutes", () => {
   let fastify: ReturnType<typeof Fastify>;
@@ -485,6 +495,51 @@ describe("internalJobsRoutes", () => {
         [{ horaProgramada: "2026-10-14T10:02:00Z" }],
         [{ horaProgramada: undefined }],
       ]);
+    });
+  });
+
+  describe("POST /jobs/purge-old-recordings", () => {
+    const TEXTO = { dias: 90 } as unknown as Awaited<
+      ReturnType<typeof purgarTextoDeLlamadasJob>
+    >;
+
+    it("hace las dos purgas y devuelve sus recuentos", async () => {
+      mockedPurgeOldRecordingsJob.mockResolvedValue({ purged: 3, failed: 0 });
+      mockedPurgarTextoJob.mockResolvedValue(TEXTO);
+
+      const response = await fastify.inject({
+        method: "POST",
+        url: "/jobs/purge-old-recordings",
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toEqual({
+        received: true,
+        purged: 3,
+        failed: 0,
+        texto: TEXTO,
+      });
+    });
+
+    it("la purga del texto (RGPD) corre aunque la del audio lance, y responde 500 para que Scheduler repita", async () => {
+      mockedPurgeOldRecordingsJob.mockRejectedValue(new Error("R2 caído"));
+      mockedPurgarTextoJob.mockResolvedValue(TEXTO);
+
+      const response = await fastify.inject({
+        method: "POST",
+        url: "/jobs/purge-old-recordings",
+      });
+
+      expect(mockedPurgarTextoJob).toHaveBeenCalledTimes(1);
+      expect(response.statusCode).toBe(500);
+
+      mockedPurgeOldRecordingsJob.mockResolvedValue({ purged: 0, failed: 0 });
+      mockedPurgarTextoJob.mockRejectedValue(new Error("BD caída"));
+      const otra = await fastify.inject({
+        method: "POST",
+        url: "/jobs/purge-old-recordings",
+      });
+      expect(otra.statusCode).toBe(500);
     });
   });
 

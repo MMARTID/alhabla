@@ -135,7 +135,8 @@ describe("processUsageReportJob", () => {
     await processUsageReportJob({ businessId: "business_123" });
 
     expect(enqueueEmailJob).toHaveBeenCalledWith(
-      expect.objectContaining({ toAddress: "dueno@example.com" })
+      expect.objectContaining({ toAddress: "dueno@example.com" }),
+      "aviso-de-minutos-period_123"
     );
     expect(alertarMinutos).toHaveBeenCalledWith({
       businessId: "business_123",
