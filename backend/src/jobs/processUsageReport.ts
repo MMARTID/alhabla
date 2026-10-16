@@ -58,7 +58,10 @@ export async function processUsageReportJob(input: { businessId: string }): Prom
           periodEndsAt: business.subscriptionCurrentPeriodEnd,
         });
         const { enqueueEmailJob } = await import("../lib/cloudTasks.js");
-        await enqueueEmailJob({ fromAlias: "support", toAddress: email, subject, html });
+        await enqueueEmailJob(
+          { fromAlias: "support", toAddress: email, subject, html },
+          `aviso-de-minutos-${period.id}`
+        );
         // Alerta #5 por WhatsApp además del email (idempotente por periodo).
         await alertarMinutos({
           businessId: input.businessId,

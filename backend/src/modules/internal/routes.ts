@@ -470,17 +470,36 @@ export const internalJobsRoutes: FastifyPluginAsync = async (fastify) => {
     "/jobs/purge-old-recordings",
     opcionesDeJob,
     async (_request, reply) => {
+      // Un solo job programado para las dos purgas: el audio (30 días) y
+      // el texto de la llamada (90). Así el plazo del texto no depende de
+      // que alguien se acuerde de crear otro job en Cloud Scheduler. Cada
+      // una en su try: si la del audio lanzaba, la del texto (RGPD) no
+      // corría. Si falla alguna, 500 al final para que Scheduler repita;
+      // las dos son idempotentes.
+      let audio: Awaited<ReturnType<typeof purgeOldRecordingsJob>> | null =
+        null;
+      let texto: Awaited<ReturnType<typeof purgarTextoDeLlamadasJob>> | null =
+        null;
       try {
-        // Un solo job programado para las dos purgas: el audio (30 días) y
-        // el texto de la llamada (90). Así el plazo del texto no depende de
-        // que alguien se acuerde de crear otro job en Cloud Scheduler.
-        const result = await purgeOldRecordingsJob();
-        const texto = await purgarTextoDeLlamadasJob();
-        return reply.send({ received: true, ...result, texto });
+        audio = await purgeOldRecordingsJob();
       } catch (error) {
-        fastify.log.error({ err: error }, "purge-old-recordings job failed");
+        fastify.log.error(
+          { err: error },
+          "purge-old-recordings: la purga del audio falló"
+        );
+      }
+      try {
+        texto = await purgarTextoDeLlamadasJob();
+      } catch (error) {
+        fastify.log.error(
+          { err: error },
+          "purge-old-recordings: la purga del texto falló"
+        );
+      }
+      if (!audio || !texto) {
         return reply.status(500).send({ error: "Job processing failed" });
       }
+      return reply.send({ received: true, ...audio, texto });
     }
   );
 

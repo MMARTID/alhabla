@@ -116,6 +116,12 @@ export type CalendarOrigin = {
   calendarId: string;
 };
 
+/** Una reserva que no cuenta como ocupación (ver `excluir`). */
+export type ReservaExcluida = {
+  bookingId: string;
+  externalEventId?: string | null;
+};
+
 /** Próximo hueco libre calculado por el backend cuando la hora pedida no
  * está disponible por capacidad, ocupación u horario (OUTSIDE_BUSINESS_HOURS
  * incluido desde 2026-09-15: cerrado ahora mismo no significa que no haya
@@ -458,11 +464,13 @@ export async function checkAvailability(input: {
   /** Calendario del que proceden externalBusyIntervals. Solo ese calendario
    * puede confirmar que un evento propio fue borrado manualmente. */
   calendarOrigin?: CalendarOrigin | null;
-  /** Reserva que se está MOVIENDO (el Gestor, fase 2): no cuenta como
-   * ocupación, ni ella ni su evento en el calendario externo, porque la
-   * hora nueva puede solaparse con la vieja (misma tarde, media hora más
-   * tarde) y sin esto se bloquearía a sí misma. */
-  excluir?: { bookingId: string; externalEventId?: string | null } | null;
+  /** Reserva que se está MOVIENDO (el Gestor, fase 2; la recepcionista al
+   * cambiar una cita): no cuenta como ocupación, ni ella ni su evento en el
+   * calendario externo, porque la hora nueva puede solaparse con la vieja
+   * (misma tarde, media hora más tarde) y sin esto se bloquearía a sí
+   * misma. Puede ser más de una: la de esta conversación y la que se
+   * cambia. */
+  excluir?: ReservaExcluida | ReservaExcluida[] | null;
   /** El hueco alternativo es el más cercano a la hora pedida, antes o
    * después, en vez de solo el siguiente (lo pide la recepcionista de voz;
    * el Gestor y la lista de espera siguen queriendo «el siguiente»).
@@ -597,11 +605,22 @@ export async function checkAvailability(input: {
     select: { externalEventId: true },
   });
 
+  const excluidas = (Array.isArray(excluir) ? excluir : [excluir]).filter(
+    (reserva): reserva is ReservaExcluida => Boolean(reserva)
+  );
+  const eventosExcluidos = new Set(
+    excluidas
+      .map((reserva) => reserva.externalEventId)
+      .filter((id): id is string => Boolean(id))
+  );
+
   const localBookings = await prisma.booking.findMany({
     where: {
       call: { businessId },
       isCancelled: false,
-      ...(excluir ? { id: { not: excluir.bookingId } } : {}),
+      ...(excluidas.length > 0
+        ? { id: { notIn: excluidas.map((reserva) => reserva.bookingId) } }
+        : {}),
       programedAt: {
         // Cota inferior imprescindible: sin ella esta consulta se traía TODAS
         // las reservas del negocio desde el principio de los tiempos en cada
@@ -624,8 +643,8 @@ export async function checkAvailability(input: {
 
   const externalIntervals = (externalBusyIntervals ?? []).filter(
     (interval) =>
-      !excluir?.externalEventId ||
-      interval.externalEventId !== excluir.externalEventId
+      !interval.externalEventId ||
+      !eventosExcluidos.has(interval.externalEventId)
   );
   const externalIntervalsById = new Map(
     externalIntervals

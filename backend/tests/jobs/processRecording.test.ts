@@ -94,6 +94,7 @@ describe("processRecordingJob", () => {
       expect.anything(),
       "audio/mpeg",
       undefined,
+      expect.any(AbortSignal),
     );
     expect(mockedRecordingUpdate).toHaveBeenCalledWith({
       where: { callId: "call_1" },
@@ -122,6 +123,7 @@ describe("processRecordingJob", () => {
       expect.anything(),
       "audio/mpeg",
       9,
+      expect.any(AbortSignal),
     );
   });
 
@@ -157,18 +159,32 @@ describe("processRecordingJob", () => {
       expect.anything(),
       "audio/mpeg",
       undefined,
+      expect.any(AbortSignal),
     );
   });
 
-  it("rechaza descargar de un destino interno (defensa contra SSRF)", async () => {
+  it("rechaza descargar de un destino interno (defensa contra SSRF): irrecuperable, sin reintentos", async () => {
     mockedCallFindUnique.mockResolvedValue({ id: "call_1", businessId: "biz_1" } as any);
     const fetchSpy = vi.fn();
     vi.stubGlobal("fetch", fetchSpy);
 
-    await expect(
-      processRecordingJob({ ...payload, externalUrl: "https://169.254.169.254/latest/meta-data" })
-    ).rejects.toThrow(/Destino no permitido/);
+    const promesa = processRecordingJob({
+      ...payload,
+      externalUrl: "https://169.254.169.254/latest/meta-data",
+    });
+    await expect(promesa).rejects.toThrow(/Destino no permitido/);
+    await expect(promesa).rejects.toMatchObject({
+      reason: "recording_url_not_allowed",
+    });
+    await expect(promesa).rejects.toBeInstanceOf(PermanentJobError);
     expect(fetchSpy).not.toHaveBeenCalled();
+    expect(mockedRecordingUpdate).toHaveBeenCalledWith({
+      where: { callId: "call_1" },
+      data: {
+        processingFailedAt: expect.any(Date),
+        processingError: expect.stringContaining("Destino no permitido"),
+      },
+    });
   });
 
   it("rechaza descargar por http sin cifrar", async () => {
@@ -216,8 +232,103 @@ describe("processRecordingJob", () => {
       }))
     );
 
-    await expect(processRecordingJob(payload)).rejects.toThrow("maximum accepted size");
+    const promesa = processRecordingJob(payload);
+    await expect(promesa).rejects.toThrow("maximum accepted size");
+    // No se arregla repitiendo: irrecuperable y fuera de la cola (antes
+    // volvía cada 15 min durante los 30 días de retención).
+    await expect(promesa).rejects.toBeInstanceOf(PermanentJobError);
+    await expect(promesa).rejects.toMatchObject({ reason: "recording_too_large" });
     expect(mockedUploadRecording).not.toHaveBeenCalled();
+    expect(mockedRecordingUpdate).toHaveBeenCalledWith({
+      where: { callId: "call_1" },
+      data: {
+        processingFailedAt: expect.any(Date),
+        processingError: "Recording exceeds the maximum accepted size",
+      },
+    });
+  });
+
+  it("si el audio sin content-length pasa del límite a mitad de la subida, aborta el PUT y la marca irrecuperable (sin tumbar el proceso)", async () => {
+    mockedCallFindUnique.mockResolvedValue({ id: "call_1", businessId: "biz_1" } as any);
+    const trozo = new Uint8Array(1024 * 1024);
+    let enviados = 0;
+    const cuerpo = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        enviados += 1;
+        if (enviados > 210) controller.close();
+        else controller.enqueue(trozo);
+      },
+    });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(cuerpo)));
+    // Como el SDK de S3: consume el audio sin escuchar sus errores y solo
+    // se entera por la señal de aborto.
+    mockedUploadRecording.mockImplementation(
+      (_clave, stream, _tipo, _longitud, senal) =>
+        new Promise((_resolver, rechazar) => {
+          stream.resume();
+          senal?.addEventListener("abort", () =>
+            rechazar(new Error("Request aborted"))
+          );
+        })
+    );
+
+    const promesa = processRecordingJob(payload);
+    await expect(promesa).rejects.toBeInstanceOf(PermanentJobError);
+    await expect(promesa).rejects.toMatchObject({ reason: "recording_too_large" });
+    expect(mockedRecordingUpdate).toHaveBeenCalledWith({
+      where: { callId: "call_1" },
+      data: {
+        processingFailedAt: expect.any(Date),
+        processingError: "Recording exceeds the maximum accepted size",
+      },
+    });
+  });
+
+  it("un corte a mitad de la descarga (red o plazo) aborta la subida y se reintenta, sin tumbar el proceso", async () => {
+    mockedCallFindUnique.mockResolvedValue({ id: "call_1", businessId: "biz_1" } as any);
+    let enviados = 0;
+    const cuerpo = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        enviados += 1;
+        if (enviados > 3) controller.error(new Error("socket hang up"));
+        else controller.enqueue(new Uint8Array(1024));
+      },
+    });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(cuerpo)));
+    mockedUploadRecording.mockImplementation(
+      (_clave, stream, _tipo, _longitud, senal) =>
+        new Promise((_resolver, rechazar) => {
+          stream.resume();
+          senal?.addEventListener("abort", () =>
+            rechazar(new Error("Request aborted"))
+          );
+        })
+    );
+
+    const promesa = processRecordingJob(payload);
+    await expect(promesa).rejects.toThrow("socket hang up");
+    await expect(promesa).rejects.not.toBeInstanceOf(PermanentJobError);
+    expect(mockedRecordingUpdate).not.toHaveBeenCalled();
+  });
+
+  it("descarga y subida comparten un plazo por debajo de los 180 s de Cloud Tasks", async () => {
+    mockedCallFindUnique.mockResolvedValue({ id: "call_1", businessId: "biz_1" } as any);
+    const timeout = vi.spyOn(AbortSignal, "timeout");
+    const fetchSpy = vi.fn().mockResolvedValue(new Response("audio-fake"));
+    vi.stubGlobal("fetch", fetchSpy);
+    mockedUploadRecording.mockResolvedValue("https://r2.example/x.mp3");
+    mockedRecordingUpdate.mockResolvedValue({} as any);
+
+    await processRecordingJob(payload);
+
+    expect(timeout).toHaveBeenCalledTimes(1);
+    expect(timeout.mock.calls[0][0]).toBeLessThan(180_000);
+    const plazo = timeout.mock.results[0].value;
+    expect(fetchSpy.mock.calls[0][1].signal).toBe(plazo);
+    const senalDeSubida = mockedUploadRecording.mock.calls[0][4]!;
+    expect(senalDeSubida.aborted).toBe(false);
+    // AbortSignal.any: abortar el plazo corta también la subida.
+    expect(senalDeSubida).not.toBe(plazo);
   });
 });
 
@@ -257,7 +368,13 @@ describe("processRecordingJob — URL caducada", () => {
 
     expect(mockedListRecordingsByCallLegId).toHaveBeenCalledWith("leg_guardado");
     expect(String(fetchSpy.mock.calls[1][0])).toBe(URL_NUEVA);
-    expect(mockedUploadRecording).toHaveBeenCalledWith("recordings/biz_1/call_1.mp3", expect.anything(), "audio/wav", undefined);
+    expect(mockedUploadRecording).toHaveBeenCalledWith(
+      "recordings/biz_1/call_1.mp3",
+      expect.anything(),
+      "audio/wav",
+      undefined,
+      expect.any(AbortSignal),
+    );
     expect(mockedRecordingUpdate).toHaveBeenLastCalledWith({
       where: { callId: "call_1" },
       data: { storageKey: "recordings/biz_1/call_1.mp3", storageUrl: "https://r2.example/recordings/biz_1/call_1.mp3" },

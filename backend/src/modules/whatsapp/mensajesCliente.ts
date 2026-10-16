@@ -3,6 +3,7 @@ import { nombreParaElCliente } from "../../lib/nombreProfesional.js";
 import { prisma } from "../../lib/prisma.js";
 import { errorMessage } from "../../lib/logUtils.js";
 import { reclamarEnvio } from "../../lib/messageIdempotency.js";
+import { claveDeMensajeAlCliente } from "../../lib/clavesDeMensajes.js";
 import { enqueueWhatsappJob } from "../../lib/cloudTasks.js";
 import { PermanentJobError } from "../../lib/jobErrors.js";
 import type { SendWhatsappJobPorProposito } from "../../lib/jobTypes.js";
@@ -634,6 +635,11 @@ export async function programarMensajesAlCliente(input: {
   etiqueta: string;
   /** true por defecto. `false` = solo el recordatorio (lista de espera). */
   confirmacion?: boolean;
+  /**
+   * Sufijo de la confirmación por petición: el reenvío del Gestor la manda
+   * otra vez aunque ya saliera (con la misma clave sería «ya enviado»).
+   */
+  sufijoConfirmacion?: string;
 }): Promise<{ confirmacion: "programada" | "no"; motivo?: string }> {
   const conConfirmacion = input.confirmacion !== false;
   const sinMensajes = (motivo: string) => {
@@ -698,12 +704,20 @@ export async function programarMensajesAlCliente(input: {
   }
 
   const now = Date.now();
-  const epoch = epochSegundos(booking.programedAt);
+  const programedAtMs = booking.programedAt.getTime();
   let confirmacion: "programada" | "no" = conConfirmacion ? "no" : "programada";
   let motivo: string | undefined;
 
   if (conConfirmacion) {
-    const taskId = `booking-${booking.id}-confirmacion-${epoch}`;
+    const clave = claveDeMensajeAlCliente(
+      booking.id,
+      "confirmacion",
+      programedAtMs,
+      to
+    );
+    const taskId = input.sufijoConfirmacion
+      ? `${clave}-${input.sufijoConfirmacion}`
+      : clave;
     try {
       await enqueueWhatsappJob(
         {
@@ -764,7 +778,12 @@ export async function programarMensajesAlCliente(input: {
             saltos: 0,
           },
           {
-            taskId: `booking-${booking.id}-recordatorio-${epoch}`,
+            taskId: claveDeMensajeAlCliente(
+              booking.id,
+              "recordatorio",
+              programedAtMs,
+              to
+            ),
             scheduleTime,
           }
         );
@@ -1004,20 +1023,21 @@ export async function enviarMensajeAlCliente(
         );
         return;
       }
-      const epoch = Math.floor(data.programedAtMs / 1000);
       // La clave de la fila es la documentada (sin `-s<n>`): el taskId del
       // salto solo nombra la tarea; `enqueueWhatsappJob` respeta la clave
       // que ya viene en el payload.
+      const clave =
+        data.idempotencyKey ??
+        claveDeMensajeAlCliente(
+          data.bookingId ?? "",
+          "recordatorio",
+          data.programedAtMs,
+          to
+        );
       await enqueueWhatsappJob(
+        { ...data, saltos, idempotencyKey: clave },
         {
-          ...data,
-          saltos,
-          idempotencyKey:
-            data.idempotencyKey ??
-            `booking-${data.bookingId}-recordatorio-${epoch}`,
-        },
-        {
-          taskId: `booking-${data.bookingId}-recordatorio-${epoch}-s${saltos}`,
+          taskId: `${clave}-s${saltos}`,
           scheduleTime: new Date(
             Math.min(reminderAt, now.getTime() + HORIZONTE_CLOUD_TASKS_MS)
           ),

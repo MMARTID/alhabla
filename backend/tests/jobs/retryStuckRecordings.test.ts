@@ -2,6 +2,10 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { retryStuckRecordingsJob } from "../../src/jobs/retryStuckRecordings.js";
 import { prisma } from "../../src/lib/prisma.js";
 import { enqueueRecordingJob } from "../../src/lib/cloudTasks.js";
+import {
+  almacenEnMemoria,
+  reiniciarAlmacenEnMemoria,
+} from "../helpers/almacenEnMemoria.js";
 
 vi.mock("../../src/lib/prisma.js", () => ({
   prisma: {
@@ -16,6 +20,13 @@ vi.mock("../../src/lib/cloudTasks.js", () => ({
   enqueueRecordingJob: vi.fn(),
 }));
 
+// El contador de reencolados vive en el almacén temporal de Postgres: aquí,
+// su versión en memoria.
+vi.mock(
+  "../../src/lib/almacenTemporal.js",
+  async () => (await import("../helpers/almacenEnMemoria.js")).almacenEnMemoria
+);
+
 const mockedFindMany = vi.mocked(prisma.recording.findMany);
 const mockedUpdateMany = vi.mocked(prisma.recording.updateMany);
 const mockedEnqueueRecordingJob = vi.mocked(enqueueRecordingJob);
@@ -23,6 +34,7 @@ const mockedEnqueueRecordingJob = vi.mocked(enqueueRecordingJob);
 describe("retryStuckRecordingsJob (hallazgo #30 de la auditoría)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    reiniciarAlmacenEnMemoria();
     mockedEnqueueRecordingJob.mockResolvedValue(undefined);
     mockedUpdateMany.mockResolvedValue({ count: 0 });
   });
@@ -84,6 +96,43 @@ describe("retryStuckRecordingsJob (hallazgo #30 de la auditoría)", () => {
       businessId: "biz_2",
     });
     expect(mockedEnqueueRecordingJob.mock.calls[0].length).toBe(1);
+  });
+
+  it("tras 96 reencolados (24 h) marca la grabación irrecuperable y deja de reencolarla; las demás siguen", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    mockedFindMany.mockResolvedValue([
+      { id: "rec_1", callId: "call_db_1", externalUrl: "url_1", call: { businessId: "biz_1" } },
+      { id: "rec_2", callId: "call_db_2", externalUrl: "url_2", call: { businessId: "biz_2" } },
+    ] as any);
+    for (let i = 0; i < 95; i++) {
+      await almacenEnMemoria.incrementarContador(
+        "grabacion-reencolada:rec_1",
+        31 * 86_400_000
+      );
+    }
+
+    // Reencolado 96: todavía entra.
+    await retryStuckRecordingsJob();
+    expect(mockedEnqueueRecordingJob).toHaveBeenCalledTimes(2);
+
+    // El 97: se marca y no se reencola.
+    mockedEnqueueRecordingJob.mockClear();
+    mockedUpdateMany.mockClear();
+    await retryStuckRecordingsJob();
+    expect(mockedEnqueueRecordingJob).toHaveBeenCalledTimes(1);
+    expect(mockedEnqueueRecordingJob).toHaveBeenCalledWith(
+      expect.objectContaining({ callId: "call_db_2" })
+    );
+    expect(mockedUpdateMany).toHaveBeenCalledWith({
+      where: { id: "rec_1", storageKey: null },
+      data: {
+        processingFailedAt: expect.any(Date),
+        processingError: expect.stringContaining("96 reintentos"),
+      },
+    });
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringContaining("call call_db_1, negocio biz_1")
+    );
   });
 
   it("sigue con las demás grabaciones aunque una falle al reencolar", async () => {

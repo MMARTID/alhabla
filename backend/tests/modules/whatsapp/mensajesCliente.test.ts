@@ -864,7 +864,7 @@ describe("programarMensajesAlCliente", () => {
     }
   });
 
-  it("encola la confirmación con taskId booking-<id>-confirmacion-<epoch> (devuelve programada) y el recordatorio 24 h antes con booking-<id>-recordatorio-<epoch> solo con plan que permite recordatorios", async () => {
+  it("encola la confirmación con taskId booking-<id>-confirmacion-<epoch>-<huella> (devuelve programada) y el recordatorio 24 h antes con booking-<id>-recordatorio-<epoch>-<huella> solo con plan que permite recordatorios", async () => {
     expect(
       await programarMensajesAlCliente({
         bookingId: "booking_1",
@@ -883,7 +883,8 @@ describe("programarMensajesAlCliente", () => {
         businessId: "biz_1",
         audience: "client",
       },
-      { taskId: `booking-booking_1-confirmacion-${EPOCH}` }
+      // Huella: 8 primeros hex de sha256("+34600111222").
+      { taskId: `booking-booking_1-confirmacion-${EPOCH}-cb24629d` }
     );
     const [recordatorio, opciones] = mockedEnqueue.mock.calls[1];
     expect(recordatorio).toEqual(
@@ -893,7 +894,9 @@ describe("programarMensajesAlCliente", () => {
         saltos: 0,
       })
     );
-    expect(opciones?.taskId).toBe(`booking-booking_1-recordatorio-${EPOCH}`);
+    expect(opciones?.taskId).toBe(
+      `booking-booking_1-recordatorio-${EPOCH}-cb24629d`
+    );
     expect(opciones?.scheduleTime?.getTime()).toBe(
       EN_DOS_DIAS.getTime() - 24 * 60 * 60_000
     );
@@ -976,6 +979,49 @@ describe("programarMensajesAlCliente", () => {
     expect(console.error).toHaveBeenCalledWith(
       expect.stringContaining("no se pudo encolar la confirmación al cliente")
     );
+  });
+
+  it("con el teléfono corregido y la misma hora, la confirmación y el recordatorio del número nuevo llevan otra clave (no chocan con la tarea del viejo); el sufijo del reenvío solo cambia la confirmación", async () => {
+    await programarMensajesAlCliente({
+      bookingId: "booking_1",
+      etiqueta: "test",
+    });
+    const [viejaConf, viejoRec] = mockedEnqueue.mock.calls.map(
+      (c) => c[1]?.taskId
+    );
+
+    vi.clearAllMocks();
+    mockedBookingFindUnique.mockResolvedValue(
+      reserva({ clientPhone: "+34600999888" }) as never
+    );
+    mockedBusinessFindUnique.mockResolvedValue(negocio() as never);
+    await programarMensajesAlCliente({
+      bookingId: "booking_1",
+      etiqueta: "test",
+    });
+    const [nuevaConf, nuevoRec] = mockedEnqueue.mock.calls.map(
+      (c) => c[1]?.taskId
+    );
+    expect(nuevaConf).toBe(`booking-booking_1-confirmacion-${EPOCH}-eea7dd8f`);
+    expect(nuevoRec).toBe(`booking-booking_1-recordatorio-${EPOCH}-eea7dd8f`);
+    expect(nuevaConf).not.toBe(viejaConf);
+    expect(nuevoRec).not.toBe(viejoRec);
+    expect(mockedEnqueue.mock.calls[0][0]).toEqual(
+      expect.objectContaining({ toNumber: "+34600999888" })
+    );
+
+    vi.clearAllMocks();
+    mockedBookingFindUnique.mockResolvedValue(reserva() as never);
+    mockedBusinessFindUnique.mockResolvedValue(negocio() as never);
+    await programarMensajesAlCliente({
+      bookingId: "booking_1",
+      etiqueta: "test",
+      sufijoConfirmacion: "gacc_1",
+    });
+    expect(mockedEnqueue.mock.calls.map((c) => c[1]?.taskId)).toEqual([
+      `${viejaConf}-gacc_1`,
+      viejoRec,
+    ]);
   });
 
   it("con confirmacion: false solo encola el recordatorio", async () => {
@@ -1229,7 +1275,7 @@ describe("enviarMensajeAlCliente", () => {
       jobConfirmacion({
         proposito: "recordatorio",
         programedAtMs: enCuarentaDias,
-        idempotencyKey: `booking-booking_1-recordatorio-${epoch}`,
+        idempotencyKey: `booking-booking_1-recordatorio-${epoch}-cb24629d`,
         saltos: 0,
       })
     );
@@ -1241,12 +1287,26 @@ describe("enviarMensajeAlCliente", () => {
       expect.objectContaining({
         proposito: "recordatorio",
         saltos: 1,
-        idempotencyKey: `booking-booking_1-recordatorio-${epoch}`,
+        idempotencyKey: `booking-booking_1-recordatorio-${epoch}-cb24629d`,
       }),
       expect.objectContaining({
-        taskId: `booking-booking_1-recordatorio-${epoch}-s1`,
+        taskId: `booking-booking_1-recordatorio-${epoch}-cb24629d-s1`,
         scheduleTime: expect.any(Date),
       })
+    );
+
+    // Sin clave en el payload, la calcula con la huella del destino.
+    vi.clearAllMocks();
+    await enviarMensajeAlCliente(
+      jobConfirmacion({
+        proposito: "recordatorio",
+        programedAtMs: enCuarentaDias,
+        idempotencyKey: undefined,
+        saltos: 0,
+      })
+    );
+    expect(mockedEnqueue.mock.calls[0][1]?.taskId).toBe(
+      `booking-booking_1-recordatorio-${epoch}-cb24629d-s1`
     );
 
     vi.clearAllMocks();
