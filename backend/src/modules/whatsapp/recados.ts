@@ -9,7 +9,7 @@ import {
 } from "../../lib/cloudTasks.js";
 import { leerIntentoDeReservaFallido } from "../../lib/intentoDeReserva.js";
 import { messageLeadEmail } from "../../lib/emailTemplates.js";
-import { isValidE164Phone } from "../../lib/phone.js";
+import { normalizarTelefono } from "../../lib/phone.js";
 import { avisarRecado } from "./avisosNegocio.js";
 import * as mensajes from "./mensajes.js";
 
@@ -134,28 +134,12 @@ export function normalizarDudas(value: unknown): string[] {
   return dudas;
 }
 
-/** Teléfono del recado en E.164 o null si no es utilizable. */
-export function normalizarTelefonoDeRecado(
-  value: string | null | undefined
-): string | null {
-  const bruto = (value ?? "").replace(/[\s().-]/g, "");
-  if (!bruto) return null;
-  const candidato = bruto.startsWith("+")
-    ? bruto
-    : bruto.startsWith("00")
-      ? `+${bruto.slice(2)}`
-      : /^[6789]\d{8}$/.test(bruto)
-        ? `+34${bruto}`
-        : bruto;
-  return isValidE164Phone(candidato) ? candidato : null;
-}
-
 export function normalizarRecado(
   recado: NonNullable<InformeFinal["recado"]>
 ): RecadoNormalizado {
   return {
     nombre: limpiarTexto(recado.nombre, 80),
-    telefono: normalizarTelefonoDeRecado(recado.telefono),
+    telefono: normalizarTelefono(recado.telefono),
     motivo: limpiarTexto(recado.motivo, 600) ?? "",
     quiereQueLeLlamen: recado.quiere_que_le_llamen === true,
   };
@@ -742,7 +726,7 @@ export async function revisarEscaladaSinRecado(
     const fallido = await leerIntentoDeReservaFallido(call.callId);
     const recado: RecadoNormalizado = {
       nombre: limpiarTexto(fallido?.clientName, 80),
-      telefono: normalizarTelefonoDeRecado(call.fromNumber),
+      telefono: normalizarTelefono(call.fromNumber),
       motivo: motivoDeEscaladaTecnica({
         servicio: informe.servicio_pedido,
         cita: fallido?.startDateTime

@@ -1019,7 +1019,8 @@ el `fetch` equivalente. **Nunca desde un route handler**: todo pasa por
   del negocio> (<zona>)]` y el prompt tiene el bloque «## Chat por WhatsApp»
   (`managedAgentPrompt.ts`: el marcador es la única fuente fiable del número y del momento;
   sin `end_call` ni referencias a voz; `smsConsent: true` sin preguntar; el cliente que «ha
-  pulsado Cambiar» se atiende con find_my_appointment → nueva hora → cancelar + reservar). El
+  pulsado Cambiar» se atiende con find_my_appointment → `check_availability` con
+  `replacesBookingId` → `book_appointment`, que anula la vieja solo si la nueva entra). El
   cambio de prompt resincroniza todos los assistants por el reconciliador (hash de configuración).
 - `modules/whatsapp/chatCliente.ts` › `conversarConRecepcionista({ message, businessId, texto,
   etiqueta? })`: nunca lanza; devuelve `{ atendido: false, motivo }` (`apagado`,
@@ -1945,6 +1946,31 @@ The backend supports two voice-AI orchestrators. `Business.orchestrator` decides
 - Supported Retell webhook events: `call_started`, `call_ended`, `call_analyzed`. Other events are acknowledged (`200`) but ignored.
 - Retell custom tools are exposed under `POST /webhooks/retell/tools/:retellAgentId/:toolName`. The `retellAgentId` path segment is required because Retell never includes an agent identifier in the tool-call body, so it's embedded in the URL itself (done in `buildRetellCalendarTools`, `backend/src/modules/calendar/service.ts`). Our tools are registered with `args_at_root: false` (see `RetellAdapter.createLlm`/`updateLlm`), so Retell sends `{name, call, args}` — `call.call_id` is threaded through as `callId` to `executeVoiceTool` so `book_appointment` can link the booking to the exact call instead of guessing "the most recent call for this business". The route still tolerates a flat args-only body (no `call_id`) for businesses not yet resynced with this config. The endpoint validates the `x-retell-signature` before executing any tool. Execution is delegated to `executeVoiceTool` in `backend/src/modules/voiceTools/service.ts`, which implements `get_catalog`, `check_availability`, `book_appointment`, `find_my_appointment`, `cancel_appointment` and `notify_when_available` (Google, Outlook and Apple/CalDAV supported). The legacy `check_business_hours` handler was removed on 2026-09-29: no agent had registered it since 2026-09-09 (a read-only sweep of the shared Retell account found 0 of 232 LLMs with it, and Telnyx assistants never had it), and `check_availability` checks opening hours and booking restrictions itself. A stale agent that still called it would hit the `default` branch of `executeVoiceTool` (warning log, empty result) and `book_appointment` would still validate everything. `check_availability` also accepts an optional `professionalId` (copied from `get_catalog`; the prompt only sends it when the caller named someone) to check that specific professional instead of "anyone free".
 - **Professional levels in the tool contract (2026-09-17).** `check_availability` translates the ranking into things the agent may say, never the internal tiers: without `professionalId` the success result carries `assignedProfessional: { id, name, isSpecialist }` (= `availableProfessionals[0]`); when the named professional is marked "no sugerir" for the requested services and someone better is free at that time, the result (success or `ALL_PROFESSIONALS_BUSY`) carries `recommendation: { professional, isSpecialist, availabilityToken, instructions }` — its own token so "vale, con Laura" books without another round-trip — and the draft of the *requested* person is flagged `recommendationOffered`. Both tools accept `professionalConfirmed: boolean`: `check_availability` with it skips the recommendation; `book_appointment` **without it on a flagged draft returns `PROFESSIONAL_CONFIRMATION_REQUIRED`** (with the recommendation) instead of booking — the safety net for manually-edited prompts, which receive new tools but not the new prompt text. Booking results now include `professionalName`. Internal fields (`specialistIds`, `recommendedProfessional`) never reach the LLM.
+- **Cambio de cita y teléfono del cliente (auditoría del 16-10,
+  `docs/auditorias/2026-10-16-pipelines-ue-y-datos.md`).** Cambiar una cita ya no es
+  «cancelar y reservar» (en un chat real del 13-10 la reserva nueva falló con la vieja ya
+  cancelada): `check_availability` acepta `replacesBookingId` (el `bookingId` de
+  `find_my_appointment`), comprueba en servidor que la cita es de quien llama, está activa y
+  no ha pasado (`citaQueSeCambia`, mismo criterio de número que `cancel_appointment`; si no,
+  `APPOINTMENT_TO_CHANGE_NOT_FOUND`), no la cuenta como ocupada (`excluir` de
+  `checkAvailability`, que desde entonces admite varias reservas: la de la conversación y la
+  que se cambia) y la guarda en el draft del token. `book_appointment` con ese token, una vez
+  guardada la reserva nueva, la anula con `anularLaCitaCambiada`
+  (`modules/bookings/reservaModificada.ts`: `cancelarReserva` + `rescheduledToId`) y
+  responde `citaAnterior: "anulada"` (o `"sigue_reservada"` si la cancelación falló, con la
+  orden de usar `cancel_appointment`). Si la nueva no entra, la vieja sigue en pie; si se
+  queda pendiente, el lead lleva `replacesBookingId` y `retryFailedBooking` la anula cuando
+  la nueva entra. Si la cita que se cambia es la de la misma conversación, el upsert ya la
+  mueve y no se anula nada. Los otros órdenes también se enlazan: cancelar y luego reservar
+  (`enlazarReservaModificada`, desde `book_appointment`) y reservar y luego cancelar
+  (`enlazarConLaReservaNueva`, desde `cancel_appointment`). El `clientPhone` que dicta el
+  cliente se normaliza a E.164 (`normalizarTelefono` en `lib/phone.ts`, la misma de los
+  recados): si no se puede, `CLIENT_PHONE_INVALID`; si coincide con el de la llamada, la
+  reserva guarda `null`. Con número oculto (`fromNumber` que no es un teléfono, p. ej.
+  «anonymous»; aún no se ha visto ninguna llamada así) el evento ya no dice «Teléfono:
+  anonymous» y `book_appointment` frena una vez por llamada con `CLIENT_PHONE_REQUIRED`
+  (clave `telefono_pedido:<calls.id>`); la segunda vez reserva sin teléfono. Ninguno de los
+  dos códigos cuenta como intento de reserva fallido. `clientEmail` ya no está en la tool.
 - **Tool errors never return HTTP 500 to Retell.** All three tools always resolve to `{success: true, result: {success: false, code, message}}` on failure — a Spanish, LLM-speakable message the agent can relay, never a raw exception. `book_appointment`'s calendar-related failures are classified into `*_RECONNECT_REQUIRED` (Google/Outlook/CalDAV credentials revoked — needs manual reconnect), `CALENDAR_TIMEOUT` / `CALENDAR_RATE_LIMITED` (the provider request took over `CALENDAR_REQUEST_TIMEOUT_MS`/`GRAPH_REQUEST_TIMEOUT_MS`, both 8s — a margin under the 20s tool timeout of Retell and Telnyx so the backend cuts the request itself instead of leaving it dangling; Telnyx only applies it at the tool level, sibling of `type` — until 2026-10-02 it went inside `webhook`, where Telnyx stores it without applying it, so every Telnyx tool ran at its 5s default) or `BOOK_APPOINTMENT_FAILED`/`BOOK_APPOINTMENT_UNEXPECTED_ERROR` (anything else). Every failure except `*_RECONNECT_REQUIRED` also enqueues `retry-failed-booking` (see Background Jobs) after saving a `Lead` with the attempted booking.
 - **`serviceIds`/`professionalId` supplied by the LLM to `book_appointment` are verified against `businessId` before use** (`prisma.service.findFirst`/`prisma.professional.findFirst` scoped by `businessId`). An ID that doesn't belong to the business is treated as if it had never been given (falls back to auto-resolution) rather than failing the booking or silently trusting a cross-tenant ID.
 - When an agent is created or updated for a Retell business, `agentBootstrap.ts` creates/updates the LLM and agent in Retell and stores `retellAgentId`/`retellLlmId` in the `Agent` row.

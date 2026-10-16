@@ -9,6 +9,29 @@ export function isValidE164Phone(phone: string): boolean {
   return E164_PHONE_REGEX.test(phone);
 }
 
+/**
+ * Teléfono que dicta un cliente (el de un recado o el de contacto de una
+ * cita) en E.164, o null si no es utilizable. Acepta espacios, guiones,
+ * puntos y paréntesis, el prefijo «00» y los nueve dígitos de un número
+ * español sin prefijo, con o sin el 34 delante. Guardarlo tal cual lo dijo
+ * el modelo («612 345 678») dejaba la cita sin WhatsApp y al cliente sin
+ * reconocer en la siguiente llamada (auditoría del 16-10).
+ */
+export function normalizarTelefono(
+  value: string | null | undefined
+): string | null {
+  const bruto = (value ?? "").replace(/[\s().-]/g, "");
+  if (!bruto) return null;
+  const candidato = bruto.startsWith("+")
+    ? bruto
+    : bruto.startsWith("00")
+      ? `+${bruto.slice(2)}`
+      : /^(34)?[6789]\d{8}$/.test(bruto)
+        ? `+34${bruto.slice(-9)}`
+        : bruto;
+  return isValidE164Phone(candidato) ? candidato : null;
+}
+
 /** Alphanumeric Sender ID de SMS («ALHABLA»): hasta 11 letras, cifras o
  * espacios y al menos una letra (si fueran solo cifras sería un número). */
 export const SENDER_ID_ALFANUMERICO_REGEX = /^(?=.*[A-Za-z])[A-Za-z0-9 ]{1,11}$/;

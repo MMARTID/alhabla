@@ -466,6 +466,11 @@ export class CalendarService {
               description:
                 "true SOLO si ya propusiste una vez a la persona que recomendó la herramienta y el cliente insistió en la que pidió por su nombre. Nunca lo envíes en la primera comprobación.",
             },
+            replacesBookingId: {
+              type: "string",
+              description:
+                "Solo para cambiar una cita que ya tiene: el bookingId que devolvió find_my_appointment. Su hora no cuenta como ocupada y, al reservar con el token de esta comprobación, el sistema anula la cita antigua (solo si la nueva queda reservada).",
+            },
           },
           required: ["startDateTime", "durationMinutes"],
         },
@@ -478,7 +483,7 @@ export class CalendarService {
       {
         name: "book_appointment",
         description:
-          "Agenda una cita en el calendario activo. Úsala solo tras confirmación explícita y con el availabilityToken de check_availability.",
+          "Agenda una cita en el calendario activo. Úsala solo tras confirmación explícita y con el availabilityToken de check_availability. Si la comprobación se hizo con replacesBookingId, la cita antigua se anula al reservar la nueva.",
         url: `${toolBaseUrl}/book_appointment`,
         method: "POST",
         args_at_root: false,
@@ -489,15 +494,10 @@ export class CalendarService {
               type: "string",
               description: "El nombre del cliente que hace la reserva",
             },
-            clientEmail: {
-              type: "string",
-              description:
-                "El correo electrónico del cliente, si lo proporciona (opcional)",
-            },
             clientPhone: {
               type: "string",
               description:
-                "Teléfono de contacto solo si el cliente eligió uno distinto a {{user_number}} (opcional).",
+                "Teléfono de contacto solo si el cliente da uno distinto al número desde el que llama o book_appointment te lo pidió, tal como lo confirmó al repetírselo (opcional).",
             },
             availabilityToken: {
               type: "string",
@@ -529,7 +529,7 @@ export class CalendarService {
         // una cita nueva encima de la que el cliente quería cambiar.
         name: "find_my_appointment",
         description:
-          "Busca la próxima cita del negocio asociada al número desde el que llama. Devuelve también clientName (el nombre con el que se reservó; puede venir vacío en citas antiguas) — úsalo si el cliente quiere recrear la cita al mismo nombre. Úsala solo si quien llama pide cambiar o cancelar una cita existente y no te ha dado datos concretos.",
+          "Busca la próxima cita del negocio asociada al número desde el que llama. Devuelve su bookingId (para cancelarla, o para cambiarla con replacesBookingId en check_availability) y clientName (el nombre con el que se reservó; puede venir vacío en citas antiguas): úsalo si el cliente quiere la cita nueva al mismo nombre. Úsala solo si quien llama pide cambiar o cancelar una cita existente y no te ha dado datos concretos.",
         url: `${toolBaseUrl}/find_my_appointment`,
         method: "POST",
         args_at_root: false,
@@ -544,7 +544,7 @@ export class CalendarService {
       {
         name: "cancel_appointment",
         description:
-          "Cancela la cita cuyo id devolvió find_my_appointment. Úsala solo tras confirmación explícita del cliente. Para 'modificar' una cita: cancélala con esta tool y reserva la nueva con check_availability + book_appointment.",
+          "Cancela la cita cuyo id devolvió find_my_appointment. Úsala solo si el cliente quiere anularla, tras su confirmación explícita. Para cambiarla no la uses: comprueba la hora nueva con check_availability y replacesBookingId, y la antigua se anula al reservar la nueva.",
         url: `${toolBaseUrl}/cancel_appointment`,
         method: "POST",
         args_at_root: false,
