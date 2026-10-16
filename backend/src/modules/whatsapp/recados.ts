@@ -34,7 +34,9 @@ import * as mensajes from "./mensajes.js";
  *    discrepancia, que es lo que hay que medir antes de retirar los insights.
  * 3. Un recado se convierte en un `Lead` tipo `message` y en el aviso #2 al
  *    dueño (WhatsApp con botones; email si no es posible), una sola vez por
- *    llamada.
+ *    llamada. Si el `Lead` no se pudo crear, el recado sigue en el informe:
+ *    lo recupera el siguiente informe o la revisión diferida, que se
+ *    programa en ese momento.
  * 4. Una escalada por fallo técnico sin recado programa una revisión
  *    diferida (revisarEscaladaSinRecado): la recepcionista le dice al
  *    cliente que el negocio se pondrá en contacto, pero el recado solo se
@@ -435,6 +437,24 @@ async function completarInforme(input: {
     if (combinado.motivo_escalada === "FALLO_TECNICO" && !combinado.recado) {
       await programarRevisionDeEscalada(existente.id, etiqueta);
     }
+    if (previo.recado && combinado.recado) {
+      // El informe anterior trajo el recado, pero si su `Lead` no se pudo
+      // crear nadie más lo iba a crear: este informe ya no lo trae como
+      // nuevo y la revisión diferida lo daba por hecho. Si ya existe, no
+      // hace nada.
+      const recuperado = await crearLeadYAvisar({
+        business,
+        callRowId: existente.id,
+        callControlId,
+        recado: recadoDesdeGuardado(combinado.recado),
+      });
+      if (recuperado) {
+        console.warn(
+          `[WhatsApp] ${etiqueta}: el recado del informe anterior no tenía lead; recuperado (lead ${recuperado})`
+        );
+        return { outcome: "duplicado-con-recado", leadId: recuperado };
+      }
+    }
     const recadoNuevo = previo.recado ? null : input.recado;
     if (!recadoNuevo) {
       console.log(
@@ -573,16 +593,40 @@ async function completarLeadDelRecado(input: {
   }
 }
 
-async function crearLeadYAvisar(input: {
-  business: NegocioDelInforme;
+/** El recado tal como lo guarda `Call.postCallReport`. */
+function recadoDesdeGuardado(
+  recado: NonNullable<InformeGuardado["recado"]>
+): RecadoNormalizado {
+  return {
+    nombre: recado.nombre,
+    telefono: recado.telefono,
+    motivo: recado.motivo,
+    quiereQueLeLlamen: recado.quiere_que_le_llamen === true,
+  };
+}
+
+/**
+ * Crea el `Lead` del recado si la llamada aún no tiene uno. Con un cerrojo
+ * de transacción por llamada: el informe o la revisión que recupera un
+ * recado sin lead puede llegar a la vez que el que lo está creando (los dos
+ * informes de la post-conversación llegan casi juntos), y sin el cerrojo
+ * los dos verían que no hay lead. Devuelve el id creado o null si ya había
+ * uno. Lanza si la BD falla.
+ */
+async function crearLeadDelRecado(input: {
   callRowId: string;
   callControlId: string;
   recado: RecadoNormalizado;
 }): Promise<string | null> {
-  const { business, recado } = input;
-  let leadId: string;
-  try {
-    const lead = await prisma.lead.create({
+  const { recado } = input;
+  return prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`recado:${input.callRowId}`}))`;
+    const existente = await tx.lead.findFirst({
+      where: { callId: input.callRowId, type: "message" },
+      select: { id: true },
+    });
+    if (existente) return null;
+    const lead = await tx.lead.create({
       data: {
         callId: input.callRowId,
         type: "message",
@@ -597,13 +641,42 @@ async function crearLeadYAvisar(input: {
       },
       select: { id: true },
     });
-    leadId = lead.id;
+    return lead.id;
+  });
+}
+
+/**
+ * Lead del recado y aviso #2, una sola vez por llamada: devuelve el id del
+ * lead que creó, o null si la llamada ya tenía uno (no se avisa otra vez) o
+ * no se pudo crear. Si falla la creación, el recado sigue en el informe y
+ * se programa la revisión diferida, que lo recupera; con `lanzarSiFalla`
+ * (la propia revisión) lanza para que Cloud Tasks la repita.
+ */
+async function crearLeadYAvisar(input: {
+  business: NegocioDelInforme;
+  callRowId: string;
+  callControlId: string;
+  recado: RecadoNormalizado;
+  lanzarSiFalla?: boolean;
+}): Promise<string | null> {
+  const { business, recado } = input;
+  let leadId: string | null;
+  try {
+    leadId = await crearLeadDelRecado(input);
   } catch (error) {
     console.error(
-      `[WhatsApp] No se pudo guardar el recado de la llamada ${input.callControlId} (negocio ${business.id}): ${errorMessage(error)}`
+      `[WhatsApp] No se pudo guardar el recado de la llamada ${input.callControlId} (negocio ${business.id}): ${errorMessage(error)}${input.lanzarSiFalla ? "" : "; se programa su recuperación"}`
+    );
+    if (input.lanzarSiFalla) throw error;
+    await programarRevisionDeEscalada(
+      input.callRowId,
+      `recado de la llamada ${input.callControlId} (negocio ${business.id})`,
+      1,
+      "recado"
     );
     return null;
   }
+  if (!leadId) return null;
 
   await avisarRecado({
     businessId: business.id,
@@ -628,12 +701,14 @@ export const MAX_REVISIONES_ESCALADA = 8;
 async function programarRevisionDeEscalada(
   callRowId: string,
   etiqueta: string,
-  intento = 1
+  intento = 1,
+  sufijo?: string
 ): Promise<void> {
   try {
     await enqueueRevisarEscaladaJob(
       { callId: callRowId, intento },
-      new Date(Date.now() + ESPERA_REVISION_ESCALADA_MS)
+      new Date(Date.now() + ESPERA_REVISION_ESCALADA_MS),
+      sufijo
     );
   } catch (error) {
     console.error(
@@ -715,9 +790,29 @@ export async function revisarEscaladaSinRecado(
       return;
     }
     const informe = leerInformeGuardado(call.postCallReport);
-    if (informe.motivo_escalada !== "FALLO_TECNICO" || informe.recado) {
+    const timezone = call.business.timezone || "Europe/Madrid";
+    if (informe.recado) {
+      // El informe ya trae recado; si su `Lead` no se pudo crear (o esta
+      // misma revisión lo escribió y falló antes de crearlo), se crea ahora.
+      const recuperado = await crearLeadYAvisar({
+        business: { id: call.business.id, name: call.business.name, timezone },
+        callRowId: call.id,
+        callControlId: call.callId,
+        recado: recadoDesdeGuardado(informe.recado),
+        lanzarSiFalla: true,
+      });
+      if (recuperado) {
+        console.warn(
+          `[WhatsApp] ${etiqueta} (negocio ${call.business.id}): el recado del informe no tenía lead; recuperado (lead ${recuperado})`
+        );
+      } else {
+        console.log(`[WhatsApp] ${etiqueta}: nada que hacer (ya con recado)`);
+      }
+      return;
+    }
+    if (informe.motivo_escalada !== "FALLO_TECNICO") {
       console.log(
-        `[WhatsApp] ${etiqueta}: nada que hacer (motivo ${informe.motivo_escalada ?? "—"}${informe.recado ? ", ya con recado" : ""})`
+        `[WhatsApp] ${etiqueta}: nada que hacer (motivo ${informe.motivo_escalada ?? "—"})`
       );
       return;
     }
@@ -738,7 +833,6 @@ export async function revisarEscaladaSinRecado(
       return;
     }
 
-    const timezone = call.business.timezone || "Europe/Madrid";
     const fallido = await leerIntentoDeReservaFallido(call.callId);
     const recado: RecadoNormalizado = {
       nombre: limpiarTexto(fallido?.clientName, 80),
@@ -780,6 +874,7 @@ export async function revisarEscaladaSinRecado(
       callRowId: call.id,
       callControlId: call.callId,
       recado,
+      lanzarSiFalla: true,
     });
   } catch (error) {
     console.error(

@@ -8,6 +8,7 @@ import {
 } from "../../adapters/whatsapp/WhatsAppAdapter.js";
 import { prisma } from "../../lib/prisma.js";
 import { errorMessage } from "../../lib/logUtils.js";
+import { claveDeMensajeAlCliente } from "../../lib/clavesDeMensajes.js";
 import { isUniqueConstraintError } from "../../lib/prismaErrors.js";
 import { estaDadoDeBaja, WhatsappOptOutError } from "./bajas.js";
 import {
@@ -995,12 +996,22 @@ async function efectosDeFalloAlCliente(input: {
           audience: "client",
           sinV2: true,
         },
-        // El nombre de la tarea sale de la RESERVA, no de la clave de la
-        // fila: si el `statuses[]` se adelantó al registro, la fila es
-        // `adhoc:<wamid>` y Cloud Tasks rechaza los `:` del nombre
-        // (solo admite [A-Za-z0-9_-]); el cliente se quedaría sin respaldo.
+        // El nombre de la tarea sale de la clave de la fila, que ya lleva la
+        // huella del destino y el sufijo del reenvío del Gestor. Si el
+        // `statuses[]` se adelantó al registro, la fila es `adhoc:<wamid>` y
+        // Cloud Tasks rechaza los `:` del nombre (solo admite
+        // [A-Za-z0-9_-]): entonces sale de la reserva y del destino.
         {
-          taskId: `booking-${reserva.id}-confirmacion-${Math.floor(reserva.programedAt.getTime() / 1000)}-respaldo`,
+          taskId: `${
+            /^[A-Za-z0-9_-]+$/.test(input.idempotencyKey)
+              ? input.idempotencyKey
+              : claveDeMensajeAlCliente(
+                  reserva.id,
+                  "confirmacion",
+                  reserva.programedAt.getTime(),
+                  input.toNumber
+                )
+          }-respaldo`,
         }
       );
       console.log(

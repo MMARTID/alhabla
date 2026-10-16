@@ -61,11 +61,16 @@ export async function requestPasswordReset(email: string) {
 
   const message = passwordResetEmail({ resetUrl: buildPasswordResetUrl(token) });
   try {
-    await enqueueEmailJob({
-      fromAlias: "support",
-      toAddress: user.email,
-      ...message,
-    });
+    // Una clave por petición (no el token: el nombre de la tarea se ve en la
+    // consola de Cloud Tasks): una entrega repetida no manda dos enlaces.
+    await enqueueEmailJob(
+      {
+        fromAlias: "support",
+        toAddress: user.email,
+        ...message,
+      },
+      `restablecer-${user.id}-${randomBytes(8).toString("hex")}`
+    );
   } catch (error) {
     // Sin correo no hay enlace: el usuario debe saber que puede reintentar
     // en vez de esperar un mensaje que no va a llegar.
@@ -125,11 +130,14 @@ export async function resetPasswordWithToken(input: {
   });
 
   try {
-    await enqueueEmailJob({
-      fromAlias: "support",
-      toAddress: user.email,
-      ...passwordChangedEmail(),
-    });
+    await enqueueEmailJob(
+      {
+        fromAlias: "support",
+        toAddress: user.email,
+        ...passwordChangedEmail(),
+      },
+      `contrasena-cambiada-${user.id}-${actualizado.tokenVersion}`
+    );
   } catch (error) {
     // La confirmación es secundaria: la contraseña ya está cambiada y el
     // usuario no debe ver un error por un correo que no salió.
