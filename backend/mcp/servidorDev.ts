@@ -12,15 +12,19 @@ import {
   JOBS_QUE_SE_PUEDEN_LANZAR,
   lanzarJobDeProd,
 } from "./jobsDeProd.js";
+import { LIMITE_MAXIMO, leerLatenciasDeProd } from "./latenciasDeProd.js";
 import { leerLogsDeProd, leerPeticionesDeProd } from "./logsDeProd.js";
 import {
   borrarLlamadasSimuladas,
   crearLlamadaSimulada,
 } from "./llamadasSimuladas.js";
 import { pararProxy, urlDeBdDeProd } from "./prod.js";
+import { resumenDeNegocio } from "./resumenDeNegocio.js";
+import { saludDeLlamadas } from "./saludDeLlamadas.js";
 import { ejecutarSoloLectura } from "./sqlDeSoloLectura.js";
 import { urlDeBd, verAssistant, verConversacion } from "./telnyx.js";
 import { estadoDelEntorno, verRamaEnDev } from "./panel/entornoDev.js";
+import { trazaDeLlamada } from "./trazaDeLlamada.js";
 import {
   BASE_RETELL_DEV,
   BASE_TELNYX_SIMULACION,
@@ -42,6 +46,11 @@ import {
  * - ver_envios_simulados: los WhatsApp/SMS/correos que backend-sim no envió.
  * - describir_tabla: tablas, columnas, índices y claves de dev o producción.
  * - ver_logs_prod / ver_peticiones_prod: Cloud Logging de alhabla-api.
+ * - latencias_prod: las peticiones agregadas por ruta (estados, p50/p95/máx).
+ * - salud_llamadas: por día, a qué llamadas les falta algo, webhooks que no
+ *   acabaron bien, citas por canal y reservas pendientes por código.
+ * - traza_llamada: todo lo que dejó una llamada, con sus logs.
+ * - resumen_negocio: la foto de un negocio (o la lista para elegir uno).
  * - estado_prod: revisión, imagen, /health, colas, jobs y último deploy.
  * - ver_assistant_telnyx / ver_conversacion_telnyx: GET a Telnyx AI.
  * - lanzar_job_prod: solo los jobs del Scheduler que se pueden repetir.
@@ -399,6 +408,90 @@ servidor.registerTool(
     annotations: { readOnlyHint: true, openWorldHint: true },
   },
   (opciones) => conErrores(() => leerPeticionesDeProd(opciones))
+);
+
+servidor.registerTool(
+  "latencias_prod",
+  {
+    title: "Latencias de producción por ruta",
+    description:
+      "Las peticiones a alhabla-api AGREGADAS por método y ruta (ids cambiados por :id, sin query string): cuántas, por familia de estado (2xx, 4xx, 5xx) y latencia p50/p95/máxima en ms, ordenadas de más a menos peticiones. Para «¿cuánto tarda book_appointment?» o «¿qué ruta da 5xx?» sin leer las peticiones una a una (eso es ver_peticiones_prod). porRevision separa por revisión (antes/después de un deploy). Lee las más recientes hasta limitePeticiones; truncado=true si se llegó al tope.",
+    inputSchema: {
+      ruta: z.string().optional().describe("Texto que contiene la URL, p. ej. /webhooks/telnyx/tools/"),
+      metodo: z.string().optional(),
+      estadoMinimo: z.number().int().optional(),
+      desde: z.string().optional().describe('"30m", "2h", "7d" o fecha ISO. Por defecto 24h'),
+      hasta: z.string().optional(),
+      incluirInternas: z.boolean().optional().describe("Incluye /internal/, /health y OPTIONS"),
+      porRevision: z.boolean().optional(),
+      limitePeticiones: z
+        .number()
+        .int()
+        .min(1)
+        .max(LIMITE_MAXIMO)
+        .optional()
+        .describe("Por defecto 2000"),
+    },
+    annotations: { readOnlyHint: true, openWorldHint: true },
+  },
+  (opciones) => conErrores(() => leerLatenciasDeProd(opciones))
+);
+
+servidor.registerTool(
+  "salud_llamadas",
+  {
+    title: "Salud de las llamadas",
+    description:
+      "Por día (hora de Madrid): llamadas de voz por estado y cuántas se quedaron sin alguna pieza (zombi abierta, sin transcripción, sin conversación, sin duración, sin coste, sin grabación o sin copiar a R2, sin resultado; la leyenda explica cada una; las de Telnyx con coste 0, que colgaron antes de contestar, no cuentan como rotas). Además: eventos de webhook de voz/WhatsApp que no acabaron bien (de toda la plataforma), citas creadas por canal (y las que no tienen evento en el calendario) y reservas pendientes por código de fallo. ejemplos da las llamadas más recientes con algún problema, para seguir con traza_llamada. Sin chats de WhatsApp ni llamadas simuladas.",
+    inputSchema: {
+      entorno,
+      desde: z.string().optional().describe('"1d", "7d" (por defecto), "30d" o fecha ISO'),
+      businessId: z.string().optional(),
+      ejemplos: z.number().int().min(0).max(50).optional().describe("Por defecto 10"),
+    },
+    annotations: { readOnlyHint: true },
+  },
+  ({ entorno: cual, desde, businessId, ejemplos }) =>
+    conErrores(async () =>
+      saludDeLlamadas(await urlDeBd(cual), { desde, businessId, ejemplos })
+    )
+);
+
+servidor.registerTool(
+  "traza_llamada",
+  {
+    title: "Traza de una llamada",
+    description:
+      "Todo lo que dejó UNA llamada (por id de la Call, callId/call_control_id, providerCallId o providerConversationId): su fila (estado, resultado, duración, coste, grabación pedida/rechazada), la cita con su calendario, profesional y servicios, las reservas que se quedaron pendientes y su código de fallo, si hay transcripción y grabación copiada, cuántas llamadas de la plataforma se solaparon (si hay alguna, las peticiones a tools pueden ser de otra) y sus logs en la ventana de la llamada (prod: Cloud Logging + las peticiones a las tools mientras duró, con su latencia; dev: docker logs del backend de dev, o de backend-sim si es sim-mcp-…). Para saber qué rama tomó una tool sin leer el código. Las tools que llamó el modelo, con ver_conversacion_telnyx.",
+    inputSchema: {
+      entorno,
+      llamada: z.string().min(1),
+      conLogs: z.boolean().optional().describe("Por defecto true"),
+      limiteLogs: z.number().int().min(1).max(1000).optional().describe("Por defecto 150"),
+      mostrarTelefonos,
+    },
+    annotations: { readOnlyHint: true, openWorldHint: true },
+  },
+  ({ entorno: cual, ...opciones }) =>
+    conErrores(async () => trazaDeLlamada(cual, await urlDeBd(cual), opciones))
+);
+
+servidor.registerTool(
+  "resumen_negocio",
+  {
+    title: "Resumen de un negocio",
+    description:
+      "La foto de un negocio: suscripción y suspensiones, número y orquestador, WhatsApp del dueño, calendarios (proveedor, conectado, si hay credenciales —nunca su valor—, último error), agentes y su sincronización con Telnyx, profesionales/servicios/ausencias y actividad de 30 días (llamadas, chats, citas creadas y por delante, reservas pendientes sin resolver). Sin businessId lista los negocios (buscar filtra por nombre, id o teléfono); si solo uno coincide, lo resume. Teléfonos y emails enmascarados salvo mostrarTelefonos.",
+    inputSchema: {
+      entorno,
+      businessId: z.string().optional(),
+      buscar: z.string().optional().describe("Parte del nombre, id o un teléfono E.164"),
+      mostrarTelefonos,
+    },
+    annotations: { readOnlyHint: true },
+  },
+  ({ entorno: cual, ...opciones }) =>
+    conErrores(async () => resumenDeNegocio(await urlDeBd(cual), opciones))
 );
 
 servidor.registerTool(

@@ -1104,6 +1104,10 @@ describe("enviarMensajeAlCliente", () => {
   });
 
   it("cancelada ⇒ skipped RESERVA_CANCELADA sin enviar; hora cambiada ⇒ HORA_CAMBIADA; sin consentimiento ⇒ SIN_CONSENTIMIENTO; recordatorio a menos de 60 min ⇒ RECORDATORIO_TARDIO", async () => {
+    // Una sola lectura del reloj: con dos Date.now(), un milisegundo entre
+    // ellas hacía que la cita y la tarea no casaran y el caso daba
+    // HORA_CAMBIADA (fallo intermitente en CI).
+    const enMediaHora = Date.now() + 30 * 60_000;
     const casos: Array<
       [Record<string, unknown>, Record<string, unknown>, string]
     > = [
@@ -1111,8 +1115,8 @@ describe("enviarMensajeAlCliente", () => {
       [{}, { programedAtMs: EN_DOS_DIAS.getTime() + 1 }, "HORA_CAMBIADA"],
       [{ smsConsent: false }, {}, "SIN_CONSENTIMIENTO"],
       [
-        { programedAt: new Date(Date.now() + 30 * 60_000) },
-        { proposito: "recordatorio", programedAtMs: Date.now() + 30 * 60_000 },
+        { programedAt: new Date(enMediaHora) },
+        { proposito: "recordatorio", programedAtMs: enMediaHora },
         "RECORDATORIO_TARDIO",
       ],
     ];
