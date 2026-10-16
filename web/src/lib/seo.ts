@@ -163,3 +163,16 @@ export const noindexMetadata = {
     googleBot: { index: false, follow: false },
   },
 } as const;
+
+// Next (16.4) escribe las entradas del sitemap en el XML tal cual, sin
+// escapar. Las portadas de Unsplash llevan `?auto=format&fit=crop…`, y un `&`
+// suelto deja el sitemap entero ilegible para Google («Error de análisis»,
+// 0 páginas descubiertas).
+export function escaparXml(texto: string): string {
+  return texto
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
+}
