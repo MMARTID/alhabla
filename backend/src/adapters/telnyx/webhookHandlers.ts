@@ -19,6 +19,8 @@ import {
   registrarSalienteContestada,
 } from "../../modules/onboarding/comprobacionDesvio.js";
 import { marcarPataSinCall, motivoDePataSinCall } from "./patasSinCall.js";
+import { guardarTranscripcionDeTelnyx } from "./transcripcion.js";
+import { programarRecuperacionDeTranscripcion } from "../../jobs/recuperarTranscripcion.js";
 
 /**
  * Envoltorio real verificado en vivo el 2026-09-11 y contra los tipos de
@@ -614,40 +616,31 @@ export async function handleCallConversationEnded(
     });
 
     if (conversation_id) {
+      // Telnyx puede avisar del fin antes de tener los mensajes (llamada
+      // cmufcsz4b0006s601kncxcf5m, 24-09: llegaron ~40 s después). Con 0
+      // mensajes, o si la descarga falla, se reintenta más tarde en un job
+      // en vez de dar la transcripción por perdida en silencio.
+      const contexto = `negocio ${dbCall.businessId}, llamada ${dbCall.id}, conversación ${conversation_id}`;
+      let guardados = 0;
+      let fallo: string | null = null;
       try {
-        const messages = await telnyxAiAdapter.listConversationMessages(
+        guardados = await guardarTranscripcionDeTelnyx(
+          dbCall.id,
           conversation_id
         );
-        // `client.ai.conversations.messages.list()` devuelve del más
-        // reciente al más antiguo (verificado en vivo 2026-09-12) — sin
-        // reordenar, fullText queda con la conversación al revés.
-        messages.sort((a, b) => {
-          const timeA = Date.parse(a.sentAt ?? a.createdAt ?? "");
-          const timeB = Date.parse(b.sentAt ?? b.createdAt ?? "");
-          return timeA - timeB;
-        });
-        if (messages.length > 0) {
-          const fullText = messages
-            .map((message) => `${message.role}: ${message.text}`)
-            .join("\n");
-          // Objeto plano: TelnyxConversationMessage con campos opcionales no
-          // encaja en el tipo JSON estructural que exige Prisma.
-          const jsonMessages = messages.map((message) => ({
-            role: message.role,
-            text: message.text,
-            createdAt: message.createdAt ?? null,
-            sentAt: message.sentAt ?? null,
-          }));
-          await prisma.transcript.upsert({
-            where: { callId: dbCall.id },
-            create: { callId: dbCall.id, fullText, messages: jsonMessages },
-            update: { fullText, messages: jsonMessages },
-          });
-        }
       } catch (err) {
-        console.error(
-          `[Telnyx] No se pudo descargar la transcripción de ${callLabel(call_control_id)}: ${errorMessage(err)}`
+        fallo = errorMessage(err);
+      }
+      if (guardados === 0) {
+        console.warn(
+          `[Telnyx] ${callLabel(call_control_id)} terminó sin transcripción (${fallo ? `la descarga falló: ${fallo}` : "Telnyx aún no tiene mensajes"}); se reintenta en unos minutos (${contexto})`
         );
+        await programarRecuperacionDeTranscripcion({
+          businessId: dbCall.businessId,
+          callRowId: dbCall.id,
+          conversationId: conversation_id,
+          intento: 1,
+        });
       }
     }
 

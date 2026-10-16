@@ -1673,7 +1673,8 @@ is now a **Cloud Scheduler** job hitting the same kind of endpoint every
 
 - **Enqueueing** (`backend/src/lib/cloudTasks.ts`): `enqueueRecordingJob`,
   `enqueueRetryBookingJob`, `enqueueUsageReportJob`, `enqueueEmailJob`,
-  `enqueueSmsJob`, `enqueueRecordarRecadoJob`, `enqueueWhatsappJob`. In production
+  `enqueueSmsJob`, `enqueueRecordarRecadoJob`, `enqueueRevisarEscaladaJob`,
+  `enqueueRecuperarTranscripcionJob`, `enqueueWhatsappJob`. In production
   (`NODE_ENV=production`) these create a real Cloud Tasks task via
   `@google-cloud/tasks`, targeting `INTERNAL_JOBS_BASE_URL` with an OIDC
   token for `CLOUD_TASKS_INVOKER_SERVICE_ACCOUNT`. **Outside production
@@ -1688,7 +1689,8 @@ is now a **Cloud Scheduler** job hitting the same kind of endpoint every
   `/cleanup-zombie-calls`, `/retry-stuck-recordings`, `/purge-old-recordings`,
   `/send-weekly-summaries`, `/report-usage`, `/retry-usage-reports`,
   `/attach-usage-prices`, `/suspend-overdue-calls`, `/telnyx-health-check`,
-  `/telnyx-reconciler`, `/recordar-desvio-sin-comprobar`. Gated by
+  `/telnyx-reconciler`, `/recordar-desvio-sin-comprobar`, `/recordar-recado`,
+  `/revisar-escalada`, `/recuperar-transcripcion`. Gated by
   `fastify.verifyCloudTasks` (`backend/src/plugins/internalAuth.ts`), which
   verifies the request carries a Google-signed OIDC token issued to
   `CLOUD_TASKS_INVOKER_SERVICE_ACCOUNT` with the right audience — anyone
@@ -1747,6 +1749,19 @@ is now a **Cloud Scheduler** job hitting the same kind of endpoint every
      - **Retell** graba siempre por su cuenta y no deja empezar ni parar a mitad de llamada, así que su audio no se guarda nunca.
      - **Lo que no depende del audio.** La transcripción, los insights y el informe salen de la conversación del assistant, así que se guardan siempre.
      - **Chat de WhatsApp.** No se graba, y el aviso de IA lo da la primera respuesta de cada conversación.
+
+   - **Transcripción diferida (`recuperar-transcripcion`, 2026-10-16, hallazgo 10 de
+     `docs/auditorias/2026-10-16-partes-completas.md`).** `handleCallConversationEnded` guarda la
+     transcripción con `guardarTranscripcionDeTelnyx` (`adapters/telnyx/transcripcion.ts`), pero
+     Telnyx puede mandar `call.conversation.ended` antes de tener los mensajes (llamada
+     `cmufcsz4b0006s601kncxcf5m`, 24-09: el evento a las 09:53:49, los mensajes ~40 s después; antes
+     se perdía en silencio y el evento quedaba `success`). Con 0 mensajes, o si la descarga falla,
+     deja un `console.warn` con negocio, llamada y conversación y programa
+     `jobs/recuperarTranscripcion.ts` (ruta `/internal/jobs/recuperar-transcripcion`, **cola
+     `process-recording`**, taskId `transcripcion-<Call.id>-<n>`) a 2, 5 y 15 min. Si la fila ya
+     tiene `Transcript` no hace nada; tras el tercer intento sin mensajes deja un `console.error`
+     «Transcripción PERDIDA». Solo lanza si falla la BD (el guardado es un upsert). En dev corre en
+     el proceso tras la misma espera.
 
 2. **`retry-failed-booking`**
    - Retries a `book_appointment` that failed during a live call for a probably-transient reason (`BOOK_APPOINTMENT_FAILED`, `CALENDAR_TIMEOUT`, `CALENDAR_RATE_LIMITED`, or an unclassified error) — enqueued by `capturePendingBookingLead`/`enqueueRetryFailedBooking` in `voiceTools/service.ts`. Not enqueued for `*_RECONNECT_REQUIRED` failures, since retrying doesn't help until the business reconnects the calendar manually.

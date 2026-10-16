@@ -161,9 +161,8 @@ export type NuevoEventoDeCalendario = {
   recordatorioInmediatoMinutos: number | null;
   /** REMINDER_MINUTES_BEFORE_START (120). */
   recordatorioPrevioMinutos: number;
-  /** Zona del negocio; "Europe/Madrid" por defecto. INERTE para Google
-   * (manda UTC) y Outlook (lib/microsoftGraph.ts la hardcodea); la
-   * consumirá CalDAV. */
+  /** Zona del negocio; "Europe/Madrid" por defecto. INERTE para Google y
+   * Outlook (los dos mandan la hora en UTC); la consumirá CalDAV. */
   zonaHoraria: string;
   /** sha256 hex de la idempotencyKey, o null. Cada adaptador lo formatea
    * (Google: "alhabla"+hex; Outlook: UUID; CalDAV: UID@alhabla.ai). */

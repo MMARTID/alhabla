@@ -72,6 +72,17 @@ export interface RevisarEscaladaJob {
   intento?: number;
 }
 
+/** Reintento diferido de la transcripción de una llamada de Telnyx (ver
+ * jobs/recuperarTranscripcion.ts). */
+export interface RecuperarTranscripcionJob {
+  /** Call.id (la fila), no el call_control_id: va en el nombre de la tarea. */
+  callId: string;
+  /** Conversación de Telnyx AI de la que salen los mensajes. */
+  conversationId: string;
+  /** Número de intento (1 = el primero). */
+  intento?: number;
+}
+
 export interface SendWhatsappJobLegado {
   toNumber: string;
   templateName: string;

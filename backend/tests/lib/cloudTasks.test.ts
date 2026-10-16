@@ -35,6 +35,13 @@ vi.mock("../../src/jobs/revisarEscalada.js", () => ({
   processRevisarEscaladaJob: mockProcessRevisarEscaladaJob,
 }));
 
+const { mockProcessRecuperarTranscripcionJob } = vi.hoisted(() => ({
+  mockProcessRecuperarTranscripcionJob: vi.fn().mockResolvedValue(undefined),
+}));
+vi.mock("../../src/jobs/recuperarTranscripcion.js", () => ({
+  processRecuperarTranscripcionJob: mockProcessRecuperarTranscripcionJob,
+}));
+
 const ORIGINAL_ENV = { ...process.env };
 
 const recordingPayload = { callId: "call_1", externalUrl: "https://vapi.example/rec.mp3", businessId: "biz_1" };
@@ -316,6 +323,84 @@ describe("enqueueRevisarEscaladaJob", () => {
       await vi.advanceTimersByTimeAsync(1_000);
       await vi.dynamicImportSettled();
       expect(mockProcessRevisarEscaladaJob).toHaveBeenCalledWith({ callId: "call_row", intento: 1 });
+      expect(mockCreateTask).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe("enqueueRecuperarTranscripcionJob (hallazgo 10 de la auditoría del 16-10)", () => {
+  const scheduleTime = new Date("2026-09-24T09:55:50.000Z");
+  const payload = { callId: "call_row", conversationId: "conv_1" };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.resetModules();
+    process.env = { ...ORIGINAL_ENV };
+  });
+
+  describe("en producción", () => {
+    beforeEach(() => {
+      process.env.NODE_ENV = "production";
+      process.env.GCP_PROJECT_ID = "project_test";
+      process.env.GCP_REGION = "europe-west1";
+      process.env.INTERNAL_JOBS_BASE_URL = "https://api.alhabla.ai";
+      process.env.CLOUD_TASKS_INVOKER_SERVICE_ACCOUNT = "invoker@test.iam.gserviceaccount.com";
+    });
+
+    it("programa la tarea en la cola process-recording, una por llamada e intento", async () => {
+      const { enqueueRecuperarTranscripcionJob } = await import("../../src/lib/cloudTasks.js");
+
+      await enqueueRecuperarTranscripcionJob(payload, scheduleTime);
+
+      const { task } = mockCreateTask.mock.calls[0][0];
+      expect(task.name).toBe(
+        "projects/project_test/locations/europe-west1/queues/process-recording/tasks/transcripcion-call_row-1"
+      );
+      expect(task.httpRequest.url).toBe("https://api.alhabla.ai/internal/jobs/recuperar-transcripcion");
+      expect(task.scheduleTime).toEqual({ seconds: scheduleTime.getTime() / 1000 });
+      expect(JSON.parse(Buffer.from(task.httpRequest.body, "base64").toString())).toEqual({
+        callId: "call_row",
+        conversationId: "conv_1",
+        intento: 1,
+      });
+      expect(mockProcessRecuperarTranscripcionJob).not.toHaveBeenCalled();
+    });
+
+    it("ignora la tarea repetida (evento reentregado) y propaga otros errores", async () => {
+      const { enqueueRecuperarTranscripcionJob } = await import("../../src/lib/cloudTasks.js");
+      mockCreateTask.mockRejectedValueOnce(Object.assign(new Error("ALREADY_EXISTS"), { code: 6 }));
+
+      await expect(
+        enqueueRecuperarTranscripcionJob({ ...payload, intento: 2 }, scheduleTime)
+      ).resolves.toBeUndefined();
+
+      mockCreateTask.mockRejectedValueOnce(Object.assign(new Error("UNAVAILABLE"), { code: 14 }));
+      await expect(
+        enqueueRecuperarTranscripcionJob({ ...payload, intento: 2 }, scheduleTime)
+      ).rejects.toThrow("UNAVAILABLE");
+    });
+  });
+
+  it("fuera de producción la ejecuta en este proceso tras la misma espera", async () => {
+    process.env.NODE_ENV = "test";
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date("2026-09-24T09:53:50.000Z"));
+      const { enqueueRecuperarTranscripcionJob } = await import("../../src/lib/cloudTasks.js");
+
+      await enqueueRecuperarTranscripcionJob(payload, scheduleTime);
+      await vi.advanceTimersByTimeAsync(119_000);
+      expect(mockProcessRecuperarTranscripcionJob).not.toHaveBeenCalled();
+
+      await vi.advanceTimersByTimeAsync(1_000);
+      await vi.dynamicImportSettled();
+      expect(mockProcessRecuperarTranscripcionJob).toHaveBeenCalledWith({
+        callId: "call_row",
+        conversationId: "conv_1",
+        intento: 1,
+      });
       expect(mockCreateTask).not.toHaveBeenCalled();
     } finally {
       vi.useRealTimers();
