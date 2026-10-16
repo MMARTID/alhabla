@@ -19,6 +19,7 @@ import {
   enqueueUsageReportJob,
 } from "../../../src/lib/cloudTasks.js";
 import { executeVoiceTool } from "../../../src/modules/voiceTools/service.js";
+import { programarRecuperacionDeTranscripcion } from "../../../src/jobs/recuperarTranscripcion.js";
 import {
   codificarClientState,
   comprobacionDeDesvioReciente,
@@ -57,6 +58,13 @@ vi.mock("../../../src/adapters/telnyx/TelnyxAiAdapter.js", () => ({
 vi.mock("../../../src/lib/cloudTasks.js", () => ({
   enqueueRecordingJob: vi.fn(),
   enqueueUsageReportJob: vi.fn(),
+}));
+
+// La recuperación diferida de la transcripción tiene su propio test
+// (tests/jobs/recuperarTranscripcion.test.ts); aquí solo importa cuándo se
+// programa.
+vi.mock("../../../src/jobs/recuperarTranscripcion.js", () => ({
+  programarRecuperacionDeTranscripcion: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock("../../../src/lib/grabacion.js", () => ({
@@ -123,6 +131,9 @@ const mockedExecuteVoiceTool = vi.mocked(executeVoiceTool);
 const mockedEnqueueRecordingJob = vi.mocked(enqueueRecordingJob);
 const mockedBorrarGrabacionesDeTelnyx = vi.mocked(borrarGrabacionesDeTelnyx);
 const mockedResolverContexto = vi.mocked(resolverContextoDeLlamada);
+const mockedProgramarRecuperacion = vi.mocked(
+  programarRecuperacionDeTranscripcion
+);
 
 /** Lo que el contexto devuelve por defecto en estos tests: quien no se
  * conoce, sin grabar. */
@@ -644,14 +655,16 @@ describe("handleCallConversationEnded", () => {
     );
   });
 
-  it("no falla si la descarga de la transcripción falla", async () => {
+  it("no falla si la descarga de la transcripción falla, y la reintenta más tarde", async () => {
     mockedCallFindUnique.mockResolvedValue({
       id: "call_db_1",
+      businessId: "biz1",
       providerConversationId: null,
       durationSecs: null,
     } as any);
     mockedCallUpdate.mockResolvedValue({} as any);
     mockedListConversationMessages.mockRejectedValue(new Error("Telnyx down"));
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
 
     const result = await handleCallConversationEnded({
       data: {
@@ -663,6 +676,76 @@ describe("handleCallConversationEnded", () => {
 
     expect(result).toEqual({ success: true });
     expect(mockedTranscriptUpsert).not.toHaveBeenCalled();
+    expect(mockedProgramarRecuperacion).toHaveBeenCalledWith({
+      businessId: "biz1",
+      callRowId: "call_db_1",
+      conversationId: "conv_1",
+      intento: 1,
+    });
+    expect(String(warn.mock.calls[0][0])).toContain("Telnyx down");
+    warn.mockRestore();
+  });
+
+  it("con 0 mensajes no da la transcripción por perdida: lo dice y la reintenta más tarde (hallazgo 10, llamada del 24-09)", async () => {
+    mockedCallFindUnique.mockResolvedValue({
+      id: "cmufcsz4b0006s601kncxcf5m",
+      businessId: "biz_infinity",
+      providerConversationId: null,
+      durationSecs: null,
+    } as any);
+    mockedCallUpdate.mockResolvedValue({} as any);
+    mockedListConversationMessages.mockResolvedValue([]);
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    const result = await handleCallConversationEnded({
+      data: {
+        id: "evt_3",
+        event_type: "call.conversation.ended",
+        payload: {
+          call_control_id: "call_ctrl_1",
+          conversation_id: "c6fc5bb5",
+          duration_sec: 34,
+        },
+      },
+    });
+
+    expect(result).toEqual({ success: true });
+    expect(mockedTranscriptUpsert).not.toHaveBeenCalled();
+    expect(mockedProgramarRecuperacion).toHaveBeenCalledWith({
+      businessId: "biz_infinity",
+      callRowId: "cmufcsz4b0006s601kncxcf5m",
+      conversationId: "c6fc5bb5",
+      intento: 1,
+    });
+    const aviso = String(warn.mock.calls[0][0]);
+    expect(aviso).toContain("biz_infinity");
+    expect(aviso).toContain("cmufcsz4b0006s601kncxcf5m");
+    expect(aviso).toContain("c6fc5bb5");
+    warn.mockRestore();
+  });
+
+  it("con mensajes no programa ningún reintento", async () => {
+    mockedCallFindUnique.mockResolvedValue({
+      id: "call_db_1",
+      businessId: "biz1",
+      providerConversationId: null,
+      durationSecs: null,
+    } as any);
+    mockedCallUpdate.mockResolvedValue({} as any);
+    mockedListConversationMessages.mockResolvedValue([
+      { role: "user", text: "Hola" },
+    ]);
+    mockedTranscriptUpsert.mockResolvedValue({} as any);
+
+    await handleCallConversationEnded({
+      data: {
+        id: "evt_3",
+        event_type: "call.conversation.ended",
+        payload: { call_control_id: "call_ctrl_1", conversation_id: "conv_1" },
+      },
+    });
+
+    expect(mockedProgramarRecuperacion).not.toHaveBeenCalled();
   });
 });
 

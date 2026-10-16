@@ -1,5 +1,5 @@
 import { CloudTasksClient } from "@google-cloud/tasks";
-import { ProcessRecordingJob, RecordarRecadoJob, ReportUsageJob, RetryFailedBookingJob, RevisarEscaladaJob, SendEmailJob, SendSmsJob, SendWhatsappJob } from "./jobTypes.js";
+import { ProcessRecordingJob, RecordarRecadoJob, RecuperarTranscripcionJob, ReportUsageJob, RetryFailedBookingJob, RevisarEscaladaJob, SendEmailJob, SendSmsJob, SendWhatsappJob } from "./jobTypes.js";
 import { processRecordingJob } from "../jobs/processRecording.js";
 import { processRetryFailedBookingJob } from "../jobs/retryFailedBooking.js";
 import { processSendEmailJob } from "../jobs/sendEmail.js";
@@ -240,6 +240,53 @@ export async function enqueueRevisarEscaladaJob(
       path: "/internal/jobs/revisar-escalada",
       payload: { ...payload, intento },
       taskId: `escalada-${payload.callId}-${intento}`,
+      scheduleTime,
+    });
+  } catch (error) {
+    if ((error as { code?: unknown })?.code === 6) return;
+    throw error;
+  }
+}
+
+/**
+ * Reintento diferido de la transcripción de una llamada de Telnyx que no
+ * tenía mensajes al llegar `call.conversation.ended`. Va por la cola
+ * `process-recording` (lo demás que se recoge de una llamada ya colgada; no
+ * hace falta una cola nueva en GCP), con una tarea por llamada e intento: un
+ * evento repetido pide la misma y Cloud Tasks descarta la segunda
+ * (ALREADY_EXISTS).
+ */
+export async function enqueueRecuperarTranscripcionJob(
+  payload: RecuperarTranscripcionJob,
+  scheduleTime: Date
+): Promise<void> {
+  const intento = payload.intento ?? 1;
+  if (!IS_PRODUCTION) {
+    // Sin Cloud Tasks en dev se ejecuta en este proceso tras la misma
+    // espera. Import dinámico: el job importa este módulo.
+    console.log(
+      `[Job] Intento ${intento} de recuperar la transcripción de la llamada ${payload.callId} programado para ${scheduleTime.toISOString()} (en este proceso, no hay Cloud Tasks en dev)`
+    );
+    setTimeout(() => {
+      void import("../jobs/recuperarTranscripcion.js")
+        .then(({ processRecuperarTranscripcionJob }) =>
+          processRecuperarTranscripcionJob({ ...payload, intento })
+        )
+        .catch((error) =>
+          console.error(
+            `[Job] Falló la recuperación de la transcripción de la llamada ${payload.callId}:`,
+            error
+          )
+        );
+    }, Math.max(0, scheduleTime.getTime() - Date.now())).unref();
+    return;
+  }
+  try {
+    await enqueueCloudTask({
+      queue: "process-recording",
+      path: "/internal/jobs/recuperar-transcripcion",
+      payload: { ...payload, intento },
+      taskId: `transcripcion-${payload.callId}-${intento}`,
       scheduleTime,
     });
   } catch (error) {

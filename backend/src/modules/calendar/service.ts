@@ -885,7 +885,7 @@ export class CalendarService {
       serviceNames?: string[] | null;
       professionalName?: string | null;
       /** Zona del negocio; "Europe/Madrid" por defecto. Inerte para Google
-       * (manda UTC) y Outlook (lib/microsoftGraph.ts la hardcodea). */
+       * y Outlook (los dos mandan la hora en UTC). */
       timezone?: string;
       /** Clave estable por llamada/reserva para que un timeout no cree dos
        * eventos externos. */

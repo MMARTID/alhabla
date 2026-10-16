@@ -8,6 +8,7 @@ import { processSendSmsJob } from "../../jobs/sendSms.js";
 import { processSendWhatsappJob } from "../../jobs/sendWhatsapp.js";
 import { processRecordarRecadoJob } from "../../jobs/recordarRecado.js";
 import { processRevisarEscaladaJob } from "../../jobs/revisarEscalada.js";
+import { processRecuperarTranscripcionJob } from "../../jobs/recuperarTranscripcion.js";
 import { cleanupZombieCallsJob } from "../../jobs/cleanupZombieCalls.js";
 import { purgarCaducados } from "../../lib/almacenTemporal.js";
 import { recordarDesvioSinComprobarJob } from "../../jobs/recordarDesvioSinComprobar.js";
@@ -40,6 +41,12 @@ const RecordarRecadoSchema = z.object({
 const RevisarEscaladaSchema = z.object({
   callId: z.string(),
   intento: z.number().int().min(1).max(20).optional(),
+});
+
+const RecuperarTranscripcionSchema = z.object({
+  callId: z.string(),
+  conversationId: z.string(),
+  intento: z.number().int().min(1).max(10).optional(),
 });
 
 const RetryFailedBookingSchema = z.object({
@@ -235,6 +242,24 @@ export const internalJobsRoutes: FastifyPluginAsync = async (fastify) => {
           return reply.status(400).send({ error: error.errors });
         }
         fastify.log.error({ err: error }, "revisar-escalada job failed");
+        return reply.status(500).send({ error: "Job processing failed" });
+      }
+    }
+  );
+
+  fastify.post(
+    "/jobs/recuperar-transcripcion",
+    opcionesDeJob,
+    async (request, reply) => {
+      try {
+        const data = RecuperarTranscripcionSchema.parse(request.body);
+        await processRecuperarTranscripcionJob(data);
+        return reply.send({ received: true });
+      } catch (error) {
+        if (error instanceof z.ZodError) {
+          return reply.status(400).send({ error: error.errors });
+        }
+        fastify.log.error({ err: error }, "recuperar-transcripcion job failed");
         return reply.status(500).send({ error: "Job processing failed" });
       }
     }

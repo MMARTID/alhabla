@@ -344,6 +344,12 @@ export async function listMicrosoftUpcomingEvents(
   })) satisfies MicrosoftUpcomingEvent[];
 }
 
+/** «2026-10-16T08:00:00.000Z» (o con offset) → «2026-10-16T08:00:00.000»: la
+ * misma hora en UTC sin sufijo, el formato de dateTimeTimeZone de Graph. */
+function aHoraDeParedUtc(iso: string): string {
+  return new Date(iso).toISOString().replace(/Z$/, "");
+}
+
 export async function createMicrosoftCalendarEvent(input: {
   accessToken: string;
   calendarId: string;
@@ -359,15 +365,19 @@ export async function createMicrosoftCalendarEvent(input: {
    * deduplicar reintentos de create tras un timeout de red. */
   transactionId?: string;
 }) {
+  // La hora llega como ISO en UTC («…T08:00:00.000Z»). Graph la toma como
+  // hora de pared en `timeZone`, así que se manda sin sufijo y con "UTC": con
+  // "Europe/Madrid" la cita podía quedar desplazada 1-2 h (hallazgo 1 de
+  // docs/auditorias/2026-10-16-partes-completas.md).
   const body: Record<string, unknown> = {
     subject: input.subject,
     start: {
-      dateTime: input.startDateTime,
-      timeZone: "Europe/Madrid",
+      dateTime: aHoraDeParedUtc(input.startDateTime),
+      timeZone: "UTC",
     },
     end: {
-      dateTime: input.endDateTime,
-      timeZone: "Europe/Madrid",
+      dateTime: aHoraDeParedUtc(input.endDateTime),
+      timeZone: "UTC",
     },
     body: {
       contentType: "text",

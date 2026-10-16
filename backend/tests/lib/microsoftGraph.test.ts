@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
+  createMicrosoftCalendarEvent,
   listMicrosoftBusyIntervals,
   refreshMicrosoftAccessToken,
   exchangeMicrosoftCode,
@@ -99,6 +100,72 @@ describe("listMicrosoftBusyIntervals", () => {
     await expect(
       listMicrosoftBusyIntervals("access_token", "calendar_1", new Date(), new Date())
     ).rejects.toThrow();
+  });
+});
+
+describe("createMicrosoftCalendarEvent (hallazgo 1 de la auditoría del 16-10)", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  async function crearYLeerCuerpo(startDateTime: string, endDateTime: string) {
+    const fetchMock = mockFetchOnce({ id: "evento_1", webLink: null });
+    await createMicrosoftCalendarEvent({
+      accessToken: "access_token",
+      calendarId: "calendar_1",
+      subject: "Corte — Ana",
+      startDateTime,
+      endDateTime,
+    });
+    const [url, init] = fetchMock.mock.calls[0];
+    return { url: String(url), body: JSON.parse(String(init.body)) };
+  }
+
+  it("manda la hora en UTC con timeZone \"UTC\", no en UTC etiquetada como Europe/Madrid", async () => {
+    // 10:00 en Madrid (CEST) = 08:00 UTC. Con timeZone "Europe/Madrid" Graph
+    // podía guardar las 08:00 de Madrid: la cita 2 h antes.
+    const { url, body } = await crearYLeerCuerpo(
+      "2026-10-16T08:00:00.000Z",
+      "2026-10-16T08:30:00.000Z"
+    );
+
+    expect(url).toContain("/me/calendars/calendar_1/events");
+    expect(body.start).toEqual({
+      dateTime: "2026-10-16T08:00:00.000",
+      timeZone: "UTC",
+    });
+    expect(body.end).toEqual({
+      dateTime: "2026-10-16T08:30:00.000",
+      timeZone: "UTC",
+    });
+  });
+
+  it("en horario de invierno también manda la hora UTC sin desplazarla", async () => {
+    // 10:00 en Madrid (CET) = 09:00 UTC.
+    const { body } = await crearYLeerCuerpo(
+      "2026-12-01T09:00:00.000Z",
+      "2026-12-01T10:15:00.000Z"
+    );
+
+    expect(body.start).toEqual({
+      dateTime: "2026-12-01T09:00:00.000",
+      timeZone: "UTC",
+    });
+    expect(body.end).toEqual({
+      dateTime: "2026-12-01T10:15:00.000",
+      timeZone: "UTC",
+    });
+  });
+
+  it("convierte a UTC una hora que llegue con offset", async () => {
+    const { body } = await crearYLeerCuerpo(
+      "2026-10-16T10:00:00+02:00",
+      "2026-10-16T10:30:00+02:00"
+    );
+
+    expect(body.start.dateTime).toBe("2026-10-16T08:00:00.000");
+    expect(body.end.dateTime).toBe("2026-10-16T08:30:00.000");
+    expect(JSON.stringify(body)).not.toContain("Europe/Madrid");
   });
 });
 
