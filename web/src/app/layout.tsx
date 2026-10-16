@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 import { GoogleAnalytics } from "@/components/google-analytics";
+import { MedicionDeClics } from "@/components/medicion-de-clics";
 import "./globals.css";
 import { absoluteUrl, defaultDescription, defaultTitle, seoKeywords, siteName, siteUrl } from "@/lib/seo";
 
@@ -103,7 +104,10 @@ export default function RootLayout({
           rutasSinAnalitica={["keystatic", "vista-previa", "preview", "api"]}
           aplazarAvisoHastaScroll
           grupoDeContenido="web"
+          eventosDeRuta={{ planes: "ver_planes" }}
         />
+        {/* Clics en lo marcado con `data-evento` (docs/eventos-de-analitica.md). */}
+        <MedicionDeClics />
       </body>
     </html>
   );

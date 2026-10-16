@@ -98,7 +98,12 @@ export default async function BlogPage() {
               </p>
             </div>
             <div className="mt-6 flex flex-wrap gap-3 lg:mt-0 lg:shrink-0">
-              <Link href="/planes" className="btn-primary px-6">
+              <Link
+                href="/planes"
+                className="btn-primary px-6"
+                data-evento="clic_probar"
+                data-ubicacion="blog"
+              >
                 Ver planes
               </Link>
               <Link href="/#como-funciona" className="btn-secondary px-6">

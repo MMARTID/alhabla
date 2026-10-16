@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { appUrl } from "@/lib/app-url";
+import { medirEventoYSeguir } from "@/components/google-analytics";
 import { normalizeBusinessType } from "@/lib/business-type";
 import type { PlanId } from "@/lib/types";
 
@@ -41,7 +42,10 @@ export function PlanSelectionLink({ planId, planName, featured, preselected = fa
     if (niche) {
       params.set("niche", normalizeBusinessType(niche));
     }
-    window.location.assign(appUrl(`/elegir-plan?${params.toString()}`));
+    // La app vive en otro dominio: el evento tiene que salir antes de irse.
+    medirEventoYSeguir("elegir_plan", { plan: planId }, () =>
+      window.location.assign(appUrl(`/elegir-plan?${params.toString()}`))
+    );
   };
 
   return (

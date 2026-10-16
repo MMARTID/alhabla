@@ -20,10 +20,79 @@ const EVENTO_PREFERENCIAS = "alhabla:preferencias-cookies";
 // Valor por defecto fuera del componente: un `[]` en la firma sería un array
 // nuevo en cada render y los useMemo de abajo se recalcularían siempre.
 const SIN_RUTAS: readonly string[] = [];
+const SIN_EVENTOS_DE_RUTA: Readonly<Record<string, string>> = {};
 
 /** Reabre el aviso de cookies desde otro sitio (la hoja «Más» del panel). */
 export function abrirPreferenciasDeCookies() {
   window.dispatchEvent(new Event(EVENTO_PREFERENCIAS));
+}
+
+/** Parámetros de un evento: de qué botón u opción se trata, nunca datos de
+ * la persona (ni nombre, ni email, ni teléfono). */
+export type ParametrosDeEvento = Record<string, string | number | boolean>;
+
+/** Lo más que se hace esperar a una navegación para que salga su evento. */
+const ESPERA_MAXIMA_DEL_EVENTO = 1500;
+
+function enviarEvento(
+  nombre: string,
+  parametros: Record<string, unknown>
+): boolean {
+  if (
+    leerConsentimiento() !== true ||
+    !window.alhablaGtagConfigurado ||
+    !window.gtag
+  ) {
+    return false;
+  }
+  window.gtag("event", nombre, {
+    ...parametros,
+    // Sin query string, como el `page_view`: puede llevar tokens.
+    page_location: `${window.location.origin}${window.location.pathname}`,
+  });
+  return true;
+}
+
+/**
+ * Evento de conversión en Google Analytics (los nombres, en
+ * docs/eventos-de-analitica.md). Sale solo si la visita aceptó la medición y
+ * la etiqueta ya está configurada; si no, no hace nada. Devuelve si salió.
+ */
+export function medirEvento(
+  nombre: string,
+  parametros: ParametrosDeEvento = {}
+): boolean {
+  return enviarEvento(nombre, parametros);
+}
+
+/**
+ * Para el evento justo antes de salir de la página (`location.assign` o
+ * `replace`, a otro dominio o no): espera a que Google confirme el envío,
+ * como mucho ESPERA_MAXIMA_DEL_EVENTO, y sigue. Sin medición, sigue al
+ * momento. El temporizador propio cubre que gtag.js no llegue a cargar (un
+ * bloqueador), porque entonces nadie llama a `event_callback`.
+ */
+export function medirEventoYSeguir(
+  nombre: string,
+  parametros: ParametrosDeEvento,
+  seguir: () => void
+) {
+  let hecho = false;
+  const continuar = () => {
+    if (hecho) return;
+    hecho = true;
+    seguir();
+  };
+  const enviado = enviarEvento(nombre, {
+    ...parametros,
+    event_callback: continuar,
+    event_timeout: ESPERA_MAXIMA_DEL_EVENTO,
+  });
+  if (!enviado) {
+    continuar();
+    return;
+  }
+  window.setTimeout(continuar, ESPERA_MAXIMA_DEL_EVENTO);
 }
 
 declare global {
@@ -157,6 +226,11 @@ type PropiedadesDeAnalitica = {
    * flujo de datos por dominio) se hace con NEXT_PUBLIC_GA_MEASUREMENT_ID
    * en cada proyecto de Vercel. */
   grupoDeContenido?: string;
+  /** Evento propio que acompaña al `page_view` de una ruta, por su primer
+   * segmento («planes» → `ver_planes`). Sale con el `page_view`, con el mismo
+   * consentimiento y sin carrera con la carga de la etiqueta, y se puede
+   * marcar como evento clave en GA4 sin una condición sobre la URL. */
+  eventosDeRuta?: Readonly<Record<string, string>>;
 };
 
 /** Comparte la elección entre la app y la web, mide solo páginas sin
@@ -168,6 +242,7 @@ export function GoogleAnalytics({
   dentroDelPanel = false,
   aplazarAvisoHastaScroll = false,
   grupoDeContenido,
+  eventosDeRuta = SIN_EVENTOS_DE_RUTA,
 }: PropiedadesDeAnalitica) {
   const pathname = usePathname();
   const [consentimiento, setConsentimiento] = useState<boolean | null>(null);
@@ -186,6 +261,9 @@ export function GoogleAnalytics({
     [rutasSinMedicion, rutasSinAnalitica]
   );
   const medible = rutaMedible(pathname, rutasSinMedir);
+  // Un texto, no el objeto: como dependencia del efecto del `page_view`, un
+  // objeto nuevo en otro render lo volvería a enviar.
+  const eventoDeRuta = eventosDeRuta[primerSegmento(pathname)];
   // Misma referencia mientras no cambien las listas: `<Analytics>` vuelve a
   // registrar `beforeSend` cada vez que cambia.
   const filtrarEventoDeVercel = useMemo(
@@ -251,7 +329,13 @@ export function GoogleAnalytics({
       page_title: document.title,
       ...(grupoDeContenido ? { content_group: grupoDeContenido } : {}),
     });
-  }, [listo, consentimiento, pathname, medible, grupoDeContenido]);
+    if (eventoDeRuta) {
+      window.gtag?.("event", eventoDeRuta, {
+        page_location: `${window.location.origin}${pathname}`,
+        ...(grupoDeContenido ? { content_group: grupoDeContenido } : {}),
+      });
+    }
+  }, [listo, consentimiento, pathname, medible, grupoDeContenido, eventoDeRuta]);
 
   if (!conAnalitica) return null;
   if (!/^G-[A-Z0-9]+$/.test(ID_MEDICION)) return null;

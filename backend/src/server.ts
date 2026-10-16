@@ -26,6 +26,7 @@ import { phoneRoutes } from "./modules/phone/routes.js";
 import { onboardingRoutes } from "./modules/onboarding/routes.js";
 import { whatsappRoutes } from "./modules/whatsapp/routes.js";
 import { demoRoutes } from "./modules/demo/routes.js";
+import { contactoRoutes } from "./modules/contacto/routes.js";
 import { webhooksTelnyxRoutes } from "./modules/webhooksTelnyx/routes.js";
 import { webhooksRetellRoutes } from "./modules/webhooksRetell/routes.js";
 import { retellAdapter } from "./adapters/retell/RetellAdapter.js";
@@ -256,6 +257,7 @@ async function start() {
     fastify.register(onboardingRoutes);
     fastify.register(whatsappRoutes);
     fastify.register(demoRoutes, { prefix: '/demo' });
+    fastify.register(contactoRoutes);
     fastify.register(internalAuthPlugin);
     fastify.register(internalJobsRoutes, { prefix: '/internal' });
 
