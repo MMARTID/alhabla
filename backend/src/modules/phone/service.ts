@@ -27,8 +27,8 @@ function sleep(ms: number) {
 }
 
 /**
- * Provisions a Telnyx phone number for a business and configures it in the
- * active voice orchestrator (Retell). Idempotent: safe to call multiple
+ * Provisions a Telnyx phone number for a business, connected to the Telnyx
+ * Call Control App that answers every call. Idempotent: safe to call multiple
  * times; skips if status is already 'active'. Telnyx number orders are
  * asynchronous (regulatory review) — if a previous attempt already placed an
  * order, resumes polling that same order instead of purchasing a new one.
@@ -139,8 +139,6 @@ export async function provisionPhoneNumber(businessId: string): Promise<{
     };
   }
 
-  const orchestrator = business.orchestrator || "retell";
-
   try {
     // Por ahora solo compramos números españoles: es el único país con
     // Requirement Group regulatorio aprobado en Telnyx. Fallar claro aquí en
@@ -205,15 +203,16 @@ export async function provisionPhoneNumber(businessId: string): Promise<{
       );
       order = await telnyxAdapter.getNumberOrder(business.telnyxNumberOrderId);
     } else {
-      // El número se conecta inicialmente al Call Control App de Telnyx
-      // cuando ese sea el primary, o al SIP trunk de Retell en cualquier
-      // otro caso (plan Telnyx-orquestador §1 paso 5) — Retell se importa
-      // más abajo siempre, como fallback caliente, independientemente de
-      // cuál sea el connection_id activo aquí.
-      const connectionId =
-        orchestrator === "telnyx"
-          ? process.env.TELNYX_CALL_CONTROL_APP_ID
-          : process.env.TELNYX_SIP_CONNECTION_ID;
+      // El número va siempre al Call Control App de Telnyx, que contesta
+      // todas las llamadas (PLAN-RETIRAR-RETELL.md, PR 1). Antes dependía de
+      // `orchestrator`: un negocio aún sin promocionar lo recibía en el SIP
+      // trunk de Retell, que nunca ha cogido una llamada en producción.
+      const connectionId = process.env.TELNYX_CALL_CONTROL_APP_ID;
+      if (!connectionId) {
+        throw new Error(
+          "Falta configurar TELNYX_CALL_CONTROL_APP_ID (el Call Control App de Telnyx que contesta las llamadas)"
+        );
+      }
 
       // 1. Search available numbers
       const available = await telnyxAdapter.searchAvailableNumbers(
@@ -345,13 +344,22 @@ export async function provisionPhoneNumber(businessId: string): Promise<{
       );
     }
 
+    // Comprado y conectado al Call Control App: ya recibe llamadas, así que
+    // está activo. Antes solo pasaba a "active" al importarlo en Retell, y
+    // si Retell fallaba el número quedaba "failed" (con aviso al dueño)
+    // aunque Telnyx ya lo contestara. `orchestrator` y `voiceRoutingTarget`
+    // dicen lo mismo que el connection_id («Comprobar desvío» los mira)
+    // hasta que se borren (PLAN-RETIRAR-RETELL.md, PR 3).
     await prisma.business.update({
       where: { id: businessId },
       data: {
         telnyxPhoneNumber: order.phoneNumber,
         telnyxPhoneNumberId: resolvedPhoneNumberId,
         telnyxPhoneNumberPurchasedAt: new Date(),
-        phoneNumberStatus: "purchased",
+        phoneNumberStatus: "active",
+        orchestrator: "telnyx",
+        voiceRoutingTarget: "telnyx",
+        voiceRoutingChangedAt: new Date(),
         // El número ya está en firme: la marca de compra en curso sobra.
         telnyxPendingPhoneNumber: null,
       },
@@ -375,85 +383,25 @@ export async function provisionPhoneNumber(businessId: string): Promise<{
     // nunca lanza y no hace nada si no hay assistant todavía.
     await syncAgentToTelnyx(businessId);
 
-    // 3. Find active agent to associate
+    // Respaldo de Retell, opcional: si falta su agente, su configuración o
+    // su API falla, el número sigue activo en Telnyx. Se retira entero en la
+    // PR 2 de PLAN-RETIRAR-RETELL.md.
     const agent = business.agents[0];
+    await importarEnRetell({
+      businessId,
+      nombre: business.name,
+      phoneNumber: order.phoneNumber,
+      retellAgentId: agent?.retellAgentId ?? null,
+    });
 
-    // Retell se importa aquí para "retell" (primary) y también para
-    // "telnyx" (fallback caliente obligatorio, plan §1 paso 2) — el
-    // connection_id que de verdad recibe las llamadas ya se fijó al comprar
-    // el número más arriba según el orchestrator; este import nunca lo
-    // cambia, solo dota a Retell del número por si hace falta un failover.
-    if (orchestrator === "retell" || orchestrator === "telnyx") {
-      if (!agent?.retellAgentId) {
-        console.warn(
-          `[Phone] Business ${businessId} has no active agent with retellAgentId. Number purchased but not linked in Retell.`
-        );
-        return {
-          success: true,
-          phoneNumber: order.phoneNumber,
-          status: "purchased",
-        };
-      }
-
-      // SIP trunk de plataforma (la conexión de Telnyx apuntando a Retell) —
-      // único, reutilizado para todos los negocios.
-      const terminationUri = process.env.RETELL_SIP_TERMINATION_URI;
-      const sipTrunkAuthUsername = process.env.RETELL_SIP_TRUNK_AUTH_USERNAME;
-      const sipTrunkAuthPassword = process.env.RETELL_SIP_TRUNK_AUTH_PASSWORD;
-
-      if (!terminationUri) {
-        throw new Error(
-          "Falta configurar RETELL_SIP_TERMINATION_URI (SIP trunk de Telnyx para importar el número en Retell)"
-        );
-      }
-
-      const webhookBaseUrl = getPublicWebhookBaseUrl();
-      const inboundWebhookUrl = webhookBaseUrl
-        ? `${webhookBaseUrl.replace(/\/$/, "")}/webhooks/retell/inbound`
-        : undefined;
-      if (!inboundWebhookUrl) {
-        console.warn(
-          `[Phone] No hay BASE_URL/webhookUrl configurada — el número de ${businessId} se importará sin inbound_webhook_url, así que el prompt se quedará con las variables {{...}} sin rellenar.`
-        );
-      }
-
-      const retellPhone = await retellAdapter.importPhoneNumber({
-        phoneNumber: order.phoneNumber,
-        terminationUri,
-        sipTrunkAuthUsername,
-        sipTrunkAuthPassword,
-        nickname: business.name,
-        inboundAgentId: agent.retellAgentId,
-        inboundWebhookUrl,
-      });
-
-      await prisma.business.update({
-        where: { id: businessId },
-        data: {
-          phoneNumberStatus: "active",
-          retellPhoneNumber: retellPhone.phone_number,
-          retellPhoneNumberId:
-            retellPhone.phone_number_id || retellPhone.phone_number,
-        },
-      });
-
-      console.log(
-        `[Phone] Number ${order.phoneNumber} active for business ${businessId} (${
-          orchestrator === "telnyx" ? "Telnyx primary, Retell fallback" : "Retell"
-        })`
-      );
-
-      return {
-        success: true,
-        phoneNumber: order.phoneNumber,
-        status: "active",
-      };
-    }
+    console.log(
+      `[Phone] Number ${order.phoneNumber} active for business ${businessId} (Telnyx)`
+    );
 
     return {
       success: true,
       phoneNumber: order.phoneNumber,
-      status: "purchased",
+      status: "active",
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -474,6 +422,54 @@ export async function provisionPhoneNumber(businessId: string): Promise<{
     return { success: false, status: "failed", error: message };
   } finally {
     await releaseLock(lockKey, lockToken);
+  }
+}
+
+/**
+ * Importa el número en Retell como respaldo. Nunca lanza: lo que no sale se
+ * loguea con negocio, número y motivo, y el número sigue activo en Telnyx.
+ */
+async function importarEnRetell(input: {
+  businessId: string;
+  nombre: string;
+  phoneNumber: string;
+  retellAgentId: string | null;
+}): Promise<void> {
+  const terminationUri = process.env.RETELL_SIP_TERMINATION_URI;
+  if (!input.retellAgentId || !terminationUri) {
+    console.warn(
+      `[Phone] El número ${input.phoneNumber} del negocio ${input.businessId} no se importa en Retell (${!input.retellAgentId ? "su agente no tiene retellAgentId" : "falta RETELL_SIP_TERMINATION_URI"}); sigue activo en Telnyx`
+    );
+    return;
+  }
+
+  const webhookBaseUrl = getPublicWebhookBaseUrl();
+  const inboundWebhookUrl = webhookBaseUrl
+    ? `${webhookBaseUrl.replace(/\/$/, "")}/webhooks/retell/inbound`
+    : undefined;
+
+  try {
+    const retellPhone = await retellAdapter.importPhoneNumber({
+      phoneNumber: input.phoneNumber,
+      terminationUri,
+      sipTrunkAuthUsername: process.env.RETELL_SIP_TRUNK_AUTH_USERNAME,
+      sipTrunkAuthPassword: process.env.RETELL_SIP_TRUNK_AUTH_PASSWORD,
+      nickname: input.nombre,
+      inboundAgentId: input.retellAgentId,
+      inboundWebhookUrl,
+    });
+    await prisma.business.update({
+      where: { id: input.businessId },
+      data: {
+        retellPhoneNumber: retellPhone.phone_number,
+        retellPhoneNumberId:
+          retellPhone.phone_number_id || retellPhone.phone_number,
+      },
+    });
+  } catch (error) {
+    console.error(
+      `[Phone] No se pudo importar el número ${input.phoneNumber} del negocio ${input.businessId} en Retell (respaldo); sigue activo en Telnyx: ${error instanceof Error ? error.message : String(error)}`
+    );
   }
 }
 
