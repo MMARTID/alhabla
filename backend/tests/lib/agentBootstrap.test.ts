@@ -807,6 +807,28 @@ describe("createBusinessAgent — creación dual Telnyx (Fase 2 del plan Telnyx-
     });
   });
 
+  // PLAN-RETIRAR-RETELL.md, PR 1: el assistant iba dentro de la rama
+  // `orchestrator === "retell"`; un negocio que ya fuera "telnyx" (agente
+  // recreado) se quedaba sin él.
+  it("crea el assistant Telnyx también si el negocio ya es Telnyx-primary, sin tocar Retell", async () => {
+    process.env.VOICE_TELNYX_ROLLOUT = "development";
+    mockedBusinessFindUnique.mockResolvedValue({
+      orchestrator: "telnyx",
+      businessType: "peluqueria",
+      name: "Peluquería de prueba",
+    } as any);
+
+    const result = await createBusinessAgent({
+      businessId: "biz_new",
+      name: "Nuevo negocio",
+    });
+
+    expect(result).toEqual(expect.objectContaining({ id: "agent_db_1" }));
+    expect(mockedTelnyxCreateAssistant).toHaveBeenCalledTimes(1);
+    expect(mockedCreateLlm).not.toHaveBeenCalled();
+    expect(mockedCreateAgent).not.toHaveBeenCalled();
+  });
+
   it("sigue devolviendo el agente ya creado en Retell si Telnyx falla", async () => {
     process.env.VOICE_TELNYX_ROLLOUT = "development";
     mockedTelnyxCreateAssistant.mockRejectedValue(new Error("Telnyx down"));

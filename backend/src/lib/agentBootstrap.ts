@@ -711,27 +711,35 @@ export async function createBusinessAgent(args: {
       });
     }
 
-    // Fase 2 del plan Telnyx-orquestador: el assistant de Telnyx, que hoy
-    // atiende todas las llamadas, con la auto-promoción del negocio a
-    // Telnyx-primary (ver crearAssistantYPromocionar). Va FUERA del try de
-    // Retell, que es solo el respaldo: antes estaba dentro, y si Retell
-    // lanzaba (sin crédito, su API caída) el negocio nuevo se quedaba sin
-    // assistant ni promoción, y el reconciliador diario no lo veía porque
-    // solo miraba agentes que ya tenían uno. Nunca lanza ni impide devolver
-    // el agente. El assistant nace con sus tools de voz: la sincronización
-    // de tools de arriba corre antes de que exista.
-    if (isVoiceTelnyxRolloutEnabled()) {
-      await crearAssistantYPromocionar({
-        agentId: agent.id,
-        businessId: args.businessId,
-        prismaClient: client,
-      });
-    }
-
+    await crearAssistantDelAgente(agent.id, args.businessId, client);
     return agenteDevuelto;
   }
 
+  await crearAssistantDelAgente(agent.id, args.businessId, client);
   return agent;
+}
+
+/**
+ * El assistant de Telnyx, que atiende todas las llamadas, con la
+ * auto-promoción del negocio a Telnyx-primary (crearAssistantYPromocionar).
+ * Va fuera del try de Retell, que es solo el respaldo: si Retell lanzaba
+ * (sin crédito, su API caída) el negocio nuevo se quedaba sin assistant. Y
+ * desde el 17-10 tampoco depende de que el negocio entre por la rama de
+ * Retell (`orchestrator === "retell"`): uno que ya fuera "telnyx" se quedaba
+ * sin assistant (PLAN-RETIRAR-RETELL.md, PR 1). Nunca lanza ni impide
+ * devolver el agente. El assistant nace con sus tools de voz.
+ */
+async function crearAssistantDelAgente(
+  agentId: string,
+  businessId: string,
+  client: typeof prisma
+): Promise<void> {
+  if (!isVoiceTelnyxRolloutEnabled()) return;
+  await crearAssistantYPromocionar({
+    agentId,
+    businessId,
+    prismaClient: client,
+  });
 }
 
 /**

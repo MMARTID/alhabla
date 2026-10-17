@@ -119,7 +119,9 @@ describe("provisionPhoneNumber", () => {
     expect(mockedSearchAvailableNumbers).not.toHaveBeenCalled();
   });
 
-  it("compra un número, lo importa en Retell y lo vincula al agente", async () => {
+  // PLAN-RETIRAR-RETELL.md, PR 1: el número va siempre al Call Control App
+  // y queda activo al comprarlo; Retell es un respaldo opcional.
+  it("compra un número en el Call Control App, lo deja activo en Telnyx e importa Retell como respaldo", async () => {
     mockedBusinessFindUnique.mockResolvedValue({
       id: businessId,
       name: "Peluquería Test",
@@ -149,10 +151,22 @@ describe("provisionPhoneNumber", () => {
     expect(result.success).toBe(true);
     expect(result.phoneNumber).toBe("+34886020712");
     expect(result.status).toBe("active");
+    // Aunque el negocio aún diga orchestrator=retell: el número va al Call
+    // Control App, no al SIP trunk de Retell.
     expect(mockedPurchaseNumber).toHaveBeenCalledWith("+34886020712", {
       requirementGroupId: "req_group_test",
-      connectionId: "conn_test",
+      connectionId: "cca_test",
     });
+    expect(mockedBusinessUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          telnyxPhoneNumber: "+34886020712",
+          phoneNumberStatus: "active",
+          orchestrator: "telnyx",
+          voiceRoutingTarget: "telnyx",
+        }),
+      })
+    );
     expect(mockedImportPhoneNumber).toHaveBeenCalledWith(
       expect.objectContaining({
         phoneNumber: "+34886020712",
@@ -164,9 +178,30 @@ describe("provisionPhoneNumber", () => {
     );
     expect(mockedBusinessUpdate).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({ phoneNumberStatus: "active" }),
+        data: {
+          retellPhoneNumber: "+34886020712",
+          retellPhoneNumberId: "phone_123",
+        },
       })
     );
+  });
+
+  it("falla con un mensaje claro si falta el Call Control App de Telnyx", async () => {
+    delete process.env.TELNYX_CALL_CONTROL_APP_ID;
+    mockedBusinessFindUnique.mockResolvedValue({
+      id: businessId,
+      name: "Peluquería Test",
+      phoneNumberStatus: "pending",
+      telnyxPhoneNumber: null,
+      telnyxNumberOrderId: null,
+      agents: [],
+    } as any);
+
+    const result = await provisionPhoneNumber(businessId);
+
+    expect(result).toMatchObject({ success: false, status: "failed" });
+    expect(result.error).toMatch(/TELNYX_CALL_CONTROL_APP_ID/);
+    expect(mockedSearchAvailableNumbers).not.toHaveBeenCalled();
   });
 
   // telnyxPhoneNumber forma parte de la configuración de voz cacheada (es el
@@ -389,7 +424,7 @@ describe("provisionPhoneNumber", () => {
     expect(mockedSearchAvailableNumbers).not.toHaveBeenCalled();
   });
 
-  it("purchases number but leaves it as purchased when no agent has retellAgentId", async () => {
+  it("sin agente de Retell, el número queda activo en Telnyx y no se importa en Retell", async () => {
     mockedBusinessFindUnique.mockResolvedValue({
       id: businessId,
       name: "Peluquería Test",
@@ -409,14 +444,16 @@ describe("provisionPhoneNumber", () => {
       phoneNumberId: "pn_123",
     });
 
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+
     const result = await provisionPhoneNumber(businessId);
 
     expect(result.success).toBe(true);
-    expect(result.status).toBe("purchased");
+    expect(result.status).toBe("active");
     expect(mockedImportPhoneNumber).not.toHaveBeenCalled();
   });
 
-  it("resincroniza el assistant de Telnyx en cuanto el número está comprado (fase 4: la tool transfer sale desde ese número), incluso si luego falla la importación en Retell", async () => {
+  it("resincroniza el assistant de Telnyx en cuanto el número está comprado (fase 4: la tool transfer sale desde ese número) y un fallo de Retell no lo deja «failed»", async () => {
     mockedBusinessFindUnique.mockResolvedValue({
       id: businessId,
       name: "Peluquería Test",
@@ -436,10 +473,22 @@ describe("provisionPhoneNumber", () => {
       phoneNumberId: "pn_123",
     });
     mockedImportPhoneNumber.mockRejectedValue(new Error("Retell caído"));
+    const errorLog = vi.spyOn(console, "error").mockImplementation(() => {});
 
     const result = await provisionPhoneNumber(businessId);
 
-    expect(result.success).toBe(false);
+    // Antes: «failed» y aviso al dueño aunque Telnyx ya lo contestara.
+    expect(result).toMatchObject({ success: true, status: "active" });
+    expect(mockedBusinessUpdate).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ phoneNumberStatus: "failed" }),
+      })
+    );
+    expect(errorLog).toHaveBeenCalledWith(
+      expect.stringMatching(
+        /No se pudo importar el número \+34886020712 del negocio biz_123 en Retell \(respaldo\); sigue activo en Telnyx: Retell caído/
+      )
+    );
     expect(mockedSyncAgentToTelnyx).toHaveBeenCalledTimes(1);
     expect(mockedSyncAgentToTelnyx).toHaveBeenCalledWith(businessId);
     // Después de guardar el número (y no antes): la resolución de la
