@@ -34,7 +34,7 @@ The codebase is fully in Spanish — UI copy, comments, variable names, and busi
 │   │   ├── server.ts           # Fastify entry point
 │   │   ├── plugins/            # Fastify plugins (auth, internalAuth); CORS and rate-limit are registered in server.ts
 │   │   ├── modules/            # Domain route modules (one folder per domain)
-│   │   ├── adapters/           # External API adapters (telnyx, whatsapp, calendar; retell only for cleaning its account until PR 3)
+│   │   ├── adapters/           # External API adapters (telnyx, whatsapp, calendar)
 │   │   ├── lib/                # Shared utilities (Prisma, temporary store, Stripe, Cloud Tasks, storage)
 │   │   ├── jobs/                # Background job logic, no framework (dispatched via Cloud Tasks)
 │   │   └── config/              # Static configuration constants
@@ -86,7 +86,7 @@ Most modules are a folder containing a `routes.ts` file (and optionally `service
 ### Key Libraries (`backend/src/lib/`)
 
 - `prisma.ts` — Prisma Client singleton with `globalThis` hot-reload guard. Since PR A also `conUnaConexion(url, parametros)` (the same URL with `connection_limit=1` plus the given parameters, leaving the rest — `host=/cloudsql/…`, escaped passwords — untouched) and `crearClienteDeUnaConexion(parametros)` (a separate `PrismaClient` with one connection of its own, outside the app pool: the rate limiter's; see § Pool and § Corte de Redis a Postgres).
-- `almacenTemporal.ts` — the temporary store in Postgres that replaced Redis (PR B, 2026-10): `claves_temporales` (key → JSON value with `expiraEn` and an optional `businessId` FK `ON DELETE CASCADE`) with `guardarClave`/`guardarClaveSiNoExiste` (SET NX)/`leerClave`/`consumirClave` (GETDEL)/`borrarClave`, and per-field writes on a JSON object (`guardarCampos`, `fijarCampo`, `fijarCampoSiNoExiste` = HSETNX, `leerCampos`); `contadores` (`incrementarContador`/`leerContador`, fixed window); and `purgarCaducados`. An expired key does not exist for any read. `lib/redis.ts` (the general ioredis client) was deleted in PR B; the only Redis client left is `redisDeCompatibilidad.ts` (locks, see § Corte de Redis a Postgres). Locks and the rate-limit counter moved to Postgres in PR A (`cerrojos.ts`, `limitesDePeticiones.ts`). The Telnyx health streaks of the automatic failover lived in `salud_telnyx` (`saludTelnyx.ts`) until the failover was removed on 2026-10-17; the table is still in the DB but its model (`SaludTelnyx`) carries `@@ignore`, so the Prisma client no longer knows it, and PR 3 of `PLAN-RETIRAR-RETELL.md` drops it.
+- `almacenTemporal.ts` — the temporary store in Postgres that replaced Redis (PR B, 2026-10): `claves_temporales` (key → JSON value with `expiraEn` and an optional `businessId` FK `ON DELETE CASCADE`) with `guardarClave`/`guardarClaveSiNoExiste` (SET NX)/`leerClave`/`consumirClave` (GETDEL)/`borrarClave`, and per-field writes on a JSON object (`guardarCampos`, `fijarCampo`, `fijarCampoSiNoExiste` = HSETNX, `leerCampos`); `contadores` (`incrementarContador`/`leerContador`, fixed window); and `purgarCaducados`. An expired key does not exist for any read. `lib/redis.ts` (the general ioredis client) was deleted in PR B; the only Redis client left is `redisDeCompatibilidad.ts` (locks, see § Corte de Redis a Postgres). Locks and the rate-limit counter moved to Postgres in PR A (`cerrojos.ts`, `limitesDePeticiones.ts`). The Telnyx health streaks of the automatic failover lived in `salud_telnyx` (`saludTelnyx.ts`) until the failover was removed on 2026-10-17; PR 3 of `PLAN-RETIRAR-RETELL.md` dropped the table (migration `20261017200000_retirar_retell_contract`).
 - `cloudTasks.ts` — Cloud Tasks job dispatch (`enqueueRecordingJob`, `enqueueRetryBookingJob`, `enqueueUsageReportJob`, `enqueueEmailJob`, `enqueueSmsJob`, `enqueueRecordarRecadoJob`, `enqueueWhatsappJob`); inline synchronous fallback outside production. See Background Jobs below.
 - `storage.ts` — R2/S3 client for file uploads (recordings).
 - `stripe.ts` — Stripe SDK client singleton.
@@ -574,7 +574,7 @@ The schema lives in `backend/prisma/schema.prisma`. Key models:
 
 - `Business` — tenant root; holds Stripe billing state, calendar tokens (encrypted), schedule JSON, agent settings, booking capacity, and optional booking restrictions `minAdvanceBookingMinutes` / `maxAppointmentDurationMinutes` (both nullable = no restriction; stated in the prompt and enforced by `check_availability` and `book_appointment`, see Business Schedule and Agent Configuration).
 - `User` — belongs to a Business; supports password (bcrypt) + Google OAuth login (`googleId`).
-- `Agent` — voice agent config; `telnyxAssistantId` links it to its Telnyx assistant (with `telnyxSyncedAt`/`telnyxSyncError`/`telnyxConfigHash`). Includes voice/LLM/STT provider configs (Retell-era fields still written by `buildAgentPersistencePayload` and `PATCH /agents/:id` and returned by the API; the Telnyx path does not read them), integrations. `retellAgentId`/`retellLlmId` are retired (2026-10-17): still in the DB but marked `@ignore`, so the Prisma client no longer knows them; PR 3 of `PLAN-RETIRAR-RETELL.md` drops them.
+- `Agent` — voice agent config; `telnyxAssistantId` links it to its Telnyx assistant (with `telnyxSyncedAt`/`telnyxSyncError`/`telnyxConfigHash`). Includes voice/LLM/STT provider configs (Retell-era fields still written by `buildAgentPersistencePayload` and `PATCH /agents/:id` and returned by the API; the Telnyx path does not read them), integrations. `retellAgentId`/`retellLlmId` were retired with Retell (2026-10-17) and dropped by migration `20261017200000_retirar_retell_contract` (PR 3 of `PLAN-RETIRAR-RETELL.md`).
 - `Call` — a phone call (Telnyx; older rows may be Retell's, and the WhatsApp chats keep a synthetic `Call` with `voiceProvider = "whatsapp"`). `voiceProvider` defaults to `"telnyx"` since migration `20261017180000_defaults_de_voz_telnyx` (before, `"retell"`; every `create` passes it anyway). Status enum: `INITIATED`, `IN_PROGRESS`, `COMPLETED`, `FAILED`, `TIMED_OUT`. Outcome enum: `RESOLVED`, `FRUSTRATED`, `NO_ANSWER`, `ESCALATED`, `LEAD_CAPTURED` — set from the Telnyx conversation insights (`call.conversation_insights.generated`, see § Voice Orchestrator) and from the receptionist's final report (`informar_al_negocio`, `modules/whatsapp/recados.ts`, which only fills what the insights left empty); until 2026-10-17 Retell's own `post_call_analysis_data` did it for its calls. The other analysis fields: `escalationReason` (enum `CallEscalationReason`) and `toolFailureDetected` (insights and report) and `requestedService` (report only).
 - `Booking` — outcome extracted from a call; stores `professionalId`, `serviceIds` (array — since 2026-09-05 a booking can cover several services, e.g. "corte y mechas") and `durationMinutes` to track who performs the appointment and how long it lasts. `professionalId`/`serviceIds` supplied by the LLM are verified to belong to the business before being trusted (`voiceTools/service.ts`) — they are not enforced at the DB/FK level.
 - `Transcript` / `Recording` — call artifacts. Recording has `storageKey` and `storageUrl` for R2, `providerLegId` (Telnyx `call_leg_id`, to request a fresh download URL once the 10-minute webhook one expires) and `processingFailedAt`/`processingError` (declared unrecoverable; `retry-stuck-recordings` leaves it alone).
@@ -1590,8 +1590,7 @@ telnyxPhoneNumberPurchasedAt
 ```
 
 `retellPhoneNumber` and `retellPhoneNumberId` (the number imported into Retell over the SIP
-trunk, until 2026-10-17) are retired: still in the DB, marked `@ignore` in `schema.prisma` so the
-Prisma client no longer knows them, and dropped in PR 3 of `PLAN-RETIRAR-RETELL.md`.
+trunk, until 2026-10-17) were dropped by migration `20261017200000_retirar_retell_contract`.
 
 ### `CalendarConnection` (desde 2026-09-18) y campos de calendario en `Business`
 
@@ -1642,7 +1641,7 @@ el PR siguiente.
 ### Retired voice-routing fields on `Business`
 
 ```
-orchestrator, voiceRoutingTarget          (String, default "telnyx" since 2026-10-17)
+orchestrator, voiceRoutingTarget          (dropped 2026-10-17)
 voiceFailoverActive, voiceFailoverReason, voiceRoutingChangedAt
 retellPhoneNumber, retellPhoneNumberId
 ```
@@ -1650,12 +1649,12 @@ retellPhoneNumber, retellPhoneNumberId
 Until 2026-10-17 `orchestrator` chose the voice provider of a business (`"retell"` or
 `"telnyx"`), `voiceRoutingTarget` was the effective route of the next call (it could differ
 during a failover) and the `voiceFailover*` fields drove the automatic failover to Retell. **Since
-Retell was retired, every business is Telnyx**: none of these fields decides anything. They are
-still in the DB (migration `20261017180000_defaults_de_voz_telnyx` only moved the defaults of
-`orchestrator` and `voiceRoutingTarget` to `"telnyx"`), but `schema.prisma` marks them `@ignore`,
-so the Prisma client no longer knows them, and PR 3 of `PLAN-RETIRAR-RETELL.md` drops the columns
-without breaking the revision that keeps serving during its deploy (expand/contract, below). What
-replaced them:
+Retell was retired, every business is Telnyx.** Expand/contract, with the recipe above: PR 2
+(migration `20261017180000_defaults_de_voz_telnyx`) stopped reading and writing them, moved the
+defaults to `"telnyx"` and marked them `@ignore` so the Prisma client no longer selected them;
+once that was deployed, PR 3 (migration `20261017200000_retirar_retell_contract`) dropped the
+columns, `Agent.retellAgentId`/`retellLlmId` and the `salud_telnyx` table without breaking the
+revision that kept serving during its deploy. What replaced them:
 
 - **The assistant.** `createBusinessAgent` (`agentBootstrap.ts`) creates the `Agent` row and its
   Telnyx assistant with `crearAssistantDelNegocio` (`telnyxAgentSync.ts`), which never throws and
@@ -2023,10 +2022,10 @@ Call outcome classification is **not** a background job — Telnyx classifies ea
 **Telnyx AI Assistants is the only voice orchestrator.** Until 2026-10-17 Retell.ai was kept as a
 hot fallback (its own LLM, agent and tools per business, the number imported over a SIP trunk
 and an automatic failover, `telnyx-health-check`); it never took a call in production and was
-removed in PR 2 of `PLAN-RETIRAR-RETELL.md`. What is left of it: the retired columns (`@ignore`,
-see «Retired voice-routing fields on `Business`»), `adapters/retell/RetellAdapter.ts` and the
-`retell-sdk` package, kept only to empty the Retell account (§ Deployment Notes, «Cleaning the
-Retell account») and removed in PR 3. When verifying anything about tools by hand, check the
+removed in PR 2 of `PLAN-RETIRAR-RETELL.md`; PR 3 dropped its columns (see «Retired
+voice-routing fields on `Business`») and removed `adapters/retell/RetellAdapter.ts` and
+`retell-sdk`, after its account was emptied (§ Deployment Notes, «Cleaning the Retell account»).
+When verifying anything about tools by hand, check the
 Telnyx assistant itself (MCP `ver_assistant_telnyx`), not only the DB.
 
 ### Telnyx (`backend/src/adapters/telnyx/TelnyxAiAdapter.ts`, `TelnyxAdapter.ts`)
@@ -3267,7 +3266,7 @@ Separate suite (`npm run test:integration`, config `backend/vitest.integration.c
 - Postgres: separate database `alhabla_test` on the same server (create once with `CREATE DATABASE alhabla_test;`, then `DATABASE_URL=... npx prisma migrate deploy`).
 - Redis: same instance, different logical DB index (`/1` instead of `/0`).
 - `backend/.env.test` (gitignored) holds both connection strings. On this project's dev machine, Postgres is reachable at `localhost:5433`, not 5432 — a native Homebrew Postgres occupies 5432 on the host.
-- `backend/tests/integration/helpers/db.ts` exposes `resetDb()` (`TRUNCATE` of `cerrojos`, `claves_temporales`, `contadores` and `salud_telnyx`, then deletes in FK-safe order + `FLUSHDB` of the test Redis index through its own ioredis client, since the locks' compatibility client may be closed by a Postgres-only test) — call it in `beforeEach`. Unit tests that touched Redis mock `lib/almacenTemporal.js` with the in-memory version in `backend/tests/helpers/almacenEnMemoria.ts` (same semantics: expiry by `Date.now()`, NX, GETDEL, per-field writes, fixed-window counters) and call `reiniciarAlmacenEnMemoria()` in `beforeEach`.
+- `backend/tests/integration/helpers/db.ts` exposes `resetDb()` (`TRUNCATE` of `cerrojos`, `claves_temporales` and `contadores`, then deletes in FK-safe order + `FLUSHDB` of the test Redis index through its own ioredis client, since the locks' compatibility client may be closed by a Postgres-only test) — call it in `beforeEach`. Unit tests that touched Redis mock `lib/almacenTemporal.js` with the in-memory version in `backend/tests/helpers/almacenEnMemoria.ts` (same semantics: expiry by `Date.now()`, NX, GETDEL, per-field writes, fixed-window counters) and call `reiniciarAlmacenEnMemoria()` in `beforeEach`.
 - `backend/tests/integration/setup.ts` connects the compatibility Redis client (`conectarRedisDeCompatibilidad`), so the suite runs in compatibility mode, like production while `REDIS_URL` exists (every lock taken in Postgres and in Redis); a test that wants Postgres-only calls `cerrarRedisDeCompatibilidad()` and reconnects in `afterAll`.
 - Requires `docker compose --profile dev up -d` running; does not start Postgres/Redis itself.
 - Pattern for external APIs (Telnyx/Stripe/Google/Microsoft): mock the adapter module boundary (e.g. `vi.mock("../../../src/modules/calendar/service.js", ...)`) rather than intercepting HTTP, when the external API isn't what the test is actually verifying.
@@ -3276,7 +3275,6 @@ Separate suite (`npm run test:integration`, config `backend/vitest.integration.c
 
 | File | Coverage |
 |------|----------|
-| `backend/tests/adapters/retell/RetellAdapter.test.ts` | Create/update/delete agents and LLMs, phone numbers, health check — goes with the adapter in PR 3 of `PLAN-RETIRAR-RETELL.md` |
 | `backend/tests/lib/availability.test.ts` | Availability logic (hours, professionals, capacity, overlaps, busy professional detection) |
 | `backend/tests/lib/businessSchedule.test.ts` | Schedule schema validation, checkBusinessHours |
 | `backend/tests/lib/businessType.test.ts` | Business type detection from Google Places `types`, normalization |
@@ -3675,14 +3673,15 @@ URLs are baked into each assistant at the provider.
 
 ### Cleaning the Retell account
 
-Since 2026-10-17 no environment uses Retell, but its account (shared by dev and production) still
-holds 13 agents, 225 LLMs and 6 imported numbers. It is emptied **once, with the user's
-permission**, by a throwaway script over `RetellAdapter` that deletes everything in the account
-(it does not cross-reference any database: nothing in it is in use). `adapters/retell/RetellAdapter.ts`
-and `retell-sdk` stay only for that and go in PR 3 of `PLAN-RETIRAR-RETELL.md`. The
-`inventarioAgentesRetell.ts`/`borrarAgentesRetell.ts` scripts (inventory cross-referenced with the
-`Agent` table, deletion by id) were removed in PR 2. Closing the Retell account and revoking its
-key is a separate decision of the user (§ 7 of the plan).
+Done on 2026-10-17, with the user's permission, before PR 3 removed the adapter: a throwaway
+script over `RetellAdapter` deleted the 6 imported numbers, 13 agents and 13 LLMs (225 LLM
+versions) of the account shared by dev and production; nothing was left. In Telnyx, the FQDN
+connection «Alhabla» (`3036588299167729519`, the SIP trunk to Retell, `TELNYX_SIP_CONNECTION_ID`)
+was deleted after moving its last number, `+34930453216` (tagged `sin-negocio`, no business in
+any environment), to the production Call Control App. The Cloud Run variables and the Secret
+Manager secrets of Retell and Vapi (`RETELL_API_KEY`, `RETELL_SIP_TRUNK_AUTH_PASSWORD`,
+`VAPI_API_KEY`, `VAPI_WEBHOOK_SECRET`) are gone too. Closing the Retell account itself and
+revoking its key is the user's decision.
 
 ### Re-syncing webhook URLs
 

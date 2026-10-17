@@ -43,8 +43,7 @@ Notes.
 - **Los adaptadores son la única vía a las APIs de voz.** Telnyx pasa por
   `backend/src/adapters/telnyx/TelnyxAdapter.ts` (números) y `TelnyxAiAdapter.ts` (assistants), y
   WhatsApp por `adapters/whatsapp/WhatsAppAdapter.ts`. Jamás llames a esas APIs desde un route
-  handler. `adapters/retell/RetellAdapter.ts` solo queda para limpiar la cuenta de Retell, hasta
-  la PR 3 del plan.
+  handler.
 - **No toques la verificación de firmas de webhooks.** Telnyx (Ed25519) se comprueba en un único
   `preHandler` (`backend/src/plugins/firmaTelnyx.ts`) que protege todas las rutas de
   `modules/webhooksTelnyx/routes.ts` — una ruta firmada nueva va en ese plugin; firma de Stripe
@@ -158,8 +157,7 @@ backend/
 │   │                 #   calls, contacto, demo, internal, onboarding, phone, places, recordings,
 │   │                 #   webhooksTelnyx, whatsapp) con routes.ts; gestor y voiceTools sin routes.ts
 │   │                 #   (los usan los webhooks y los scripts)
-│   ├── adapters/     # telnyx (voz y números), whatsapp, calendar (Google, Outlook, CalDAV) y
-│   │                 #   retell (solo para limpiar su cuenta)
+│   ├── adapters/     # telnyx (voz y números), whatsapp, calendar (Google, Outlook, CalDAV)
 │   ├── lib/          # prisma, almacenTemporal, cerrojos, limitesDePeticiones, cloudTasks,
 │   │                 #   storage, stripe, availability, salud, zohoMail, emailTemplates,
 │   │                 #   businessSchedule, agentBootstrap, managedAgentPrompt

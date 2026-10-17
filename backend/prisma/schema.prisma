@@ -25,24 +25,13 @@ model Business {
   minAdvanceBookingMinutes      Int?
   maxAppointmentDurationMinutes Int?
 
-  // Retirados el 17-10 con Retell (PLAN-RETIRAR-RETELL.md): todo negocio es
-  // de Telnyx. `@ignore` los saca del cliente de Prisma (ninguna consulta los
-  // selecciona) para que la PR 3 pueda borrar las columnas sin romper la
-  // revisión que sigue sirviendo mientras dura su despliegue.
-  orchestrator            String    @default("telnyx") @ignore
-  retellPhoneNumberId     String?   @unique @ignore
-  retellPhoneNumber       String?   @unique @ignore
-  voiceRoutingTarget      String    @default("telnyx") @ignore
-  voiceFailoverActive     Boolean   @default(false) @ignore
-  voiceFailoverReason     String?   @ignore
-  voiceRoutingChangedAt   DateTime? @ignore
   // Explican por qué un negocio no es elegible para Telnyx (idioma sin
   // validar, voz sin fallback compatible, residencia UE no confirmada) antes
   // de tocar su número — null cuando no aplica ninguna exclusión.
   telnyxEligibilityStatus String?
-  telnyxEligibilityReason String?   @db.Text
+  telnyxEligibilityReason String? @db.Text
 
-  // Business niche/type used for agent templates and Retell folder organization
+  // Business niche/type used for agent templates
   businessType String @default("other")
 
   // Stripe Billing is scoped to the business, not an individual user.
@@ -445,9 +434,6 @@ model User {
 model Agent {
   id                   String    @id @default(cuid())
   businessId           String
-  // Retirados con Retell; se borran en la PR 3 (ver `orchestrator`).
-  retellAgentId        String?   @unique @ignore
-  retellLlmId          String?   @ignore
   name                 String
   voice                String    @default("Octave")
   language             String    @default("es")
@@ -467,7 +453,7 @@ model Agent {
   voiceProvider        String    @default("cartesia")
   integrations         Json?
   // true una vez que PATCH /agents/:id edita systemPrompt a mano — a partir
-  // de ahí syncAgentToRetell debe dejar de reconstruir y sobrescribir el
+  // de ahí syncAgentToTelnyx deja de reconstruir y sobrescribir el
   // prompt de este agente cuando cambien servicios/profesionales/ajustes.
   promptManuallyEdited Boolean   @default(false)
   // Un agente conserva sus llamadas y su configuración remota para poder
@@ -475,8 +461,8 @@ model Agent {
   // oculta, pero nunca se borra físicamente junto a esas llamadas.
   deletedAt            DateTime?
 
-  // Sincronización Telnyx AI Assistants — fallback caliente de Retell hasta
-  // que el negocio entre en rollout Telnyx (ver docs/historico/PLAN-TELNYX-ORQUESTADOR.md).
+  // Sincronización con el assistant de Telnyx (ver
+  // docs/historico/PLAN-TELNYX-ORQUESTADOR.md).
   telnyxAssistantId String?   @unique
   telnyxConfigHash  String?
   telnyxSyncedAt    DateTime?
@@ -487,7 +473,6 @@ model Agent {
 
   @@index([businessId])
   @@index([businessId, deletedAt])
-  @@index([retellAgentId])
   @@map("agents")
 }
 
@@ -595,8 +580,8 @@ model Call {
   sentiment              CallSentiment?
   summary                String?               @db.Text
   successful             Boolean?
-  // Los tres campos siguientes ya los calculaba Retell en cada llamada y se
-  // descartaban al parsear el webhook. Responden al «por qué no se reservó»,
+  // Los tres campos siguientes los rellenan los insights de Telnyx (y el
+  // informe de informar_al_negocio). Responden al «por qué no se reservó»,
   // que es la pregunta que el negocio se hace ante una llamada sin cita.
   escalationReason       CallEscalationReason?
   toolFailureDetected    Boolean?
@@ -681,7 +666,7 @@ model Call {
 }
 
 /**
- * Idempotencia de webhooks de voz (Telnyx y, más adelante, Retell) — evita
+ * Idempotencia de webhooks de voz de Telnyx — evita
  * duplicar grabaciones, insights, outcomes y trabajos de Cloud Tasks cuando
  * un proveedor reintenta la entrega del mismo evento.
  */
@@ -814,7 +799,7 @@ model Recording {
   // La URL que llega en el webhook de Telnyx caduca a los 10 minutos. Con el
   // leg se le puede pedir una nueva (GET /v2/recordings?filter[call_leg_id])
   // en vez de dar la grabación por perdida si el primer intento no llegó a
-  // tiempo. Retell no lo necesita: sus URLs no caducan.
+  // tiempo.
   providerLegId      String?
   // Marca de "irrecuperable": el proveedor ya no tiene el audio (o nunca lo
   // tuvo). retryStuckRecordings deja de reencolarla y el motivo queda para el
@@ -1148,19 +1133,6 @@ model Contador {
   @@map("contadores")
 }
 
-/// Rachas del health-check de Telnyx, retirado el 17-10 con el failover a
-/// Retell. Se borra en la PR 3 de PLAN-RETIRAR-RETELL.md.
-model SaludTelnyx {
-  id            String   @id @default("telnyx")
-  malas         Int      @default(0)
-  buenas        Int      @default(0)
-  ultimoTick    BigInt   @default(0)
-  actualizadoEn DateTime @default(now()) @db.Timestamptz(3)
-
-  @@map("salud_telnyx")
-  @@ignore
-}
-
 enum CallStatus {
   INITIATED
   IN_PROGRESS
@@ -1185,9 +1157,10 @@ enum CallSentiment {
 
 /**
  * Motivo por el que una llamada acabó escalada o con una reserva sin
- * completar. Lo clasifica Retell en post_call_analysis_data — ver
- * ESCALATION_REASON_FIELD en lib/agentBootstrap.ts, que define estas mismas
- * opciones; si se cambian ahí, hay que cambiarlas aquí.
+ * completar. Lo clasifica el insight `escalation_reason` de Telnyx
+ * (scripts/createTelnyxCallInsights.ts, mapeado en
+ * adapters/telnyx/webhookHandlers.ts), con estas mismas opciones; si se
+ * cambian ahí, hay que cambiarlas aquí.
  */
 enum CallEscalationReason {
   CLIENTE_LO_PIDIO

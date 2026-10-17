@@ -267,7 +267,7 @@ describe("tablasDePrisma", () => {
     );
     expect(tablas.get("bookings")).toBe("Booking");
     expect(tablas.get("claves_temporales")).toBe("ClaveTemporal");
-    expect(tablas.get("salud_telnyx")).toBe("SaludTelnyx");
+    expect(tablas.get("contadores")).toBe("Contador");
     expect(tablas.get("owner_pending_actions")).toBe("OwnerPendingAction");
   });
 
