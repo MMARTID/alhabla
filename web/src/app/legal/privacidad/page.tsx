@@ -27,7 +27,7 @@ export default function PrivacidadPage() {
     <LegalPage
       title="Política de privacidad"
       description="Aquí te contamos qué datos tratamos, para qué, quién más interviene y qué puedes exigirnos. Sin cláusulas copiadas: solo lo que el producto hace de verdad."
-      updatedAt="2026-10-16"
+      updatedAt="2026-10-17"
     >
       <LegalSection title="Quién es el responsable">
         <p>
@@ -219,21 +219,11 @@ export default function PrivacidadPage() {
         </p>
         <ul className="list-disc space-y-2 pl-5">
           <li>
-            <strong className="font-semibold text-[#0a0a0a]">Retell.</strong> Procesa la conversación de voz y las
-            transcripciones para atender llamadas y elaborar sus resultados. Consulta su{" "}
-            <a
-              href="https://www.retellai.com/legal/privacy-policy"
-              target="_blank"
-              rel="noreferrer"
-              className="font-medium text-[#6d28d9] underline underline-offset-2"
-            >
-              política de privacidad
-            </a>
-            .
-          </li>
-          <li>
             <strong className="font-semibold text-[#0a0a0a]">Telnyx.</strong> Proporciona telefonía, mensajería y
-            WhatsApp para cursar llamadas y comunicaciones del servicio. Puedes consultar su{" "}
+            WhatsApp para cursar llamadas y comunicaciones del servicio, y la recepcionista con inteligencia
+            artificial que atiende a quien llama o escribe por WhatsApp: transcribe la voz, genera las respuestas y,
+            en las llamadas, las convierte en voz. Para generar las respuestas usa un modelo de lenguaje de OpenAI,
+            que recibe el texto de la conversación. Puedes consultar su{" "}
             <a
               href="https://telnyx.com/privacy-policy"
               target="_blank"
@@ -270,9 +260,10 @@ export default function PrivacidadPage() {
 
       <LegalSection title="Transferencias internacionales">
         <p>
-          Algunos proveedores pueden procesar datos fuera del Espacio Económico Europeo. Por ejemplo, Retell informa de
-          que procesa principalmente datos en Estados Unidos; Telnyx publica los mecanismos que emplea para transferencias
-          internacionales. Cuando corresponde, las transferencias se amparan en una decisión de adecuación, el Marco de
+          Algunos proveedores pueden procesar datos fuera del Espacio Económico Europeo. Por ejemplo, el modelo de
+          lenguaje de OpenAI con el que Telnyx genera las respuestas de la recepcionista procesa el texto de la
+          conversación fuera del Espacio Económico Europeo, y Telnyx publica los mecanismos que emplea para
+          transferencias internacionales. Cuando corresponde, las transferencias se amparan en una decisión de adecuación, el Marco de
           Privacidad de Datos UE-EE. UU. o cláusulas contractuales tipo, según el proveedor y el tratamiento.
         </p>
         <p>
