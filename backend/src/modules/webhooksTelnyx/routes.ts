@@ -157,7 +157,7 @@ export async function webhooksTelnyxRoutes(fastify: FastifyInstance) {
     }
   });
 
-  // Telnyx tool endpoints. A diferencia de Retell, el body es solo los
+  // Telnyx tool endpoints. El body es solo los
   // argumentos que decide el LLM — call_control_id llega por el header
   // custom X-Alhabla-Call-Control-Id, templado con la variable de
   // sistema {{call_control_id}} (ver CANAL_DE_TOOLS_DE_VOZ en

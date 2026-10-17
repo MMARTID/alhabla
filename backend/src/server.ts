@@ -28,8 +28,6 @@ import { whatsappRoutes } from "./modules/whatsapp/routes.js";
 import { demoRoutes } from "./modules/demo/routes.js";
 import { contactoRoutes } from "./modules/contacto/routes.js";
 import { webhooksTelnyxRoutes } from "./modules/webhooksTelnyx/routes.js";
-import { webhooksRetellRoutes } from "./modules/webhooksRetell/routes.js";
-import { retellAdapter } from "./adapters/retell/RetellAdapter.js";
 import { telnyxAdapter } from "./adapters/telnyx/TelnyxAdapter.js";
 import { comprobarSalud, conMemoria } from "./lib/salud.js";
 import { pingDeRedisDeCompatibilidad } from "./lib/redisDeCompatibilidad.js";
@@ -178,18 +176,14 @@ async function start() {
     });
 
     // Health check endpoint with dependency probes
-    // Telnyx (orquestador principal) y Retell (respaldo) solo informan (ver
-    // comprobarSalud) y se preguntan como mucho una vez por minuto e
-    // instancia (conMemoria): el uptime check consulta /health sin parar.
+    // Telnyx solo informa (ver comprobarSalud) y se pregunta como mucho una
+    // vez por minuto e instancia (conMemoria): el uptime check consulta
+    // /health sin parar.
     const comprobarTelnyx = conMemoria(() => telnyxAdapter.checkHealth());
-    const comprobarRetell = conMemoria(() => retellAdapter.checkHealth());
     fastify.get("/health", async (_request, reply) => {
       const informativas: Record<string, () => Promise<unknown>> = {};
       if (process.env.TELNYX_API_KEY) {
         informativas.telnyx = comprobarTelnyx;
-      }
-      if (process.env.RETELL_API_KEY) {
-        informativas.retell = comprobarRetell;
       }
       // Redis solo cuenta mientras haya REDIS_URL, y por el cliente de los
       // cerrojos (lib/redisDeCompatibilidad.ts): sin él, las reservas fallan
@@ -212,10 +206,6 @@ async function start() {
       });
     });
 
-    // Webhooks firmados de Retell (eventos, llamada entrante y tools): la
-    // firma se verifica en un único preHandler encapsulado en su plugin
-    // (modules/webhooksRetell/routes.ts).
-    fastify.register(webhooksRetellRoutes);
 
     // Webhooks firmados de Telnyx (Call Control App de plataforma, WhatsApp,
     // tools de voz y del Gestor): la firma Ed25519 se verifica en un único

@@ -7,7 +7,6 @@ import {
 import { createAccount, fetchCalendars } from "tsdav";
 import { cifrarJson, descifrarJson } from "../../../src/lib/cifradoDeCredenciales.js";
 import { prisma } from "../../../src/lib/prisma.js";
-import { retellAdapter } from "../../../src/adapters/retell/RetellAdapter.js";
 import { getPublicWebhookBaseUrl } from "../../../src/lib/serverUrl.js";
 import {
   almacenEnMemoria,
@@ -32,15 +31,6 @@ vi.mock("../../../src/lib/prisma.js", () => ({
       findUnique: vi.fn(),
       update: vi.fn(),
     },
-  },
-}));
-
-vi.mock("../../../src/adapters/retell/RetellAdapter.js", () => ({
-  retellAdapter: {
-    updateLlm: vi.fn(),
-    getAgent: vi.fn(),
-    createAgentVersion: vi.fn(),
-    publishAgent: vi.fn(),
   },
 }));
 
@@ -109,12 +99,6 @@ vi.mock("../../../src/lib/telnyxAgentSync.js", () => ({
 const mockedAgentFindMany = vi.mocked(prisma.agent.findMany);
 const mockedBusinessFindUnique = vi.mocked(prisma.business.findUnique);
 const mockedBusinessUpdate = vi.mocked(prisma.business.update);
-const mockedRetellUpdateLlm = vi.mocked(retellAdapter.updateLlm);
-const mockedRetellGetAgent = vi.mocked(retellAdapter.getAgent);
-const mockedRetellCreateAgentVersion = vi.mocked(
-  retellAdapter.createAgentVersion
-);
-const mockedRetellPublishAgent = vi.mocked(retellAdapter.publishAgent);
 const mockedGetPublicWebhookBaseUrl = vi.mocked(getPublicWebhookBaseUrl);
 const mockedGoogleCalendar = vi.mocked(google.calendar);
 const mockedSyncAgentToTelnyx = vi.mocked(syncAgentToTelnyx);
@@ -1266,161 +1250,21 @@ describe("CalendarService.connectMicrosoftCalendar", () => {
 describe("CalendarService.syncCalendarToolsToAgents", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockedBusinessFindUnique.mockResolvedValue({
-      id: "business_123",
-      orchestrator: "retell",
-    } as any);
-    mockedRetellGetAgent.mockImplementation(async (_agentId, version) => ({
-      version: version ?? 3,
-      is_published: true,
-      response_engine: {
-        type: "retell-llm",
-        llm_id: "retell_llm_789",
-        version: version ?? 3,
-      },
-    }) as any);
-    mockedRetellCreateAgentVersion.mockResolvedValue({
-      version: 4,
-      is_published: false,
-      response_engine: {
-        type: "retell-llm",
-        llm_id: "retell_llm_789",
-        version: 4,
-      },
-    } as any);
-    mockedRetellPublishAgent.mockResolvedValue(undefined);
+    mockedBusinessFindUnique.mockResolvedValue({ id: "business_123" } as any);
   });
 
-  it("registra las tools de Retell con el retellAgentId en la propia URL", async () => {
-    mockedBusinessFindUnique.mockResolvedValue({
-      id: "business_123",
-      orchestrator: "retell",
-    } as any);
+  it("no sincroniza nada si el agente aún no tiene assistant de Telnyx", async () => {
     mockedAgentFindMany.mockResolvedValue([
-      {
-        id: "agent_123",
-        businessId: "business_123",
-        retellAgentId: "retell_agent_456",
-        retellLlmId: "retell_llm_789",
-      },
+      { id: "agent_123", businessId: "business_123", telnyxAssistantId: null },
     ] as any);
     mockedGetPublicWebhookBaseUrl.mockReturnValue("https://example.com");
-    mockedRetellUpdateLlm.mockResolvedValue({} as any);
 
     await calendarService.syncCalendarToolsToAgents("business_123");
 
-    expect(mockedRetellUpdateLlm).toHaveBeenCalledWith(
-      "retell_llm_789",
-      expect.objectContaining({
-        version: 4,
-        tools: expect.arrayContaining([
-          expect.objectContaining({
-            name: "get_catalog",
-            url: "https://example.com/webhooks/retell/tools/retell_agent_456/get_catalog",
-            args_at_root: false,
-          }),
-          expect.objectContaining({
-            name: "book_appointment",
-            url: "https://example.com/webhooks/retell/tools/retell_agent_456/book_appointment",
-            args_at_root: false,
-          }),
-        ]),
-      })
-    );
-    expect(mockedRetellCreateAgentVersion).toHaveBeenCalledWith(
-      "retell_agent_456",
-      3
-    );
-    expect(mockedRetellPublishAgent).toHaveBeenCalledWith(
-      "retell_agent_456",
-      4,
-      "Herramientas de calendario gestionadas por Alhabla"
-    );
-    expect(mockedRetellGetAgent).toHaveBeenLastCalledWith(
-      "retell_agent_456",
-      4
-    );
+    expect(mockedSyncAgentToTelnyx).not.toHaveBeenCalled();
   });
 
-  it("falla en modo estricto si Retell no confirma que publicó las tools", async () => {
-    mockedBusinessFindUnique.mockResolvedValue({
-      id: "business_123",
-      orchestrator: "retell",
-    } as any);
-    mockedAgentFindMany.mockResolvedValue([
-      {
-        id: "agent_123",
-        businessId: "business_123",
-        retellAgentId: "retell_agent_456",
-        retellLlmId: "retell_llm_789",
-      },
-    ] as any);
-    mockedGetPublicWebhookBaseUrl.mockReturnValue("https://example.com");
-    mockedRetellUpdateLlm.mockResolvedValue({} as any);
-    mockedRetellGetAgent.mockImplementation(async (_agentId, version) => ({
-      version: version ?? 3,
-      is_published: version === undefined,
-      response_engine: {
-        type: "retell-llm",
-        llm_id: "retell_llm_789",
-        version: version ?? 3,
-      },
-    }) as any);
-
-    await expect(
-      calendarService.syncCalendarToolsToAgents("business_123", { strict: true })
-    ).rejects.toThrow("No se pudieron sincronizar las tools de calendario");
-  });
-
-  it("habla durante disponibilidad y reserva, sin narrar la lectura del catálogo", async () => {
-    mockedBusinessFindUnique.mockResolvedValue({
-      id: "business_123",
-      orchestrator: "retell",
-    } as any);
-    mockedAgentFindMany.mockResolvedValue([
-      {
-        id: "agent_123",
-        businessId: "business_123",
-        retellAgentId: "retell_agent_456",
-        retellLlmId: "retell_llm_789",
-      },
-    ] as any);
-    mockedGetPublicWebhookBaseUrl.mockReturnValue("https://example.com");
-    mockedRetellUpdateLlm.mockResolvedValue({} as any);
-
-    await calendarService.syncCalendarToolsToAgents("business_123");
-
-    const [, payload] = mockedRetellUpdateLlm.mock.calls[0];
-    const tools = (payload as { tools: Array<{ name: string; speak_during_execution?: boolean }> }).tools;
-    expect(tools.find((t) => t.name === "get_catalog")?.speak_during_execution).toBe(false);
-    expect(tools.find((t) => t.name === "check_availability")?.speak_during_execution).toBe(true);
-    expect(tools.find((t) => t.name === "book_appointment")?.speak_during_execution).toBe(true);
-  });
-
-  it("no registra tools de Retell si el agente no tiene retellAgentId", async () => {
-    mockedBusinessFindUnique.mockResolvedValue({
-      id: "business_123",
-      orchestrator: "retell",
-    } as any);
-    mockedAgentFindMany.mockResolvedValue([
-      {
-        id: "agent_123",
-        businessId: "business_123",
-        retellAgentId: null,
-        retellLlmId: "retell_llm_789",
-      },
-    ] as any);
-
-    await calendarService.syncCalendarToolsToAgents("business_123");
-
-    expect(mockedRetellUpdateLlm).not.toHaveBeenCalled();
-  });
-
-  it("sincroniza las tools de Telnyx cuando el agente tiene telnyxAssistantId, sin importar el orchestrator", async () => {
-    mockedBusinessFindUnique.mockResolvedValue({
-      id: "business_123",
-      orchestrator: "unknown",
-    } as any);
+  it("sincroniza las tools de Telnyx cuando el agente tiene telnyxAssistantId", async () => {
     mockedAgentFindMany.mockResolvedValue([
       {
         id: "agent_123",
@@ -1441,38 +1285,7 @@ describe("CalendarService.syncCalendarToolsToAgents", () => {
     );
   });
 
-  it("sincroniza Retell (fallback) Y Telnyx para el mismo agente cuando orchestrator es telnyx", async () => {
-    mockedBusinessFindUnique.mockResolvedValue({
-      id: "business_123",
-      orchestrator: "telnyx",
-    } as any);
-    mockedAgentFindMany.mockResolvedValue([
-      {
-        id: "agent_123",
-        businessId: "business_123",
-        retellAgentId: "retell_agent_456",
-        retellLlmId: "retell_llm_789",
-        telnyxAssistantId: "assistant_telnyx_1",
-      },
-    ] as any);
-    mockedGetPublicWebhookBaseUrl.mockReturnValue("https://example.com");
-    mockedRetellUpdateLlm.mockResolvedValue({} as any);
-    mockedSyncAgentToTelnyx.mockResolvedValue(undefined);
-
-    await calendarService.syncCalendarToolsToAgents("business_123");
-
-    expect(mockedRetellUpdateLlm).toHaveBeenCalled();
-    expect(mockedSyncAgentToTelnyx).toHaveBeenCalledWith(
-      "business_123",
-      prisma
-    );
-  });
-
   it("no llama a syncAgentToTelnyx si no hay URL pública configurada", async () => {
-    mockedBusinessFindUnique.mockResolvedValue({
-      id: "business_123",
-      orchestrator: "telnyx",
-    } as any);
     mockedAgentFindMany.mockResolvedValue([
       {
         id: "agent_123",
@@ -1488,10 +1301,6 @@ describe("CalendarService.syncCalendarToolsToAgents", () => {
   });
 
   it("en modo estricto, lanza si telnyxSyncError quedó guardado tras la sincronización", async () => {
-    mockedBusinessFindUnique.mockResolvedValue({
-      id: "business_123",
-      orchestrator: "telnyx",
-    } as any);
     mockedAgentFindMany
       .mockResolvedValueOnce([
         {

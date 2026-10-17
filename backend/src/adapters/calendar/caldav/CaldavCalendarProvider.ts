@@ -147,7 +147,7 @@ export class CaldavCalendarProvider implements CalendarProvider<"caldav"> {
   }
 
   /** Cabeceras y opciones comunes: Basic auth y timeout por debajo del de
-   * Retell (20 s), como el resto de adaptadores. */
+   * las tools de voz (20 s), como el resto de adaptadores. */
   private peticion(cuenta: CredencialesActivas<"caldav">) {
     const { username, appPassword } = cuenta.credentials;
     return {

@@ -2,8 +2,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import Fastify from "fastify";
 import { agentsRoutes } from "../../../src/modules/agents/routes.js";
 import { prisma } from "../../../src/lib/prisma.js";
-import { retellAdapter } from "../../../src/adapters/retell/RetellAdapter.js";
-import { getPublicWebhookBaseUrl } from "../../../src/lib/serverUrl.js";
+import { syncAgentToTelnyx } from "../../../src/lib/telnyxAgentSync.js";
 
 vi.mock("../../../src/lib/prisma.js", () => ({
   prisma: {
@@ -21,31 +20,16 @@ vi.mock("../../../src/lib/prisma.js", () => ({
   },
 }));
 
-vi.mock("../../../src/adapters/retell/RetellAdapter.js", () => ({
-  retellAdapter: {
-    updateLlm: vi.fn(),
-    updateAgent: vi.fn(),
-    createAgentVersion: vi.fn(),
-    publishAgent: vi.fn(),
-    getAgent: vi.fn(),
-    deleteAgent: vi.fn(),
-    deleteLlm: vi.fn(),
-  },
-}));
-
-vi.mock("../../../src/lib/serverUrl.js", () => ({
-  getPublicWebhookBaseUrl: vi.fn(),
+vi.mock("../../../src/lib/telnyxAgentSync.js", () => ({
+  syncAgentToTelnyx: vi.fn(),
 }));
 
 const mockedAgentFindFirst = vi.mocked(prisma.agent.findFirst);
 const mockedAgentUpdate = vi.mocked(prisma.agent.update);
-const mockedBusinessFindUnique = vi.mocked(prisma.business.findUnique);
-const mockedUpdateLlm = vi.mocked(retellAdapter.updateLlm);
-const mockedUpdateAgent = vi.mocked(retellAdapter.updateAgent);
-const mockedCreateAgentVersion = vi.mocked(retellAdapter.createAgentVersion);
-const mockedPublishAgent = vi.mocked(retellAdapter.publishAgent);
-const mockedGetAgent = vi.mocked(retellAdapter.getAgent);
-const mockedGetPublicWebhookBaseUrl = vi.mocked(getPublicWebhookBaseUrl);
+const mockedSyncAgentToTelnyx = vi.mocked(syncAgentToTelnyx);
+
+const FEMENINA = "538a8872-3799-4df5-b373-b78493b766c6";
+const MASCULINA = "13ff5deb-2591-42ad-a356-63a04e524411";
 
 describe("PATCH /agents/:id — conserva la voz elegida (hallazgo #26 de la auditoría)", () => {
   let fastify: ReturnType<typeof Fastify>;
@@ -57,48 +41,22 @@ describe("PATCH /agents/:id — conserva la voz elegida (hallazgo #26 de la audi
       request.user = { businessId: "biz_1" };
     });
     await fastify.register(agentsRoutes);
-
-    mockedBusinessFindUnique.mockResolvedValue({ orchestrator: "retell" } as any);
-    mockedGetPublicWebhookBaseUrl.mockReturnValue("https://api.example.com");
-    mockedUpdateLlm.mockResolvedValue({} as any);
-    mockedUpdateAgent.mockResolvedValue({ version: 12, is_published: false } as any);
-    mockedCreateAgentVersion.mockResolvedValue({
-      version: 12,
-      is_published: false,
-      response_engine: {
-        type: "retell-llm",
-        llm_id: "retell_llm_1",
-        version: 12,
-      },
-    } as any);
-    mockedPublishAgent.mockResolvedValue(undefined);
-    mockedGetAgent.mockImplementation(async (_agentId, version) =>
-      version === undefined
-        ? ({
-            version: 11,
-            is_published: true,
-            response_engine: {
-              type: "retell-llm",
-              llm_id: "retell_llm_1",
-              version: 11,
-            },
-          } as any)
-        : ({ is_published: true } as any)
-    );
+    mockedAgentUpdate.mockResolvedValue({ id: "agent_1" } as any);
+    mockedSyncAgentToTelnyx.mockResolvedValue(undefined as any);
   });
 
-  it("no resetea la voz masculina a la femenina por defecto al editar solo el saludo", async () => {
-    const MASCULINE_VOICE_ID = "13ff5deb-2591-42ad-a356-63a04e524411";
+  function agenteConVoz(voiceId: string) {
     mockedAgentFindFirst.mockResolvedValue({
       id: "agent_1",
       businessId: "biz_1",
       name: "Asistente",
       systemPrompt: "prompt actual",
-      voiceId: MASCULINE_VOICE_ID,
-      retellAgentId: "retell_agent_1",
-      retellLlmId: "retell_llm_1",
+      voiceId,
     } as any);
-    mockedAgentUpdate.mockResolvedValue({ id: "agent_1" } as any);
+  }
+
+  it("no resetea la voz masculina a la femenina por defecto al editar solo el saludo", async () => {
+    agenteConVoz(MASCULINA);
 
     const response = await fastify.inject({
       method: "PATCH",
@@ -108,147 +66,108 @@ describe("PATCH /agents/:id — conserva la voz elegida (hallazgo #26 de la audi
     });
 
     expect(response.statusCode).toBe(200);
-    expect(mockedUpdateAgent).toHaveBeenCalledWith(
-      "retell_agent_1",
-      expect.objectContaining({ voiceId: MASCULINE_VOICE_ID })
-    );
-    expect(mockedPublishAgent).toHaveBeenCalledWith(
-      "retell_agent_1",
-      12,
-      "Configuración gestionada por Alhabla"
-    );
+    const { data } = mockedAgentUpdate.mock.calls[0][0] as any;
+    expect(data).toMatchObject({ firstMessage: "Hola, gracias por llamar" });
+    expect(data).not.toHaveProperty("voiceId");
   });
 
   it("sí cambia la voz cuando el PATCH la indica explícitamente", async () => {
-    const FEMININE_VOICE_ID = "538a8872-3799-4df5-b373-b78493b766c6";
-    const MASCULINE_VOICE_ID = "13ff5deb-2591-42ad-a356-63a04e524411";
-    mockedAgentFindFirst.mockResolvedValue({
-      id: "agent_1",
-      businessId: "biz_1",
-      name: "Asistente",
-      systemPrompt: "prompt actual",
-      voiceId: FEMININE_VOICE_ID,
-      retellAgentId: "retell_agent_1",
-      retellLlmId: "retell_llm_1",
-    } as any);
-    mockedAgentUpdate.mockResolvedValue({ id: "agent_1" } as any);
+    agenteConVoz(FEMENINA);
 
     const response = await fastify.inject({
       method: "PATCH",
       url: "/agents/agent_1",
-      payload: { voiceId: MASCULINE_VOICE_ID },
+      payload: { voiceId: MASCULINA },
     });
 
     expect(response.statusCode).toBe(200);
-    expect(mockedUpdateAgent).toHaveBeenCalledWith(
-      "retell_agent_1",
-      expect.objectContaining({ voiceId: MASCULINE_VOICE_ID })
+    expect(mockedAgentUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "agent_1" },
+        data: expect.objectContaining({ voiceId: MASCULINA }),
+      })
     );
   });
+});
 
-  it("fuerza una cadena compatible y coherente al editar una voz con catalán activo", async () => {
-    mockedBusinessFindUnique.mockResolvedValue({
-      orchestrator: "retell",
-      agentSettings: {
-        version: 1,
-        tone: "warm",
-        primaryGoal: "bookings",
-        responseStyle: "concise",
-        escalation: "take_message",
-        voiceGender: "femenina",
-        languages: ["es-ES", "ca-ES"],
-      },
-    } as any);
+describe("PATCH /agents/:id — el prompt llega al assistant de Telnyx", () => {
+  let fastify: ReturnType<typeof Fastify>;
+
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    fastify = Fastify();
+    fastify.decorate("authenticate", async (request: any) => {
+      request.user = { businessId: "biz_1" };
+    });
+    await fastify.register(agentsRoutes);
     mockedAgentFindFirst.mockResolvedValue({
       id: "agent_1",
       businessId: "biz_1",
       name: "Asistente",
       systemPrompt: "prompt actual",
-      voiceId: "cartesia-Isabel",
-      retellAgentId: "retell_agent_1",
-      retellLlmId: "retell_llm_1",
+      voiceId: FEMENINA,
     } as any);
     mockedAgentUpdate.mockResolvedValue({ id: "agent_1" } as any);
+    mockedSyncAgentToTelnyx.mockResolvedValue(undefined as any);
+  });
 
+  it("un prompt editado a mano queda marcado y se sincroniza con Telnyx", async () => {
     const response = await fastify.inject({
       method: "PATCH",
       url: "/agents/agent_1",
-      // Cartesia no es compatible con ca-ES en Retell: el backend debe
-      // ignorar este valor y mantener el perfil seguro del negocio.
-      payload: { voiceId: "cartesia-Isabel" },
+      payload: { systemPrompt: "Prompt a mano" },
     });
 
     expect(response.statusCode).toBe(200);
     expect(mockedAgentUpdate).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
-          voiceId: "11labs-Hailey-Latin-America-Spanish-localized",
-          voiceProvider: "elevenlabs",
+          systemPrompt: "Prompt a mano",
+          promptManuallyEdited: true,
         }),
       })
     );
-    expect(mockedUpdateAgent).toHaveBeenCalledWith(
-      "retell_agent_1",
-      expect.objectContaining({
-        voiceId: "11labs-Hailey-Latin-America-Spanish-localized",
-        voiceModel: "eleven_v3",
-        fallbackVoiceIds: ["minimax-Camille"],
-        // Desde el 2026-10-05 la cooficial guardada es el principal. Retell,
-        // el respaldo, atiende solo el principal y el español
-        // (ajustesParaRetell), no los ocho que habla en Telnyx.
-        language: ["es-ES", "ca-ES"],
-      })
+    expect(mockedSyncAgentToTelnyx).toHaveBeenCalledWith("biz_1");
+    // Primero se guarda y después se sincroniza: el assistant lee la fila.
+    expect(mockedAgentUpdate.mock.invocationCallOrder[0]).toBeLessThan(
+      mockedSyncAgentToTelnyx.mock.invocationCallOrder[0]
     );
   });
 
-  it("con principal alemán también fuerza la cadena multilingüe al editar una voz", async () => {
-    mockedBusinessFindUnique.mockResolvedValue({
-      orchestrator: "retell",
-      agentSettings: {
-        version: 1,
-        tone: "warm",
-        primaryGoal: "bookings",
-        responseStyle: "concise",
-        escalation: "take_message",
-        voiceGender: "femenina",
-        languages: ["es-ES", "de-DE"],
-        voiceLanguage: "de-DE",
-      },
-    } as any);
-    mockedAgentFindFirst.mockResolvedValue({
-      id: "agent_1",
-      businessId: "biz_1",
-      name: "Asistente",
-      systemPrompt: "prompt actual",
-      voiceId: "cartesia-Isabel",
-      retellAgentId: "retell_agent_1",
-      retellLlmId: "retell_llm_1",
-    } as any);
-    mockedAgentUpdate.mockResolvedValue({ id: "agent_1" } as any);
+  it("el saludo, el nombre o la voz no tocan el assistant: salen de los ajustes del negocio", async () => {
+    for (const payload of [
+      { firstMessage: "Hola" },
+      { name: "Recepción" },
+      { voiceId: MASCULINA },
+    ]) {
+      const response = await fastify.inject({
+        method: "PATCH",
+        url: "/agents/agent_1",
+        payload,
+      });
+      expect(response.statusCode).toBe(200);
+    }
 
-    const response = await fastify.inject({
-      method: "PATCH",
-      url: "/agents/agent_1",
-      payload: { voiceId: "cartesia-Isabel" },
+    expect(mockedSyncAgentToTelnyx).not.toHaveBeenCalled();
+  });
+});
+
+describe("DELETE /agents/:id", () => {
+  let fastify: ReturnType<typeof Fastify>;
+
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    fastify = Fastify();
+    fastify.decorate("authenticate", async (request: any) => {
+      request.user = { businessId: "biz_1" };
     });
-
-    expect(response.statusCode).toBe(200);
-    expect(mockedUpdateAgent).toHaveBeenCalledWith(
-      "retell_agent_1",
-      expect.objectContaining({
-        voiceId: "11labs-Hailey-Latin-America-Spanish-localized",
-        voiceModel: "eleven_v3",
-        language: ["es-ES", "de-DE"],
-      })
-    );
+    await fastify.register(agentsRoutes);
   });
 
-  it("retira un agente de forma lógica y conserva su configuración remota", async () => {
+  it("retira un agente de forma lógica", async () => {
     mockedAgentFindFirst.mockResolvedValue({
       id: "agent_1",
       businessId: "biz_1",
-      retellAgentId: "retell_agent_1",
-      retellLlmId: "retell_llm_1",
       active: true,
     } as any);
     mockedAgentUpdate.mockResolvedValue({ id: "agent_1" } as any);
@@ -273,7 +192,5 @@ describe("PATCH /agents/:id — conserva la voz elegida (hallazgo #26 de la audi
         data: expect.objectContaining({ active: false, deletedAt: expect.any(Date) }),
       })
     );
-    expect(retellAdapter.deleteAgent).not.toHaveBeenCalled();
-    expect(retellAdapter.deleteLlm).not.toHaveBeenCalled();
   });
 });

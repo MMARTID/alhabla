@@ -116,8 +116,7 @@ export async function resolveTelnyxVoiceId(
 
 /**
  * Precondición para intentar crear/mantener el assistant Telnyx de un
- * negocio. No decide nada sobre `voiceRoutingTarget` (Fase 5): solo si
- * conviene intentarlo en absoluto ahora mismo. La voz la decide
+ * negocio: si conviene intentarlo en absoluto ahora mismo. La voz la decide
  * resolverIdiomas: Soniox con un principal cooficial (catalán, euskera o
  * gallego); si no, las Ultra nativas del principal. Antes el
  * catalán dejaba el negocio en Retell.

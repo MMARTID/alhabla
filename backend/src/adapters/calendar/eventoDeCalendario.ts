@@ -16,9 +16,9 @@ export const REMINDER_MINUTES_BEFORE_START = 120;
  * seguro. */
 export const MAX_REMINDER_MINUTES = 40_320;
 
-// Límite propio bajo el timeout de 20s que Retell aplica a cada tool call:
-// así el backend corta la petición él mismo en vez de dejarla colgada
-// respondiendo a nadie cuando Retell ya se rindió.
+// Límite propio bajo el timeout de 20s de cada tool call de voz: así el
+// backend corta la petición él mismo en vez de dejarla colgada respondiendo
+// a nadie cuando el assistant ya se rindió.
 export const CALENDAR_REQUEST_TIMEOUT_MS = 8000;
 
 /** Google Calendar no avisa al propietario de que se creó un evento nuevo

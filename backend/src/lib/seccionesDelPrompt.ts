@@ -10,7 +10,7 @@ import type { AgentSettings } from "./managedAgentPrompt.js";
  * línea en blanco.
  *
  * Un solo carácter distinto cambia el `telnyxConfigHash` y actualiza todos
- * los assistants (y publica una versión nueva en Retell): las instantáneas
+ * los assistants: las instantáneas
  * de tests/lib/managedAgentPrompt.snapshot.test.ts lo vigilan. Muchas reglas
  * salieron de llamadas reales o de mediciones por chat; los comentarios con
  * fecha dicen de dónde, y ninguna se quita sin repetir la medición.
@@ -404,7 +404,7 @@ function seccionReferenciaTemporal({ timezone }: ContextoDelPrompt): Parrafos {
     "## Referencia temporal",
     // La zona va escrita literalmente, no como {{zona_horaria}} anidada
     // dentro de {{current_time_...}}: no está documentado en ningún sitio que
-    // Retell resuelva una variable dentro de otra, y si no la resuelve el
+    // el proveedor resuelva una variable dentro de otra, y si no la resuelve el
     // agente se queda sin saber qué día es hoy — "mañana" o "el martes" se
     // convierten en una fecha inventada y la cita acaba en el día equivocado.
     `Momento actual en la zona del negocio:\n{{current_time_${timezone}}}`,

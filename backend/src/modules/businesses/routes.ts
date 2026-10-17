@@ -35,7 +35,7 @@ import {
   resolvePlanId,
 } from "../../lib/planFeatures.js";
 import { isBusinessType } from "../../lib/businessType.js";
-import { syncAgentNameWithBusinessType, syncAgentToRetell } from "../../lib/agentBootstrap.js";
+import { syncAgentNameWithBusinessType } from "../../lib/agentBootstrap.js";
 import { syncAgentToTelnyx } from "../../lib/telnyxAgentSync.js";
 import { nonDeletedServiceLinks, serializeProfessional } from "../bookings/service.js";
 import { E164_PHONE_REGEX } from "../../lib/phone.js";
@@ -743,22 +743,11 @@ export async function businessesRoutes(fastify: FastifyInstance) {
           await invalidarCacheDeVoz(request.user!.businessId);
         }
 
-        // Empuja el prompt gestionado a los proveedores. Sin esto, editar
+        // Empuja el prompt gestionado al assistant. Sin esto, editar
         // tono/objetivo/horario/nicho en el dashboard solo actualizaba la BD
-        // sin afectar a la llamada real. Telnyx primero: es el que atiende
-        // todas las llamadas. Antes iba después de Retell y un fallo del
-        // respaldo dejaba al primario sin actualizar y al dueño con un 500
-        // sobre datos ya guardados.
+        // sin afectar a la llamada real. syncAgentToTelnyx nunca lanza.
         if (shouldResyncPrompt) {
           await syncAgentToTelnyx(request.user!.businessId);
-          try {
-            await syncAgentToRetell(request.user!.businessId);
-          } catch (error) {
-            request.log.error(
-              { err: error, businessId: request.user!.businessId },
-              "[Business] No se pudo sincronizar el agente de respaldo en Retell"
-            );
-          }
         }
 
         if (data.schedule !== undefined) {

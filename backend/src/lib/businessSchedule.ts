@@ -103,8 +103,7 @@ const WEEKDAY_LABELS_ES: Record<WeekDay, string> = {
 };
 
 /**
- * Texto en español del horario semanal, para inyectar como dynamic variable
- * de Retell (los valores de retell_llm_dynamic_variables deben ser string).
+ * Texto en español del horario semanal, para get_catalog y el Gestor.
  * Sustituye al JSON crudo que antes se horneaba en el prompt: mismo dato, en
  * un formato que el modelo lee directamente sin tener que interpretar JSON.
  */

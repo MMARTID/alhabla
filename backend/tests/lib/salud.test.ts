@@ -9,26 +9,23 @@ describe("comprobarSalud (GET /health)", () => {
   it("con todo bien, sale sano y lista cada dependencia", async () => {
     const resultado = await comprobarSalud({
       criticas: { postgres: bien, redis: bien },
-      informativas: { telnyx: bien, retell: bien },
+      informativas: { telnyx: bien },
     });
 
     expect(resultado).toEqual({
       healthy: true,
-      dependencies: { postgres: "ok", redis: "ok", telnyx: "ok", retell: "ok" },
+      dependencies: { postgres: "ok", redis: "ok", telnyx: "ok" },
     });
   });
 
-  it("si cae Telnyx o Retell lo dice, pero sigue sano: el deploy no debe revertir por ellos", async () => {
+  it("si cae Telnyx lo dice, pero sigue sano: el deploy no debe revertir por él", async () => {
     const resultado = await comprobarSalud({
       criticas: { postgres: bien, redis: bien },
-      informativas: { telnyx: mal, retell: mal },
+      informativas: { telnyx: mal },
     });
 
     expect(resultado.healthy).toBe(true);
-    expect(resultado.dependencies).toMatchObject({
-      telnyx: "unhealthy",
-      retell: "unhealthy",
-    });
+    expect(resultado.dependencies).toMatchObject({ telnyx: "unhealthy" });
   });
 
   it.each(["postgres", "redis"])("si cae %s, no está sano", async (critica) => {
@@ -51,7 +48,7 @@ describe("comprobarSalud (GET /health)", () => {
   });
 });
 
-describe("conMemoria (Telnyx y Retell en /health)", () => {
+describe("conMemoria (Telnyx en /health)", () => {
   function reloj() {
     let ms = 1_000_000;
     return { ahora: () => ms, avanzar: (delta: number) => (ms += delta) };
@@ -120,13 +117,13 @@ describe("conMemoria (Telnyx y Retell en /health)", () => {
     });
   });
 
-  it("GET /health pregunta a Telnyx y a Retell con memoria, y a Postgres y Redis en cada consulta", () => {
+  it("GET /health pregunta a Telnyx con memoria, y a Postgres y Redis en cada consulta", () => {
     const servidor = readFileSync(
       new URL("../../src/server.ts", import.meta.url),
       "utf8"
     );
     expect(servidor).toContain("conMemoria(() => telnyxAdapter.checkHealth())");
-    expect(servidor).toContain("conMemoria(() => retellAdapter.checkHealth())");
+    expect(servidor).not.toContain("retellAdapter");
     expect(servidor).not.toMatch(/informativas\.\w+ = \(\) =>/);
     expect(servidor).toContain("postgres: () => prisma.$queryRaw`SELECT 1`");
   });

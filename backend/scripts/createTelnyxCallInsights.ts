@@ -1,8 +1,9 @@
 /**
  * Crea (si no existen) los insights custom que clasifican el resultado de
  * una llamada Telnyx — equivalente a CALL_OUTCOME_ANALYSIS_FIELD/
- * ESCALATION_REASON_FIELD/TOOL_FAILURE_FIELD de Retell (agentBootstrap.ts),
- * mismas categorías exactas para que ambos proveedores sean comparables. Los
+ * ESCALATION_REASON_FIELD/TOOL_FAILURE_FIELD que usaba Retell, mismas
+ * categorías exactas para que las llamadas de antes y de después sean
+ * comparables. Los
  * asigna al insight group indicado (el "Default" que ya usan los 5
  * assistants de desarrollo, id fijo de cuenta — ver memoria del proyecto).
  *

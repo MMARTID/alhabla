@@ -25,8 +25,10 @@ model Business {
   minAdvanceBookingMinutes      Int?
   maxAppointmentDurationMinutes Int?
 
-  // Voice orchestrator selection (default Retell for RGPD compliance)
-  orchestrator        String  @default("retell")
+  // Ya no decide nada: todo negocio es de Telnyx desde el 17-10. Se borra,
+  // con los demás campos de Retell y del failover, en la PR 3 de
+  // PLAN-RETIRAR-RETELL.md.
+  orchestrator        String  @default("telnyx")
   retellPhoneNumberId String? @unique
   retellPhoneNumber   String? @unique
 
@@ -34,7 +36,7 @@ model Business {
   // docs/historico/PLAN-TELNYX-ORQUESTADOR.md). voiceRoutingTarget es la ruta EFECTIVA de la
   // próxima llamada nueva y puede diferir de `orchestrator` durante un
   // failover; una llamada ya iniciada nunca migra de proveedor.
-  voiceRoutingTarget      String    @default("retell")
+  voiceRoutingTarget      String    @default("telnyx")
   voiceFailoverActive     Boolean   @default(false)
   voiceFailoverReason     String?
   voiceRoutingChangedAt   DateTime?
@@ -611,7 +613,7 @@ model Call {
   // mantiene poblado en paralelo por compatibilidad (índices, joins ya
   // existentes en el resto del esquema) hasta migrarlo por completo a estos
   // campos genéricos — ver docs/historico/PLAN-TELNYX-ORQUESTADOR.md § "Cambios de datos".
-  voiceProvider          String                @default("retell")
+  voiceProvider          String                @default("telnyx")
   // Informe que la recepcionista manda con la tool informar_al_negocio al
   // terminar la llamada (post-conversación de Telnyx, PLAN-CANAL-DUENO.md
   // § 10): resultado, motivo de escalada, fallo de tool, servicio pedido y

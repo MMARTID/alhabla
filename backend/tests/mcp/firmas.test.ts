@@ -1,8 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
-import Retell from "retell-sdk";
 import { TelnyxAiAdapter } from "../../src/adapters/telnyx/TelnyxAiAdapter.js";
 import {
-  firmarComoRetell,
   firmarComoTelnyx,
   generarClavesDeSimulacion,
 } from "../../mcp/firmas.js";
@@ -52,13 +50,5 @@ describe("firmarComoTelnyx", () => {
   it("la pública tiene el formato de Telnyx: 32 bytes crudos en base64", () => {
     const { publica } = generarClavesDeSimulacion();
     expect(Buffer.from(publica, "base64")).toHaveLength(32);
-  });
-});
-
-describe("firmarComoRetell", () => {
-  it("Retell.verify (lo que usa RetellAdapter) acepta la firma", async () => {
-    const firma = await firmarComoRetell(CUERPO, "key_de_prueba");
-    await expect(Retell.verify(CUERPO, "key_de_prueba", firma)).resolves.toBe(true);
-    await expect(Retell.verify(CUERPO, "otra_key", firma)).resolves.toBe(false);
   });
 });

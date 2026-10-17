@@ -1,13 +1,10 @@
 import { describe, it, expect } from "vitest";
 import {
-  ajustesParaRetell,
   elegirVoz,
   funcionQueExige,
-  idiomaDeRetell,
   instruccionesDeIdioma,
   resolverIdiomas,
   saludoDelNegocio,
-  usaVozMultilingueEnRetell,
 } from "../../../src/lib/idiomas/resolver.js";
 import {
   CODIGOS_DE_IDIOMA,
@@ -352,42 +349,6 @@ describe("resolverIdiomas — prompt y saludo", () => {
   });
 });
 
-describe("Retell, el respaldo", () => {
-  it("no le llega el euskera, que rechazaría el agente entero", () => {
-    expect(idiomaDeRetell(["es-ES", "eu-ES"])).toBe("es-ES");
-    expect(idiomaDeRetell(["es-ES", "eu-ES", "gl-ES"])).toEqual([
-      "es-ES",
-      "gl-ES",
-    ]);
-  });
-
-  it("con euskera de principal, Retell saluda en español y atiende solo español, con Cartesia", () => {
-    const ajustes = ajustesParaRetell({
-      languages: idiomasQueHabla("eu-ES"),
-      voiceLanguage: "eu-ES",
-      voiceGender: "femenina",
-    });
-    expect(ajustes).toMatchObject({
-      languages: ["es-ES"],
-      voiceLanguage: "es-ES",
-    });
-    expect(idiomaDeRetell(ajustes.languages)).toBe("es-ES");
-    expect(
-      usaVozMultilingueEnRetell(ajustes.languages, ajustes.voiceLanguage)
-    ).toBe(false);
-  });
-
-  // Hasta el 2026-10-05 solo el catalán; ahora también cualquier cooficial
-  // y un principal que no es español (las Cartesia por defecto son
-  // españolas).
-  it("la cadena de voces multilingüe va con catalán, con una cooficial o con un principal que no es español", () => {
-    expect(usaVozMultilingueEnRetell(["es-ES", "ca-ES"])).toBe(true);
-    expect(usaVozMultilingueEnRetell(["es-ES", "en-GB", "gl-ES"])).toBe(true);
-    expect(usaVozMultilingueEnRetell(["es-ES", "en-GB"])).toBe(false);
-    expect(usaVozMultilingueEnRetell(["es-ES", "en-GB"], "en-GB")).toBe(true);
-  });
-});
-
 // ---------------------------------------------------------------------
 // Idiomas y voces del 2026-10-05: el principal manda (saludo, familia de
 // voces e idiomas que habla).
@@ -592,59 +553,5 @@ describe("resolverIdiomas — el prompt con un principal cooficial", () => {
     expect(resolver([], "ca-ES").instruccionDelPrompt).toBe(
       "En las llamadas, el saludo ya lo dice el sistema al descolgar (en catalán o, si quien llama ya ha llamado antes, en el idioma en que habló) y es el primer mensaje de la conversación: no lo repitas. Desde tu primera respuesta, contesta y continúa exclusivamente en el idioma en que te habla quien llama si es uno de estos: español de España, inglés, francés, catalán, alemán, italiano, portugués, neerlandés, ruso. Si cambia entre esos idiomas, acompaña el cambio sin pedirle que elija uno. Las frases que estas instrucciones ponen entre comillas para decírselas a quien llama están en castellano: dilas traducidas al idioma de la conversación. Los nombres de los servicios del catálogo también suelen estar en castellano y no son nombres propios: en otro idioma, dilos traducidos a ese idioma, no tal cual (salvo los que no tienen traducción, como «balayage»). Si quien llama usa formas valencianas o baleares del catalán, adáptate a ellas."
     );
-  });
-});
-
-describe("Retell, el respaldo, con el principal que manda", () => {
-  // Desde la revisión del 2026-10-05, Retell atiende el principal y el
-  // español, no los siete u ocho que habla en Telnyx: lo ya validado contra
-  // su API, y con solo español su ruta monolingüe.
-  it("atiende el principal y el español: escalar es-ES con principal español, array con uno extranjero o cooficial", () => {
-    const deRetell = (voiceLanguage: CodigoDeIdioma) =>
-      ajustesParaRetell({
-        languages: idiomasQueHabla(voiceLanguage),
-        voiceLanguage,
-        voiceGender: "femenina",
-      });
-    expect(deRetell("es-ES")).toMatchObject({
-      languages: ["es-ES"],
-      voiceLanguage: "es-ES",
-    });
-    expect(idiomaDeRetell(deRetell("es-ES").languages)).toBe("es-ES");
-    expect(deRetell("de-DE")).toMatchObject({
-      languages: ["es-ES", "de-DE"],
-      voiceLanguage: "de-DE",
-    });
-    expect(deRetell("ca-ES")).toMatchObject({
-      languages: ["es-ES", "ca-ES"],
-      voiceLanguage: "ca-ES",
-    });
-    expect(idiomaDeRetell(deRetell("gl-ES").languages)).toEqual([
-      "es-ES",
-      "gl-ES",
-    ]);
-  });
-
-  it("la voz Cartesia sigue con principal español; la multilingüe, con uno extranjero o cooficial", () => {
-    for (const voiceLanguage of CODIGOS_DE_IDIOMA.filter(puedeSerPrincipal)) {
-      const ajustes = ajustesParaRetell({
-        languages: idiomasQueHabla(voiceLanguage),
-        voiceLanguage,
-        voiceGender: "femenina",
-      });
-      expect(
-        usaVozMultilingueEnRetell(ajustes.languages, ajustes.voiceLanguage)
-      ).toBe(voiceLanguage !== "es-ES" && voiceLanguage !== "eu-ES");
-    }
-  });
-
-  it("unos ajustes anteriores con una cooficial en languages llegan a Retell con ella de principal", () => {
-    expect(
-      ajustesParaRetell({
-        languages: ["es-ES", "ca-ES"],
-        voiceLanguage: "es-ES",
-        voiceGender: "femenina",
-      })
-    ).toMatchObject({ languages: ["es-ES", "ca-ES"], voiceLanguage: "ca-ES" });
   });
 });

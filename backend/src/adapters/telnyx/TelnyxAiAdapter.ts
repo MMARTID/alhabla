@@ -498,9 +498,9 @@ export class TelnyxAiAdapter {
 
   // ---------------------------------------------------------------------
   // Asignación de número — genérico a propósito: el mismo `connection_id`
-  // enruta un número a la TeXML App auto-creada de un assistant, al Call
-  // Control App compartido de plataforma (Fase 4), o de vuelta al SIP trunk
-  // de Retell (failback) — quien llama decide cuál es cuál.
+  // enruta un número a la TeXML App auto-creada de un assistant o al Call
+  // Control App compartido de plataforma (Fase 4) — quien llama decide cuál
+  // es cuál.
   // ---------------------------------------------------------------------
 
   async setPhoneNumberConnectionId(
@@ -600,9 +600,8 @@ export class TelnyxAiAdapter {
    * Limpia el ruido de fondo del audio de quien llama (peluquería con
    * secador, calle, música) ANTES de que llegue a STT/al assistant — mejora
    * tanto la calidad percibida como la precisión de la transcripción, no es
-   * solo cosmético. Solo tiene sentido con Telnyx como orquestador de la
-   * llamada (Call Control): con Retell, la limpieza de audio la controla
-   * Retell, no nosotros. `direction: "inbound"` a propósito: nuestro propio
+   * solo cosmético. Solo tiene sentido con la llamada en Call Control.
+   * `direction: "inbound"` a propósito: nuestro propio
    * TTS ya sale limpio, no hace falta procesarlo también. Motor AiCoustics
    * familia "quail" — la propia documentación de Telnyx la describe como
    * optimizada para "Voice AI/STT", que es exactamente este caso de uso (a
@@ -945,8 +944,7 @@ export class TelnyxAiAdapter {
   }
 
   // ---------------------------------------------------------------------
-  // Tests nativos de assistant — equivalente Telnyx a
-  // RetellAdapter.createBatchTest. `destination` decide qué assistant se
+  // Tests nativos de assistant. `destination` decide qué assistant se
   // prueba (no hay un assistant_id en el payload): para
   // telnyxConversationChannel="phone_call" es el número Telnyx real del
   // negocio, y Telnyx llama a ese número simulando el escenario de
@@ -1069,9 +1067,7 @@ export class TelnyxAiAdapter {
   }
 
   // ---------------------------------------------------------------------
-  // Firma de webhooks — Ed25519 con ventana de timestamp. A diferencia de
-  // Retell/Stripe (ver CLAUDE.md), esta verificación es nueva: no toca
-  // ninguna firma ya validada en producción.
+  // Firma de webhooks — Ed25519 con ventana de timestamp.
   //
   // Delega en `TelnyxWebhook` (telnyx/lib/webhooks.js), la clase Ed25519
   // oficial del SDK — no en `client.webhooks.unwrap()` (el `webhooks` del

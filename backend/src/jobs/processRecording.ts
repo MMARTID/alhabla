@@ -84,8 +84,7 @@ function legIdDesdeUrl(url: string): string | null {
  * Solo Telnyx: sus URLs firmadas caducan a los 10 minutos, y si el primer
  * intento no llegó a tiempo (webhook con el backend caído, cola atascada)
  * la grabación seguía en Telnyx pero nosotros la dábamos por perdida y la
- * reintentábamos cada 15 minutos contra la misma URL muerta. Retell no
- * necesita esto: sus URLs no caducan.
+ * reintentábamos cada 15 minutos contra la misma URL muerta.
  */
 async function pedirUrlNuevaATelnyx(
   callId: string,
@@ -114,7 +113,7 @@ async function marcarIrrecuperable(callId: string, motivo: string): Promise<void
 }
 
 /**
- * Descarga la grabación desde Retell/Telnyx y la sube a R2/S3. Invocado desde
+ * Descarga la grabación desde Telnyx y la sube a R2/S3. Invocado desde
  * POST /internal/jobs/process-recording (Cloud Tasks) o en línea en dev.
  */
 export async function processRecordingJob(data: ProcessRecordingJob): Promise<void> {
@@ -257,7 +256,7 @@ async function copiarAR2(
 }
 
 /**
- * La URL de la grabación llega dentro de webhooks firmados de Retell/Telnyx,
+ * La URL de la grabación llega dentro de webhooks firmados de Telnyx,
  * pero este job la descarga desde dentro de la red de Cloud Run: si alguna
  * vez llegara una URL manipulada, un `fetch` sin filtro sería una vía directa
  * al servidor de metadatos de GCP (169.254.169.254) o a cualquier servicio
@@ -307,7 +306,7 @@ async function downloadRecording(url: string, plazo: AbortSignal): Promise<{
   contentType: string;
   contentLength?: number;
 }> {
-  // Seguimos los redirects a mano porque las URLs de Retell y Telnyx suelen
+  // Seguimos los redirects a mano porque las URLs de Telnyx suelen
   // saltar a un bucket firmado: cada salto tiene que pasar el mismo filtro,
   // o un 302 hacia una IP interna anularía la comprobación inicial.
   let destino = assertDescargaPermitida(url);

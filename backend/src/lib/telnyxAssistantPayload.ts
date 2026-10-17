@@ -120,8 +120,7 @@ export function construirToolsDeWebhook(
 }
 
 /**
- * Única forma de que el assistant pueda colgar por su cuenta — mismo motivo
- * que la tool `end_call` de Retell (ver agentBootstrap.ts): sin ella la
+ * Única forma de que el assistant pueda colgar por su cuenta: sin ella la
  * llamada sigue abierta hasta que cuelga el cliente o se agota el límite de
  * duración.
  */
@@ -467,10 +466,11 @@ const RETELL_CURRENT_TIME_PATTERN =
  * primera llamada real, no documentado en ningún sitio.
  *
  * `{{nombre_negocio}}` no es una variable de sistema de ningún proveedor —
- * es propia de Alhabla, resuelta hoy vía `retell_llm_dynamic_variables` en
- * el webhook de llamada entrante de Retell. Telnyx no tiene ese mecanismo
- * para el flujo normal (ver plan §2: sin `dynamic_variables_webhook_url`),
- * así que aquí se sustituye por el nombre real del negocio en texto plano.
+ * es propia de Alhabla, y la resolvía `retell_llm_dynamic_variables` en el
+ * webhook de llamada entrante de Retell (retirado el 17-10). Telnyx no tiene
+ * ese mecanismo para el flujo normal (ver plan §2: sin
+ * `dynamic_variables_webhook_url`), así que aquí se sustituye por el nombre
+ * real del negocio en texto plano.
  *
  * `{{zona_horaria}}` también es de Alhabla (dynamic variable de Retell): el
  * prompt gestionado la usa suelta en la regla de zona horaria de las tools
@@ -646,7 +646,7 @@ export interface BuildTelnyxAssistantPayloadInput {
    * prompt (regla de startDateTime local de las tools). */
   timezone?: string;
   /** Prompt gestionado completo (managedAgentPrompt.ts) o el prompt manual
-   * del negocio — igual que `Assistant.instructions` en Retell. Se traduce
+   * del negocio. Se traduce
    * automáticamente a las variables de sistema de Telnyx. */
   instructions: string;
   /** Cadena vacía para que el assistant espere a que hable el cliente. */
@@ -669,16 +669,15 @@ export interface BuildTelnyxAssistantPayloadInput {
    * `transfer`; sin él (ajuste «nunca» o sin móvil válido) no se registra.
    * Lo resuelve `resolverTransferenciaAlDueno` (lib/transferenciaAlDueno.ts). */
   transferenciaAlDueno?: { from: string; to: string } | null;
-  /** Nombres de servicios/profesionales para sesgar la transcripción — mismo
-   * propósito que `boostedKeywords` en syncAgentToRetell. */
+  /** Nombres de servicios/profesionales para sesgar la transcripción. */
   boostedKeywords?: string[];
   maxCallDurationSecs?: number;
   userIdleTimeoutSecs?: number;
   userIdleReplySecs?: number;
 }
 
-// Mismos límites que DEFAULT_RETELL_AGENT_CONFIG (agentBootstrap.ts): una
-// recepcionista de reservas no necesita más de 10 minutos, y 30s de silencio
+// Los mismos límites que tenía el agente de Retell: una recepcionista de
+// reservas no necesita más de 10 minutos, y 30s de silencio
 // ya indica que el cliente colgó o dejó el teléfono descolgado.
 const DEFAULT_MAX_CALL_DURATION_SECS = 10 * 60;
 const DEFAULT_USER_IDLE_TIMEOUT_SECS = 30;
@@ -833,9 +832,8 @@ export function buildTelnyxAssistantPayload(
     // "mmhm"/"vale" sueltos del cliente no cortan al agente a mitad de
     // frase (la propia Telnyx lo describe como "una de las razones más
     // comunes por las que las llamadas de voz con IA se sienten rotas").
-    // Mismo problema que ya se arregló en Retell bajando
-    // interruptionSensitivity a 0.65 (agentBootstrap.ts) — aquí es la
-    // versión nativa de Telnyx para el mismo síntoma. Por defecto viene
+    // Mismo problema que se arregló en Retell bajando
+    // interruptionSensitivity a 0.65; esta es la versión nativa de Telnyx. Por defecto viene
     // desactivado (0.0); 0.4 es el punto de partida que la propia Telnyx
     // recomienda, subir para exigir más confianza (menos interrupciones
     // falsas) o bajar para un barge-in más permisivo.

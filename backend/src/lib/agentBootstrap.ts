@@ -1,14 +1,5 @@
 import { prisma } from "./prisma.js";
 import {
-  retellAdapter,
-  type RetellEnumAnalysisField,
-  type RetellBooleanAnalysisField,
-  type RetellAnalysisField,
-  type CreateRetellLlmInput,
-  type RetellPiiCategory,
-} from "../adapters/retell/RetellAdapter.js";
-import { getPublicWebhookBaseUrl } from "./serverUrl.js";
-import {
   BUSINESS_TYPE_LABELS,
   isBusinessType,
   type BusinessType,
@@ -17,168 +8,17 @@ import {
   buildManagedAgentPrompt,
   parseAgentSettings,
   DEFAULT_AGENT_SETTINGS,
-  type AgentSettings,
 } from "./managedAgentPrompt.js";
 import { componerSaludo } from "./idiomas/catalogo.js";
-import {
-  ajustesParaRetell,
-  idiomaDeRetell,
-  resolverIdiomas,
-  usaVozMultilingueEnRetell,
-} from "./idiomas/resolver.js";
-import { cooficialDeLaZona } from "./idiomas/zona.js";
-import { calendarService } from "../modules/calendar/service.js";
-import { crearAssistantYPromocionar } from "./telnyxAgentSync.js";
+import { crearAssistantDelNegocio } from "./telnyxAgentSync.js";
 import { listaDeEsperaDisponible } from "../modules/whatsapp/service.js";
-import { isVoiceTelnyxRolloutEnabled } from "./voiceRollout.js";
-import { resolverTransferenciaAlDueno } from "./transferenciaAlDueno.js";
-import { VARIABLES_DE_LA_LLAMADA_POR_DEFECTO } from "./seccionesDelPrompt.js";
 
 /**
- * Campo de post_call_analysis_data para clasificar el resultado de la llamada:
- * Retell lo extrae con su propio LLM tras cada llamada, sin coste ni llamada
- * extra a un tercero, y lo entrega en
- * call_analysis.custom_analysis_data.call_outcome del evento call_analyzed.
+ * Alta del agente de un negocio: la fila `Agent` (con el prompt gestionado
+ * de partida) y su assistant de Telnyx, que atiende todas las llamadas.
+ * Hasta el 17-10 creaba también un agente de Retell como respaldo, que nunca
+ * llegó a coger una llamada (PLAN-RETIRAR-RETELL.md).
  */
-export const CALL_OUTCOME_ANALYSIS_FIELD: RetellEnumAnalysisField = {
-  name: "call_outcome",
-  type: "enum",
-  choices: [
-    "RESOLVED",
-    "FRUSTRATED",
-    "NO_ANSWER",
-    "ESCALATED",
-    "LEAD_CAPTURED",
-  ],
-  description:
-    "Clasifica el resultado de la llamada en una sola categoría: " +
-    "RESOLVED si se resolvió la petición del cliente o se completó una reserva; " +
-    "FRUSTRATED si el cliente mostró enfado, frustración o insatisfacción notable; " +
-    "NO_ANSWER si la llamada terminó sin una resolución clara o el cliente colgó sin más; " +
-    "ESCALATED si la llamada se transfirió a una persona o a otro departamento; " +
-    "LEAD_CAPTURED si se recogió un contacto o interés comercial sin llegar a resolver la petición.",
-};
-
-export const ESCALATION_REASON_FIELD: RetellEnumAnalysisField = {
-  name: "escalation_reason",
-  type: "enum",
-  choices: [
-    "CLIENTE_LO_PIDIO",
-    "FALLO_TECNICO",
-    "FUERA_DE_HORARIO",
-    "CONSULTA_COMPLEJA",
-    "NO_APLICA",
-  ],
-  description:
-    "Motivo principal por el que la llamada terminó escalada, con una reserva sin completar, o sin " +
-    "resolución clara: CLIENTE_LO_PIDIO si el cliente pidió hablar con una persona; FALLO_TECNICO si alguna " +
-    "herramienta (calendario, disponibilidad) falló o no respondió; FUERA_DE_HORARIO si lo solicitado caía " +
-    "fuera del horario del negocio; CONSULTA_COMPLEJA si la petición excedía lo que el asistente puede " +
-    "resolver; NO_APLICA si la llamada no tuvo ningún problema de este tipo.",
-  conditional_prompt:
-    "Solo evalúa este campo si call_outcome es ESCALATED, o si alguna reserva no se pudo completar durante la llamada.",
-};
-
-export const TOOL_FAILURE_FIELD: RetellBooleanAnalysisField = {
-  name: "tool_failure_detected",
-  type: "boolean",
-  description:
-    "true si alguna herramienta (check_availability, book_appointment, find_my_appointment o " +
-    "cancel_appointment) falló, dio error o no pudo completarse durante la llamada, aunque la " +
-    "llamada terminara bien igualmente.",
-};
-
-/**
- * Campo enum de post_call_analysis_data cuyas opciones se generan a partir de
- * los servicios reales del negocio en el momento de sincronizar — sin
- * taxonomía hardcodeada por vertical, se adapta sola a cada negocio.
- */
-export function buildRequestedServiceAnalysisField(
-  serviceNames: string[]
-): RetellEnumAnalysisField {
-  return {
-    name: "requested_service_type",
-    type: "enum",
-    choices: [...serviceNames, "OTRO", "NO_APLICA"],
-    description:
-      "Categoriza el servicio que el cliente pidió o mencionó durante la llamada, si alguno. Usa NO_APLICA " +
-      "si no se mencionó ningún servicio concreto.",
-  };
-}
-
-const MAX_ANALYSIS_CHOICES = 40;
-
-/**
- * Conjunto completo de post_call_analysis_data que se envía a Retell. Un
- * negocio sin servicios activos (recién creado) no lleva requested_service_type.
- */
-export function buildPostCallAnalysisData(
-  serviceNames: string[]
-): RetellAnalysisField[] {
-  const fields: RetellAnalysisField[] = [
-    CALL_OUTCOME_ANALYSIS_FIELD,
-    ESCALATION_REASON_FIELD,
-    TOOL_FAILURE_FIELD,
-  ];
-  if (serviceNames.length > 0) {
-    fields.push(
-      buildRequestedServiceAnalysisField(
-        serviceNames.slice(0, MAX_ANALYSIS_CHOICES)
-      )
-    );
-  }
-  return fields;
-}
-
-export async function buildPostCallAnalysisDataForBusiness(
-  businessId: string,
-  prismaClient: typeof prisma = prisma
-): Promise<RetellAnalysisField[]> {
-  const services = await prismaClient.service.findMany({
-    where: { businessId, active: true, deletedAt: null },
-    select: { name: true },
-    orderBy: { name: "asc" },
-  });
-  return buildPostCallAnalysisData(services.map((service) => service.name));
-}
-
-/**
- * Variables mínimas por llamada entrante. El catálogo, profesionales y
- * horario se obtienen con get_catalog solo cuando hacen falta: inyectarlos
- * siempre aumentaba el contexto y la latencia de todos los turnos.
- *
- * Las de quien llama (lib/contextoDeLlamada.ts) van vacías, como a quien no
- * se conoce: el saludo de Retell es fijo y no le llama por su nombre. Si
- * toca pedirle permiso para grabar lo decide el backend en las tools
- * (lib/grabacion.ts).
- */
-export async function buildInboundCallDynamicVariables(
-  businessId: string,
-  prismaClient: typeof prisma = prisma
-): Promise<Record<string, string>> {
-  const business = await prismaClient.business.findUnique({
-    where: { id: businessId },
-    select: { name: true, timezone: true },
-  });
-
-  const timezone = resolvePromptTimezone(business?.timezone);
-
-  return {
-    nombre_negocio: business?.name?.trim() || "el negocio",
-    zona_horaria: timezone,
-    ...VARIABLES_DE_LA_LLAMADA_POR_DEFECTO,
-  };
-}
-
-function resolvePromptTimezone(timezone: string | null | undefined): string {
-  const candidate = timezone || "Europe/Madrid";
-  try {
-    new Intl.DateTimeFormat("es-ES", { timeZone: candidate }).format();
-    return candidate;
-  } catch {
-    return "Europe/Madrid";
-  }
-}
 
 export type AgentTemplateConfig = {
   name: string;
@@ -213,193 +53,8 @@ export const DEFAULT_AGENT_CONFIG: AgentTemplateConfig = {
   firstMessageMode: "assistant-speaks-first",
 };
 
-export const DEFAULT_RETELL_AGENT_CONFIG = {
-  voiceId: "cartesia-Isabel",
-  voiceModel: "sonic-3.5" as const,
-  model: "gpt-5.6-luna" as const,
-  modelTemperature: 0.3,
-  language: "es-ES" as const,
-  timezone: "Europe/Madrid",
-  // El default de Retell es 1 (máxima sensibilidad) — cualquier palabra suelta del
-  // cliente ("ah", "vale") corta al agente a mitad de frase, confirmado con una
-  // llamada real el 2026-09-05. 0.65 permite más control al cliente sin perder
-  // fluidez del agente.
-  interruptionSensitivity: 0.65,
-  // RGPD: sin esto Retell retiene grabaciones/transcripciones para siempre.
-  // Decisión explícita del usuario, 2026-09-05: 30 días.
-  dataStorageRetentionDays: 30,
-  // El default de Retell ("fast") prioriza latencia sobre precisión — para un
-  // sistema donde una reserva depende de transcribir bien un nombre o una
-  // fecha, "accurate" es la prioridad correcta. Decisión explícita del
-  // usuario, 2026-09-05.
-  sttMode: "accurate" as const,
-  // RGPD: qué categorías redacta Retell de transcripciones/grabaciones tras
-  // la llamada (mode: post_call). Decisión explícita del usuario, 2026-09-05
-  // — las 4 que de verdad aparecen en una llamada de reserva. OJO: esto solo
-  // afecta a lo que Retell guarda/muestra en su propio dashboard, NUNCA al
-  // payload del webhook que recibimos y persistimos nosotros (confirmado en
-  // su documentación: "You will continue to receive webhook events... even
-  // when data storage is restricted").
-  piiCategories: [
-    "person_name",
-    "phone_number",
-    "email",
-    "address",
-  ] as RetellPiiCategory[],
-  // Sin estos dos, una llamada que el cliente deja abierta (teléfono
-  // descolgado, silencio) sigue viva facturando minutos de Retell, que además
-  // consumen los minutos incluidos del plan del negocio. Detectado con la
-  // batería de simulación el 2026-09-06: el agente tampoco tenía forma de
-  // colgar (ver la tool end_call en calendar/service.ts).
-  endCallAfterSilenceMs: 30_000,
-  // Una recepcionista de reservas no necesita una hora (el default de Retell).
-  maxCallDurationMs: 10 * 60 * 1000,
-};
-
-/**
- * Voice ID de Retell por género elegido en AgentSettings.voiceGender. La
- * femenina es la voz por defecto histórica (DEFAULT_RETELL_AGENT_CONFIG); la
- * masculina es la alternativa añadida en 2026-09.
- */
-export const RETELL_VOICE_ID_BY_GENDER: Record<
-  AgentSettings["voiceGender"],
-  string
-> = {
-  femenina: DEFAULT_RETELL_AGENT_CONFIG.voiceId,
-  masculina: "cartesia-Manuel",
-};
-
-type RetellVoiceProfile = {
-  voiceId: string;
-  voiceModel: "eleven_v3" | "sonic-3.5";
-  fallbackVoiceIds: string[];
-  voiceProvider: "cartesia" | "elevenlabs";
-};
-
-/**
- * Retell actualiza únicamente el borrador más reciente. Esta comprobación
- * convierte esa actualización en un cambio efectivo de producción y evita
- * que un job informe de éxito cuando la versión publicada sigue intacta.
- */
-export async function publishRetellAgentUpdate(
-  agentId: string,
-  updatedAgent: { version?: number; is_published?: boolean }
-): Promise<void> {
-  if (updatedAgent.is_published) return;
-  if (!Number.isInteger(updatedAgent.version)) {
-    throw new Error(
-      `Retell no devolvió una versión publicable para el agente ${agentId}.`
-    );
-  }
-
-  await retellAdapter.publishAgent(
-    agentId,
-    updatedAgent.version!,
-    "Configuración gestionada por Alhabla"
-  );
-  const published = await retellAdapter.getAgent(agentId, updatedAgent.version);
-  if (!published.is_published) {
-    throw new Error(
-      `Retell no confirmó la publicación de la versión ${updatedAgent.version} del agente ${agentId}.`
-    );
-  }
-  console.log("[Agent] Versión de Retell publicada y verificada", {
-    agentId,
-    version: updatedAgent.version,
-  });
-}
-
-type RetellEditableDraft = {
-  agentVersion: number;
-  llmId: string;
-  llmVersion?: number;
-};
-
-/** Las versiones publicadas son inmutables en Retell. Prepara un borrador
- * clonado, con la versión de LLM asociada, antes de cualquier edición. */
-export async function getRetellEditableDraft(
-  agentId: string
-): Promise<RetellEditableDraft> {
-  const current = await retellAdapter.getAgent(agentId);
-  const draft = current.is_published
-    ? await retellAdapter.createAgentVersion(agentId, current.version)
-    : current;
-
-  if (!Number.isInteger(draft.version)) {
-    throw new Error(`Retell no devolvió una versión editable para el agente ${agentId}.`);
-  }
-  if (draft.response_engine.type !== "retell-llm") {
-    throw new Error(`El agente ${agentId} no usa un Retell LLM editable.`);
-  }
-
-  return {
-    agentVersion: draft.version,
-    llmId: draft.response_engine.llm_id,
-    llmVersion: draft.response_engine.version ?? undefined,
-  };
-}
-
-/**
- * Cadenas fijas ya validadas contra la API de Retell. Cartesia ofrece la
- * voz española principal para es/en/fr y se cambia a ElevenLabs
- * (usaVozMultilingueEnRetell en lib/idiomas/resolver.ts) si el principal
- * no es el español, si habla una lengua cooficial o si uno de sus idiomas
- * la exige (`retell.vozMultilingue`; hoy el catalán, porque Retell rechaza
- * ca-ES con Cartesia). MiniMax queda como último proveedor distinto.
- */
-const RETELL_VOICE_PROFILES: Record<
-  AgentSettings["voiceGender"],
-  { default: RetellVoiceProfile; multilingue: RetellVoiceProfile }
-> = {
-  femenina: {
-    default: {
-      voiceId: "cartesia-Isabel",
-      voiceModel: "sonic-3.5",
-      fallbackVoiceIds: [
-        "11labs-Hailey-Latin-America-Spanish-localized",
-        "minimax-Camille",
-      ],
-      voiceProvider: "cartesia",
-    },
-    multilingue: {
-      voiceId: "11labs-Hailey-Latin-America-Spanish-localized",
-      voiceModel: "eleven_v3",
-      fallbackVoiceIds: ["minimax-Camille"],
-      voiceProvider: "elevenlabs",
-    },
-  },
-  masculina: {
-    default: {
-      voiceId: "cartesia-Manuel",
-      voiceModel: "sonic-3.5",
-      fallbackVoiceIds: ["11labs-Santiago", "minimax-Louis"],
-      voiceProvider: "cartesia",
-    },
-    multilingue: {
-      voiceId: "11labs-Santiago",
-      voiceModel: "eleven_v3",
-      fallbackVoiceIds: ["minimax-Louis"],
-      voiceProvider: "elevenlabs",
-    },
-  },
-};
-
-// Retell es solo el fallback de Telnyx: no usa la voz elegida
-// (AgentSettings.voz), solo su género. Con un principal en otro idioma
-// (inglés, alemán…) o una lengua cooficial va la cadena multilingüe de
-// ElevenLabs (usaVozMultilingueEnRetell), con los ajustes tal como los
-// atiende Retell (sin euskera).
-export function resolveRetellVoiceProfile(settings: unknown): RetellVoiceProfile {
-  const parsed = parseAgentSettings(settings);
-  const ajustes = ajustesParaRetell(parsed);
-  return usaVozMultilingueEnRetell(ajustes.languages, ajustes.voiceLanguage)
-    ? RETELL_VOICE_PROFILES[parsed.voiceGender].multilingue
-    : RETELL_VOICE_PROFILES[parsed.voiceGender].default;
-}
-
 /**
  * Devuelve un nombre legible para el agente basado en el tipo de negocio.
- * Facilita identificarlo en el dashboard de Retell mientras no haya API de carpetas.
  */
 export function buildAgentDisplayName(
   businessName: string,
@@ -415,7 +70,7 @@ export function buildAgentDisplayName(
  * systemPrompt ya incluye las instrucciones de nicho (NICHE_INSTRUCTIONS en
  * managedAgentPrompt.ts) desde el momento de creación — es efímero de todos
  * modos, porque PATCH /business/me lo reconstruye en cuanto el negocio guarda
- * ajustes o tipo de negocio (ver syncAgentToRetell). El horario y el
+ * ajustes o tipo de negocio (ver syncAgentToTelnyx). El horario y el
  * catálogo no viven en el prompt: get_catalog los devuelve solo cuando el
  * agente los necesita. TTS/LLM/STT siguen siendo iguales para todos los
  * nichos.
@@ -500,79 +155,6 @@ export function buildSafeAssistantName(name: string) {
   return `${prefix}-${hash}`.slice(0, 40);
 }
 
-export function buildRetellLlmPayload(input: {
-  name: string;
-  systemPrompt: string;
-  firstMessage?: string;
-  tools?: any[];
-}) {
-  const payload: {
-    generalPrompt: string;
-    beginMessage: string;
-    model: CreateRetellLlmInput["model"];
-    modelTemperature: number;
-    tools?: any[];
-  } = {
-    generalPrompt: input.systemPrompt,
-    beginMessage: input.firstMessage || DEFAULT_AGENT_CONFIG.firstMessage,
-    model: DEFAULT_RETELL_AGENT_CONFIG.model,
-    modelTemperature: DEFAULT_RETELL_AGENT_CONFIG.modelTemperature,
-  };
-
-  if (input.tools !== undefined) {
-    payload.tools = input.tools;
-  }
-
-  return payload;
-}
-
-export function buildRetellAgentPayload(input: {
-  name: string;
-  llmId: string;
-  webhookUrl?: string;
-  postCallAnalysisData?: RetellAnalysisField[];
-  // Opcional: sin indicarlo, cae a la voz femenina por defecto — el caso
-  // correcto para createBusinessAgent (agente nuevo, sin voz elegida
-  // todavía). PATCH /agents/:id SÍ debe pasar la voz ya resuelta del
-  // negocio (agent.voiceId existente o la que se acabe de elegir); antes
-  // este payload la ignoraba siempre y cualquier edición del agente
-  // (nombre, saludo, prompt) reseteaba en silencio la voz a la femenina
-  // aunque el negocio hubiera elegido la masculina (hallazgo #26 de la
-  // auditoría).
-  voiceId?: string;
-  voiceModel?: RetellVoiceProfile["voiceModel"];
-  fallbackVoiceIds?: string[];
-  languages?: AgentSettings["languages"];
-  /** Zona del negocio. Sin esto, todos los agentes creían estar en Madrid y
-   * un negocio canario recibía "ahora" con una hora de más. */
-  timezone?: string | null;
-}) {
-  return {
-    name: buildSafeAssistantName(input.name),
-    voiceId: input.voiceId ?? DEFAULT_RETELL_AGENT_CONFIG.voiceId,
-    llmId: input.llmId,
-    language: idiomaDeRetell(input.languages ?? DEFAULT_AGENT_SETTINGS.languages),
-    // No enviar undefined como una actualización vacía: PATCH /agents/:id
-    // puede editar solo el saludo de una voz elegida manualmente y Retell debe
-    // conservar su modelo y sus fallbacks ya configurados.
-    voiceModel: input.voiceModel,
-    fallbackVoiceIds: input.fallbackVoiceIds,
-    webhookUrl: input.webhookUrl,
-    timezone: resolvePromptTimezone(input.timezone),
-    postCallAnalysisData: input.postCallAnalysisData ?? [
-      CALL_OUTCOME_ANALYSIS_FIELD,
-    ],
-    interruptionSensitivity:
-      DEFAULT_RETELL_AGENT_CONFIG.interruptionSensitivity,
-    dataStorageRetentionDays:
-      DEFAULT_RETELL_AGENT_CONFIG.dataStorageRetentionDays,
-    sttMode: DEFAULT_RETELL_AGENT_CONFIG.sttMode,
-    piiCategories: DEFAULT_RETELL_AGENT_CONFIG.piiCategories,
-    endCallAfterSilenceMs: DEFAULT_RETELL_AGENT_CONFIG.endCallAfterSilenceMs,
-    maxCallDurationMs: DEFAULT_RETELL_AGENT_CONFIG.maxCallDurationMs,
-  };
-}
-
 export async function createBusinessAgent(args: {
   businessId: string;
   name: string;
@@ -585,7 +167,6 @@ export async function createBusinessAgent(args: {
   const business = await client.business.findUnique({
     where: { id: args.businessId },
     select: {
-      orchestrator: true,
       businessType: true,
       name: true,
       businessDetails: true,
@@ -600,7 +181,6 @@ export async function createBusinessAgent(args: {
   const businessType =
     args.businessType ??
     (isBusinessType(business?.businessType) ? business?.businessType : "other");
-  const orchestrator = business?.orchestrator || "retell";
   const displayName = buildAgentDisplayName(args.name, businessType);
 
   const listaDeEspera = await listaDeEsperaDisponible();
@@ -611,7 +191,6 @@ export async function createBusinessAgent(args: {
     listaDeEspera
   );
   const agentSettings = parseAgentSettings(business?.agentSettings);
-  const voiceProfile = resolveRetellVoiceProfile(agentSettings);
   const config = {
     ...templateConfig,
     systemPrompt: buildManagedAgentPrompt({
@@ -635,118 +214,19 @@ export async function createBusinessAgent(args: {
     }),
   });
 
-  if (orchestrator === "retell") {
-    let agenteDevuelto = agent;
-    try {
-      const baseUrl = getPublicWebhookBaseUrl();
-      const webhookUrl = baseUrl
-        ? `${baseUrl.replace(/\/$/, "")}/webhooks/retell`
-        : undefined;
-
-      const retellLlm = await retellAdapter.createLlm(
-        buildRetellLlmPayload({
-          name: config.name,
-          systemPrompt: config.systemPrompt,
-          firstMessage: config.firstMessage,
-          tools: [],
-        })
-      );
-
-      const postCallAnalysisData = await buildPostCallAnalysisDataForBusiness(
-        args.businessId,
-        client
-      );
-      const retellAgent = await retellAdapter.createAgent(
-        buildRetellAgentPayload({
-          name: config.name,
-          llmId: retellLlm.llm_id,
-          webhookUrl,
-          postCallAnalysisData,
-          voiceId: voiceProfile.voiceId,
-          voiceModel: voiceProfile.voiceModel,
-          fallbackVoiceIds: voiceProfile.fallbackVoiceIds,
-          languages: ajustesParaRetell(agentSettings).languages,
-          timezone: business?.timezone,
-        })
-      );
-      await publishRetellAgentUpdate(retellAgent.agent_id, retellAgent);
-
-      agenteDevuelto = await client.agent.update({
-        where: { id: agent.id },
-        data: {
-          retellAgentId: retellAgent.agent_id,
-          retellLlmId: retellLlm.llm_id,
-          voiceId: voiceProfile.voiceId,
-          voiceProvider: voiceProfile.voiceProvider,
-        },
-      });
-
-      // El LLM se crea con tools: [] — sin este paso, un agente recién
-      // creado no puede consultar horario, disponibilidad, reservar ni
-      // colgar hasta que OTRA acción (conectar el calendario, guardar el
-      // horario) dispare una sincronización por su cuenta. También cierra
-      // la carrera contraria: si el negocio conecta el calendario ANTES de
-      // que esta creación asíncrona termine, esa sincronización anterior no
-      // encuentra ningún agente todavía y no hace nada — este paso final
-      // deja las tools correctas sea cual sea el orden (hallazgo #25 de la
-      // auditoría).
-      try {
-        await calendarService.syncCalendarToolsToAgents(args.businessId);
-      } catch (toolsError) {
-        console.error("[Agent] No se pudieron sincronizar las herramientas de calendario tras crear el agente:", {
-          agentId: agent.id,
-          businessId: args.businessId,
-          message:
-            toolsError instanceof Error
-              ? toolsError.message
-              : String(toolsError),
-        });
-      }
-    } catch (error) {
-      console.error("[Agent] No se pudo sincronizar el agente con Retell:", {
-        agentId: agent.id,
-        businessId: args.businessId,
-        message: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined,
-      });
-    }
-
-    await crearAssistantDelAgente(agent.id, args.businessId, client);
-    return agenteDevuelto;
-  }
-
-  await crearAssistantDelAgente(agent.id, args.businessId, client);
-  return agent;
-}
-
-/**
- * El assistant de Telnyx, que atiende todas las llamadas, con la
- * auto-promoción del negocio a Telnyx-primary (crearAssistantYPromocionar).
- * Va fuera del try de Retell, que es solo el respaldo: si Retell lanzaba
- * (sin crédito, su API caída) el negocio nuevo se quedaba sin assistant. Y
- * desde el 17-10 tampoco depende de que el negocio entre por la rama de
- * Retell (`orchestrator === "retell"`): uno que ya fuera "telnyx" se quedaba
- * sin assistant (PLAN-RETIRAR-RETELL.md, PR 1). Nunca lanza ni impide
- * devolver el agente. El assistant nace con sus tools de voz.
- */
-async function crearAssistantDelAgente(
-  agentId: string,
-  businessId: string,
-  client: typeof prisma
-): Promise<void> {
-  if (!isVoiceTelnyxRolloutEnabled()) return;
-  await crearAssistantYPromocionar({
-    agentId,
-    businessId,
+  // El assistant de Telnyx, que atiende todas las llamadas. Nunca lanza ni
+  // impide devolver el agente; nace con sus tools de voz.
+  await crearAssistantDelNegocio({
+    agentId: agent.id,
+    businessId: args.businessId,
     prismaClient: client,
   });
+  return agent;
 }
 
 /**
  * Actualiza el nombre del agente existente para reflejar el tipo de negocio.
  * Se usa cuando el usuario confirma/selecciona el nicho tras el registro.
- * Nota: Retell no expone API pública para mover agentes entre carpetas,
- * por lo que el tipo se refleja en el nombre del agente.
  */
 export async function syncAgentNameWithBusinessType(args: {
   businessId: string;
@@ -758,7 +238,7 @@ export async function syncAgentNameWithBusinessType(args: {
 
   const business = await client.business.findUnique({
     where: { id: args.businessId },
-    select: { name: true, orchestrator: true },
+    select: { name: true },
   });
 
   if (!business) return;
@@ -780,236 +260,5 @@ export async function syncAgentNameWithBusinessType(args: {
   await client.agent.update({
     where: { id: agent.id },
     data: { name: displayName },
-  });
-
-  if (business.orchestrator === "retell" && agent.retellAgentId) {
-    try {
-      await retellAdapter.updateAgent(agent.retellAgentId, {
-        name: displayName,
-      });
-    } catch (error) {
-      console.error("[Agent] Failed to update Retell agent name:", {
-        agentId: agent.id,
-        retellAgentId: agent.retellAgentId,
-        businessId: args.businessId,
-        message: error instanceof Error ? error.message : String(error),
-      });
-    }
-  }
-}
-
-/**
- * Reconstruye el prompt gestionado y el post_call_analysis_data de un
- * negocio a partir de su configuración actual (nicho, horario, ajustes,
- * restricciones, servicios y profesionales activos) y los sincroniza con
- * Retell. Es el único punto que debe llamarse cuando cambia cualquier dato
- * que afecte al prompt gestionado. No toca agentes cuyo systemPrompt se editó
- * a mano vía PATCH /agents/:id — ese endpoint no llama a esta función a
- * propósito, para no pisar un prompt escrito manualmente por el negocio.
- */
-export async function syncAgentToRetell(
-  businessId: string,
-  prismaClient: typeof prisma = prisma,
-  options?: {
-    onlyManagedPrompts?: boolean;
-    onlyActive?: boolean;
-    /** El job de despliegue debe fallar si Retell no confirma las tools. */
-    strictCalendarTools?: boolean;
-  }
-): Promise<void> {
-  const business = await prismaClient.business.findUnique({
-    where: { id: businessId },
-    select: {
-      name: true,
-      // La cooficial de la zona, solo para la copia del panel (ver
-      // promptDelPanel): Retell atiende el principal y el español.
-      address: true,
-      businessDetails: true,
-      businessType: true,
-      agentSettings: true,
-      orchestrator: true,
-      timezone: true,
-      minAdvanceBookingMinutes: true,
-      maxAppointmentDurationMinutes: true,
-      hideOwnerNumberFromClients: true,
-      // Transferencia al dueño (fase 4): solo para la copia del prompt que
-      // ve el panel (ver promptDelPanel), Retell no tiene la tool.
-      customerLineType: true,
-      phone: true,
-      telnyxPhoneNumber: true,
-      ownerWhatsappNumber: true,
-      ownerPhoneIsCustomerLine: true,
-    },
-  });
-
-  // Retell es siempre el fallback caliente (plan Telnyx-orquestador §6), sin
-  // depender de cuál sea el primary — se sincroniza tanto si orchestrator es
-  // "retell" como "telnyx".
-  if (!business) return;
-
-  const agents = await prismaClient.agent.findMany({
-    where: {
-      businessId,
-      deletedAt: null,
-      retellAgentId: { not: null },
-      retellLlmId: { not: null },
-      ...(options?.onlyActive ? { active: true } : {}),
-    },
-  });
-  if (agents.length === 0) return;
-
-  // El horario y el catálogo se consultan bajo demanda mediante get_catalog;
-  // estos servicios se cargan aquí solo para postCallAnalysisData y para
-  // boostear la transcripción con los nombres reales del negocio.
-  const services = await prismaClient.service.findMany({
-    where: { businessId, active: true, deletedAt: null },
-    select: { name: true },
-    orderBy: { name: "asc" },
-  });
-
-  const professionals = await prismaClient.professional.findMany({
-    where: { businessId, active: true, deletedAt: null },
-    select: { name: true },
-    orderBy: { name: "asc" },
-  });
-
-  const businessType = isBusinessType(business.businessType)
-    ? business.businessType
-    : "other";
-  const agentSettings = parseAgentSettings(business.agentSettings);
-
-  const promptBase = {
-    businessName: business.name,
-    businessDetails: business.businessDetails,
-    businessType,
-    settings: agentSettings,
-    timezone: business.timezone,
-    minAdvanceBookingMinutes: business.minAdvanceBookingMinutes,
-    maxAppointmentDurationMinutes: business.maxAppointmentDurationMinutes,
-    listaDeEspera: await listaDeEsperaDisponible(),
-    ocultarNumeroDelNegocio: business.hideOwnerNumberFromClients,
-  };
-  // Lo que ejecuta Retell: sin el bloque «## Pasar la llamada», porque el
-  // agente de Retell no tiene la tool `transfer` y el prompt nunca debe
-  // mandar usar una herramienta que no existe.
-  // Y solo con los idiomas que atiende Retell: el principal y el español
-  // (sin euskera: si el principal es el euskera, saluda en español), con el
-  // prompt diciendo esos mismos (ajustesParaRetell).
-  const ajustesDeRetell = ajustesParaRetell(agentSettings);
-  const systemPrompt = buildManagedAgentPrompt({
-    ...promptBase,
-    settings: ajustesDeRetell,
-    idiomas: ajustesDeRetell.languages,
-  });
-  // Lo que guarda Agent.systemPrompt (la copia que enseña /agente): el
-  // prompt del primary, Telnyx, con el bloque de transferencia cuando la
-  // tool está registrada. Antes esta función lo pisaba con la versión sin
-  // bloque justo después de que PATCH /business/me lo escribiera con él, y
-  // el panel no enseñaba la regla que Telnyx sí aplicaba.
-  const promptDelPanel = buildManagedAgentPrompt({
-    ...promptBase,
-    transferenciaAlDueno: resolverTransferenciaAlDueno(
-      business,
-      agentSettings.pasarLlamadas
-    ),
-    // Con la cooficial de su zona, como el de telnyxAgentSync.ts.
-    idiomas: resolverIdiomas({
-      ...agentSettings,
-      zona: cooficialDeLaZona(business),
-    }).idiomas,
-  });
-
-  const postCallAnalysisData = buildPostCallAnalysisData(
-    services.map((service) => service.name)
-  );
-  // Sesga la transcripción hacia los nombres reales del negocio (servicios y
-  // profesionales) — reduce errores tipo "corte" transcrito como "corta".
-  const boostedKeywords = [
-    ...services.map((service) => service.name),
-    ...professionals.map((professional) => professional.name),
-  ];
-  const voiceProfile = resolveRetellVoiceProfile(agentSettings);
-  const voiceId = voiceProfile.voiceId;
-
-  const failedAgentIds: string[] = [];
-  for (const agent of agents) {
-    if (options?.onlyManagedPrompts && agent.promptManuallyEdited) continue;
-
-    try {
-      const retellDraft = await getRetellEditableDraft(agent.retellAgentId!);
-      // Los agentes editados a mano vía PATCH /agents/:id (promptManuallyEdited)
-      // nunca deben perder ese texto solo porque cambió un servicio, un
-      // profesional o los ajustes del negocio — antes esta función lo
-      // sobrescribía siempre, pese a que su propio comentario decía lo
-      // contrario (hallazgo #27 de la auditoría). El resto de la
-      // sincronización (postCallAnalysisData, voz, boostedKeywords) sí se
-      // aplica igual: no tiene sentido dejar esos desactualizados solo
-      // porque el prompt es manual.
-      if (!agent.promptManuallyEdited) {
-        await retellAdapter.updateLlm(retellDraft.llmId, {
-          generalPrompt: systemPrompt,
-          beginMessage: componerSaludo(ajustesDeRetell.voiceLanguage, business.name),
-          version: retellDraft.llmVersion,
-        });
-      }
-      const updatedRetellAgent = await retellAdapter.updateAgent(agent.retellAgentId!, {
-        postCallAnalysisData,
-        llmId: retellDraft.llmId,
-        version: retellDraft.agentVersion,
-        voiceId,
-        voiceModel: voiceProfile.voiceModel,
-        fallbackVoiceIds: voiceProfile.fallbackVoiceIds,
-        language: idiomaDeRetell(ajustesDeRetell.languages),
-        // Estos tres viajaban SOLO en la creación del agente, así que los
-        // agentes creados antes de que existieran (commit 3be1e12) se
-        // quedaban sin tope de duración ni corte por silencio para siempre:
-        // un teléfono descolgado facturaba hasta el default de Retell, una
-        // hora, contra los minutos incluidos del plan. Al mandarlos en cada
-        // sincronización, cualquier guardado de ajustes los pone al día.
-        timezone: resolvePromptTimezone(business.timezone),
-        endCallAfterSilenceMs: DEFAULT_RETELL_AGENT_CONFIG.endCallAfterSilenceMs,
-        maxCallDurationMs: DEFAULT_RETELL_AGENT_CONFIG.maxCallDurationMs,
-        interruptionSensitivity:
-          DEFAULT_RETELL_AGENT_CONFIG.interruptionSensitivity,
-        dataStorageRetentionDays:
-          DEFAULT_RETELL_AGENT_CONFIG.dataStorageRetentionDays,
-        sttMode: DEFAULT_RETELL_AGENT_CONFIG.sttMode,
-        boostedKeywords,
-        piiCategories: DEFAULT_RETELL_AGENT_CONFIG.piiCategories,
-      });
-      await publishRetellAgentUpdate(agent.retellAgentId!, updatedRetellAgent);
-      await prismaClient.agent.update({
-        where: { id: agent.id },
-        data: agent.promptManuallyEdited
-          ? {
-              retellLlmId: retellDraft.llmId,
-              voiceId,
-              voiceProvider: voiceProfile.voiceProvider,
-            }
-          : {
-              retellLlmId: retellDraft.llmId,
-              systemPrompt: promptDelPanel,
-              voiceId,
-              voiceProvider: voiceProfile.voiceProvider,
-            },
-      });
-    } catch (error) {
-      failedAgentIds.push(agent.id);
-      console.error("[Agent] Failed to sync agent to Retell:", {
-        agentId: agent.id,
-        businessId,
-        message: error instanceof Error ? error.message : String(error),
-      });
-    }
-  }
-
-  if (failedAgentIds.length > 0) {
-    throw new Error(
-      `No se pudieron publicar ${failedAgentIds.length} agente(s) de Retell: ${failedAgentIds.join(", ")}`
-    );
-  }
-
-  await calendarService.syncCalendarToolsToAgents(businessId, {
-    strict: options?.strictCalendarTools,
   });
 }

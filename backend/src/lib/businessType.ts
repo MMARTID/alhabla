@@ -1,6 +1,6 @@
 /**
  * Tipos de negocio soportados. Se usan para elegir plantilla de agente,
- * organizar asistentes en Retell y personalizar prompts en futuras iteraciones.
+ * organizar asistentes en Telnyx y personalizar prompts en futuras iteraciones.
  */
 export const BUSINESS_TYPES = [
   "peluqueria",

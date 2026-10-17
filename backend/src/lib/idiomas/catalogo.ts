@@ -1,6 +1,6 @@
 /**
  * Catálogo único de los idiomas de la recepcionista. Todo lo que depende
- * del idioma —voz, transcripción, saludo, prompt, Retell y panel— sale de
+ * del idioma —voz, transcripción, saludo, prompt y panel— sale de
  * aquí a través de resolverIdiomas (resolver.ts): ningún otro módulo
  * guarda listas de idiomas ni decide por su cuenta. Módulo puro: sin E/S ni
  * dependencias de adapters.
@@ -28,8 +28,8 @@ import type { IdiomaConVocesUltra } from "./curacionDeVoces.js";
 
 /**
  * Orden canónico de los idiomas. Los seis primeros no se mueven: alimentan,
- * en este orden, las pistas de transcripción, el array de idiomas de
- * Retell, la lista del prompt y el JSON guardado, y cambiarlo cambiaría el
+ * en este orden, las pistas de transcripción, la lista del prompt y el
+ * JSON guardado, y cambiarlo cambiaría el
  * hash del payload de Telnyx de todos los negocios multilingües. Los nuevos
  * van al final.
  */
@@ -52,19 +52,6 @@ export type CodigoDeIdioma = (typeof CODIGOS_DE_IDIOMA)[number];
 export const GENEROS_DE_VOZ = ["femenina", "masculina"] as const;
 
 export type GeneroDeVoz = (typeof GENEROS_DE_VOZ)[number];
-
-/** Los locales de `IdiomaDelCatalogo.retell` que acepta Retell (su SDK
- * los enumera; el euskera no está). */
-export type IdiomaDeRetell =
-  | "es-ES"
-  | "en-GB"
-  | "fr-FR"
-  | "ca-ES"
-  | "gl-ES"
-  | "de-DE"
-  | "it-IT"
-  | "pt-PT"
-  | "nl-NL";
 
 /** Proveedores de las voces del catálogo, como los nombra Telnyx al
  * listarlas (`listVoices`). Las de Azure y MiniMax se retiraron el
@@ -139,9 +126,6 @@ export interface IdiomaDelCatalogo {
    * entiende. flux es el rápido (fin de turno anticipado); Soniox entiende
    * todos. */
   transcripcion: { flux: string | null; soniox: string };
-  /** Locale de Retell (el respaldo), o null si no lo tiene; y si exige la
-   * cadena de voces multilingüe (Retell rechaza ca-ES con Cartesia). */
-  retell: { locale: IdiomaDeRetell | null; vozMultilingue: boolean };
   /** Lengua cooficial (catalán, euskera, gallego): ninguna Ultra la habla,
    * así que solo es principal, con sus voces de Soniox (que arrancan en
    * ella: `voice_settings.language`), y solo así la habla la
@@ -242,7 +226,6 @@ export const IDIOMAS: Record<CodigoDeIdioma, IdiomaDelCatalogo> = {
         "¿Quieres repetir lo de la última vez o prefieres algo nuevo?",
     },
     transcripcion: { flux: "es", soniox: "es" },
-    retell: { locale: "es-ES", vozMultilingue: false },
     cooficial: false,
     voces: ultra("es-ES"),
   },
@@ -265,7 +248,6 @@ export const IDIOMAS: Record<CodigoDeIdioma, IdiomaDelCatalogo> = {
         "Would you like the same as last time, or something new?",
     },
     transcripcion: { flux: "en", soniox: "en" },
-    retell: { locale: "en-GB", vozMultilingue: false },
     cooficial: false,
     voces: ultra("en-GB"),
   },
@@ -288,7 +270,6 @@ export const IDIOMAS: Record<CodigoDeIdioma, IdiomaDelCatalogo> = {
         "Vous souhaitez la même chose que la dernière fois, ou autre chose ?",
     },
     transcripcion: { flux: "fr", soniox: "fr" },
-    retell: { locale: "fr-FR", vozMultilingue: false },
     cooficial: false,
     voces: ultra("fr-FR"),
   },
@@ -309,7 +290,6 @@ export const IDIOMAS: Record<CodigoDeIdioma, IdiomaDelCatalogo> = {
         "Vols repetir el de l'última vegada o prefereixes una altra cosa?",
     },
     transcripcion: { flux: null, soniox: "ca" },
-    retell: { locale: "ca-ES", vozMultilingue: true },
     cooficial: true,
     // Las nativas de Azure y las de MiniMax se ofrecieron del 03 al 05-10 y
     // se retiraron por decisión del usuario: se cobran aparte por carácter
@@ -338,7 +318,6 @@ export const IDIOMAS: Record<CodigoDeIdioma, IdiomaDelCatalogo> = {
         "Azken aldikoa berriro nahi duzu, ala beste zerbait?",
     },
     transcripcion: { flux: null, soniox: "eu" },
-    retell: { locale: null, vozMultilingue: false },
     cooficial: true,
     voces: [MARTA, SERGIO],
   },
@@ -359,10 +338,6 @@ export const IDIOMAS: Record<CodigoDeIdioma, IdiomaDelCatalogo> = {
         "Queres repetir o da última vez ou prefires outra cousa?",
     },
     transcripcion: { flux: null, soniox: "gl" },
-    // Retell admite gl-ES. Su voz Cartesia estaba sin verificar en gallego;
-    // desde el 2026-10-05, con una cooficial va la cadena multilingüe
-    // (usaVozMultilingueEnRetell en resolver.ts).
-    retell: { locale: "gl-ES", vozMultilingue: false },
     cooficial: true,
     voces: [MARTA, SERGIO],
   },
@@ -385,7 +360,6 @@ export const IDIOMAS: Record<CodigoDeIdioma, IdiomaDelCatalogo> = {
         "Möchten Sie dasselbe wie beim letzten Mal oder etwas anderes?",
     },
     transcripcion: { flux: "de", soniox: "de" },
-    retell: { locale: "de-DE", vozMultilingue: false },
     cooficial: false,
     voces: ultra("de-DE"),
   },
@@ -407,7 +381,6 @@ export const IDIOMAS: Record<CodigoDeIdioma, IdiomaDelCatalogo> = {
         "Vuole ripetere come l'ultima volta o preferisce qualcos'altro?",
     },
     transcripcion: { flux: "it", soniox: "it" },
-    retell: { locale: "it-IT", vozMultilingue: false },
     cooficial: false,
     voces: ultra("it-IT"),
   },
@@ -430,7 +403,6 @@ export const IDIOMAS: Record<CodigoDeIdioma, IdiomaDelCatalogo> = {
         "Quer repetir o da última vez ou prefere outra coisa?",
     },
     transcripcion: { flux: "pt", soniox: "pt" },
-    retell: { locale: "pt-PT", vozMultilingue: false },
     cooficial: false,
     voces: ultra("pt-PT"),
   },
@@ -452,7 +424,6 @@ export const IDIOMAS: Record<CodigoDeIdioma, IdiomaDelCatalogo> = {
         "Wilt u hetzelfde als de vorige keer of liever iets anders?",
     },
     transcripcion: { flux: "nl", soniox: "nl" },
-    retell: { locale: "nl-NL", vozMultilingue: false },
     cooficial: false,
     voces: ultra("nl-NL"),
   },
@@ -479,8 +450,6 @@ export const IDIOMAS: Record<CodigoDeIdioma, IdiomaDelCatalogo> = {
         "Хотите повторить то же, что в прошлый раз, или что-то другое?",
     },
     transcripcion: { flux: "ru", soniox: "ru" },
-    // Retell solo recibe el principal y el español (ajustesParaRetell).
-    retell: { locale: null, vozMultilingue: false },
     cooficial: false,
     voces: null,
   },
@@ -547,7 +516,7 @@ export function esCooficial(codigo: CodigoDeIdioma): boolean {
  * Los siete de ULTRA_HABLA con cualquier principal y, si es una lengua
  * cooficial, también ella (con sus voces de Soniox, que hablan todos). Se
  * guardan así en `languages`, para que lo que lo lee siga igual, y
- * alimentan la transcripción, la lista del prompt y Retell.
+ * alimentan la transcripción y la lista del prompt.
  */
 export function idiomasQueHabla(principal: CodigoDeIdioma): CodigoDeIdioma[] {
   return CODIGOS_DE_IDIOMA.filter(
@@ -621,7 +590,7 @@ function conGenero(texto: TextoConGenero, genero: GeneroDeVoz): string {
 
 /**
  * El saludo fijo del assistant: a quien no se conoce y sin grabar. Es el que
- * queda guardado en Telnyx y el `begin_message` de Retell; en cada llamada
+ * queda guardado en Telnyx; en cada llamada
  * de Telnyx el backend manda el suyo (componerSaludoDeLlamada).
  */
 export function componerSaludo(

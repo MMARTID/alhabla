@@ -13,9 +13,9 @@ cachés y claves de un solo uso; Redis solo queda como espejo de los cerrojos mi
 `app.alhabla.ai`, TanStack Query, sesión JWT en `localStorage`) y **la web pública** en `web/`
 (puerto 3002, `alhabla.ai`: landing, sectores, planes, legal, registro de cuenta y blog en MDX,
 sin sesión). El registro crea la cuenta en la web y entra en la app con un pase de un solo uso
-(`POST /auth/pase/canjear`). Voz vía **Telnyx AI Assistants** (primario; todos los negocios son
-`orchestrator = "telnyx"`) con **Retell.ai** de respaldo; telefonía y WhatsApp por Telnyx, pagos
-Stripe.
+(`POST /auth/pase/canjear`). Voz vía **Telnyx AI Assistants** (el único orquestador: Retell.ai,
+el respaldo que nunca cogió una llamada, se retiró el 2026-10-17, `PLAN-RETIRAR-RETELL.md`);
+telefonía y WhatsApp por Telnyx, pagos Stripe.
 
 **Producción** (desde 2026-09-01): backend en Google Cloud Run, **un solo servicio**,
 `alhabla-api` (`https://api.alhabla.ai`, tráfico público). Los jobs en segundo plano (antes
@@ -40,15 +40,15 @@ Notes.
 - **Aislamiento multi-tenant:** toda consulta con ámbito de negocio se filtra por
   `request.user.businessId` del token JWT. Nunca aceptes un `businessId` del body para
   lecturas ni escrituras.
-- **Los adaptadores son la única vía a las APIs de voz.** Retell pasa por
-  `backend/src/adapters/retell/RetellAdapter.ts`; Telnyx por `adapters/telnyx/TelnyxAdapter.ts`
-  (números) y `TelnyxAiAdapter.ts` (assistants), y WhatsApp por
-  `adapters/whatsapp/WhatsAppAdapter.ts`. Jamás llames a esas APIs desde un route handler.
-- **No toques la verificación de firmas de webhooks.** Retell (`x-retell-signature`) y
-  Telnyx (Ed25519) se comprueban cada uno en un único `preHandler`
-  (`backend/src/plugins/firmaRetell.ts` y `firmaTelnyx.ts`) que protege todas las rutas de
-  `modules/webhooksRetell/routes.ts` y `modules/webhooksTelnyx/routes.ts` — una ruta firmada
-  nueva de cualquiera de los dos va en su plugin; firma de Stripe con `rawBody: true`.
+- **Los adaptadores son la única vía a las APIs de voz.** Telnyx pasa por
+  `backend/src/adapters/telnyx/TelnyxAdapter.ts` (números) y `TelnyxAiAdapter.ts` (assistants), y
+  WhatsApp por `adapters/whatsapp/WhatsAppAdapter.ts`. Jamás llames a esas APIs desde un route
+  handler. `adapters/retell/RetellAdapter.ts` solo queda para los scripts que limpian la cuenta
+  de Retell (`inventarioAgentesRetell.ts`, `borrarAgentesRetell.ts`) hasta la PR 3 del plan.
+- **No toques la verificación de firmas de webhooks.** Telnyx (Ed25519) se comprueba en un único
+  `preHandler` (`backend/src/plugins/firmaTelnyx.ts`) que protege todas las rutas de
+  `modules/webhooksTelnyx/routes.ts` — una ruta firmada nueva va en ese plugin; firma de Stripe
+  con `rawBody: true`.
 - **Nunca commitees `.env`.** En la raíz hay `.env`, `.env.bak` y `.env.google` con
   credenciales reales; están en `.gitignore`. `docker-compose.yml` vive en la raíz y lee
   ese `.env` (build context de `backend`/`backend-dev` es `./backend`).
@@ -152,13 +152,14 @@ Detalle en `AGENTS.md` § Entorno de desarrollo fijo.
 backend/
 ├── src/
 │   ├── server.ts     # entry Fastify: registra rutas + endpoints internos de jobs (Cloud Tasks)
-│   ├── plugins/      # auth (JWT), internalAuth (OIDC de Cloud Tasks), firmaRetell y
-│   │                 #   firmaTelnyx (Ed25519); CORS y rate-limit se registran en server.ts
+│   ├── plugins/      # auth (JWT), internalAuth (OIDC de Cloud Tasks) y firmaTelnyx
+│   │                 #   (Ed25519); CORS y rate-limit se registran en server.ts
 │   ├── modules/      # por dominio (agents, auth, billing, bookings, businesses, busqueda, calendar,
 │   │                 #   calls, contacto, demo, internal, onboarding, phone, places, recordings,
-│   │                 #   webhooksRetell, webhooksTelnyx, whatsapp) con routes.ts; gestor, voiceTools y
-│   │                 #   retellSimulation sin routes.ts (los usan los webhooks y los scripts)
-│   ├── adapters/     # retell, telnyx (voz y números), whatsapp, calendar (Google, Outlook, CalDAV)
+│   │                 #   webhooksTelnyx, whatsapp) con routes.ts; gestor y voiceTools sin routes.ts
+│   │                 #   (los usan los webhooks y los scripts)
+│   ├── adapters/     # telnyx (voz y números), whatsapp, calendar (Google, Outlook, CalDAV) y
+│   │                 #   retell (solo para limpiar su cuenta)
 │   ├── lib/          # prisma, almacenTemporal, cerrojos, limitesDePeticiones, cloudTasks,
 │   │                 #   storage, stripe, availability, salud, zohoMail, emailTemplates,
 │   │                 #   businessSchedule, agentBootstrap, managedAgentPrompt
@@ -184,10 +185,10 @@ y `WEB_URL` (`backend/src/lib/urls.ts`). Nada de rutas de la otra web escritas a
 
 - `AGENTS.md` — referencia técnica completa (~240 KB, en inglés con secciones en español):
   modelos Prisma, flujos de webhooks, WhatsApp, telefonía, facturación Stripe, calendarios,
-  orquestadores de voz (Telnyx y Retell), despliegue.
+  el orquestador de voz (Telnyx), despliegue.
   Consúltalo cuando trabajes sobre un subsistema concreto.
 - MCP `alhabla-dev` (`.mcp.json`, `backend/mcp/`): SQL de solo lectura y esquema real en dev y en
-  producción, JWT de dev, webhooks firmados de Telnyx/Retell contra el backend local, logs, peticiones,
+  producción, JWT de dev, webhooks firmados de Telnyx contra el backend local, logs, peticiones,
   latencias por ruta y estado de producción, salud y traza de las llamadas, resumen de un negocio,
   assistants y conversaciones de Telnyx (solo GET) y los jobs del Scheduler que se pueden repetir. Úsalo antes que `gcloud`/`curl`/`psql` a mano. Ver `AGENTS.md` § MCP de desarrollo.
 - `.claude-context.md` — resumen de producto, audiencia, tono de marca y problemas

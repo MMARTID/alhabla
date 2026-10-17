@@ -26,7 +26,7 @@ import { programarRecuperacionDeTranscripcion } from "../../jobs/recuperarTransc
  * Envoltorio real verificado en vivo el 2026-09-11 y contra los tipos de
  * webhook que publica el SDK (`node_modules/telnyx/resources/webhooks.d.ts`)
  * — Telnyx envuelve cada evento como `{ data: { id, event_type, occurred_at,
- * payload } }`, distinto de la forma `{event_type, data}` de Retell.
+ * payload } }`.
  * `.passthrough()` en cada payload: Telnyx puede añadir campos sin avisar y
  * el body real puede diferir del tipo del SDK (ver TelnyxAiAdapter.listVoices).
  */
@@ -805,9 +805,9 @@ function mapTelnyxToolFailureDetected(value: unknown): boolean | undefined {
  * IDs reales de los 3 insights custom creados en la cuenta de Telnyx
  * (2026-09-14, ver memoria del proyecto) y asignados al insight group
  * "Default" que ya usan los 5 assistants — mismas categorías que
- * CALL_OUTCOME_ANALYSIS_FIELD/ESCALATION_REASON_FIELD/TOOL_FAILURE_FIELD de
- * Retell (agentBootstrap.ts), para que ambos proveedores clasifiquen la
- * llamada de forma comparable. `requested_service_type` queda fuera a
+ * CALL_OUTCOME_ANALYSIS_FIELD/ESCALATION_REASON_FIELD/TOOL_FAILURE_FIELD que
+ * usaba Retell, para que las llamadas de antes y de después del corte se
+ * clasifiquen igual. `requested_service_type` queda fuera a
  * propósito: en Retell es un enum generado por negocio (sus propios
  * servicios), pero el insight group de Telnyx es único y compartido para
  * toda la plataforma — no hay un mecanismo limpio para un enum por negocio

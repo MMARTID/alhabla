@@ -21,10 +21,6 @@ import {
  *   (lib/contextoDeLlamada.ts).
  * - Dice que no, en cualquier momento: se para, lo grabado se descarta al
  *   llegar y no se le vuelve a preguntar.
- *
- * Retell, el respaldo, graba siempre por su cuenta y no deja empezar ni
- * parar a mitad de llamada: su audio no se guarda nunca (webhooks de
- * Retell). El permiso que dé ahí sí vale para sus llamadas por Telnyx.
  */
 
 export type EstadoDeGrabacion = "aceptada" | "rechazada" | "sin_preguntar";
@@ -77,7 +73,7 @@ export function telefonoDelCliente(
  * en el log.
  */
 export async function tocaPreguntarPorGrabar(input: {
-  /** `Call.callId`: el call_control_id de Telnyx o el call_id de Retell. */
+  /** `Call.callId`: el call_control_id de Telnyx. */
   callId: string;
   businessId: string;
   etiqueta: string;
@@ -166,7 +162,7 @@ export type ResultadoDeLaPreferencia = "aceptada" | "rechazada" | "sin_llamada";
  * dirá cuando se le pregunte en otra llamada.
  */
 export async function guardarPreferenciaDeGrabacion(input: {
-  /** `Call.callId`: el call_control_id de Telnyx o el call_id de Retell. */
+  /** `Call.callId`: el call_control_id de Telnyx. */
   callId: string;
   businessId: string;
   acepta: boolean;

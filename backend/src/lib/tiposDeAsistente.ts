@@ -22,7 +22,7 @@ import {
  * AGENTS.md § «Cómo añadir un nuevo tipo de asistente».
  *
  * Solo metadatos y referencias a funciones puras: nada aquí llama a Telnyx
- * ni a Retell, ni cambia lo que se les envía.
+ * ni cambia lo que se le envía.
  */
 
 export type ClaveDeTipoDeAsistente = "recepcionista" | "demo" | "gestor";
@@ -34,8 +34,8 @@ export interface TipoDeAsistente {
   ambito: "por_agente" | "plataforma" | "reutiliza_recepcionista";
   /** Canales por los que habla con personas. */
   canales: ReadonlyArray<"voz" | "whatsapp" | "web">;
-  /** Proveedor principal y respaldo caliente, si lo hay. */
-  proveedores: { principal: "telnyx"; respaldo?: "retell" };
+  /** Proveedor que lo atiende. */
+  proveedores: { principal: "telnyx" };
   /** Canal de sus tools de webhook (null si no tiene tools propias). */
   canalDeTools: CanalDeTools | null;
   /** Nombre (o prefijo) del assistant en Telnyx: permite reconciliar y
@@ -61,13 +61,13 @@ export const TIPOS_DE_ASISTENTE: Readonly<
       "Recepcionista de un negocio: atiende sus llamadas y, con el mismo assistant, el chat de clientes por WhatsApp (modules/whatsapp/chatCliente.ts).",
     ambito: "por_agente",
     canales: ["voz", "whatsapp"],
-    proveedores: { principal: "telnyx", respaldo: "retell" },
+    proveedores: { principal: "telnyx" },
     canalDeTools: CANAL_DE_TOOLS_DE_VOZ,
     nombreEnTelnyx: ({ businessId, agentId }) =>
       buildTelnyxAssistantName(businessId, agentId),
     tools: buildTelnyxVoiceTools,
     sincronizacion:
-      "lib/telnyxAgentSync.ts (Telnyx, por hash del payload) y lib/agentBootstrap.ts#syncAgentToRetell (Retell, respaldo)",
+      "lib/telnyxAgentSync.ts (Telnyx, por hash del payload)",
   },
   demo: {
     clave: "demo",

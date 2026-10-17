@@ -8,7 +8,6 @@ import { z } from "zod";
 import { prisma } from "../../lib/prisma.js";
 import { consumirClave, guardarClave } from "../../lib/almacenTemporal.js";
 import { createBusinessAgent } from "../../lib/agentBootstrap.js";
-import { detectVoiceOrchestrator } from "../../lib/voiceOrchestrator.js";
 import {
   normalizeBusinessType,
   type BusinessType,
@@ -199,18 +198,14 @@ async function createUserWithBusiness(input: {
   password: string | null;
   googleId?: string;
   facebookId?: string;
-  isEuropeanUnion?: boolean;
   businessType?: BusinessType;
 }) {
-  const orchestrator = detectVoiceOrchestrator(input.isEuropeanUnion);
-
   return prisma.$transaction(async (tx) => {
     const business = await tx.business.create({
       data: {
         name: `Negocio de ${input.email}`,
         phone: `TEMP-${Date.now()}-${randomBytes(4).toString("hex")}`,
         schedule: {},
-        orchestrator,
         businessType: input.businessType ?? "other",
       },
     });
@@ -235,10 +230,10 @@ async function createUserWithBusiness(input: {
 // esperarlo, puede quedarse sin CPU justo después de responder y dejar una
 // cuenta recién creada sin ningún agente (hallazgo #11 de la auditoría). Un
 // fallo aquí no debe impedir el registro en sí — createBusinessAgent ya
-// captura sus propios errores de Retell internamente y siempre
-// devuelve el Agent (aunque sin retellAgentId/retellLlmId si falló la
-// sincronización externa), así que este catch es solo para errores
-// realmente inesperados (p. ej. el propio insert en Postgres).
+// captura los errores de Telnyx y siempre devuelve el Agent (aunque sin
+// assistant si falló la creación: el reconciliador lo crea), así que este
+// catch es solo para errores realmente inesperados (p. ej. el propio insert
+// en Postgres).
 async function bootstrapBusinessAgent(
   businessId: string,
   email: string,
@@ -355,6 +350,9 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
           .send({ error: contrasena.error.errors[0]?.message ?? "Contraseña no válida" });
       }
 
+      // Ya no decide nada (elegía el orquestador de voz, y desde el 17-10
+      // solo hay Telnyx: PLAN-RETIRAR-RETELL.md), pero el registro de la web
+      // lo sigue mandando: se valida para no cambiar el contrato.
       if (typeof isEuropeanUnion !== "boolean") {
         return reply
           .status(400)
@@ -387,7 +385,6 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
           // sentido que la contraseña nazca peor protegida de lo que queda
           // después de cambiarla.
           password: await bcrypt.hash(password, 12),
-          isEuropeanUnion,
           businessType: normalizedBusinessType,
         });
       } catch (error) {
@@ -1006,13 +1003,11 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
         }
       }
 
-      const { email, password, businessName, isEuropeanUnion } =
-        request.body as {
-          email: string;
-          password: string;
-          businessName: string;
-          isEuropeanUnion?: boolean;
-        };
+      const { email, password, businessName } = request.body as {
+        email: string;
+        password: string;
+        businessName: string;
+      };
 
       const existingUser = await prisma.user.findFirst();
       if (existingUser) {
@@ -1021,7 +1016,6 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
           .send({ error: "A user already exists. Initial setup is complete." });
       }
 
-      const orchestrator = detectVoiceOrchestrator(isEuropeanUnion);
       const hashedPassword = await bcrypt.hash(password, 12);
       const result = await prisma.$transaction(async (tx) => {
         const business = await tx.business.create({
@@ -1029,7 +1023,6 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
             name: businessName,
             phone: "123456789",
             schedule: {},
-            orchestrator,
           },
         });
         const user = await tx.user.create({
