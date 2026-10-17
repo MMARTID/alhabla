@@ -206,7 +206,6 @@ async function start() {
       });
     });
 
-
     // Webhooks firmados de Telnyx (Call Control App de plataforma, WhatsApp,
     // tools de voz y del Gestor): la firma Ed25519 se verifica en un único
     // preHandler encapsulado en su plugin (modules/webhooksTelnyx/routes.ts).
