@@ -199,6 +199,15 @@ export interface TelnyxVoice {
   deprecated?: boolean;
 }
 
+/**
+ * Lo que puede tardar el `answer` de una llamada entrante antes de darlo por
+ * perdido y reintentarlo (adapters/telnyx/contestarLlamada.ts). En
+ * producción el `call.initiated` entero, con BD y contexto, tarda 0,3-1,5 s
+ * (medido el 17-10); 3 s deja margen y, con dos reintentos, la llamada se
+ * contesta o se cuelga en ~10 s.
+ */
+export const TIEMPO_PARA_CONTESTAR_MS = 3_000;
+
 export class TelnyxAiAdapter {
   // ---------------------------------------------------------------------
   // Assistants CRUD
@@ -541,26 +550,30 @@ export class TelnyxAiAdapter {
     } = {}
   ): Promise<void> {
     const client = getTelnyxClient();
-    await client.calls.actions.answer(callControlId, {
-      assistant: {
-        id: assistantId,
-        ...(options.greeting ? { greeting: options.greeting } : {}),
-        ...(options.dynamicVariables
-          ? { dynamic_variables: options.dynamicVariables }
-          : {}),
-        ...(options.voiceSettings
-          ? { voice_settings: options.voiceSettings }
+    await client.calls.actions.answer(
+      callControlId,
+      {
+        assistant: {
+          id: assistantId,
+          ...(options.greeting ? { greeting: options.greeting } : {}),
+          ...(options.dynamicVariables
+            ? { dynamic_variables: options.dynamicVariables }
+            : {}),
+          ...(options.voiceSettings
+            ? { voice_settings: options.voiceSettings }
+            : {}),
+        },
+        client_state: options.clientState,
+        ...(options.grabar
+          ? {
+              record: "record-from-answer",
+              record_format: "mp3",
+              record_channels: "dual",
+            }
           : {}),
       },
-      client_state: options.clientState,
-      ...(options.grabar
-        ? {
-            record: "record-from-answer",
-            record_format: "mp3",
-            record_channels: "dual",
-          }
-        : {}),
-    });
+      { timeout: TIEMPO_PARA_CONTESTAR_MS }
+    );
   }
 
   async startAssistantOnCall(

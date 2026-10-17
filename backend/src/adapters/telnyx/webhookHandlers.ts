@@ -3,6 +3,10 @@ import type { CallEscalationReason, CallOutcome } from "@prisma/client";
 import { prisma } from "../../lib/prisma.js";
 import { telnyxAiAdapter } from "./TelnyxAiAdapter.js";
 import {
+  contestarConReintentos,
+  NoSePudoContestar,
+} from "./contestarLlamada.js";
+import {
   enqueueRecordingJob,
   enqueueUsageReportJob,
 } from "../../lib/cloudTasks.js";
@@ -459,24 +463,45 @@ export async function handleCallInitiated(
         }
       : {};
     try {
-      await telnyxAiAdapter.answerCallWithAssistant(
-        call_control_id,
-        agent.telnyxAssistantId,
-        opciones
-      );
-    } catch (error) {
-      if (!contexto?.voz) throw error;
       // La voz de esta llamada (la cooficial de la zona) es una mejora: si
       // Telnyx la rechaza, se contesta con la del assistant y su saludo, que
-      // va en el principal, antes que dejar la llamada sin atender.
+      // va en el principal, antes que dejar la llamada sin atender. Los
+      // fallos transitorios se reintentan (contestarLlamada.ts).
+      await contestarConReintentos({
+        callControlId: call_control_id,
+        assistantId: agent.telnyxAssistantId,
+        businessId: business.id,
+        opciones,
+        sinVoz: contexto?.voz
+          ? {
+              opciones: {
+                dynamicVariables: contexto.variables,
+                grabar: contexto.grabar,
+              },
+              voz: contexto.voz.voice,
+            }
+          : null,
+      });
+    } catch (error) {
+      if (!(error instanceof NoSePudoContestar)) throw error;
+      // Decisión del usuario del 17-10 (PLAN-RETIRAR-RETELL.md): si no se
+      // puede contestar, se cuelga, para que el cliente note el corte y
+      // vuelva a llamar en vez de oír tonos hasta cansarse. Salvo que un
+      // intento agotara el tiempo y Telnyx pudiera ejecutarlo: entonces la
+      // llamada quizá ya habla con la recepcionista y no se toca.
       console.error(
-        `[Telnyx] ${callLabel(call_control_id)}: Telnyx rechazó contestar con la voz ${contexto.voz.voice} (negocio ${business.id}); se contesta con la del assistant y su saludo: ${errorMessage(error)}`
+        `[Telnyx] No se pudo contestar ${callLabel(call_control_id)} del negocio ${business.id} con el assistant ${agent.telnyxAssistantId} tras ${error.intentos} ${error.intentos === 1 ? "intento" : "intentos"}${error.quizaContestada ? "; un intento agotó el tiempo y puede que Telnyx la contestara, así que no se cuelga" : "; se cuelga"}: ${errorMessage(error.causa)}`
       );
-      await telnyxAiAdapter.answerCallWithAssistant(
-        call_control_id,
-        agent.telnyxAssistantId,
-        { dynamicVariables: contexto.variables, grabar: contexto.grabar }
-      );
+      if (!error.quizaContestada) {
+        await telnyxAiAdapter
+          .hangupCall(call_control_id)
+          .catch((errorAlColgar) => {
+            console.error(
+              `[Telnyx] ${callLabel(call_control_id)}: tampoco se pudo colgar (negocio ${business.id}): ${errorMessage(errorAlColgar)}`
+            );
+          });
+      }
+      return { success: false };
     }
 
     console.log(
