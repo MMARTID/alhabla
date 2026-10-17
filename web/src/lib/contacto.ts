@@ -16,11 +16,11 @@ export type Sedes = (typeof OPCIONES_DE_SEDES)[number]["valor"];
 
 /**
  * WhatsApp del equipo, en internacional y sin «+» (`34600123456`), o `null`
- * mientras no haya uno: entonces el botón no se pinta. No vale ninguno de los
- * números de Alhabla («Alhabla» y «Alhabla Reservas»): esos los contesta la
- * IA, y aquí quien escribe quiere hablar con una persona.
+ * para quitar el botón. Es el móvil que eligió el dueño el 17-10-2026. No vale
+ * ninguno de los números de Alhabla («Alhabla» y «Alhabla Reservas»): esos
+ * los contesta la IA, y aquí quien escribe quiere hablar con una persona.
  */
-export const WHATSAPP_DEL_EQUIPO: string | null = null;
+export const WHATSAPP_DEL_EQUIPO: string | null = "34692138456";
 
 const SALUDO_DE_WHATSAPP = "Hola, me gustaría saber más sobre Alhabla para mi negocio.";
 
