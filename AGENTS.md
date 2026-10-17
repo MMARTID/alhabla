@@ -1779,6 +1779,19 @@ is now a **Cloud Scheduler** job hitting the same kind of endpoint every
      **ignored by the API** (returns an empty list — verified against the live account
      2026-09-17). Only `call_leg_id`/`call_session_id` filters work; the adapter no
      longer exposes a by-call-control-id lookup.
+   - **Contestar con reintentos (2026-10-17, `PLAN-RETIRAR-RETELL.md` PR 4).**
+     `handleCallInitiated` contesta con `contestarConReintentos` (`adapters/telnyx/contestarLlamada.ts`):
+     - Un 5xx, un 429 o un fallo de red se reintentan dos veces, tras 300 y 800 ms.
+     - El `answer` tiene su propio timeout de 3 s (`TIEMPO_PARA_CONTESTAR_MS`), así que el peor caso
+       ronda 10 s. El `call.initiated` entero tarda 0,3-1,5 s en producción.
+     - Un 4xx no se reintenta. Si la llamada llevaba la voz de la cooficial, se contesta una vez sin
+       ella, como antes.
+     - Agotados los intentos, **se cuelga** (decisión del usuario del 17-10: el cliente nota el corte
+       y vuelve a llamar) con el log `[Telnyx] No se pudo contestar llamada … tras N intentos`.
+     - Antes la llamada sonaba hasta que el cliente colgaba, y la ruta respondía 404.
+     - Excepción: si un intento agotó el tiempo y el siguiente recibe un 4xx, puede que Telnyx
+       ejecutara el primero. Entonces no se cuelga, para no cortar una llamada que ya habla con la
+       recepcionista.
    - **Aviso de IA, saludo por cliente y grabación con permiso (2026-10-12/13).**
      - **Saludo y aviso de IA.** Al entrar la llamada, `lib/contextoDeLlamada.ts` mira tres cosas: si ese teléfono ya reservó en el negocio (nombre y último servicio, sacados de `Booking`), si deja grabar (`ClienteDelNegocio`) y si el negocio está en su primera semana desde su primera llamada. Con eso `handleCallInitiated` contesta con `answer`, pasando el saludo de esa llamada (`assistant.greeting`) y las variables del prompt (`nombre_cliente`, `ultimo_servicio`). El assistant guarda unos valores por defecto para el chat.
        - Las piezas del saludo están en `lib/idiomas/catalogo.ts` (10 idiomas). Todas dicen «inteligencia artificial» (Reglamento europeo de IA, art. 50; Alhabla es el proveedor).
