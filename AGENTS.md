@@ -1779,6 +1779,19 @@ is now a **Cloud Scheduler** job hitting the same kind of endpoint every
      **ignored by the API** (returns an empty list — verified against the live account
      2026-09-17). Only `call_leg_id`/`call_session_id` filters work; the adapter no
      longer exposes a by-call-control-id lookup.
+   - **Contestar con reintentos (2026-10-17, `PLAN-RETIRAR-RETELL.md` PR 4).**
+     `handleCallInitiated` contesta con `contestarConReintentos` (`adapters/telnyx/contestarLlamada.ts`):
+     - Un 5xx, un 429 o un fallo de red se reintentan dos veces, tras 300 y 800 ms.
+     - El `answer` tiene su propio timeout de 3 s (`TIEMPO_PARA_CONTESTAR_MS`), así que el peor caso
+       ronda 10 s. El `call.initiated` entero tarda 0,3-1,5 s en producción.
+     - Un 4xx no se reintenta. Si la llamada llevaba la voz de la cooficial, se contesta una vez sin
+       ella, como antes.
+     - Agotados los intentos, **se cuelga** (decisión del usuario del 17-10: el cliente nota el corte
+       y vuelve a llamar) con el log `[Telnyx] No se pudo contestar llamada … tras N intentos`.
+     - Antes la llamada sonaba hasta que el cliente colgaba, y la ruta respondía 404.
+     - Excepción: si un intento agotó el tiempo y el siguiente recibe un 4xx, puede que Telnyx
+       ejecutara el primero. Entonces no se cuelga, para no cortar una llamada que ya habla con la
+       recepcionista.
    - **Aviso de IA, saludo por cliente y grabación con permiso (2026-10-12/13).**
      - **Saludo y aviso de IA.** Al entrar la llamada, `lib/contextoDeLlamada.ts` mira tres cosas: si ese teléfono ya reservó en el negocio (nombre y último servicio, sacados de `Booking`), si deja grabar (`ClienteDelNegocio`) y si el negocio está en su primera semana desde su primera llamada. Con eso `handleCallInitiated` contesta con `answer`, pasando el saludo de esa llamada (`assistant.greeting`) y las variables del prompt (`nombre_cliente`, `ultimo_servicio`). El assistant guarda unos valores por defecto para el chat.
        - Las piezas del saludo están en `lib/idiomas/catalogo.ts` (10 idiomas). Todas dicen «inteligencia artificial» (Reglamento europeo de IA, art. 50; Alhabla es el proveedor).
@@ -3560,7 +3573,7 @@ Desde el PR B nada usa ya el cliente general de Redis (`lib/redis.ts`, borrado):
 
 Set up on 2026-09-17 after two days of `process-recording` failing every ten seconds
 with `/health` and CI both green: **`/health` only proves Postgres and Redis (while
-`REDIS_URL` exists) answer — it says nothing about jobs, queues or 5xx rates.** All five policies notify
+`REDIS_URL` exists) answer — it says nothing about jobs, queues or 5xx rates.** All seven policies notify
 the email channel *"Alhabla · avisos de producción (correo)"* (`miguel.zero.admin@gmail.com`,
 same inbox as `TELNYX_ALERT_EMAIL`); change the address in Monitoring › Alerting ›
 Notification channels, not in code.
@@ -3571,12 +3584,15 @@ Notification channels, not in code.
 | **Cloud Tasks · cola que no baja** | `cloudtasks.googleapis.com/queue/depth`, any queue, 5-min mean **> 200 for 15 min** | Queues drain in seconds at current traffic; a queue that grows is a task failing in a loop. Same incident peaked at ~9,000. |
 | **alhabla-api · /health caído** | Uptime check `alhabla-api-health-tJzyQ7cVqx8` (HTTPS `api.alhabla.ai/health` every minute from 6 regions, must contain `"status":"ok"`) failing from **more than one region for 60 s** | One region failing is usually the checker; two is us. |
 | **alhabla-api · cerrojos de citas con errores** | Log match (added 2026-10-12, PR A vigilance): stderr `[Cerrojo]` or `[Compat Redis]`, or `[Purga] No se pudo purgar`, from `alhabla-api`; at most one email per 30 min, auto-close after 30 min | Every `[Cerrojo]` line is an error: a booking, change or cancellation that did not happen (the lock fails closed, never double-books). `[Compat Redis]` errors mean the compatibility Redis is down or slow, which makes every lock fail closed. Kept after the 72 h of PR A vigilance. |
+| **alhabla-api · llamadas de voz con fallos** | Log match (added 2026-10-17, `PLAN-RETIRAR-RETELL.md` PR 5): `textPayload` with `[Telnyx] No se pudo contestar`, `[Telnyx] Error procesando inicio de`, `[Telnyx] No se pudo procesar el evento`, `[Telnyx] Error procesando call.`, `sin assistant Telnyx operativo o suspendido` or `[Salud] ` from `alhabla-api`; at most one email per 30 min, auto-close after 30 min | A voice failure was invisible until then: `/webhooks/telnyx` answers **404, not 5xx**, when `handleCallInitiated` fails, so the 5xx policy never sees it. `[Salud]` comes from `avisarDeLlamadasSinResultado` (`jobs/cleanupZombieCalls.ts`, every 15 min): Telnyx calls that ended 10–25 min ago with cost ≠ 0 and no `outcome` (the conversation insights never arrived), each reported once. A suspended business also logs `sin assistant…`: legitimate after a missed payment. |
+| **alhabla-api · WhatsApp rechazado por Meta** | Log match (added 2026-10-17, PR 5): `textPayload:"[WhatsApp] Meta rechazó"`; at most one email per hour, auto-close after 1 h | A deferred `statuses[].failed` on a message to a client (`aplicarEfectosDeEntrega`): a confirmation, reminder or notice that never arrived. 1 in 175 sends up to 2026-10-17. |
 | **alhabla-api · límite de peticiones solo en local** | Log match (added 2026-10-11, PR A): `textPayload:"no se abre otra hasta"` from `alhabla-api`; at most one email per hour, auto-close after 30 min | Fires when an instance has 2 limiter connections discarded by a timeout in 15 min and stops opening new ones: up to 15 min counting the rate limit locally with Postgres healthy, which `/health` does not see (§ Corte de Redis a Postgres, «Conexión desechada y tope»). |
 
 Resource ids (project `project-84381467-a606-4b71-a6e`): channel
 `notificationChannels/3301523917747931516`, policies `14798085137940900180` (5xx),
 `8824325884392888489` (queue), `14275085039933176867` (uptime),
-`9267553680755852729` (limiter on its local count), `11485991775861093593` (locks). List with
+`9267553680755852729` (limiter on its local count), `11485991775861093593` (locks),
+`12857991338509678084` (voice), `9385021159831932541` (WhatsApp rejected). List with
 `gcloud alpha monitoring policies list` / `gcloud monitoring uptime list-configs`.
 
 **When one fires:** the policy's own documentation (visible in the email) says what to
