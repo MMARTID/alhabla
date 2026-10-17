@@ -1,14 +1,11 @@
 /**
  * Migración idempotente para cuentas existentes (docs/historico/PLAN-TELNYX-ORQUESTADOR.md
- * Fase 1: "crea los assistants Telnyx faltantes sin tocar la ruta de las
- * llamadas"). Crea el assistant Telnyx de cada agente activo que todavía no
- * tenga uno, SIN cambiar orchestrator/voiceRoutingTarget ni el connection_id
- * del número — eso es el cutover de la Fase 5, un paso aparte y deliberado.
+ * Fase 1). Crea el assistant Telnyx de cada agente activo que todavía no
+ * tenga uno, sin tocar el connection_id del número.
  *
  * Desde el 2026-10-12 el reconciliador diario (jobs/telnyxReconciler.ts) crea
- * solo el assistant de los negocios que no tienen ninguno, y además los
- * promociona a Telnyx-primary si aún no tienen número; este script queda
- * para forzarlo a mano sin tocar el enrutamiento.
+ * solo el assistant de los negocios que no tienen ninguno; este script queda
+ * para forzarlo a mano agente por agente.
  *
  * Uso:
  *   npx tsx scripts/backfillTelnyxAssistants.ts --business <id> [--business <id> ...]

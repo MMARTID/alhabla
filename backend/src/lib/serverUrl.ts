@@ -1,6 +1,6 @@
 /**
- * URL pública base del servidor, usada para registrar webhooks en Retell y
- * Telnyx (webhook de la Call Control App y URL de cada tool).
+ * URL pública base del servidor, usada para registrar webhooks en Telnyx
+ * (webhook de la Call Control App y URL de cada tool).
  *
  * Es SIEMPRE `BASE_URL`, en los tres entornos. Antes, en desarrollo, la URL se
  * capturaba al arrancar desde el API de ngrok y vivía en un

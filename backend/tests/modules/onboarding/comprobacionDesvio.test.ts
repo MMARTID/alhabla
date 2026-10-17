@@ -72,7 +72,6 @@ function negocio(overrides: Record<string, unknown> = {}) {
     telnyxPhoneNumber: ALHABLA,
     phoneNumberStatus: "active",
     customerLineType: "fijo",
-    voiceRoutingTarget: "telnyx",
     ...overrides,
   } as any;
 }
@@ -290,19 +289,6 @@ describe("iniciarComprobacionDeDesvio", () => {
     );
     await iniciarComprobacionDeDesvio("biz_1");
     expect(mockedDialCall).toHaveBeenCalledTimes(1);
-  });
-
-  it("503 si el número está en failover a Retell: la llamada desviada no volvería por nuestro webhook", async () => {
-    mockedBusinessFindUnique.mockResolvedValue(
-      negocio({ voiceRoutingTarget: "retell" })
-    );
-
-    const error = await iniciarYEsperarError();
-
-    expect(error.codigo).toBe("telefonia_no_configurada");
-    expect(error.status).toBe(503);
-    expect(mockedDialCall).not.toHaveBeenCalled();
-    expect(clavesVivas()).toEqual([]);
   });
 
   it("503 sin TELNYX_CALL_CONTROL_APP_ID, sin reservar nada", async () => {

@@ -3,12 +3,11 @@ import {
   generateKeyPairSync,
   sign as firmarEd25519,
 } from "node:crypto";
-import Retell from "retell-sdk";
 
 /**
  * Firmas de los webhooks simulados. Nada de esto toca la verificación del
- * backend (plugins/firmaTelnyx.ts y firmaRetell.ts): firma igual que el
- * proveedor para que la verificación de siempre las acepte.
+ * backend (plugins/firmaTelnyx.ts): firma igual que el proveedor para que la
+ * verificación de siempre las acepte.
  *
  * Telnyx firma `${timestamp}|${cuerpo}` con Ed25519 y su clave privada, que
  * solo tiene Telnyx. Por eso las peticiones simuladas van al backend de
@@ -53,7 +52,3 @@ export function generarClavesDeSimulacion(): {
   };
 }
 
-/** Retell firma con la API key de la cuenta (HMAC), la misma que usa dev. */
-export function firmarComoRetell(cuerpo: string, apiKey: string): Promise<string> {
-  return Retell.sign(cuerpo, apiKey);
-}

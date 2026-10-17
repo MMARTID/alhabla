@@ -3,7 +3,7 @@ import { telnyxReconcilerJob } from "../../src/jobs/telnyxReconciler.js";
 import { prisma } from "../../src/lib/prisma.js";
 import { telnyxAiAdapter } from "../../src/adapters/telnyx/TelnyxAiAdapter.js";
 import {
-  crearAssistantYPromocionar,
+  crearAssistantDelNegocio,
   syncAgentToTelnyx,
 } from "../../src/lib/telnyxAgentSync.js";
 import { acquireLock, releaseLock } from "../../src/lib/bookingLock.js";
@@ -26,7 +26,7 @@ vi.mock("../../src/adapters/telnyx/TelnyxAiAdapter.js", () => ({
 
 vi.mock("../../src/lib/telnyxAgentSync.js", () => ({
   syncAgentToTelnyx: vi.fn(),
-  crearAssistantYPromocionar: vi.fn(),
+  crearAssistantDelNegocio: vi.fn(),
 }));
 
 vi.mock("../../src/lib/bookingLock.js", () => ({
@@ -56,12 +56,11 @@ const mockedSync = vi.mocked(syncAgentToTelnyx);
 const mockedSendMail = vi.mocked(sendZohoMail);
 const mockedRefrescarPlantillas = vi.mocked(refrescarPlantillasConClave);
 const mockedAgentFindUnique = vi.mocked(prisma.agent.findUnique);
-const mockedCrearAssistant = vi.mocked(crearAssistantYPromocionar);
+const mockedCrearAssistant = vi.mocked(crearAssistantDelNegocio);
 const mockedAcquireLock = vi.mocked(acquireLock);
 const mockedReleaseLock = vi.mocked(releaseLock);
 
 const ORIGINAL_ALERT_EMAIL = process.env.TELNYX_ALERT_EMAIL;
-const ORIGINAL_ROLLOUT = process.env.VOICE_TELNYX_ROLLOUT;
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -72,16 +71,11 @@ beforeEach(() => {
   mockedReleaseLock.mockResolvedValue(undefined);
   mockedAgentFindUnique.mockResolvedValue({ telnyxAssistantId: null } as any);
   process.env.TELNYX_ALERT_EMAIL = "ops@alhabla.ai";
-  // Apagado salvo en los tests de assistants que faltan, para que el resto
-  // no dependa del entorno.
-  delete process.env.VOICE_TELNYX_ROLLOUT;
 });
 
 afterEach(() => {
   if (ORIGINAL_ALERT_EMAIL === undefined) delete process.env.TELNYX_ALERT_EMAIL;
   else process.env.TELNYX_ALERT_EMAIL = ORIGINAL_ALERT_EMAIL;
-  if (ORIGINAL_ROLLOUT === undefined) delete process.env.VOICE_TELNYX_ROLLOUT;
-  else process.env.VOICE_TELNYX_ROLLOUT = ORIGINAL_ROLLOUT;
 });
 
 describe("telnyxReconcilerJob", () => {
@@ -264,71 +258,38 @@ describe("telnyxReconcilerJob", () => {
     expect(mockedSendMail).toHaveBeenCalled();
   });
 
-  it("detecta un negocio con número activo pero sin telnyxPhoneNumberId", async () => {
+  // Primera consulta de negocios: los que no tienen assistant (vacía);
+  // segunda: números que Telnyx no sabría enrutar, ya filtrados en la BD.
+  function numerosSinId(negocios: Array<{ id: string }>) {
+    mockedBusinessFindMany
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce(negocios as any);
+  }
+
+  it("detecta un negocio con número pero sin telnyxPhoneNumberId", async () => {
     mockedAgentFindMany.mockResolvedValue([]);
-    mockedBusinessFindMany.mockResolvedValue([
-      {
-        id: "biz1",
-        voiceRoutingTarget: "telnyx",
-        voiceFailoverActive: false,
-        telnyxPhoneNumberId: null,
-        telnyxPhoneNumber: "+34930000001",
-        phoneNumberStatus: "active",
-      },
-    ] as any);
+    numerosSinId([{ id: "biz1" }]);
 
     const result = await telnyxReconcilerJob();
 
     expect(result.businessesWithRoutingInconsistency).toEqual([
-      "biz1: orchestrator=telnyx sin telnyxPhoneNumberId",
+      "biz1: número sin telnyxPhoneNumberId",
     ]);
+    // Un negocio que aún no ha comprado número (registrado sin plan) no
+    // entra: el filtro exige número activo o guardado.
+    const consulta = mockedBusinessFindMany.mock.calls[1][0] as any;
+    expect(consulta.where).toEqual({
+      telnyxPhoneNumberId: null,
+      OR: [
+        { phoneNumberStatus: "active" },
+        { telnyxPhoneNumber: { not: null } },
+      ],
+    });
   });
 
-  it("no avisa de un negocio que aún no ha comprado número (registrado sin plan)", async () => {
+  it("sin números a medias no avisa", async () => {
     mockedAgentFindMany.mockResolvedValue([]);
-    mockedBusinessFindMany.mockResolvedValue([
-      {
-        id: "biz_sin_numero",
-        voiceRoutingTarget: "telnyx",
-        voiceFailoverActive: false,
-        telnyxPhoneNumberId: null,
-        telnyxPhoneNumber: null,
-        phoneNumberStatus: "pending",
-      },
-    ] as any);
-
-    const result = await telnyxReconcilerJob();
-
-    expect(result.businessesWithRoutingInconsistency).toEqual([]);
-    expect(mockedSendMail).not.toHaveBeenCalled();
-  });
-
-  it("detecta voiceRoutingTarget desalineado con voiceFailoverActive", async () => {
-    mockedAgentFindMany.mockResolvedValue([]);
-    mockedBusinessFindMany.mockResolvedValue([
-      {
-        id: "biz1",
-        voiceRoutingTarget: "telnyx",
-        voiceFailoverActive: true,
-        telnyxPhoneNumberId: "pn_1",
-      },
-    ] as any);
-
-    const result = await telnyxReconcilerJob();
-
-    expect(result.businessesWithRoutingInconsistency).toHaveLength(1);
-  });
-
-  it("no marca inconsistencia cuando el enrutamiento es coherente", async () => {
-    mockedAgentFindMany.mockResolvedValue([]);
-    mockedBusinessFindMany.mockResolvedValue([
-      {
-        id: "biz1",
-        voiceRoutingTarget: "telnyx",
-        voiceFailoverActive: false,
-        telnyxPhoneNumberId: "pn_1",
-      },
-    ] as any);
+    numerosSinId([]);
 
     const result = await telnyxReconcilerJob();
 
@@ -339,14 +300,7 @@ describe("telnyxReconcilerJob", () => {
   it("no envía correo si TELNYX_ALERT_EMAIL no está configurado, aunque haya hallazgos", async () => {
     delete process.env.TELNYX_ALERT_EMAIL;
     mockedAgentFindMany.mockResolvedValue([]);
-    mockedBusinessFindMany.mockResolvedValue([
-      {
-        id: "biz1",
-        voiceRoutingTarget: "retell",
-        voiceFailoverActive: false,
-        telnyxPhoneNumberId: "pn_1",
-      },
-    ] as any);
+    numerosSinId([{ id: "biz1" }]);
 
     await telnyxReconcilerJob();
 
@@ -355,14 +309,7 @@ describe("telnyxReconcilerJob", () => {
 
   it("no lanza si el envío de correo de alerta falla", async () => {
     mockedAgentFindMany.mockResolvedValue([]);
-    mockedBusinessFindMany.mockResolvedValue([
-      {
-        id: "biz1",
-        voiceRoutingTarget: "telnyx",
-        voiceFailoverActive: false,
-        telnyxPhoneNumberId: null,
-      },
-    ] as any);
+    numerosSinId([{ id: "biz1" }]);
     mockedSendMail.mockRejectedValue(new Error("Zoho caído"));
 
     await expect(telnyxReconcilerJob()).resolves.toBeDefined();
@@ -379,19 +326,14 @@ describe("telnyxReconcilerJob — assistants que faltan", () => {
   };
 
   beforeEach(() => {
-    process.env.VOICE_TELNYX_ROLLOUT = "all";
     mockedAgentFindMany.mockResolvedValue([]);
     mockedBusinessFindMany
       .mockResolvedValueOnce([NEGOCIO_SIN_ASSISTANT] as any)
       .mockResolvedValue([]);
   });
 
-  it("crea el assistant del primer agente activo, promociona el negocio y avisa por correo", async () => {
-    mockedCrearAssistant.mockResolvedValue({
-      eligible: true,
-      reason: null,
-      promocion: "hecha",
-    });
+  it("crea el assistant del primer agente activo y avisa por correo", async () => {
+    mockedCrearAssistant.mockResolvedValue({ eligible: true, reason: null });
     const warnSpy = vi
       .spyOn(console, "warn")
       .mockImplementation(() => undefined);
@@ -402,9 +344,7 @@ describe("telnyxReconcilerJob — assistants que faltan", () => {
       agentId: "agent_sin",
       businessId: "biz_sin",
     });
-    expect(result.assistantsCreados).toEqual([
-      "biz_sin/agent_sin: creado y promocionado a Telnyx-primary",
-    ]);
+    expect(result.assistantsCreados).toEqual(["biz_sin/agent_sin"]);
     expect(result.assistantsSinCrear).toEqual([]);
     // Solo negocios sin NINGÚN agente activo con assistant, y con agentes
     // de hace un rato (no uno que createBusinessAgent está creando ahora).
@@ -448,7 +388,6 @@ describe("telnyxReconcilerJob — assistants que faltan", () => {
     mockedCrearAssistant.mockResolvedValue({
       eligible: false,
       reason: "Telnyx down",
-      promocion: null,
     });
 
     const result = await telnyxReconcilerJob();
@@ -462,33 +401,6 @@ describe("telnyxReconcilerJob — assistants que faltan", () => {
         html: expect.stringContaining("Negocios que siguen sin assistant"),
       })
     );
-  });
-
-  it("con número ya comprado, lo crea pero señala que falta el cutover", async () => {
-    mockedCrearAssistant.mockResolvedValue({
-      eligible: true,
-      reason: null,
-      promocion: "falta_cutover",
-    });
-
-    const result = await telnyxReconcilerJob();
-
-    expect(result.assistantsCreados).toEqual([
-      "biz_sin/agent_sin: creado, pero ya tiene número: falta el cutover (scripts/cutoverToTelnyx.ts)",
-    ]);
-  });
-
-  it("no crea nada con el rollout de Telnyx apagado", async () => {
-    delete process.env.VOICE_TELNYX_ROLLOUT;
-    mockedBusinessFindMany.mockReset();
-    mockedBusinessFindMany.mockResolvedValue([]);
-
-    const result = await telnyxReconcilerJob();
-
-    expect(mockedCrearAssistant).not.toHaveBeenCalled();
-    // Solo la consulta de enrutamiento.
-    expect(mockedBusinessFindMany).toHaveBeenCalledTimes(1);
-    expect(result.assistantsCreados).toEqual([]);
   });
 
   it("no crea el assistant si otra pasada tiene el cerrojo del negocio", async () => {

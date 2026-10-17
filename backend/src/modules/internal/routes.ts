@@ -18,7 +18,6 @@ import { purgarCaducados } from "../../lib/almacenTemporal.js";
 import { recordarDesvioSinComprobarJob } from "../../jobs/recordarDesvioSinComprobar.js";
 import { purgeOldRecordingsJob } from "../../jobs/purgeOldRecordings.js";
 import { purgarTextoDeLlamadasJob } from "../../jobs/purgarTextoDeLlamadas.js";
-import { telnyxHealthCheckJob } from "../../jobs/telnyxHealthCheck.js";
 import { telnyxReconcilerJob } from "../../jobs/telnyxReconciler.js";
 import { retryStuckRecordingsJob } from "../../jobs/retryStuckRecordings.js";
 import { suspendOverdueCallsJob } from "../../jobs/suspendOverdueCalls.js";
@@ -555,42 +554,12 @@ export const internalJobsRoutes: FastifyPluginAsync = async (fastify) => {
     }
   );
 
-  // Cada 2 minutos (Cloud Scheduler) — plan Telnyx-orquestador §7. Inerte
-  // por defecto: VOICE_FAILOVER_ENABLED=off y ningún negocio tiene
-  // orchestrator="telnyx" todavía (eso es la Fase 5, deliberadamente sin
-  // ejecutar).
-  fastify.post(
-    "/jobs/telnyx-health-check",
-    opcionesDeJob,
-    async (request, reply) => {
-      try {
-        const horaProgramada = request.headers["x-cloudscheduler-scheduletime"];
-        await telnyxHealthCheckJob({
-          horaProgramada:
-            typeof horaProgramada === "string" ? horaProgramada : undefined,
-        });
-        return reply.send({ received: true });
-      } catch (error) {
-        if (error instanceof PermanentJobError) {
-          fastify.log.warn(
-            { err: error, reason: error.reason },
-            "telnyx-health-check job failed descartado por fallo definitivo"
-          );
-          return reply.send({ received: true, skipped: error.reason });
-        }
-        fastify.log.error({ err: error }, "telnyx-health-check job failed");
-        return reply.status(500).send({ error: "Job processing failed" });
-      }
-    }
-  );
-
-  // Una vez al día (Cloud Scheduler) — plan Telnyx-orquestador §6.
-  // Crea el assistant de los negocios que no tienen ninguno (y promociona a
-  // Telnyx-primary a los que aún no tienen número, como el registro),
-  // resincroniza cualquier agente con telnyxSyncError pendiente y avisa por
-  // email (TELNYX_ALERT_EMAIL) de assistants borrados a mano en Telnyx o de
-  // un enrutamiento inconsistente. No mueve tráfico ni cambia connection_id
-  // de ningún negocio — eso sigue siendo cosa de telnyx-health-check/Fase 5.
+  // Una vez al día (Cloud Scheduler), y tras cada despliegue que cambia el
+  // prompt o el payload. Crea el assistant de los negocios que no tienen
+  // ninguno, resincroniza cualquier agente con telnyxSyncError pendiente y
+  // avisa por email (TELNYX_ALERT_EMAIL) de assistants borrados a mano en
+  // Telnyx o de números que Telnyx no sabría enrutar. No cambia el
+  // connection_id de ningún número.
   fastify.post(
     "/jobs/telnyx-reconciler",
     opcionesDeJob,

@@ -4,7 +4,7 @@ import { errorMessage } from "../lib/logUtils.js";
 
 /**
  * Días que se conserva el audio de una llamada. El mismo valor que se le
- * pide a Retell (dataStorageRetentionDays) y a Telnyx, para que no haya un
+ * pide a Telnyx, para que no haya un
  * sitio donde la grabación viva más de lo que el negocio y el cliente
  * esperan. RGPD: sin purga, el audio y su transcripción se quedaban en R2 y
  * en Postgres indefinidamente, incluso después de que el panel los "borrara"

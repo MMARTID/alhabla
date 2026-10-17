@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { prisma } from "../../../src/lib/prisma.js";
 import { invalidarCacheDeVoz } from "../../../src/lib/voiceConfigCache.js";
-import { syncAgentToRetell } from "../../../src/lib/agentBootstrap.js";
 import { syncAgentToTelnyx } from "../../../src/lib/telnyxAgentSync.js";
 import { calendarService } from "../../../src/modules/calendar/service.js";
 import { DEFAULT_BUSINESS_SCHEDULE } from "../../../src/lib/businessSchedule.js";
@@ -12,9 +11,6 @@ vi.mock("../../../src/lib/prisma.js", () => ({
 }));
 vi.mock("../../../src/lib/voiceConfigCache.js", () => ({
   invalidarCacheDeVoz: vi.fn(),
-}));
-vi.mock("../../../src/lib/agentBootstrap.js", () => ({
-  syncAgentToRetell: vi.fn(),
 }));
 vi.mock("../../../src/lib/telnyxAgentSync.js", () => ({
   syncAgentToTelnyx: vi.fn(),
@@ -39,9 +35,6 @@ describe("guardarHorarioDelNegocio", () => {
     vi.mocked(invalidarCacheDeVoz).mockImplementation(async () => {
       orden.push("cache");
     });
-    vi.mocked(syncAgentToRetell).mockImplementation(async () => {
-      orden.push("retell");
-    });
     vi.mocked(syncAgentToTelnyx).mockImplementation(async () => {
       orden.push("telnyx");
     });
@@ -61,12 +54,12 @@ describe("guardarHorarioDelNegocio", () => {
       where: { id: "biz_1" },
       data: { schedule: DEFAULT_BUSINESS_SCHEDULE },
     });
-    expect(orden).toEqual(["update", "cache", "telnyx", "retell", "tools"]);
+    expect(orden).toEqual(["update", "cache", "telnyx", "tools"]);
   });
 
   it("si la sincronización lanza, el horario ya está guardado: no lanza, lo registra y devuelve sincronizado false", async () => {
-    vi.mocked(syncAgentToRetell).mockRejectedValueOnce(
-      new Error("Retell caído")
+    vi.mocked(calendarService.syncCalendarToolsToAgents).mockRejectedValueOnce(
+      new Error("Telnyx caído")
     );
     const r = await guardarHorarioDelNegocio(
       "biz_1",
@@ -84,6 +77,7 @@ describe("guardarHorarioDelNegocio", () => {
     await expect(
       guardarHorarioDelNegocio("biz_1", DEFAULT_BUSINESS_SCHEDULE)
     ).rejects.toThrow("bd");
-    expect(syncAgentToRetell).not.toHaveBeenCalled();
+    expect(syncAgentToTelnyx).not.toHaveBeenCalled();
+    expect(calendarService.syncCalendarToolsToAgents).not.toHaveBeenCalled();
   });
 });

@@ -2,9 +2,9 @@
  * Estado de GET /health. Solo las dependencias críticas (Postgres y Redis)
  * deciden el código: son lo que la revisión necesita para servir, y el
  * workflow de deploy revierte la revisión si /health no da "ok". Las
- * informativas (los proveedores de voz, Telnyx y Retell) salen en el JSON
- * pero nunca lo cambian: un fallo pasajero de su API durante un deploy
- * revertía una revisión sana (con las migraciones ya aplicadas).
+ * informativas (el proveedor de voz, Telnyx) salen en el JSON pero nunca
+ * lo cambian: un fallo pasajero de su API durante un deploy revertía una
+ * revisión sana (con las migraciones ya aplicadas).
  */
 export async function comprobarSalud(comprobaciones: {
   criticas: Record<string, () => Promise<unknown>>;
@@ -28,9 +28,9 @@ export async function comprobarSalud(comprobaciones: {
 /**
  * Comprobación informativa con memoria, por instancia. El uptime check de
  * Cloud Monitoring pide /health cada 60 s desde 6 regiones (unas 8.600 veces
- * al día) y cada vez se abrían conexiones TLS nuevas con Telnyx y Retell:
- * ~30 MB/día de salida a internet y ~17.000 llamadas a sus APIs que no
- * aportaban nada (issue #281). El resultado se guarda `vidaBienMs` si fue bien
+ * al día) y cada vez se abrían conexiones TLS nuevas con los proveedores de
+ * voz (entonces Telnyx y Retell): ~30 MB/día de salida a internet y ~17.000
+ * llamadas a sus APIs que no aportaban nada (issue #281). El resultado se guarda `vidaBienMs` si fue bien
  * y `vidaMalMs` si falló, para que una caída (y su vuelta) se vea pronto. Lo
  * que llega con una comprobación en vuelo espera a esa misma. Solo para las
  * informativas: las críticas se comprueban en cada consulta, porque deciden

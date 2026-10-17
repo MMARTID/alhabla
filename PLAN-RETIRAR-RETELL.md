@@ -295,11 +295,22 @@ y la integración pasen.
   - `DROP TABLE salud_telnyx`.
 - `schema.prisma` y los selects que aún nombren esos campos. Tras la PR 2 no debería quedar
   ninguno: `tsc` lo comprueba.
+- **Sin ventana rota en el despliegue (decidido al hacer la PR 2, 17-10).** Prisma selecciona
+  todas las columnas del modelo en cada consulta sin `select`: si la migración las borrara
+  mientras la revisión de la PR 2 sigue sirviendo, sus consultas a `businesses` y `agents`
+  fallarían hasta el cambio de tráfico. Por eso la PR 2 ya marca esos campos con `@ignore` (y
+  `SaludTelnyx` con `@@ignore`): siguen en la BD, el cliente no los conoce, y esta migración
+  los borra sin que nada los lea.
 - **Operación (manual, con permiso del usuario):**
-  - Con la salida guardada del inventario, `borrarAgentesRetell.ts --ids … --confirm` para los
-    agentes, LLMs y números importados.
-  - Borrar en el portal de Telnyx la SIP Connection que apunta a `sip.retellai.com`.
-  - Borrar después los dos scripts de inventario y su test.
+  - La PR 2 borró `inventarioAgentesRetell.ts` y `borrarAgentesRetell.ts` (cruzaban la cuenta
+    con `Agent.retellAgentId`, ya `@ignore`). Nada de la cuenta de Retell se usa en ningún
+    entorno, así que no hace falta cruzarla con la BD: inventario del 17-10, 13 agentes (7 de
+    negocios de prueba y 6 de la demo antigua), 225 LLM y 6 números importados sin agente. Se
+    borran de una vez con un script de usar y tirar sobre `RetellAdapter`.
+  - Telnyx: la SIP Connection «Alhabla» (`3036588299167729519`, el `TELNYX_SIP_CONNECTION_ID`)
+    es el trunk hacia Retell. Aún tiene el número `+34930453216`
+    (etiqueta env-prod), que no es de ningún negocio ni en dev ni en producción: decidir si se
+    da de baja o se mueve antes de borrar la conexión.
 - **Cuenta de Retell.** Baja y revocación de la clave cuando el usuario lo decida.
 - **Rollback.** No hay vuelta atrás de los datos. Sin usuarios reales (decisión del usuario del
   17-10) no se espera una semana: va en cuanto la PR 2 pase la verificación en producción, y

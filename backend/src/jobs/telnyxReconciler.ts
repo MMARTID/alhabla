@@ -1,7 +1,7 @@
 import { prisma } from "../lib/prisma.js";
 import { telnyxAiAdapter } from "../adapters/telnyx/TelnyxAiAdapter.js";
 import {
-  crearAssistantYPromocionar,
+  crearAssistantDelNegocio,
   syncAgentToTelnyx,
 } from "../lib/telnyxAgentSync.js";
 import { sendZohoMail } from "../lib/zohoMail.js";
@@ -12,7 +12,6 @@ import {
   refrescarPlantillasConClave,
 } from "../modules/whatsapp/service.js";
 import { sincronizarGestor } from "../lib/gestorSync.js";
-import { isVoiceTelnyxRolloutEnabled } from "../lib/voiceRollout.js";
 import { acquireLock, releaseLock } from "../lib/bookingLock.js";
 
 /**
@@ -33,9 +32,8 @@ import { acquireLock, releaseLock } from "../lib/bookingLock.js";
  *      en el dashboard).
  *   2. El `name` remoto sigue siendo el determinista esperado (detecta un
  *      `telnyxAssistantId` guardado que en realidad apunta a otro recurso).
- *   3. El estado de enrutamiento (`orchestrator`/`voiceRoutingTarget`/
- *      `telnyxPhoneNumberId`) de cada negocio en Telnyx es internamente
- *      consistente.
+ *   3. Todo número comprado tiene su `telnyxPhoneNumberId`: sin él no se
+ *      sabe a qué negocio llega la llamada.
  * Y antes de todo eso repara lo que ninguna de las tres ve: un negocio sin
  * ningún agente activo con assistant (ver crearAssistantsQueFaltan).
  */
@@ -46,8 +44,7 @@ export interface TelnyxReconcilerResult {
   assistantsWithUnexpectedName: string[];
   businessesWithSyncError: string[];
   businessesWithRoutingInconsistency: string[];
-  /** Assistants creados porque el negocio no tenía ninguno, con lo que pasó
-   * con su enrutamiento. */
+  /** Assistants creados porque el negocio no tenía ninguno. */
   assistantsCreados: string[];
   /** Negocios que siguen sin assistant tras intentarlo, con el motivo. */
   assistantsSinCrear: string[];
@@ -61,7 +58,7 @@ const MAX_AGENTES_POR_PASADA = 200;
 const MAX_ASSISTANTS_NUEVOS_POR_PASADA = 20;
 
 /** Un agente más reciente que esto puede estar a medio crear:
- * `createBusinessAgent` lo guarda en la BD antes de crear Retell y Telnyx, y
+ * `createBusinessAgent` lo guarda en la BD antes de crear su assistant, y
  * si el reconciliador (el deploy también lo lanza) creara el assistant a la
  * vez, el negocio acabaría con dos. */
 const MARGEN_DE_CREACION_MS = 15 * 60 * 1000;
@@ -204,40 +201,22 @@ export async function telnyxReconcilerJob(): Promise<TelnyxReconcilerResult> {
     }
   }
 
+  // Un número que Telnyx no sabría enrutar: activo (o con E.164 guardado)
+  // pero sin el id del recurso PhoneNumber.
   const routingBusinesses = await prisma.business.findMany({
-    where: { orchestrator: "telnyx" },
-    select: {
-      id: true,
-      voiceRoutingTarget: true,
-      voiceFailoverActive: true,
-      telnyxPhoneNumberId: true,
-      telnyxPhoneNumber: true,
-      phoneNumberStatus: true,
+    where: {
+      telnyxPhoneNumberId: null,
+      OR: [{ phoneNumberStatus: "active" }, { telnyxPhoneNumber: { not: null } }],
     },
+    select: { id: true },
   });
   for (const business of routingBusinesses) {
     // Un negocio que se registró y aún no ha comprado número (o cuya compra
-    // falló) no tiene nada que enrutar: no es una inconsistencia, es una
-    // cuenta a medias. Solo se avisa cuando el número existe (activo o con
-    // E.164 guardado) y falta el id con el que Telnyx lo enruta — el 20-09
-    // el correo diario señalaba una peluquería sin plan ni número.
-    const tieneNumero =
-      business.phoneNumberStatus === "active" ||
-      business.telnyxPhoneNumber !== null;
-    if (!business.telnyxPhoneNumberId) {
-      if (tieneNumero) {
-        result.businessesWithRoutingInconsistency.push(
-          `${business.id}: orchestrator=telnyx sin telnyxPhoneNumberId`
-        );
-      }
-      continue;
-    }
-    const expectedTarget = business.voiceFailoverActive ? "retell" : "telnyx";
-    if (business.voiceRoutingTarget !== expectedTarget) {
-      result.businessesWithRoutingInconsistency.push(
-        `${business.id}: voiceRoutingTarget="${business.voiceRoutingTarget}" pero voiceFailoverActive=${business.voiceFailoverActive}`
-      );
-    }
+    // falló) no sale aquí: no tiene nada que enrutar. El 20-09 el correo
+    // diario señalaba una peluquería sin plan ni número.
+    result.businessesWithRoutingInconsistency.push(
+      `${business.id}: número sin telnyxPhoneNumberId`
+    );
   }
 
   await maybeSendAlert(result);
@@ -251,16 +230,13 @@ export async function telnyxReconcilerJob(): Promise<TelnyxReconcilerResult> {
  * `createBusinessAgent` no pudo crearlo (Telnyx caído, sin voz compatible
  * ese día) o, hasta octubre de 2026, cuando Retell fallaba antes. Se crea el
  * del primer agente activo —el mismo que elige selectTelnyxInboundAgent
- * (phone/telnyxInbound.ts) para atender— y, si el negocio aún no tiene
- * número, se promociona a Telnyx-primary como en el registro
- * (crearAssistantYPromocionar). Hace el trabajo de
+ * (phone/telnyxInbound.ts) para atender— como en el registro
+ * (crearAssistantDelNegocio). Hace el trabajo de
  * scripts/backfillTelnyxAssistants.ts sin esperar a nadie.
  */
 async function crearAssistantsQueFaltan(
   result: TelnyxReconcilerResult
 ): Promise<void> {
-  if (!isVoiceTelnyxRolloutEnabled()) return;
-
   const agenteActivo = { active: true, deletedAt: null };
   const negocios = await prisma.business.findMany({
     where: {
@@ -311,20 +287,18 @@ async function crearAssistantsQueFaltan(
       console.warn(
         `[TelnyxReconciler] ${etiqueta}: el negocio no tiene assistant Telnyx, se crea`
       );
-      const creado = await crearAssistantYPromocionar({
+      const creado = await crearAssistantDelNegocio({
         agentId: agente.id,
         businessId: negocio.id,
       });
       if (!creado.eligible) {
-        // crearAssistantYPromocionar ya lo ha logueado con el motivo.
+        // crearAssistantDelNegocio ya lo ha logueado con el motivo.
         result.assistantsSinCrear.push(
           `${etiqueta}: ${creado.reason ?? "motivo desconocido"}`
         );
         continue;
       }
-      result.assistantsCreados.push(
-        `${etiqueta}: ${DESCRIPCION_DE_LA_PROMOCION[creado.promocion ?? "sin_guardar"]}`
-      );
+      result.assistantsCreados.push(etiqueta);
     } catch (error) {
       console.error(
         `[TelnyxReconciler] ${etiqueta}: no se pudo crear el assistant: ${errorMessage(error)}`
@@ -335,15 +309,6 @@ async function crearAssistantsQueFaltan(
     }
   }
 }
-
-const DESCRIPCION_DE_LA_PROMOCION = {
-  hecha: "creado y promocionado a Telnyx-primary",
-  ya_estaba: "creado (ya era Telnyx-primary)",
-  falta_cutover:
-    "creado, pero ya tiene número: falta el cutover (scripts/cutoverToTelnyx.ts)",
-  sin_guardar:
-    "creado, pero no se pudo guardar la elegibilidad ni la promoción del negocio",
-} as const;
 
 function hasFindings(result: TelnyxReconcilerResult): boolean {
   return (

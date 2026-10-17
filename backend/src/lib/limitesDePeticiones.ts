@@ -14,7 +14,7 @@ import { crearClienteDeUnaConexion } from "./prisma.js";
  * Cloud Run: en la memoria de cada una se multiplicaba por el número de
  * instancias y se reiniciaba en cada arranque en frío (arreglado el 17-09).
  *
- * Todas las rutas, también /webhooks/telnyx* y /webhooks/retell*, cuentan de
+ * Todas las rutas, también /webhooks/telnyx*, cuentan de
  * forma SÍNCRONA en Postgres (decisión D2, AGENTS.md § Corte de Redis): cada
  * petición espera a que Postgres la cuente y se decide con el valor global,
  * como con el INCR de Redis, a cualquier ritmo de llegada. La instancia

@@ -44,7 +44,6 @@ async function main() {
     select: {
       id: true,
       name: true,
-      orchestrator: true,
       agentSettings: true,
       address: true,
       businessDetails: true,
@@ -81,7 +80,7 @@ async function main() {
     const zona = atiende.cooficialDeLaZona
       ? ` · zona ${atiende.cooficialDeLaZona.idioma} con ${atiende.cooficialDeLaZona.voz.nombre}`
       : "";
-    const configuracion = `principal ${perfil.principal} · habla ${atiende.idiomas.length} idiomas · voz ${perfil.voz.proveedor} ${perfil.voz.nombre}${elegida ? " (elegida)" : ""}${zona} · ${atiende.transcripcion.motor} · ${negocio.orchestrator}`;
+    const configuracion = `principal ${perfil.principal} · habla ${atiende.idiomas.length} idiomas · voz ${perfil.voz.proveedor} ${perfil.voz.nombre}${elegida ? " (elegida)" : ""}${zona} · ${atiende.transcripcion.motor}`;
     porConfiguracion.set(
       configuracion,
       (porConfiguracion.get(configuracion) ?? 0) + 1
@@ -92,7 +91,7 @@ async function main() {
     const pierdeLaVoz = elegida !== null && ajustes.voz !== elegida;
     if (clave(guardadoPrincipal) !== clave(perfil.principal) || pierdeLaVoz) {
       cambianPrincipalOVoz.push(
-        `- ${negocio.id} «${negocio.name}» (${negocio.orchestrator}, ${assistants} assistant(s) Telnyx): guardado ${clave(guardadosIdiomas)} / ${clave(guardadoPrincipal)} → principal ${perfil.principal}${pierdeLaVoz ? ` · la voz elegida ${elegida} se olvida, atiende ${perfil.voz.nombre}` : ""}`
+        `- ${negocio.id} «${negocio.name}» (${assistants} assistant(s) Telnyx): guardado ${clave(guardadosIdiomas)} / ${clave(guardadoPrincipal)} → principal ${perfil.principal}${pierdeLaVoz ? ` · la voz elegida ${elegida} se olvida, atiende ${perfil.voz.nombre}` : ""}`
       );
     }
     if (clave(guardadosIdiomas) !== clave(perfil.idiomas)) {

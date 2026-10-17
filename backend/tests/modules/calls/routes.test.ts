@@ -147,7 +147,7 @@ describe("GET /business/me/calls/:id", () => {
       name: "Recepcionista",
       voice: "Octave",
       systemPrompt: "PROMPT_SECRETO_DEL_NEGOCIO",
-      retellLlmId: "llm_secreto",
+      llmModel: "llm_secreto",
       telnyxAssistantId: "assistant_secreto",
     };
     const profesionalCompleto = {

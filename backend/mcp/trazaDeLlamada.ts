@@ -105,7 +105,7 @@ export function lineasQueMencionan(
     .slice(-limite);
 }
 
-const RUTA_DE_TOOL = /\/webhooks\/(telnyx\/tools|retell\/tools)\//;
+const RUTA_DE_TOOL = /\/webhooks\/telnyx\/tools\//;
 
 /**
  * Las peticiones a las tools de un volcado de `docker logs -t`, a partir de
@@ -348,7 +348,7 @@ export async function trazaDeLlamada(
       // Solo las tools: los eventos de Call Control son de todas las
       // llamadas de la plataforma.
       peticionesDeTools = (peticiones.peticiones as Peticion[]).filter((p) =>
-        /\/webhooks\/(telnyx\/tools|retell\/tools)\//.test(p.ruta)
+        RUTA_DE_TOOL.test(p.ruta)
       );
     } else {
       const contenedor = fila.callId.startsWith("sim-mcp-")

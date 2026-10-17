@@ -7,9 +7,8 @@
  * DESARROLLO vía Prisma y la reproduce en producción a través de la API
  * pública real (POST /auth/register + PATCH /business/me + POST
  * /booking-settings/services|professionals) — así el alta pasa por el mismo
- * camino que un negocio real (crea Agent, LLM de Retell y, con
- * VOICE_TELNYX_ROLLOUT=all en producción, el assistant de Telnyx y la
- * auto-promoción a orchestrator="telnyx", ver agentBootstrap.ts).
+ * camino que un negocio real (crea el Agent y su assistant de Telnyx, ver
+ * agentBootstrap.ts).
  *
  * Lo único que NO hace (decisión explícita, ver docs/historico/PLAN-TELNYX-ORQUESTADOR.md y
  * memoria de sesión): comprar 5 números de Telnyx nuevos. Reutiliza los 5

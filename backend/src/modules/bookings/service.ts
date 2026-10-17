@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { syncAgentToRetell } from "../../lib/agentBootstrap.js";
 import { syncAgentToTelnyx } from "../../lib/telnyxAgentSync.js";
 import {
   getPlanLimits,
@@ -167,18 +166,16 @@ export async function invalidateBusinessAgentConfigCache(businessId: string) {
 
 /**
  * Tras cambiar el catálogo: caché de voz fuera y la recepcionista al día en
- * los dos orquestadores. Exportada para que el Gestor (fase 2 del plan de
- * WhatsApp) sincronice UNA vez al final de un lote (`{ sync: false }` en
- * cada alta) en vez de una por servicio o profesional.
+ * Telnyx. Exportada para que el Gestor (fase 2 del plan de WhatsApp)
+ * sincronice UNA vez al final de un lote (`{ sync: false }` en cada alta) en
+ * vez de una por servicio o profesional.
  */
 export async function syncBookingConfiguration(businessId: string) {
   await invalidateBusinessAgentConfigCache(businessId);
   // También actualizamos los agentes temporalmente inactivos: se pueden
-  // reactivar desde PATCH /agents/:id y deben recuperar el catálogo y el
-  // análisis post-llamada vigentes en ese momento.  // Telnyx es el orquestador de todos los negocios: va primero, para que un
-  // fallo de Retell (que lanza) no lo deje sin sincronizar.
+  // reactivar desde PATCH /agents/:id y deben recuperar el catálogo vigente
+  // en ese momento.
   await syncAgentToTelnyx(businessId, prisma);
-  await syncAgentToRetell(businessId, prisma);
 }
 
 export async function createService(
