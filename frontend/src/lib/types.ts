@@ -377,6 +377,8 @@ export type BillingSummary = {
   cancelAtPeriodEnd: boolean;
   includedMinutes: number | null;
   extraMinuteCents: number | null;
+  /** Si paga el precio de fundador vigente de su plan (plans.ts → founderPrice). */
+  precioDeFundador?: boolean;
   consumedMinutes: number;
   /** Plan efectivo resuelto en backend (priceId de Stripe o columna legacy). */
   effectivePlanId: PlanId;

@@ -10,12 +10,19 @@ type BillingPlan = {
   /** El precio con el que se abre un checkout NUEVO. */
   priceEnvironmentVariable: string;
   /**
-   * Precios "de fundador": ya no se ofrecen a nadie nuevo, pero los negocios
-   * que los contrataron los conservan mientras sigan suscritos. Sin esto,
-   * `getPlanByPriceId` dejaría de reconocerlos en cuanto se suba el precio
-   * (plan/minutos/features a null) — ver subida de precios 2026-10.
+   * El precio de fundador vigente: lo cobra el checkout mientras quedan
+   * plazas del cupo (billing/service.ts). Opcional.
    */
-  legacyPriceEnvironmentVariables: readonly string[];
+  founderPriceEnvironmentVariable: string;
+  /**
+   * Lista separada por comas de precios que ya no se ofrecen a nadie nuevo
+   * (vigentes y de fundador de tablas anteriores) pero que se siguen
+   * reconociendo para este plan. Sin ella, `getPlanByPriceId` dejaría de
+   * reconocer a quien siga en un precio antiguo (plan/minutos/features a
+   * null). Opcional. Un precio de fundador antiguo NO cuenta para el cupo:
+   * al cambiar la tabla, migrar a los fundadores al precio de fundador nuevo.
+   */
+  previousPricesEnvironmentVariable: string;
   usagePriceEnvironmentVariable: string;
 };
 
@@ -23,28 +30,31 @@ export const BILLING_PLANS: Record<PlanId, BillingPlan> = {
   inicio: {
     id: "inicio",
     databasePlan: "basic",
-    includedMinutes: 150,
-    extraMinuteCents: 45,
+    includedMinutes: 200,
+    extraMinuteCents: 30,
     priceEnvironmentVariable: "STRIPE_PRICE_INICIO",
-    legacyPriceEnvironmentVariables: ["STRIPE_PRICE_INICIO_FOUNDER"],
+    founderPriceEnvironmentVariable: "STRIPE_PRICE_INICIO_FOUNDER",
+    previousPricesEnvironmentVariable: "STRIPE_PRICES_ANTERIORES_INICIO",
     usagePriceEnvironmentVariable: "STRIPE_PRICE_EXTRA_INICIO",
   },
   pro: {
     id: "pro",
     databasePlan: "pro",
-    includedMinutes: 500,
-    extraMinuteCents: 40,
+    includedMinutes: 600,
+    extraMinuteCents: 25,
     priceEnvironmentVariable: "STRIPE_PRICE_PRO",
-    legacyPriceEnvironmentVariables: ["STRIPE_PRICE_PRO_FOUNDER"],
+    founderPriceEnvironmentVariable: "STRIPE_PRICE_PRO_FOUNDER",
+    previousPricesEnvironmentVariable: "STRIPE_PRICES_ANTERIORES_PRO",
     usagePriceEnvironmentVariable: "STRIPE_PRICE_EXTRA_PRO",
   },
   scale: {
     id: "scale",
     databasePlan: "enterprise",
-    includedMinutes: 1100,
-    extraMinuteCents: 35,
+    includedMinutes: 1500,
+    extraMinuteCents: 20,
     priceEnvironmentVariable: "STRIPE_PRICE_SCALE",
-    legacyPriceEnvironmentVariables: ["STRIPE_PRICE_SCALE_FOUNDER"],
+    founderPriceEnvironmentVariable: "STRIPE_PRICE_SCALE_FOUNDER",
+    previousPricesEnvironmentVariable: "STRIPE_PRICES_ANTERIORES_SCALE",
     usagePriceEnvironmentVariable: "STRIPE_PRICE_EXTRA_SCALE",
   },
 };
@@ -75,8 +85,17 @@ export function getUsagePriceId(planId: PlanId) {
 
 /** El precio de fundador de este plan, si hay uno configurado. */
 export function getFounderPriceId(planId: PlanId) {
-  const envVar = getBillingPlan(planId).legacyPriceEnvironmentVariables[0];
-  return envVar ? process.env[envVar] : undefined;
+  return process.env[getBillingPlan(planId).founderPriceEnvironmentVariable] || undefined;
+}
+
+/** Los precios de tablas anteriores que se siguen reconociendo para el plan. */
+export function getPreviousPriceIds(planId: PlanId): string[] {
+  const valor =
+    process.env[getBillingPlan(planId).previousPricesEnvironmentVariable] ?? "";
+  return valor
+    .split(",")
+    .map((priceId) => priceId.trim())
+    .filter(Boolean);
 }
 
 /** Todos los precios de fundador configurados, de cualquier plan. */
@@ -89,8 +108,12 @@ export function getAllFounderPriceIds(): string[] {
 export function getPlanByPriceId(priceId: string) {
   return Object.values(BILLING_PLANS).find((plan) => {
     if (process.env[plan.priceEnvironmentVariable] === priceId) return true;
-    return plan.legacyPriceEnvironmentVariables.some(
-      (envVar) => process.env[envVar] === priceId,
-    );
+    if (getFounderPriceId(plan.id) === priceId) return true;
+    return getPreviousPriceIds(plan.id).includes(priceId);
   });
+}
+
+/** Si el precio es el de fundador vigente de algún plan. */
+export function isFounderPriceId(priceId: string | null | undefined) {
+  return Boolean(priceId && getAllFounderPriceIds().includes(priceId));
 }

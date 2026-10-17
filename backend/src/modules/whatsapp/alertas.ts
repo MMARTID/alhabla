@@ -243,7 +243,7 @@ export async function alertarMinutos(input: {
       mensajes.alertaMinutos({
         consumidos: input.consumidos,
         incluidos: input.incluidos,
-        precioExtra: `${(input.extraMinuteCents / 100).toFixed(2).replace(".", ",")} €`,
+        precioExtra: `${(input.extraMinuteCents / 100).toFixed(2).replace(".", ",")} € + IVA`,
       }),
     conEmailDeRespaldo: false,
   });

@@ -94,9 +94,10 @@ Lo que un producto vecino no podría copiar honestamente:
   real, su número de teléfono actual, y el teléfono como canal principal de reserva.
 - **Evaluación antes de comprar:** demo de voz pública en el navegador (requiere micrófono y
   WebRTC, vía Telnyx) y la calculadora de pérdida de ingresos.
-- **Comercial:** prueba de 7 días y suscripción Stripe. `inicio` 69 €/mes (100 min, 0,45 €/min
-  extra), `pro` 149 €/mes (400 min, 0,40 €/min extra, plan destacado), `scale` 299 €/mes
-  (1000 min, 0,35 €/min extra).
+- **Comercial:** prueba de 7 días y suscripción Stripe, precios sin IVA (desde el 2026-10-16).
+  `inicio` 59 € + IVA/mes (200 min, 0,30 €/min extra), `pro` 139 € + IVA/mes (600 min, 0,25 €/min
+  extra, plan destacado), `scale` 269 € + IVA/mes (1.500 min, 0,20 €/min extra). Precio de fundador
+  39/99/199 € + IVA para los 15 primeros negocios.
 
 ## Capabilities and Constraints
 

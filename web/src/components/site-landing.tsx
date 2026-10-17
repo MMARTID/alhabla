@@ -138,7 +138,7 @@ export function SiteLanding({ content }: { content?: NicheLandingContent }) {
 
       {/*
         Orden decidido (2026-09-16): la calculadora vive justo antes de
-        Precios. La cifra de pérdida queda fresca al ver los 69€, y /planes
+        Precios. La cifra de pérdida queda fresca al ver los precios, y /planes
         reutiliza esa estimación (plans-with-roi) — su CTA ya no pide
         comprar antes de haber visto cómo funciona el producto.
       */}
