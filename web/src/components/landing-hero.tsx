@@ -122,7 +122,12 @@ export function LandingHero({ content }: { content?: NicheLandingContent }) {
                 <Headphones className="h-4 w-4" aria-hidden="true" />
                 Escuchar la demo
               </button>
-              <Link href={plansHref} className="btn-secondary h-12 w-full px-6 sm:w-auto">
+              <Link
+                href={plansHref}
+                className="btn-secondary h-12 w-full px-6 sm:w-auto"
+                data-evento="clic_probar"
+                data-ubicacion="sector"
+              >
                 Empezar 7 días gratis
                 <ArrowRight className="h-4 w-4" aria-hidden="true" />
               </Link>

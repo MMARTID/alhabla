@@ -45,6 +45,9 @@ export function SiteFooter() {
             <Link href="/blog" className={enlace}>
               Blog
             </Link>
+            <Link href="/contacto" className={enlace}>
+              Hablar con nosotros
+            </Link>
           </nav>
         </div>
         <div className="flex flex-col gap-4 border-t border-white/10 pt-5 md:flex-row md:items-center md:justify-between">
@@ -66,7 +69,7 @@ export function SiteFooter() {
               Aviso legal
             </Link>
             <a href={`mailto:${contactEmail}`} className={enlace}>
-              Contacto
+              {contactEmail}
             </a>
           </nav>
         </div>

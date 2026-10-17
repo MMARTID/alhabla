@@ -5,6 +5,7 @@ import { useEffect, useState, use } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { CheckCircle2, CircleAlert, Clock3, RefreshCw } from "lucide-react";
 import { getBillingSummary, reconcileCheckoutSession } from "@/lib/api";
+import { medirEvento } from "@/components/google-analytics";
 
 export default function CheckoutResultPage(props: {
   searchParams: Promise<{ session_id?: string }>;
@@ -59,6 +60,33 @@ export default function CheckoutResultPage(props: {
     // se queda obsoleto en cuanto Stripe confirma el plan.
     void queryClient.invalidateQueries({ queryKey: ["billing-summary"] });
   }, [confirmed, queryClient]);
+
+  const planConfirmado = confirmed ? (data?.planId ?? data?.effectivePlanId ?? null) : null;
+  const enPrueba = data?.status === "TRIALING";
+
+  useEffect(() => {
+    // Solo al volver de Stripe (con `session_id`): entrar aquí sin él con un
+    // plan ya activo no es un checkout completado.
+    if (!planConfirmado || !sessionId) return;
+    // Una vez por sesión de Stripe, aunque se recargue la página. La marca
+    // se pone solo si el evento salió (sin medición aceptada no sale).
+    const clave = `alhabla_checkout_medido:${sessionId}`;
+    try {
+      if (window.sessionStorage.getItem(clave)) return;
+    } catch {
+      // Sin sessionStorage (modo privado estricto) se mide igual.
+    }
+    const medido = medirEvento("checkout_completado", {
+      plan: planConfirmado,
+      estado: enPrueba ? "prueba" : "activa",
+    });
+    if (!medido) return;
+    try {
+      window.sessionStorage.setItem(clave, "1");
+    } catch {
+      // Ídem: como mucho se repetiría al recargar.
+    }
+  }, [planConfirmado, sessionId, enPrueba]);
 
   // Si la reconciliación falla no hay nada que sondear: sin esta rama el
   // usuario veía "Estamos confirmando tu suscripción" y un sondeo inútil.

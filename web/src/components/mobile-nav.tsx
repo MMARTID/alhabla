@@ -60,7 +60,12 @@ export function MobileNav({ niche, inicio = "" }: { niche?: NicheSlug; inicio?: 
 
   return (
     <div ref={containerRef} className="flex items-center gap-2 md:hidden">
-      <Link href={plansHref} className="btn-primary h-11 px-4 text-sm">
+      <Link
+        href={plansHref}
+        className="btn-primary h-11 px-4 text-sm"
+        data-evento="clic_probar"
+        data-ubicacion="cabecera_movil"
+      >
         Empezar
         <ArrowRight className="h-4 w-4" aria-hidden="true" />
       </Link>
@@ -121,10 +126,19 @@ export function MobileNav({ niche, inicio = "" }: { niche?: NicheSlug; inicio?: 
               <a href={`${inicio}#preguntas`} onClick={closeMenu} className={linkClass}>
                 Preguntas
               </a>
+              <Link href="/contacto" onClick={closeMenu} className={linkClass}>
+                Hablar con nosotros
+              </Link>
               <a href={appUrl("/login")} onClick={closeMenu} className={linkClass}>
                 Iniciar sesión
               </a>
-              <Link href={plansHref} onClick={closeMenu} className="btn-primary mt-1.5 justify-center">
+              <Link
+                href={plansHref}
+                onClick={closeMenu}
+                className="btn-primary mt-1.5 justify-center"
+                data-evento="clic_probar"
+                data-ubicacion="menu_movil"
+              >
                 Empezar ahora
               </Link>
             </div>

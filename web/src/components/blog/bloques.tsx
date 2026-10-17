@@ -57,7 +57,13 @@ export function Cta({
       {texto ? (
         <p className="mt-2 text-base leading-7 text-muted">{texto}</p>
       ) : null}
-      <Link href={d.href} className="btn-primary mt-5 inline-flex px-6">
+      <Link
+        href={d.href}
+        className="btn-primary mt-5 inline-flex px-6"
+        {...(d.href === "/planes"
+          ? { "data-evento": "clic_probar", "data-ubicacion": "blog_cta" }
+          : {})}
+      >
         {boton || d.texto}
         <ArrowRight className="h-4 w-4" aria-hidden="true" />
       </Link>

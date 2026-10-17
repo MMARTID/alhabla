@@ -202,6 +202,8 @@ export function RevenueLossCalculator({
                   type="button"
                   onClick={openPersonalizedPlans}
                   className="btn-purple min-h-12 w-full"
+                  data-evento="clic_probar"
+                  data-ubicacion="calculadora"
                   style={accent ? { backgroundColor: accent.strong } : undefined}
                 >
                   Recuperar mis {monthlyLoss.toLocaleString("es-ES")} €

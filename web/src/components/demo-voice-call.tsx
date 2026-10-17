@@ -691,7 +691,7 @@ export function DemoVoiceCall({ open, onClose, onActiveChange, niche }: DemoVoic
                     </span>
                     <p className="text-sm font-semibold">¿Quieres que atienda así en tu negocio?</p>
                   </div>
-                  <Link href="/planes" className="btn-purple justify-center">Ver planes</Link>
+                  <Link href="/planes" className="btn-purple justify-center" data-evento="clic_probar" data-ubicacion="demo">Ver planes</Link>
                 </div>
               ) : null}
               <p className="mt-3 text-xs leading-5 text-white/50">Demo con una cuenta de prueba · máximo {formatDuration(maxDurationSeconds)} · no se reserva nada en tu agenda.</p>

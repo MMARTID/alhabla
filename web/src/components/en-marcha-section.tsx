@@ -54,7 +54,12 @@ export function EnMarchaSection() {
 
         <Reveal className="mt-8 flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:justify-between" y={10}>
           <p className="text-base font-semibold text-[#27272a]">{TRIAL_REASSURANCE}</p>
-          <Link href="/planes" className="btn-primary h-12 px-6">
+          <Link
+            href="/planes"
+            className="btn-primary h-12 px-6"
+            data-evento="clic_probar"
+            data-ubicacion="en_marcha"
+          >
             Empezar la prueba <ArrowRight className="h-4 w-4" aria-hidden="true" />
           </Link>
         </Reveal>

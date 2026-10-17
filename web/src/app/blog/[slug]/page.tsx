@@ -182,7 +182,12 @@ export default async function ArticuloPage(props: Props) {
                   <p className="mt-2 text-sm leading-6 text-muted">
                     Atiende, reserva en tu calendario y te avisa por WhatsApp. {PRECIO_DESDE}.
                   </p>
-                  <Link href="/planes" className="btn-primary mt-4 w-full">
+                  <Link
+                    href="/planes"
+                    className="btn-primary mt-4 w-full"
+                    data-evento="clic_probar"
+                    data-ubicacion="blog_articulo"
+                  >
                     Probar 7 días
                   </Link>
                 </div>

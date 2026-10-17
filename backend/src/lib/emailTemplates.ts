@@ -306,3 +306,45 @@ export function weeklySummaryEmail(input: {
   `);
   return { subject, html };
 }
+
+/**
+ * Aviso interno de una solicitud del formulario «Hablar con nosotros» de la
+ * web (`POST /contacto`). Va a hola@alhabla.ai, no al visitante. El asunto no
+ * lleva datos personales: lo escribe en el log el job de correo
+ * (jobs/sendEmail.ts) y, fuera de producción, el aviso de «no enviado».
+ * Responder es un enlace `mailto:` porque el envío por Zoho no fija Reply-To.
+ */
+export function solicitudDeContactoEmail(input: {
+  nombre: string;
+  email: string;
+  telefono?: string;
+  negocio: string;
+  sedes: string;
+  mensaje?: string;
+}): { subject: string; html: string } {
+  const subject = `Contacto desde la web · ${input.sedes}`;
+  const fila = (etiqueta: string, valorHtml: string) => `
+    <tr>
+      <td style="padding:10px 12px 10px 0;border-bottom:1px solid #f4f4f5;color:#52525b;font-size:14px;vertical-align:top;white-space:nowrap;">${etiqueta}</td>
+      <td style="padding:10px 0;border-bottom:1px solid #f4f4f5;font-size:15px;color:#0a0a0a;">${valorHtml}</td>
+    </tr>`;
+  const responder = `mailto:${input.email}?subject=${encodeURIComponent("Tu consulta sobre Alhabla")}`;
+  const html = emailShell(`
+    <p style="font-size:18px;font-weight:600;margin:0 0 16px 0;">Nueva solicitud de contacto</p>
+    <p style="margin:0 0 16px 0;">Alguien ha rellenado «Hablar con nosotros» en alhabla.ai.</p>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 8px 0;">
+      ${fila("Nombre", escaparHtml(input.nombre))}
+      ${fila("Email", `<a href="mailto:${escaparHtml(input.email)}" style="color:#6d28d9;">${escaparHtml(input.email)}</a>`)}
+      ${fila("Teléfono", input.telefono ? `<a href="tel:${escaparHtml(input.telefono.replace(/[^\d+]/g, ""))}" style="color:#6d28d9;">${escaparHtml(input.telefono)}</a>` : "—")}
+      ${fila("Negocio", escaparHtml(input.negocio))}
+      ${fila("Sedes", escaparHtml(input.sedes))}
+    </table>
+    ${
+      input.mensaje
+        ? `<p style="margin:16px 0 0 0;padding:12px 16px;background:#f4f4f5;border-radius:12px;white-space:pre-line;">${escaparHtml(input.mensaje)}</p>`
+        : ""
+    }
+    ${ctaButton(responder, "Responder por email")}
+  `);
+  return { subject, html };
+}

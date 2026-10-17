@@ -560,6 +560,8 @@ describe("authRoutes", () => {
 
       expect(response.statusCode).toBe(302);
       expect(response.headers.location).not.toContain("error=");
+      // La app mide el alta completada con esta marca (evento sign_up).
+      expect(response.headers.location).toMatch(/\/auth\/google\/callback\?alta=1$/);
       expect(mockedUserCreate).toHaveBeenCalledWith(
         expect.objectContaining({ data: expect.objectContaining({ termsAcceptedAt: expect.any(Date) }) })
       );
@@ -577,6 +579,27 @@ describe("authRoutes", () => {
 
       expect(response.statusCode).toBe(302);
       expect(response.headers.location).toContain("error=account_not_found");
+      expect(mockedTransaction).not.toHaveBeenCalled();
+    });
+
+    it("entrar con una cuenta que ya existía no lleva la marca de alta", async () => {
+      mockedConsumirClave.mockResolvedValue(JSON.stringify({ termsAccepted: true, intent: "login" }));
+      mockedGuardarClave.mockResolvedValue(undefined);
+      mockedUserFindUnique.mockResolvedValue({
+        id: "user_123",
+        email: "new@example.com",
+        businessId: "business_123",
+        googleId: "google_123",
+      } as any);
+
+      const response = await fastify.inject({
+        method: "GET",
+        url: "/google/callback?code=auth_code&state=abc",
+        headers: { cookie: "alhabla_google_oauth_state=abc" },
+      });
+
+      expect(response.statusCode).toBe(302);
+      expect(response.headers.location).toMatch(/\/auth\/google\/callback$/);
       expect(mockedTransaction).not.toHaveBeenCalled();
     });
 
@@ -696,6 +719,7 @@ describe("authRoutes", () => {
 
       expect(response.statusCode).toBe(302);
       expect(response.headers.location).not.toContain("error=");
+      expect(response.headers.location).toMatch(/\/auth\/facebook\/callback\?alta=1$/);
       expect(mockedUserCreate).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({

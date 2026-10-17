@@ -7,6 +7,7 @@ import { consumeGoogleSession } from "@/lib/api";
 import { consumePendingPlan } from "@/lib/billing-navigation";
 import { BrandMark } from "@/components/brand-mark";
 import { webUrl } from "@/lib/web-url";
+import { medirEventoYSeguir } from "@/components/google-analytics";
 
 const GOOGLE_ERRORS: Record<string, string> = {
   access_denied: "Se canceló el acceso con Google.",
@@ -26,7 +27,8 @@ export default function GoogleCallbackPage() {
     if (started.current) return;
     started.current = true;
 
-    const providerError = new URLSearchParams(window.location.search).get("error");
+    const query = new URLSearchParams(window.location.search);
+    const providerError = query.get("error");
     if (providerError) {
       setError(GOOGLE_ERRORS[providerError] ?? "No se pudo completar el acceso con Google.");
       setAccountNotFound(providerError === "account_not_found");
@@ -38,7 +40,14 @@ export default function GoogleCallbackPage() {
         window.localStorage.setItem("alhabla_token", token);
         const selectedPlan = consumePendingPlan();
         const planParam = selectedPlan ? `?plan=${selectedPlan}` : "";
-        window.location.replace(`/bienvenida${planParam}`);
+        const irABienvenida = () => window.location.replace(`/bienvenida${planParam}`);
+        // `alta=1` lo pone el backend cuando el callback acaba de crear la
+        // cuenta: es el alta completada con Google (con email la mide la web).
+        if (query.get("alta") === "1") {
+          medirEventoYSeguir("sign_up", { method: "google" }, irABienvenida);
+        } else {
+          irABienvenida();
+        }
       })
       .catch(() => {
         setError("La sesión de Google ha caducado. Vuelve a intentarlo.");

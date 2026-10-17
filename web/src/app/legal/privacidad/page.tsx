@@ -27,7 +27,7 @@ export default function PrivacidadPage() {
     <LegalPage
       title="Política de privacidad"
       description="Aquí te contamos qué datos tratamos, para qué, quién más interviene y qué puedes exigirnos. Sin cláusulas copiadas: solo lo que el producto hace de verdad."
-      updatedAt="2026-10-13"
+      updatedAt="2026-10-16"
     >
       <LegalSection title="Quién es el responsable">
         <p>
@@ -69,6 +69,10 @@ export default function PrivacidadPage() {
             Hacer la demo y guardar su transcripción para mejorarla: consentimiento, que das al empezarla y puedes
             retirar escribiéndonos, sin afectar al resto del servicio.
           </li>
+          <li>
+            Contestar a lo que nos preguntas por el formulario de contacto, por correo o por WhatsApp: aplicación, a
+            petición tuya, de medidas precontractuales.
+          </li>
         </ul>
       </LegalSection>
 
@@ -92,6 +96,19 @@ export default function PrivacidadPage() {
         <p>
           Si buscas tu negocio, solo usamos su categoría para elegir la recepción que te enseñamos; no guardamos qué
           negocio elegiste.
+        </p>
+      </LegalSection>
+
+      <LegalSection title="Si nos escribes antes de contratar" id="contacto">
+        <p>
+          Si rellenas «Hablar con nosotros», tratamos tu nombre, tu email, tu teléfono si lo das, el nombre de tu
+          negocio, cuántas sedes tiene y lo que nos cuentes, solo para contestarte. Nos llega como un correo a nuestro
+          buzón, a través de Zoho Mail; no se guarda en la base de datos de Alhabla ni se usa para enviarte publicidad.
+          Si nos escribes por WhatsApp, el mensaje pasa además por WhatsApp (Meta), con sus propias condiciones.
+        </p>
+        <p>
+          Lo conservamos mientras dure la conversación y, si no llegas a contratar, lo borramos como tarde un año
+          después de tu último mensaje. Puedes pedirnos antes que lo borremos en privacidad@alhabla.ai.
         </p>
       </LegalSection>
 
