@@ -120,7 +120,7 @@ prompt.
 Orden y dependencias:
 
 ```
-PR 1 desacoplar ──► PR 2 cortar Retell ──► (estable 1 semana) ──► PR 3 contract
+PR 1 desacoplar ──► PR 2 cortar Retell ──► (verificada en producción) ──► PR 3 contract
 PR 4 reintento de answer     (independiente; puede ir primero)
 PR 5 alertas                 (independiente; puede ir primero)
 PR 6 fallback_destination    (tras un experimento en dev)
@@ -285,7 +285,7 @@ y la integración pasen.
 - Va el mismo día que la PR 2: la política no puede nombrar un encargado que ya no tratamos ni
   callar uno que sí.
 
-### PR 3. Contract (tras una semana estable)
+### PR 3. Contract (en cuanto la PR 2 esté verificada en producción)
 
 - Migración con la etiqueta `migracion-contract`:
   - `Business`: `DROP COLUMN` de `orchestrator`, `voiceRoutingTarget`, `voiceFailoverActive`,
@@ -301,7 +301,8 @@ y la integración pasen.
   - Borrar en el portal de Telnyx la SIP Connection que apunta a `sip.retellai.com`.
   - Borrar después los dos scripts de inventario y su test.
 - **Cuenta de Retell.** Baja y revocación de la clave cuando el usuario lo decida.
-- **Rollback.** No hay vuelta atrás de los datos: por eso va una semana después de la PR 2, y
+- **Rollback.** No hay vuelta atrás de los datos. Sin usuarios reales (decisión del usuario del
+  17-10) no se espera una semana: va en cuanto la PR 2 pase la verificación en producción, y
   esos valores ya no los lee nadie.
 
 ### PR 4. Reintentar el `answer`
@@ -455,18 +456,24 @@ borrado al acabar, según la regla de qué debe existir en Telnyx):
 | 6 | M (1 día) | Medio día de experimento |
 | 7 | XS-S | Puede quedarse en investigación |
 
-## 7. Decisiones pendientes del usuario
+## 7. Decisiones
 
-Con la recomendación primero:
+Tomadas por el usuario el 17-10:
 
-1. **Orden.** (a) PR 4 y PR 5 primero, porque protegen ya y no dependen de nada; después PR 1 →
-   PR 2 + W → PR 3; la PR 6 y la PR 7 en paralelo cuando haya hueco (recomendado). (b) Retell
-   primero.
-2. **`fallback_destination`.** (a) Solo si el dueño aceptó que le pasen llamadas (recomendado);
-   (b) siempre que haya un móvil válido.
-3. **Cuenta de Retell.** (a) Baja tras la PR 3 (recomendado); (b) un mes más sin uso.
-4. **Ruta de `answer` agotada.** (a) Colgar, para que el cliente note el corte y vuelva a llamar
-   (recomendado); (b) dejarla sonar como hoy.
+1. **Orden:** las protecciones primero (PR 4 y PR 5), después PR 1 → PR 2 + W → PR 3, y al
+   final PR 6 y PR 7.
+2. **`answer` agotado:** se cuelga la llamada, para que el cliente note el corte y vuelva a
+   llamar.
+3. **Fusiones:** cada PR de backend se fusiona y se despliega en cuanto CI está en verde, sin
+   preguntar, con verificación en producción después. Las acciones irreversibles en cuentas
+   externas (borrar en Retell, darse de baja) se preguntan aparte.
+4. **Sin esperas:** no hay usuarios reales, así que la PR 3 no espera una semana.
+
+El resto se pregunta cuando surja. Por ahora quedan, con la recomendación primero:
+
+- **`fallback_destination` (PR 6).** (a) Solo si el dueño aceptó que le pasen llamadas;
+  (b) siempre que haya un móvil válido.
+- **Cuenta de Retell (PR 3).** (a) Baja tras la PR 3; (b) un mes más sin uso.
 
 ## Apéndice: el contestador, aparcado
 
