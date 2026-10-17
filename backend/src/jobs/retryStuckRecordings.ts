@@ -10,8 +10,8 @@ import { diasDeRetencionDeAudio } from "./purgeOldRecordings.js";
 // intento realmente falló, no a una que sigue en curso.
 const STUCK_RECORDING_THRESHOLD_MINUTES = 15;
 const MAX_RECORDINGS_PER_RUN = 50;
-// El mismo plazo que purgeOldRecordings: es lo que pedimos conservar a Retell
-// y Telnyx, así que más allá no hay nada que descargar.
+// El mismo plazo que purgeOldRecordings: es lo que pedimos conservar a
+// Telnyx, así que más allá no hay nada que descargar.
 
 // Tope de reencolados por grabación: 96 barridos de 15 min son 24 h, cada
 // uno con los 5 intentos de la cola `process-recording`. Un fallo que dura
@@ -28,7 +28,7 @@ const DIA_MS = 24 * 60 * 60 * 1000;
  * llamada (handleCallEnded en webhookHandlers.ts), así que existe aunque el
  * enqueueRecordingJob posterior fallara (Cloud Tasks caído, permisos IAM mal
  * configurados, etc.). Sin este barrido periódico, ese fallo era definitivo:
- * la grabación se quedaba solo en Retell, sujeta a su propia ventana de
+ * la grabación se quedaba solo en el proveedor, sujeta a su propia ventana de
  * retención (dataStorageRetentionDays), sin ningún mecanismo que lo
  * recuperara (hallazgo #30 de la auditoría). Invocado cada 15 min por Cloud
  * Scheduler vía POST /internal/jobs/retry-stuck-recordings.
@@ -40,8 +40,8 @@ export async function retryStuckRecordingsJob(): Promise<void> {
     Date.now() - STUCK_RECORDING_THRESHOLD_MINUTES * 60 * 1000
   );
 
-  // Lo que supera la retención del proveedor ya no está ni en Telnyx ni en
-  // Retell: reencolarlo solo produce 403 cada 15 minutos hasta el fin de los
+  // Lo que supera la retención del proveedor ya no está en Telnyx:
+  // reencolarlo solo produce 403 cada 15 minutos hasta el fin de los
   // tiempos. Se marca como irrecuperable con motivo y sale del barrido.
   const retencion = diasDeRetencionDeAudio();
   const limiteRetencion = new Date(Date.now() - retencion * 24 * 60 * 60 * 1000);

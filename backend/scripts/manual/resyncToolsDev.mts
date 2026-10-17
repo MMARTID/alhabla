@@ -46,7 +46,7 @@ async function main() {
   console.log(`[Resync] BASE_URL: ${baseUrl}`);
 
   const businesses = await prisma.business.findMany({
-    select: { id: true, name: true, orchestrator: true },
+    select: { id: true, name: true },
     orderBy: { createdAt: "asc" },
   });
 
@@ -56,7 +56,7 @@ async function main() {
       await calendarService.syncCalendarToolsToAgents(business.id, {
         strict: true,
       });
-      console.log(`[Resync] OK  ${business.name} (${business.orchestrator})`);
+      console.log(`[Resync] OK  ${business.name}`);
     } catch (error) {
       fallos++;
       console.error(`[Resync] FALLO ${business.name}:`, error);

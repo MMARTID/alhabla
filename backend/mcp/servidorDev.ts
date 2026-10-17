@@ -26,9 +26,8 @@ import { urlDeBd, verAssistant, verConversacion } from "./telnyx.js";
 import { estadoDelEntorno, verRamaEnDev } from "./panel/entornoDev.js";
 import { trazaDeLlamada } from "./trazaDeLlamada.js";
 import {
-  BASE_RETELL_DEV,
+  BASE_DEV,
   BASE_TELNYX_SIMULACION,
-  enviarWebhookRetell,
   enviarWebhookTelnyx,
 } from "./webhooks.js";
 
@@ -38,8 +37,8 @@ import {
  *
  * - consultar_bd_dev / consultar_bd_prod: SQL de solo lectura.
  * - generar_jwt_dev: sesión de un usuario de dev para probar rutas con curl.
- * - simular_webhook_telnyx / simular_webhook_retell: peticiones firmadas
- *   como las del proveedor contra el backend local (webhooks.ts).
+ * - simular_webhook_telnyx: peticiones firmadas como las de Telnyx contra el
+ *   backend de simulación (webhooks.ts).
  * - borrar_llamadas_simuladas: limpia las llamadas que crean las anteriores.
  * - listar_tools_voz: las tools de voz con sus argumentos, sacadas del código
  *   que las registra en Telnyx.
@@ -190,7 +189,7 @@ servidor.registerTool(
       return {
         usuario: { id: usuario.id, email: usuario.email, businessId: usuario.businessId },
         token,
-        ejemplo: `curl -s -H "Authorization: Bearer ${token}" ${BASE_RETELL_DEV}/business/me`,
+        ejemplo: `curl -s -H "Authorization: Bearer ${token}" ${BASE_DEV}/business/me`,
       };
     })
 );
@@ -290,29 +289,6 @@ servidor.registerTool(
   },
   ({ desde, canal, destino, limite }) =>
     conErrores(() => leerEnviosSimulados({ desde, canal, destino, limite }))
-);
-
-servidor.registerTool(
-  "simular_webhook_retell",
-  {
-    title: "Simular un webhook firmado de Retell",
-    description:
-      "POST firmado como Retell (x-retell-signature con la RETELL_API_KEY de dev) a una ruta /webhooks/retell… del backend de dev (localhost:3000). Para tools: /webhooks/retell/tools/<retellAgentId>/<tool> con { call: { call_id }, args }. Ojo: el backend de dev SÍ manda los WhatsApp, SMS y correos.",
-    inputSchema: {
-      ruta: z.string().describe("Ej.: /webhooks/retell/inbound"),
-      cuerpo: z.record(z.unknown()),
-      baseUrl: z.string().optional().describe(`Por defecto ${BASE_RETELL_DEV}`),
-    },
-  },
-  ({ ruta, cuerpo, baseUrl }) =>
-    conErrores(async () =>
-      enviarWebhookRetell({
-        ruta,
-        cuerpo,
-        baseUrl,
-        apiKey: variable(cargarEnv(), "RETELL_API_KEY"),
-      })
-    )
 );
 
 servidor.registerTool(

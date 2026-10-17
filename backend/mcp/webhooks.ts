@@ -1,14 +1,13 @@
 import { exigirUrlLocal } from "./entorno.js";
-import { firmarComoRetell, firmarComoTelnyx } from "./firmas.js";
+import { firmarComoTelnyx } from "./firmas.js";
 
 export const BASE_TELNYX_SIMULACION = "http://localhost:3010";
-export const BASE_RETELL_DEV = "http://localhost:3000";
+/** El backend de dev (docker compose --profile dev). */
+export const BASE_DEV = "http://localhost:3000";
 
 const COMO_ARRANCAR = {
   "/webhooks/telnyx":
     "Levanta el backend de simulación con scripts/backend-sim.sh (desde la raíz del repo).",
-  "/webhooks/retell":
-    "Levanta el backend de dev con docker compose --profile dev up -d (desde la raíz del repo).",
 } as const;
 
 type Prefijo = keyof typeof COMO_ARRANCAR;
@@ -103,22 +102,4 @@ export async function enviarWebhookTelnyx({
     "telnyx-timestamp": marcaDeTiempo,
   });
   return { ...resultado, llamada: llamada ?? null };
-}
-
-export async function enviarWebhookRetell({
-  ruta,
-  cuerpo,
-  baseUrl = BASE_RETELL_DEV,
-  apiKey,
-}: {
-  ruta: string;
-  cuerpo: Record<string, unknown>;
-  baseUrl?: string;
-  apiKey: string;
-}) {
-  const url = urlDeWebhook(ruta, baseUrl, "/webhooks/retell");
-  await comprobarBackend(url, "/webhooks/retell");
-  const texto = JSON.stringify(cuerpo);
-  const firma = await firmarComoRetell(texto, apiKey);
-  return enviar(url, texto, { "x-retell-signature": firma });
 }

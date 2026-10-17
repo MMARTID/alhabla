@@ -1,11 +1,9 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { createServer, type IncomingHttpHeaders, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
-import Retell from "retell-sdk";
 import { TelnyxAiAdapter } from "../../src/adapters/telnyx/TelnyxAiAdapter.js";
 import { generarClavesDeSimulacion } from "../../mcp/firmas.js";
 import {
-  enviarWebhookRetell,
   enviarWebhookTelnyx,
   urlDeWebhook,
 } from "../../mcp/webhooks.js";
@@ -67,9 +65,6 @@ describe("urlDeWebhook", () => {
     expect(() =>
       urlDeWebhook("//api.alhabla.ai/webhooks/telnyx", base, "/webhooks/telnyx")
     ).toThrow(/acaba en https?:\/\/api\.alhabla\.ai/);
-    expect(() =>
-      urlDeWebhook("https://api.alhabla.ai/webhooks/retell", base, "/webhooks/retell")
-    ).toThrow(/tiene que quedar dentro/);
   });
 
   it("rechaza una base que no es local", () => {
@@ -180,37 +175,5 @@ describe("enviarWebhookTelnyx", () => {
       /No hay ningún backend respondiendo en http:\/\/127\.0\.0\.1:\d+ \(ECONNREFUSED\)\. Levanta el backend de simulación con scripts\/backend-sim\.sh/
     );
     expect(crearLlamada).not.toHaveBeenCalled();
-  });
-});
-
-describe("enviarWebhookRetell", () => {
-  it("firma con la API key y Retell.verify lo acepta", async () => {
-    const resultado = await enviarWebhookRetell({
-      ruta: "/webhooks/retell/inbound",
-      cuerpo: { event: "call_inbound" },
-      baseUrl: base,
-      apiKey: "key_de_prueba",
-    });
-    expect(resultado.status).toBe(200);
-    expect(resultado.respuesta).toEqual({ ok: true });
-    const [recibida] = recibidas;
-    await expect(
-      Retell.verify(
-        recibida!.cuerpo,
-        "key_de_prueba",
-        recibida!.cabeceras["x-retell-signature"] as string
-      )
-    ).resolves.toBe(true);
-  });
-
-  it("sin backend apunta al perfil dev", async () => {
-    await expect(
-      enviarWebhookRetell({
-        ruta: "/webhooks/retell",
-        cuerpo: {},
-        baseUrl: "http://127.0.0.1:1",
-        apiKey: "k",
-      })
-    ).rejects.toThrow(/docker compose --profile dev up -d/);
   });
 });

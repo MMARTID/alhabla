@@ -90,12 +90,12 @@ describe("recordarDesvioSinComprobarJob", () => {
     expect(HASTA_HORAS).toBe(48);
   });
 
-  it("exige lo mismo que «Comprobar desvío»: línea guardada (no el TEMP- del registro) y número enrutado a Telnyx", async () => {
+  it("exige lo mismo que «Comprobar desvío»: línea guardada (no el TEMP- del registro) y número activo", async () => {
     await recordarDesvioSinComprobarJob(AHORA);
 
     const where = mockedFindMany.mock.calls[0][0]!.where!;
     expect(where).toMatchObject({
-      voiceRoutingTarget: "telnyx",
+      phoneNumberStatus: "active",
       NOT: { phone: { startsWith: "TEMP-" } },
     });
   });

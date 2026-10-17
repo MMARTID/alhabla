@@ -58,13 +58,13 @@ function getMicrosoftConfig() {
   return { clientId, clientSecret, redirectUri };
 }
 
-// Límite propio bajo el timeout de 20s que Retell aplica a cada tool call
+// Límite propio bajo el timeout de 20s de cada tool call de voz
 // (book_appointment puede acabar aquí durante una llamada en curso). Se
 // aplicaba solo a graphFetch (peticiones a Graph) — exchangeMicrosoftCode y
 // refreshMicrosoftAccessToken hacían un fetch propio sin límite, así que una
 // renovación de token colgada podía superar los 20s de la tool sin que
 // nuestro propio código la cortara nunca (hallazgo #23 de la auditoría):
-// Retell ya habría dado la tool call por fallida, y el código seguiría
+// el assistant ya habría dado la tool call por fallida, y el código seguiría
 // ejecutándose de fondo pudiendo llegar a crear la cita igualmente, después
 // de que el agente ya le hubiera dicho al cliente que algo falló.
 const GRAPH_REQUEST_TIMEOUT_MS = 8000;

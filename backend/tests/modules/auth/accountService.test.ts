@@ -130,7 +130,6 @@ describe("accountService", () => {
       name: "Peluquería Norte",
       stripeSubscriptionId: "sub_123",
       telnyxPhoneNumberId: null,
-      retellPhoneNumberId: null,
       agents: [],
       calls: [],
     } as any);
@@ -168,14 +167,7 @@ describe("accountService", () => {
         name: "Peluquería Norte",
         stripeSubscriptionId: null,
         telnyxPhoneNumberId: null,
-        retellPhoneNumberId: null,
-        agents: [
-          {
-            telnyxAssistantId: "assistant-abc",
-            retellAgentId: null,
-            retellLlmId: null,
-          },
-        ],
+        agents: [{ telnyxAssistantId: "assistant-abc" }],
         calls: [],
       } as any);
       mockedDeleteAssistant.mockResolvedValue(undefined);

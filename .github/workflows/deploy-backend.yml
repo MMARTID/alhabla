@@ -232,8 +232,7 @@ jobs:
       # se repara solo, pero con el reconciliador diario de las 04:00, así que
       # una mejora desplegada por la mañana no llega a los clientes hasta el
       # día siguiente. Si el diff toca el comportamiento del agente, lo
-      # forzamos ahora. El respaldo de Retell NO se repara solo y sigue siendo
-      # manual (scripts/syncManagedAgentPrompts.ts).
+      # forzamos ahora.
       - name: Propagar cambios de prompt o de tools a los agentes vivos
         if: success()
         run: |
@@ -258,7 +257,7 @@ jobs:
             exit 0
           fi
 
-          echo "::warning::Este deploy cambia el comportamiento del agente. Telnyx se fuerza abajo; el respaldo de RETELL sigue con la versión anterior hasta que alguien corra backend/scripts/syncManagedAgentPrompts.ts contra producción."
+          echo "Este deploy cambia el comportamiento del agente: se lanza el reconciliador de Telnyx."
 
           # No bloquea el deploy: si falta el permiso o el job no existe, el
           # reconciliador diario acabará haciéndolo igual.

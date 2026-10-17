@@ -12,8 +12,8 @@ import { normalizar } from "./normalizar.js";
  *   (`postCallReport.dudas_sin_respuesta`, informe de `informar_al_negocio`),
  *   agrupadas cuando se repiten, las más preguntadas primero;
  * - las llamadas que acabaron sin resolver (FRUSTRATED o ESCALATED), con el
- *   motivo, el servicio pedido, el recado y el resumen si lo hay (solo lo
- *   deja Retell: Telnyx no manda resumen de la llamada).
+ *   motivo, el servicio pedido, el recado y el resumen si lo hay (Telnyx no
+ *   manda resumen de la llamada; lo dejaban las llamadas de Retell).
  */
 
 const RESULTADO_SIN_RESOLVER: Partial<Record<CallOutcome, string>> = {

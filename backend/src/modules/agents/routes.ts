@@ -8,22 +8,8 @@ import {
   STT_PROVIDERS,
   VOICE_PROVIDERS,
 } from "../../config/voiceAgent.js";
-import {
-  buildRetellLlmPayload,
-  buildRetellAgentPayload,
-  buildPostCallAnalysisDataForBusiness,
-  createBusinessAgent,
-  getRetellEditableDraft,
-  publishRetellAgentUpdate,
-  resolveRetellVoiceProfile,
-} from "../../lib/agentBootstrap.js";
-import { parseAgentSettings } from "../../lib/managedAgentPrompt.js";
-import {
-  ajustesParaRetell,
-  usaVozMultilingueEnRetell,
-} from "../../lib/idiomas/resolver.js";
-import { retellAdapter } from "../../adapters/retell/RetellAdapter.js";
-import { getPublicWebhookBaseUrl } from "../../lib/serverUrl.js";
+import { createBusinessAgent } from "../../lib/agentBootstrap.js";
+import { syncAgentToTelnyx } from "../../lib/telnyxAgentSync.js";
 
 type VoiceId = string;
 
@@ -167,28 +153,6 @@ export async function agentsRoutes(fastify: FastifyInstance) {
             .send({ error: "Recepcionista no encontrada" });
         }
 
-        const business = await prisma.business.findUnique({
-          where: { id: agent.businessId },
-          select: { orchestrator: true, agentSettings: true },
-        });
-
-        const orchestrator = business?.orchestrator || "retell";
-        // En Retell la voz y los idiomas se gestionan desde Ajustes del
-        // negocio. Así un PATCH individual no puede volver a poner una voz
-        // Cartesia donde hace falta la multilingüe: principal en otro idioma,
-        // lengua cooficial o un idioma que la exige (el catálogo de
-        // lib/idiomas lo marca con `retell.vozMultilingue`; hoy, el catalán).
-        const agentSettings = parseAgentSettings(business?.agentSettings);
-        const retellVoiceProfile = resolveRetellVoiceProfile(agentSettings);
-        const ajustesDeRetell = ajustesParaRetell(agentSettings);
-        // Los que atiende Retell (el principal y el español), no los siete u
-        // ocho que habla en Telnyx.
-        const agentLanguages = ajustesDeRetell.languages;
-        const necesitaVozMultilingue = usaVozMultilingueEnRetell(
-          ajustesDeRetell.languages,
-          ajustesDeRetell.voiceLanguage
-        );
-
         const agentWithConfig = agent as typeof agent & {
           voiceId?: string | null;
           voice?: string | null;
@@ -208,31 +172,20 @@ export async function agentsRoutes(fastify: FastifyInstance) {
           agentWithConfig.voiceId ||
           agentWithConfig.voice ||
           "538a8872-3799-4df5-b373-b78493b766c6") as VoiceId;
-        const persistedVoiceId =
-          orchestrator === "retell" && necesitaVozMultilingue
-            ? retellVoiceProfile.voiceId
-            : voiceId;
-        const persistedVoiceProvider =
-          orchestrator === "retell" && necesitaVozMultilingue
-            ? retellVoiceProfile.voiceProvider
-            : data.voiceProvider;
         const agentUpdateData = {
           ...(data.name !== undefined ? { name: data.name } : {}),
           ...(data.voiceId !== undefined || data.voice !== undefined
-            ? { voiceId: persistedVoiceId }
+            ? { voiceId }
             : {}),
-          ...(data.voiceProvider !== undefined ||
-          (orchestrator === "retell" &&
-            necesitaVozMultilingue &&
-            (data.voiceId !== undefined || data.voice !== undefined))
-            ? { voiceProvider: persistedVoiceProvider }
+          ...(data.voiceProvider !== undefined
+            ? { voiceProvider: data.voiceProvider }
             : {}),
           ...(data.voiceModel !== undefined
             ? { voiceModel: data.voiceModel }
             : {}),
           ...(data.language !== undefined ? { language: data.language } : {}),
           ...(data.systemPrompt !== undefined
-            ? // Marca este agente como editado a mano — syncAgentToRetell lo
+            ? // Marca este agente como editado a mano — syncAgentToTelnyx lo
               // usa para dejar de reconstruir y sobrescribir el prompt aquí
               // cuando cambien servicios/profesionales/ajustes del negocio
               // (hallazgo #27 de la auditoría: la propia función afirmaba
@@ -265,85 +218,14 @@ export async function agentsRoutes(fastify: FastifyInstance) {
           data: agentUpdateData,
         });
 
-        const shouldSync =
-          data.name ||
-          data.systemPrompt ||
-          data.voice ||
-          data.voiceId ||
-          data.voiceProvider ||
-          data.voiceModel ||
-          data.llmProvider ||
-          data.llmModel ||
-          typeof data.llmTemperature === "number" ||
-          data.sttProvider ||
-          data.sttModel ||
-          data.firstMessage ||
-          data.firstMessageMode;
-
-        if (shouldSync) {
-          if (
-            orchestrator === "retell" &&
-            agent.retellAgentId &&
-            agent.retellLlmId
-          ) {
-            try {
-              const baseUrl = getPublicWebhookBaseUrl();
-              const webhookUrl = baseUrl
-                ? `${baseUrl.replace(/\/$/, "")}/webhooks/retell`
-                : undefined;
-              const retellDraft = await getRetellEditableDraft(agent.retellAgentId);
-
-              const retellLlmPayload = buildRetellLlmPayload({
-                  name: data.name || agent.name,
-                  systemPrompt: data.systemPrompt || agent.systemPrompt,
-                  firstMessage:
-                    data.firstMessage ??
-                    agentWithConfig.firstMessage ??
-                    undefined,
-                });
-              await retellAdapter.updateLlm(retellDraft.llmId, {
-                ...retellLlmPayload,
-                version: retellDraft.llmVersion,
-              });
-
-              const postCallAnalysisData =
-                await buildPostCallAnalysisDataForBusiness(agent.businessId);
-              const updatedRetellAgent = await retellAdapter.updateAgent(
-                agent.retellAgentId,
-                {
-                  ...buildRetellAgentPayload({
-                  name: data.name || agent.name,
-                  llmId: retellDraft.llmId,
-                  webhookUrl,
-                  postCallAnalysisData,
-                  // Con la voz multilingüe (principal en otro idioma o
-                  // lengua cooficial; Retell rechaza ca-ES con Cartesia),
-                  // una edición individual no vuelve a enviar Cartesia. Sin
-                  // ella se respeta la voz manual y se conservan sus
-                  // fallbacks.
-                  voiceId: necesitaVozMultilingue ? retellVoiceProfile.voiceId : voiceId,
-                  ...(necesitaVozMultilingue
-                    ? {
-                        voiceModel: retellVoiceProfile.voiceModel,
-                        fallbackVoiceIds: retellVoiceProfile.fallbackVoiceIds,
-                      }
-                    : {}),
-                  languages: agentLanguages,
-                  }),
-                  version: retellDraft.agentVersion,
-                }
-              );
-              await publishRetellAgentUpdate(
-                agent.retellAgentId,
-                updatedRetellAgent
-              );
-            } catch (retellError) {
-              fastify.log.error(
-                { err: retellError },
-                "[Agent] Failed to sync update to Retell"
-              );
-            }
-          }
+        // El prompt editado a mano llega al assistant de Telnyx tal cual
+        // (promptManuallyEdited). El nombre, el saludo y la voz del agente no
+        // cambian el assistant: su saludo (con el aviso de IA) y su voz salen
+        // de los ajustes del negocio. Hasta el 17-10 esta ruta solo
+        // sincronizaba Retell, y el prompt esperaba al siguiente
+        // syncAgentToTelnyx o al reconciliador. syncAgentToTelnyx nunca lanza.
+        if (data.systemPrompt !== undefined) {
+          await syncAgentToTelnyx(agent.businessId);
         }
 
         return reply.send(updated);

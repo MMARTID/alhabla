@@ -3,18 +3,17 @@ import {
   buildManagedAgentPrompt,
   DEFAULT_AGENT_SETTINGS,
 } from "../../src/lib/managedAgentPrompt.js";
-import { ajustesParaRetell } from "../../src/lib/idiomas/resolver.js";
 import { idiomasQueHabla } from "../../src/lib/idiomas/catalogo.js";
 import type { TransferenciaAlDueno } from "../../src/lib/transferenciaAlDueno.js";
 
 /**
  * Instantáneas del prompt gestionado completo en las combinaciones que lo
- * cambian: nicho, tono, objetivo, estilo, escalada, idiomas (los de Telnyx y
- * los de Retell), restricciones, lista de espera, privacidad del número,
- * transferencia e información del negocio. Son la red para reorganizar
+ * cambian: nicho, tono, objetivo, estilo, escalada, idiomas, restricciones,
+ * lista de espera, privacidad del número, transferencia e información del
+ * negocio. Son la red para reorganizar
  * managedAgentPrompt.ts: cualquier carácter distinto cambia el
- * `telnyxConfigHash` y fuerza un updateAssistant en todos los agentes (y
- * una versión nueva en Retell). Actualizarlas solo a propósito.
+ * `telnyxConfigHash` y fuerza un updateAssistant en todos los agentes.
+ * Actualizarlas solo a propósito.
  */
 const transferencia = (
   modo: TransferenciaAlDueno["modo"]
@@ -89,15 +88,6 @@ const CASOS: Array<[string, Parameters<typeof buildManagedAgentPrompt>[0]]> = [
         destino: null,
         activa: false,
       },
-    },
-  ],
-  [
-    "salón de uñas con los idiomas de Retell (solo español)",
-    {
-      businessName: "Uñas Bea",
-      businessType: "salon-de-unas",
-      settings: ajustesParaRetell(DEFAULT_AGENT_SETTINGS),
-      idiomas: ajustesParaRetell(DEFAULT_AGENT_SETTINGS).languages,
     },
   ],
   [

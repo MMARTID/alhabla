@@ -7,7 +7,6 @@ import {
 } from "../../lib/emailTemplates.js";
 import { getStripeClient } from "../../lib/stripe.js";
 import { deleteStorageObject } from "../../lib/storage.js";
-import { retellAdapter } from "../../adapters/retell/RetellAdapter.js";
 import { telnyxAdapter } from "../../adapters/telnyx/TelnyxAdapter.js";
 import { telnyxAiAdapter } from "../../adapters/telnyx/TelnyxAiAdapter.js";
 
@@ -180,11 +179,8 @@ export async function deleteAccount(input: {
       stripeSubscriptionId: true,
       telnyxPhoneNumber: true,
       telnyxPhoneNumberId: true,
-      retellPhoneNumberId: true,
       agents: {
         select: {
-          retellAgentId: true,
-          retellLlmId: true,
           telnyxAssistantId: true,
         },
       },
@@ -204,11 +200,6 @@ export async function deleteAccount(input: {
     });
   }
 
-  if (business.retellPhoneNumberId) {
-    await removeExternalResource("el número de Retell", () =>
-      retellAdapter.deletePhoneNumber(business.retellPhoneNumberId!),
-    );
-  }
   let telnyxPhoneNumberId = business.telnyxPhoneNumberId;
   if (business.telnyxPhoneNumber) {
     try {
@@ -235,16 +226,6 @@ export async function deleteAccount(input: {
       // También cuando el assistant ya daba 404: un intento anterior pudo
       // borrarlo y fallar antes de retirar su app.
       await removeTexmlAppOfAssistant(business.id, agent.telnyxAssistantId);
-    }
-    if (agent.retellAgentId) {
-      await removeExternalResource("el agente de Retell", () =>
-        retellAdapter.deleteAgent(agent.retellAgentId!),
-      );
-    }
-    if (agent.retellLlmId) {
-      await removeExternalResource("la configuración de Retell", () =>
-        retellAdapter.deleteLlm(agent.retellLlmId!),
-      );
     }
   }
 

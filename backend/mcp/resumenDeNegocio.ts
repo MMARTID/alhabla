@@ -38,7 +38,7 @@ export function enmascararIdDeCuenta(calendarId: string): string {
 
 const LISTADO = `
   SELECT b.id, b.name AS nombre, b."businessType" AS tipo,
-      b."subscriptionStatus"::text AS suscripcion, b.orchestrator AS orquestador,
+      b."subscriptionStatus"::text AS suscripcion,
       b."telnyxPhoneNumber" AS numero, b."calendarProvider" AS calendario,
       (SELECT max(c."startedAt") FROM calls c WHERE c."businessId" = b.id
          AND c."callId" NOT LIKE 'whatsapp:%') AS "ultimaLlamada",
@@ -87,8 +87,6 @@ export async function resumenDeNegocio(
         b."subscriptionCancelAtPeriodEnd" AS "cancelaAlFinal",
         b."callsSuspendedAt" AS "llamadasSuspendidasEn",
         b."paymentFailureSuspensionAt" AS "suspensionPorImpagoEn",
-        b.orchestrator AS orquestador, b."voiceRoutingTarget" AS "destinoDeVoz",
-        b."voiceFailoverActive" AS "failoverActivo",
         b."telnyxPhoneNumber" AS numero, b."phoneNumberStatus" AS "estadoDelNumero",
         b.phone AS "telefonoDelDueno", b."customerLineType" AS "tipoDeLinea",
         b."ownerWhatsappNumber" AS "whatsappDelDueno",
@@ -119,7 +117,7 @@ export async function resumenDeNegocio(
 
   const agentes = await ejecutar(
     `SELECT id, name AS nombre, active AS activo, "deletedAt" AS "borradoEn",
-        "telnyxAssistantId", "retellAgentId", "telnyxSyncedAt" AS "sincronizadoEn",
+        "telnyxAssistantId", "telnyxSyncedAt" AS "sincronizadoEn",
         "telnyxSyncError" AS "errorDeSincronizacion", "promptManuallyEdited" AS "promptEditadoAMano"
       FROM agents WHERE "businessId" = $1 ORDER BY "createdAt"`,
     [id]

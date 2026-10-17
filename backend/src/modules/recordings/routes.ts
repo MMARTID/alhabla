@@ -17,7 +17,7 @@ const PaginacionSchema = z.object({
 /**
  * Lo que traen los dos detalles de grabación de su llamada: del agente, solo
  * id y nombre — `agent: true` mandaba la fila entera (el systemPrompt
- * completo del negocio, sus ids de Retell/Telnyx y la configuración del
+ * completo del negocio, sus ids de Telnyx y la configuración del
  * modelo) —, y del negocio, id y nombre, nunca sus tokens.
  */
 const INCLUDE_DEL_DETALLE = {

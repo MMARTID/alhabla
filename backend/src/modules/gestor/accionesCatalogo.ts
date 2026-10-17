@@ -115,7 +115,7 @@ function listar(items: string[]): string {
 }
 
 /** Al dueño solo le llega el texto del plan; cualquier otro error (Prisma,
- * red, Retell) se registra y se sustituye por un texto humano. */
+ * red, Telnyx) se registra y se sustituye por un texto humano. */
 function mensajeDeError(
   error: unknown,
   accion: string,
@@ -130,8 +130,7 @@ function mensajeDeError(
 
 /**
  * Sincroniza la recepcionista tras un cambio de catálogo, como best-effort
- * con log ruidoso: `syncAgentToRetell` LANZA si la publicación falla y el
- * cambio ya está confirmado en la BD, así que un fallo aquí no puede
+ * con log ruidoso: el cambio ya está confirmado en la BD, así que un fallo aquí no puede
  * convertir un «hecho» en un «no he podido»; el reconciliador diario repara
  * el drift. Por eso todas las llamadas al servicio van con `{ sync: false }`.
  */

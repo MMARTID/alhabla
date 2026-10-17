@@ -113,8 +113,6 @@ describe("«Comprobar desvío» de punta a punta (integración)", () => {
       telnyxPhoneNumberId: "pn_test",
       phoneNumberStatus: "active",
       customerLineType: "fijo",
-      orchestrator: "telnyx",
-      voiceRoutingTarget: "telnyx",
     });
     businessId = business.id;
     await prisma.agent.create({

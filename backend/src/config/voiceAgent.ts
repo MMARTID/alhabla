@@ -2,8 +2,7 @@
 //
 // Catálogo genérico de proveedores/modelos de voz, LLM y STT para el modelo
 // Agent — usado por PATCH /agents/:id para validar y tipar los campos
-// voiceProvider/llmProvider/sttProvider, independientemente del orquestador
-// (Retell/Telnyx) que use el negocio.
+// voiceProvider/llmProvider/sttProvider.
 
 export const VOICE_PROVIDERS = [
   "11labs",

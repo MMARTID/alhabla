@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import Fastify from "fastify";
 import { bookingSettingsRoutes } from "../../../src/modules/bookings/routes.js";
 import { prisma } from "../../../src/lib/prisma.js";
-import { syncAgentToRetell } from "../../../src/lib/agentBootstrap.js";
+import { syncAgentToTelnyx } from "../../../src/lib/telnyxAgentSync.js";
 import { invalidarCacheDeVoz } from "../../../src/lib/voiceConfigCache.js";
 
 const {
@@ -66,8 +66,8 @@ vi.mock("../../../src/lib/prisma.js", () => ({
   },
 }));
 
-vi.mock("../../../src/lib/agentBootstrap.js", () => ({
-  syncAgentToRetell: vi.fn(),
+vi.mock("../../../src/lib/telnyxAgentSync.js", () => ({
+  syncAgentToTelnyx: vi.fn(),
 }));
 
 // La invalidación de la caché de voz se comprueba por su función, no por la
@@ -156,7 +156,7 @@ describe("PATCH /bookings/ (capacidad) — invalidación de caché (hallazgo #16
       where: { id: "service_1" },
       data: { active: false, deletedAt: expect.any(Date) },
     });
-    expect(syncAgentToRetell).toHaveBeenCalledWith(
+    expect(syncAgentToTelnyx).toHaveBeenCalledWith(
       "biz_1",
       prisma
     );

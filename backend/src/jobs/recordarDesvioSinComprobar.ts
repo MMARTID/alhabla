@@ -48,8 +48,8 @@ export interface ResultadoDelRecordatorio {
  * "alhabla"`) no tienen desvío que comprobar. Y solo se escribe a quien
  * «Comprobar desvío» (`iniciarComprobacionDeDesvio`) le funcionaría, porque
  * el recordatorio promete «te llamamos y lo verificamos»: línea de clientes
- * guardada (no el `TEMP-` del registro), fijo o móvil español y número
- * enrutado al Call Control App de Telnyx (`voiceRoutingTarget = "telnyx"`).
+ * guardada (no el `TEMP-` del registro), fijo o móvil español y número de
+ * Alhabla activo.
  *
  * Idempotente: `Business.forwardingReminderSentAt` se reclama con un
  * updateMany condicional ANTES de avisar, así dos entregas del scheduler (o
@@ -81,7 +81,6 @@ export async function recordarDesvioSinComprobarJob(
       forwardingReminderSentAt: null,
       // Los mismos requisitos que «Comprobar desvío»: sin ellos el botón que
       // promete el recordatorio respondería con error.
-      voiceRoutingTarget: "telnyx",
       NOT: { phone: { startsWith: PREFIJO_DE_TELEFONO_PROVISIONAL } },
       AND: [
         {

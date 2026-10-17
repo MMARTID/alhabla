@@ -1,11 +1,9 @@
 /**
  * Crea el test nativo de Telnyx AI Assistants (client.ai.assistants.tests,
- * ver TelnyxAiAdapter.createAssistantTest) equivalente al caso de reserva
- * end-to-end de cada nicho en las simulaciones de Retell (catálogo de
- * src/modules/retellSimulation/catalog.ts, `npm run sim`) — uno por cada uno
- * de los 5 negocios de desarrollo. No migra ni sustituye las
- * simulaciones de Retell (siguen siendo la referencia); esto solo añade el
- * mecanismo de test nativo de Telnyx para poder compararlos.
+ * ver TelnyxAiAdapter.createAssistantTest) con el caso de reserva de
+ * extremo a extremo de cada nicho — uno por cada uno de los 5 negocios de
+ * desarrollo. Nació como el equivalente de las simulaciones de Retell,
+ * retiradas el 17-10 (PLAN-RETIRAR-RETELL.md).
  *
  * Idempotente: si ya existe un test con el mismo `name` en el test_suite
  * "alhabla-dev-simulaciones", se omite en vez de duplicarlo.

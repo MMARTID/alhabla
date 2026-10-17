@@ -6,7 +6,7 @@ import { GoogleCalendarProvider } from "./google/GoogleCalendarProvider.js";
 import { OutlookCalendarProvider } from "./outlook/OutlookCalendarProvider.js";
 import { CaldavCalendarProvider } from "./caldav/CaldavCalendarProvider.js";
 
-// Singletons sin estado (como retellAdapter): el estado por operación
+// Singletons sin estado (como telnyxAdapter): el estado por operación
 // (cliente OAuth de Google, access token de Outlook) vive dentro de cada
 // llamada. Este fichero importa SOLO los adaptadores; la persistencia de
 // credenciales rotadas se inyecta por conexión, no por constructor.

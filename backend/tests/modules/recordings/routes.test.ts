@@ -60,9 +60,8 @@ const FULL_AGENT_ROW = {
   id: "agent_1",
   name: "Recepcionista",
   systemPrompt: "PROMPT_SECRETO_DEL_NEGOCIO",
-  retellLlmId: "llm_secreto",
   telnyxAssistantId: "assistant_secreto",
-  llmModel: "openai/gpt-oss-20b",
+  llmModel: "llm_secreto",
 };
 
 /** Igual que projectBusiness, para el agente de la llamada. */

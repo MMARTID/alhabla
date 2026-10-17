@@ -12,7 +12,7 @@ function claveDeReintento(): string {
 
 /**
  * Recupera informes que no pudieron encolarse al terminar una llamada. No
- * depende de los webhooks de Retell: vuelve a calcular el consumo del periodo
+ * depende de los webhooks de voz: vuelve a calcular el consumo del periodo
  * actual y processUsageReportJob solo remite a Stripe la diferencia pendiente.
  */
 export async function retryUsageReportsJob(): Promise<void> {

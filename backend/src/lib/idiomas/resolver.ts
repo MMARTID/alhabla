@@ -8,7 +8,6 @@ import {
   type CodigoDeIdioma,
   type FamiliaDeVoces,
   type GeneroDeVoz,
-  type IdiomaDeRetell,
   type VozDelCatalogo,
 } from "./catalogo.js";
 import {
@@ -49,8 +48,8 @@ export type TranscripcionResuelta =
   { motor: "flux"; idioma: string } | { motor: "soniox"; pistas: string[] };
 
 /** Todo lo que depende del idioma de un negocio, decidido en un solo
- * sitio. Lo consumen la elegibilidad, el payload de Telnyx, el prompt,
- * Retell y el panel. */
+ * sitio. Lo consumen la elegibilidad, el payload de Telnyx, el prompt y el
+ * panel. */
 export interface PerfilDeIdiomas {
   /** Los que habla con su principal (idiomasQueHabla), en orden canónico. */
   idiomas: CodigoDeIdioma[];
@@ -127,8 +126,7 @@ function resolverTranscripcion(
  * principal y sigue en el de quien llama si es uno de los que habla; desde
  * el 2026-10-05, siempre varios: los siete de ULTRA_HABLA más la cooficial
  * que sea principal) y un recordatorio que cierra el prompt. Con uno solo,
- * la de antes («Habla siempre en…») y sin recordatorio: es lo que recibe
- * Retell con solo español (ajustesParaRetell).
+ * la de antes («Habla siempre en…») y sin recordatorio.
  *
  * El recordatorio y la frase de las comillas vienen de la medición del
  * 2026-10-05 (tanda «A2 inglés» del laboratorio): con la regla sola, la
@@ -315,67 +313,4 @@ export function saludoDelNegocio(
   negocio: string
 ): string {
   return componerSaludo(perfil.principal, negocio);
-}
-
-// ---------------------------------------------------------------------
-// Retell, el respaldo: solo tiene los idiomas con `retell.locale` (no el
-// euskera) y rechaza ca-ES con su voz Cartesia por defecto.
-// ---------------------------------------------------------------------
-
-/**
- * Los ajustes tal como los atiende Retell: el principal y el obligatorio, no
- * los siete u ocho que habla en Telnyx, y sin los idiomas que Retell no
- * tiene; si el principal es uno de ellos (euskera), el obligatorio de
- * principal, o el agente saludaría en un idioma que Retell no entiende.
- *
- * Así recibe lo que ya tenía antes del 2026-10-05: `es-ES` solo (su ruta
- * monolingüe, la más precisa, con la voz Cartesia) con principal español, y
- * español con la cooficial (cadena ElevenLabs). Mandarle los siete locales
- * con Cartesia no se ha probado contra Retell, y si rechazara el
- * `updateAgent`, `syncAgentToRetell` lanzaría y PATCH /business/me
- * devolvería 500 a todos los negocios (revisión del 2026-10-05). El prompt
- * de Retell lista estos mismos idiomas (`idiomas` de
- * buildManagedAgentPrompt).
- */
-export function ajustesParaRetell<T extends AjustesDeIdioma>(
-  ajustes: T
-): T & { languages: CodigoDeIdioma[]; voiceLanguage: CodigoDeIdioma } {
-  const { voiceLanguage: principal } = normalizarIdiomas(ajustes);
-  const voiceLanguage =
-    IDIOMAS[principal].retell.locale !== null ? principal : IDIOMA_OBLIGATORIO;
-  return {
-    ...ajustes,
-    languages: ordenarIdiomas([IDIOMA_OBLIGATORIO, voiceLanguage]),
-    voiceLanguage,
-  };
-}
-
-/** El campo `language` de Retell: un escalar con un solo idioma (su ruta
- * monolingüe, la más precisa) o el array con varios. */
-export function idiomaDeRetell(
-  idiomas: readonly CodigoDeIdioma[]
-): IdiomaDeRetell | IdiomaDeRetell[] {
-  const locales = idiomas
-    .map((idioma) => IDIOMAS[idioma].retell.locale)
-    .filter((locale): locale is IdiomaDeRetell => locale !== null);
-  return locales.length === 1 ? locales[0] : locales;
-}
-
-/**
- * ¿Hace falta la cadena de voces multilingüe de Retell (ElevenLabs)? Sí si
- * el principal no es el obligatorio (las voces Cartesia por defecto son
- * españolas), si habla una lengua cooficial o si algún idioma la exige
- * (Retell rechaza ca-ES con Cartesia). Recibe los ajustes de
- * ajustesParaRetell: el euskera ya no está.
- */
-export function usaVozMultilingueEnRetell(
-  idiomas: readonly CodigoDeIdioma[],
-  saludo: CodigoDeIdioma = IDIOMA_OBLIGATORIO
-): boolean {
-  return (
-    saludo !== IDIOMA_OBLIGATORIO ||
-    idiomas.some(
-      (idioma) => esCooficial(idioma) || IDIOMAS[idioma].retell.vozMultilingue
-    )
-  );
 }

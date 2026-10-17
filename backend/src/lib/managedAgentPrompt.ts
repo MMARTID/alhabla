@@ -208,11 +208,10 @@ export function buildManagedAgentPrompt(input: {
   ocultarNumeroDelNegocio?: boolean;
   /** Transferencia al dueño (fase 4): con `activa` el prompt lleva el
    * bloque «## Pasar la llamada» según el modo; sin ella (o sin pasar
-   * nada, como en Retell, que no tiene la tool) no se menciona. */
+   * nada) no se menciona. */
   transferenciaAlDueno?: TransferenciaAlDueno | null;
   /** Los idiomas que atiende si no son todos los de su principal: los de
-   * Retell, el respaldo (ajustesParaRetell en lib/idiomas/resolver.ts), o
-   * los de su principal con la cooficial de su zona (lib/idiomas/zona.ts).
+   * su principal con la cooficial de su zona (lib/idiomas/zona.ts).
    * Sin ellos, los que habla con su principal. */
   idiomas?: readonly CodigoDeIdioma[];
 }) {

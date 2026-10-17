@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { prisma } from "../../../src/lib/prisma.js";
 import { invalidarCacheDeVoz } from "../../../src/lib/voiceConfigCache.js";
-import { syncAgentToRetell } from "../../../src/lib/agentBootstrap.js";
 import { syncAgentToTelnyx } from "../../../src/lib/telnyxAgentSync.js";
 import { guardarInformacionDelNegocio } from "../../../src/modules/businesses/informacion.js";
 
@@ -10,9 +9,6 @@ vi.mock("../../../src/lib/prisma.js", () => ({
 }));
 vi.mock("../../../src/lib/voiceConfigCache.js", () => ({
   invalidarCacheDeVoz: vi.fn(),
-}));
-vi.mock("../../../src/lib/agentBootstrap.js", () => ({
-  syncAgentToRetell: vi.fn(),
 }));
 vi.mock("../../../src/lib/telnyxAgentSync.js", () => ({
   syncAgentToTelnyx: vi.fn(),
@@ -25,7 +21,7 @@ beforeEach(() => {
 });
 
 describe("guardarInformacionDelNegocio", () => {
-  it("guarda solo si el texto sigue siendo el esperado, invalida la caché y sincroniza Telnyx antes que Retell", async () => {
+  it("guarda solo si el texto sigue siendo el esperado, invalida la caché y sincroniza Telnyx", async () => {
     const orden: string[] = [];
     vi.mocked(prisma.business.updateMany).mockImplementation((async () => {
       orden.push("update");
@@ -36,9 +32,6 @@ describe("guardarInformacionDelNegocio", () => {
     });
     vi.mocked(syncAgentToTelnyx).mockImplementation(async () => {
       orden.push("telnyx");
-    });
-    vi.mocked(syncAgentToRetell).mockImplementation(async () => {
-      orden.push("retell");
     });
 
     const r = await guardarInformacionDelNegocio("biz_1", {
@@ -53,7 +46,7 @@ describe("guardarInformacionDelNegocio", () => {
         businessDetails: "Estamos en la calle Mayor 1.\nAceptamos Bizum.",
       },
     });
-    expect(orden).toEqual(["update", "cache", "telnyx", "retell"]);
+    expect(orden).toEqual(["update", "cache", "telnyx"]);
   });
 
   it("si otro lo cambió entretanto no guarda ni sincroniza nada", async () => {
@@ -71,11 +64,10 @@ describe("guardarInformacionDelNegocio", () => {
     });
     expect(invalidarCacheDeVoz).not.toHaveBeenCalled();
     expect(syncAgentToTelnyx).not.toHaveBeenCalled();
-    expect(syncAgentToRetell).not.toHaveBeenCalled();
   });
 
-  it("si Retell falla, el texto queda guardado y se registra alto para el reconciliador", async () => {
-    vi.mocked(syncAgentToRetell).mockRejectedValue(new Error("Retell 500"));
+  it("si la sincronización lanza, el texto queda guardado y se registra alto para el reconciliador", async () => {
+    vi.mocked(syncAgentToTelnyx).mockRejectedValue(new Error("Telnyx 500"));
 
     expect(
       await guardarInformacionDelNegocio("biz_1", {

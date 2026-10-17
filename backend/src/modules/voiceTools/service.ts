@@ -243,8 +243,8 @@ type BusinessVoiceConfig = FilaDeConexionDeCalendario & {
   bookingCapacity: number;
   minAdvanceBookingMinutes: number | null;
   maxAppointmentDurationMinutes: number | null;
-  // Teléfono del propietario del negocio (no el número que usa Retell para
-  // recibir llamadas) — destino del SMS de aviso de nueva reserva.
+  // Teléfono del propietario del negocio (no el número de Alhabla que recibe
+  // las llamadas) — destino del SMS de aviso de nueva reserva.
   phone: string;
   // Número Telnyx que el negocio ya tiene comprado para recibir llamadas;
   // se reutiliza como remitente del SMS en vez de comprar/gestionar un
@@ -857,7 +857,7 @@ function canalDeLaTool(callId?: string): "voice" | "client_chat" {
 
 /**
  * Resuelve la fila Call a la que vincular una reserva o un lead pendiente:
- * por callId cuando se conoce (viene del sobre del webhook de Retell, no del
+ * por callId cuando se conoce (viene del sobre del webhook de Telnyx, no del
  * LLM) y, si su fila aún no existe por una carrera con call_started, cae al
  * heurístico de "llamada más reciente del negocio" como red de seguridad.
  */
@@ -2039,7 +2039,7 @@ async function executeBookAppointment(
         : elegido?.name;
 
       // Idempotencia: si esta llamada YA tiene un Booking con un evento
-      // externo creado para esta misma fecha/duración exactas (Retell
+      // externo creado para esta misma fecha/duración exactas (Telnyx
       // reintentando el tool call tras un timeout, por ejemplo), no se crea
       // un segundo evento — se confirma reutilizando el que ya existe. Una
       // fecha/duración distinta sigue tratándose como un cambio de opinión

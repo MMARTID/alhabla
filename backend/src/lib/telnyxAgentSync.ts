@@ -233,10 +233,9 @@ function datosDeSincronizacion(
  * con una recepcionista incapaz de reservar (incidente real 2026-09-14).
  *
  * Nunca lanza: un fallo aquí no debe impedir que `createBusinessAgent()`
- * devuelva el agente. Lo llaman `crearAssistantYPromocionar()` (registro y
- * reconciliador) y el backfill (`scripts/backfillTelnyxAssistants.ts`), que
- * no toca el enrutamiento; para agentes que ya tienen assistant usa
- * `syncAgentToTelnyx`.
+ * devuelva el agente. Lo llaman `crearAssistantDelNegocio()` (registro y
+ * reconciliador) y el backfill (`scripts/backfillTelnyxAssistants.ts`); para
+ * agentes que ya tienen assistant usa `syncAgentToTelnyx`.
  */
 export async function createTelnyxAssistantForAgent(args: {
   agentId: string;
@@ -255,7 +254,7 @@ export async function createTelnyxAssistantForAgent(args: {
     }
 
     // Sin URL pública las tools no tendrían adónde llamar: mejor no crear
-    // el assistant (el negocio sigue en Retell y el motivo queda guardado)
+    // el assistant (el motivo queda guardado y el reconciliador lo reintenta)
     // que crear uno que contesta pero no puede consultar ni reservar nada.
     const baseUrl = getPublicWebhookBaseUrl();
     if (!baseUrl) return { eligible: false, reason: SIN_BASE_URL };
@@ -295,43 +294,22 @@ export async function createTelnyxAssistantForAgent(args: {
   }
 }
 
-/** Qué pasó con el `orchestrator` del negocio al crear su assistant. */
-export type PromocionATelnyx =
-  /** Pasa ahora a Telnyx-primary. */
-  | "hecha"
-  /** Ya era Telnyx-primary. */
-  | "ya_estaba"
-  /** Tiene número conectado según el orquestador anterior: moverlo es el
-   * cutover (scripts/cutoverToTelnyx.ts), no un cambio de flag. */
-  | "falta_cutover";
-
-export interface AssistantNuevoDelNegocio {
-  eligible: boolean;
-  reason: string | null;
-  /** null si no hay assistant o no se pudo guardar el negocio. */
-  promocion: PromocionATelnyx | null;
-}
-
 /**
- * Crea el assistant Telnyx de un agente y lo apunta en el negocio: su
- * elegibilidad y la auto-promoción a Telnyx-primary (decisión del usuario,
- * 2026-09-13). Solo se promociona cuando el assistant existe de verdad
- * (`eligible`) y el negocio aún no tiene número: `provisionPhoneNumber`
- * (phone/service.ts) conecta el número al Call Control App o al SIP de
- * Retell según `orchestrator` en el momento de comprarlo, así que basta el
- * flag; con un número ya conectado, el flag y su connection_id quedarían
- * desalineados.
+ * Crea el assistant Telnyx de un agente y apunta en el negocio si es
+ * elegible. Hasta el 17-10 además lo promocionaba a Telnyx-primary
+ * (`orchestrator`); desde que no hay Retell (PLAN-RETIRAR-RETELL.md) todo
+ * negocio es de Telnyx y su número va siempre al Call Control App
+ * (phone/service.ts).
  *
  * Nunca lanza, y lo que no sale se loguea con negocio, agente y motivo: un
- * negocio sin assistant no tiene quien conteste en Telnyx, el orquestador
- * de todas las llamadas. Lo llaman `createBusinessAgent()` y el
- * reconciliador diario (jobs/telnyxReconciler.ts).
+ * negocio sin assistant no tiene quien conteste. Lo llaman
+ * `createBusinessAgent()` y el reconciliador diario (jobs/telnyxReconciler.ts).
  */
-export async function crearAssistantYPromocionar(args: {
+export async function crearAssistantDelNegocio(args: {
   agentId: string;
   businessId: string;
   prismaClient?: typeof prisma;
-}): Promise<AssistantNuevoDelNegocio> {
+}): Promise<{ eligible: boolean; reason: string | null }> {
   const client = args.prismaClient ?? prisma;
   const { eligible, reason } = await createTelnyxAssistantForAgent(args);
 
@@ -344,51 +322,13 @@ export async function crearAssistantYPromocionar(args: {
   }
 
   try {
-    const negocio = eligible
-      ? await client.business.findUnique({
-          where: { id: args.businessId },
-          select: {
-            orchestrator: true,
-            telnyxPhoneNumber: true,
-            telnyxPhoneNumberId: true,
-            telnyxPendingPhoneNumber: true,
-            telnyxNumberOrderId: true,
-          },
-        })
-      : null;
-    const promocion: PromocionATelnyx | null = !negocio
-      ? null
-      : negocio.orchestrator === "telnyx"
-        ? "ya_estaba"
-        : negocio.telnyxPhoneNumber ||
-            negocio.telnyxPhoneNumberId ||
-            negocio.telnyxPendingPhoneNumber ||
-            negocio.telnyxNumberOrderId
-          ? "falta_cutover"
-          : "hecha";
-
     await client.business.update({
       where: { id: args.businessId },
       data: {
         telnyxEligibilityStatus: eligible ? "eligible" : "ineligible",
         telnyxEligibilityReason: reason,
-        ...(promocion === "hecha"
-          ? {
-              orchestrator: "telnyx",
-              voiceRoutingTarget: "telnyx",
-              voiceRoutingChangedAt: new Date(),
-            }
-          : {}),
       },
     });
-
-    if (promocion === "falta_cutover") {
-      console.error(
-        "[Agent] Assistant Telnyx creado, pero el negocio ya tiene número: falta el cutover (scripts/cutoverToTelnyx.ts)",
-        { businessId: args.businessId, agentId: args.agentId }
-      );
-    }
-    return { eligible, reason, promocion };
   } catch (error) {
     console.error(
       "[Agent] No se pudo guardar la elegibilidad Telnyx del negocio:",
@@ -398,14 +338,13 @@ export async function crearAssistantYPromocionar(args: {
         message: error instanceof Error ? error.message : String(error),
       }
     );
-    return { eligible, reason, promocion: null };
   }
+  return { eligible, reason };
 }
 
 /**
  * Reconstruye la configuración gestionada de Telnyx y la sincroniza con los
- * agentes que ya tienen `telnyxAssistantId` — espejo de `syncAgentToRetell`,
- * pero SIN lanzar nunca: un fallo aquí no debe tumbar el flujo (reservas,
+ * agentes que ya tienen `telnyxAssistantId`, SIN lanzar nunca: un fallo aquí no debe tumbar el flujo (reservas,
  * ajustes) que dispara esta sincronización. El estado queda en
  * `telnyxSyncError` para que el panel lo muestre. Solo llama a Telnyx si el
  * hash del payload cambió.
@@ -496,7 +435,7 @@ export async function syncAgentToTelnyx(
       }
     }
   } catch (error) {
-    console.error("[Agent] Fallo inesperado sincronizando Telnyx (no afecta a Retell):", {
+    console.error("[Agent] Fallo inesperado sincronizando Telnyx:", {
       businessId,
       message: error instanceof Error ? error.message : String(error),
     });

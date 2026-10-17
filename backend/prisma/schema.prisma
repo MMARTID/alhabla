@@ -25,19 +25,17 @@ model Business {
   minAdvanceBookingMinutes      Int?
   maxAppointmentDurationMinutes Int?
 
-  // Voice orchestrator selection (default Retell for RGPD compliance)
-  orchestrator        String  @default("retell")
-  retellPhoneNumberId String? @unique
-  retellPhoneNumber   String? @unique
-
-  // Enrutamiento Telnyx AI Assistants / failover a Retell (ver
-  // docs/historico/PLAN-TELNYX-ORQUESTADOR.md). voiceRoutingTarget es la ruta EFECTIVA de la
-  // próxima llamada nueva y puede diferir de `orchestrator` durante un
-  // failover; una llamada ya iniciada nunca migra de proveedor.
-  voiceRoutingTarget      String    @default("retell")
-  voiceFailoverActive     Boolean   @default(false)
-  voiceFailoverReason     String?
-  voiceRoutingChangedAt   DateTime?
+  // Retirados el 17-10 con Retell (PLAN-RETIRAR-RETELL.md): todo negocio es
+  // de Telnyx. `@ignore` los saca del cliente de Prisma (ninguna consulta los
+  // selecciona) para que la PR 3 pueda borrar las columnas sin romper la
+  // revisión que sigue sirviendo mientras dura su despliegue.
+  orchestrator            String    @default("telnyx") @ignore
+  retellPhoneNumberId     String?   @unique @ignore
+  retellPhoneNumber       String?   @unique @ignore
+  voiceRoutingTarget      String    @default("telnyx") @ignore
+  voiceFailoverActive     Boolean   @default(false) @ignore
+  voiceFailoverReason     String?   @ignore
+  voiceRoutingChangedAt   DateTime? @ignore
   // Explican por qué un negocio no es elegible para Telnyx (idioma sin
   // validar, voz sin fallback compatible, residencia UE no confirmada) antes
   // de tocar su número — null cuando no aplica ninguna exclusión.
@@ -127,12 +125,12 @@ model Business {
   // Caso C: la línea de clientes es el mismo móvil que recibe los avisos y
   // el Gestor. Evita preguntar dos veces por el número en el alta y en
   // Ajustes («es el mismo»).
-  ownerPhoneIsCustomerLine   Boolean @default(false)
+  ownerPhoneIsCustomerLine   Boolean   @default(false)
   // Privacidad (caso C): la recepcionista NO dice el número del negocio a
   // los clientes ni lo escribe en SMS/WhatsApp; en su lugar toma recado
   // («te llamamos nosotros»). Lo leen voiceTools, whatsapp/mensajesCliente
   // y el prompt gestionado.
-  hideOwnerNumberFromClients Boolean @default(false)
+  hideOwnerNumberFromClients Boolean   @default(false)
   // Mensaje único del día 1 sobre el desvío
   // (docs/historico/PLAN-TELEFONIA-UX.md § 5,
   // fase 5), en cualquiera de sus dos variantes: «tu desvío está comprobado»
@@ -447,8 +445,9 @@ model User {
 model Agent {
   id                   String    @id @default(cuid())
   businessId           String
-  retellAgentId        String?   @unique
-  retellLlmId          String?
+  // Retirados con Retell; se borran en la PR 3 (ver `orchestrator`).
+  retellAgentId        String?   @unique @ignore
+  retellLlmId          String?   @ignore
   name                 String
   voice                String    @default("Octave")
   language             String    @default("es")
@@ -611,7 +610,7 @@ model Call {
   // mantiene poblado en paralelo por compatibilidad (índices, joins ya
   // existentes en el resto del esquema) hasta migrarlo por completo a estos
   // campos genéricos — ver docs/historico/PLAN-TELNYX-ORQUESTADOR.md § "Cambios de datos".
-  voiceProvider          String                @default("retell")
+  voiceProvider          String                @default("telnyx")
   // Informe que la recepcionista manda con la tool informar_al_negocio al
   // terminar la llamada (post-conversación de Telnyx, PLAN-CANAL-DUENO.md
   // § 10): resultado, motivo de escalada, fallo de tool, servicio pedido y
@@ -1149,7 +1148,8 @@ model Contador {
   @@map("contadores")
 }
 
-/// Rachas del health-check de Telnyx: una sola fila (id "telnyx").
+/// Rachas del health-check de Telnyx, retirado el 17-10 con el failover a
+/// Retell. Se borra en la PR 3 de PLAN-RETIRAR-RETELL.md.
 model SaludTelnyx {
   id            String   @id @default("telnyx")
   malas         Int      @default(0)
@@ -1158,6 +1158,7 @@ model SaludTelnyx {
   actualizadoEn DateTime @default(now()) @db.Timestamptz(3)
 
   @@map("salud_telnyx")
+  @@ignore
 }
 
 enum CallStatus {

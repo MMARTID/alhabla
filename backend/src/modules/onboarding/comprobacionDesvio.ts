@@ -267,7 +267,6 @@ export async function iniciarComprobacionDeDesvio(
       telnyxPhoneNumber: true,
       phoneNumberStatus: true,
       customerLineType: true,
-      voiceRoutingTarget: true,
     },
   });
   if (!business) {
@@ -305,19 +304,6 @@ export async function iniciarComprobacionDeDesvio(
     throw new ComprobacionDeDesvioError(
       "linea_no_admitida",
       "Solo podemos comprobar el desvío de un fijo o un móvil de España"
-    );
-  }
-
-  // La llamada desviada solo vuelve por nuestro webhook si el número está
-  // enrutado al Call Control App de Telnyx; en failover a Retell la
-  // cogería Retell y la comprobación daría un falso «sin desvío».
-  if (business.voiceRoutingTarget !== "telnyx") {
-    console.error(
-      `[Desvío] Negocio ${businessId}: el número está en ruta "${business.voiceRoutingTarget}", no en el Call Control App de Telnyx; no se puede comprobar el desvío`
-    );
-    throw new ComprobacionDeDesvioError(
-      "telefonia_no_configurada",
-      "Ahora mismo no podemos comprobar el desvío; inténtalo más tarde"
     );
   }
 

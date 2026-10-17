@@ -36,8 +36,6 @@ export const JOBS_QUE_NO: Record<string, string> = {
   "suspend-overdue-calls":
     "suspende las llamadas de cuentas con pagos atrasados",
   "retry-usage-reports": "reporta minutos a Stripe",
-  "telnyx-health-check":
-    "una lectura de más cuenta para el failover automático a Retell",
 };
 
 type EstadoDelJob = {
