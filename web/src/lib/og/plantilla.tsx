@@ -1,6 +1,7 @@
 import { ImageResponse } from "next/og";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
+import { PRECIO_DESDE } from "@/lib/plans";
 
 /**
  * Plantilla única de las imágenes de Open Graph (lo que se ve al compartir
@@ -44,7 +45,7 @@ export type DatosDeImagen = {
   subtitulo?: string;
   /** Texto del pie, a la derecha de la pastilla de precio. */
   pie?: string;
-  /** Pastilla negra del pie. Por defecto «Desde 69 €/mes»; `null` la quita. */
+  /** Pastilla negra del pie. Por defecto PRECIO_DESDE («Desde 59 € + IVA/mes»); `null` la quita. */
   pastilla?: string | null;
   /** Color de la pastilla de etiqueta; por defecto el morado de marca. */
   acento?: { strong: string; soft: string; deep: string };
@@ -124,7 +125,7 @@ export async function imagenOg(datos: DatosDeImagen) {
     deep: MORADO_PROFUNDO,
   };
   const pastilla =
-    datos.pastilla === undefined ? "Desde 69 €/mes" : datos.pastilla;
+    datos.pastilla === undefined ? PRECIO_DESDE : datos.pastilla;
 
   return new ImageResponse(
     <div
@@ -359,7 +360,7 @@ export async function imagenOg(datos: DatosDeImagen) {
                     color: plan.destacado ? "#d4d4d8" : GRIS,
                   }}
                 >
-                  /mes
+                  + IVA/mes
                 </span>
               </span>
             </div>

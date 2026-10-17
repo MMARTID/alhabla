@@ -18,6 +18,7 @@ import {
 import { AUTOR_POR_DEFECTO } from "@/lib/blog";
 import { nicheLandings } from "@/lib/niche-landings";
 import { absoluteUrl, buildBreadcrumbStructuredData, ogImages, organizationId, siteName, websiteId } from "@/lib/seo";
+import { PRECIO_DESDE } from "@/lib/plans";
 
 type Props = { params: Promise<{ slug: string }> };
 
@@ -179,7 +180,7 @@ export default async function ArticuloPage(props: Props) {
                     Una recepcionista que coge todas las llamadas
                   </p>
                   <p className="mt-2 text-sm leading-6 text-muted">
-                    Atiende, reserva en tu calendario y te avisa por WhatsApp. Desde 69 €/mes.
+                    Atiende, reserva en tu calendario y te avisa por WhatsApp. {PRECIO_DESDE}.
                   </p>
                   <Link href="/planes" className="btn-primary mt-4 w-full">
                     Probar 7 días

@@ -30,7 +30,7 @@ export default function AvisoLegalPage() {
     <LegalPage
       title="Aviso legal"
       description="Quién está detrás de Alhabla, en qué condiciones puedes usarlo, qué implica contratar una suscripción y cómo tratamos por tu cuenta los datos de tus clientes."
-      updatedAt="2026-10-13"
+      updatedAt="2026-10-16"
       indice
     >
       <LegalSection id="titularidad" title="Titularidad del sitio">
@@ -101,8 +101,9 @@ export default function AvisoLegalPage() {
             página de planes
           </Link>
           ; los minutos que superen los incluidos en tu plan se facturan a ese precio. Los precios se indican en euros
-          e incluyen el IVA aplicable. Si contratas como empresa o profesional, puedes indicar tu identificador fiscal
-          durante el pago.
+          y no incluyen el IVA, que se añade en el pago y en cada factura al tipo aplicable (en España, el 21 %). La
+          página de planes muestra también el total con IVA. Si contratas como empresa o profesional, puedes indicar
+          tu identificador fiscal durante el pago.
         </p>
         <p>
           La suscripción incluye un periodo de prueba de 7 días. Para empezarlo se te pide un método de pago, y si no

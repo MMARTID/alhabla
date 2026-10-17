@@ -25,8 +25,9 @@ describe("PrecioDePlan", () => {
     );
 
     expect(await screen.findByText("Precio de fundador", { selector: "span" })).toBeInTheDocument();
-    expect(screen.getByText(/79€/, { selector: "s" })).toBeInTheDocument();
-    expect(screen.getByText(/69€/)).toBeInTheDocument();
+    expect(screen.getByText(/59 €/, { selector: "s" })).toBeInTheDocument();
+    expect(screen.getByText(/39 €/)).toBeInTheDocument();
+    expect(screen.getByText("47,19 € con IVA")).toBeInTheDocument();
     expect(screen.getByText(/quedan 14 plazas/)).toBeInTheDocument();
     expect(mockedCupo).toHaveBeenCalledTimes(1);
   });
@@ -47,7 +48,8 @@ describe("PrecioDePlan", () => {
     );
 
     await vi.waitFor(() => expect(mockedCupo).toHaveBeenCalled());
-    expect(screen.getByText("79€")).toBeInTheDocument();
+    expect(screen.getByText("59 €")).toBeInTheDocument();
+    expect(screen.getByText("71,39 € con IVA")).toBeInTheDocument();
     expect(container.querySelector("s")).toBeNull();
     expect(screen.queryByText(/fundador/)).not.toBeInTheDocument();
   });
@@ -57,7 +59,7 @@ describe("PrecioDePlan", () => {
     render(<PrecioDePlan plan={inicio} />);
 
     await vi.waitFor(() => expect(mockedCupo).toHaveBeenCalled());
-    expect(screen.getByText("79€")).toBeInTheDocument();
+    expect(screen.getByText("59 €")).toBeInTheDocument();
     expect(screen.queryByText(/fundador/)).not.toBeInTheDocument();
   });
 });
