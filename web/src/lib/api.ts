@@ -1,13 +1,14 @@
 import axios from "axios";
 import type { DemoPlaceSearchResult, PlaceDetails } from "./types";
+import type { Sedes } from "./contacto";
 
 /**
  * Cliente de la API para la web de marketing
  * (docs/historico/PLAN-APP-DOMINIO.md § 4, fase
  * 1): solo lo que la web necesita sin sesión — el registro, el enlace de
- * Google Login y la demo de voz. Todo lo demás vive en la app
- * (`frontend/src/lib/api.ts`). Sin interceptor de token: aquí nunca hay
- * sesión que adjuntar.
+ * Google Login, la demo de voz y el formulario de contacto. Todo lo demás
+ * vive en la app (`frontend/src/lib/api.ts`). Sin interceptor de token: aquí
+ * nunca hay sesión que adjuntar.
  */
 
 const configuredBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
@@ -126,4 +127,20 @@ export type CupoDeFundador = { total: number; restantes: number; disponible: boo
 export async function getCupoDeFundador() {
   const { data } = await api.get<CupoDeFundador>("/billing/fundadores");
   return data;
+}
+
+export type SolicitudDeContacto = {
+  nombre: string;
+  email: string;
+  telefono?: string;
+  negocio: string;
+  sedes: Sedes;
+  mensaje?: string;
+  /** Trampa para bots: una persona lo deja vacío. */
+  sitioWeb?: string;
+};
+
+/** Formulario «Hablar con nosotros» (ruta pública, 5 envíos cada 10 min). */
+export async function enviarContacto(solicitud: SolicitudDeContacto) {
+  await api.post("/contacto", solicitud, { timeout: 15000 });
 }

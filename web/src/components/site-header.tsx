@@ -51,12 +51,24 @@ export function SiteHeader({ niche, inicio = "" }: { niche?: NicheSlug; inicio?:
             <a href={`${inicio}#preguntas`} className="enlace-nav">
               Preguntas
             </a>
+            {/* Desde 1100 px: por debajo la fila no cabe en una línea (medido
+                el 16-10, ~1015 px más la barra de scroll) y ya iba justa
+                antes de este enlace. Ahí /contacto sigue en el pie, en /planes
+                y en el menú móvil. */}
+            <Link href="/contacto" className="enlace-nav hidden min-[1100px]:inline">
+              Contacto
+            </Link>
           </div>
           <div className="ml-8 flex items-center gap-3 lg:ml-10">
             <a href={appUrl("/login")} className="btn-secondary h-10 px-4">
               Iniciar sesión
             </a>
-            <Link href={plansHref} className="btn-primary h-10 px-4">
+            <Link
+              href={plansHref}
+              className="btn-primary h-10 px-4"
+              data-evento="clic_probar"
+              data-ubicacion="cabecera"
+            >
               Empezar ahora
             </Link>
           </div>

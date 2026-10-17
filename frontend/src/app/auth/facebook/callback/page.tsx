@@ -7,6 +7,7 @@ import { consumeFacebookSession } from "@/lib/api";
 import { consumePendingPlan } from "@/lib/billing-navigation";
 import { BrandMark } from "@/components/brand-mark";
 import { webUrl } from "@/lib/web-url";
+import { medirEventoYSeguir } from "@/components/google-analytics";
 
 const FACEBOOK_ERRORS: Record<string, string> = {
   access_denied: "Se canceló el acceso con Facebook.",
@@ -26,7 +27,8 @@ export default function FacebookCallbackPage() {
     if (started.current) return;
     started.current = true;
 
-    const providerError = new URLSearchParams(window.location.search).get("error");
+    const query = new URLSearchParams(window.location.search);
+    const providerError = query.get("error");
     if (providerError) {
       setError(FACEBOOK_ERRORS[providerError] ?? "No se pudo completar el acceso con Facebook.");
       setAccountNotFound(providerError === "account_not_found");
@@ -38,7 +40,13 @@ export default function FacebookCallbackPage() {
         window.localStorage.setItem("alhabla_token", token);
         const selectedPlan = consumePendingPlan();
         const planParam = selectedPlan ? `?plan=${selectedPlan}` : "";
-        window.location.replace(`/bienvenida${planParam}`);
+        const irABienvenida = () => window.location.replace(`/bienvenida${planParam}`);
+        // `alta=1`: como en el callback de Google.
+        if (query.get("alta") === "1") {
+          medirEventoYSeguir("sign_up", { method: "facebook" }, irABienvenida);
+        } else {
+          irABienvenida();
+        }
       })
       .catch(() => {
         setError("La sesión de Facebook ha caducado. Vuelve a intentarlo.");

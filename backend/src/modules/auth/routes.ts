@@ -608,6 +608,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
         }
 
         let user = await prisma.user.findUnique({ where: { googleId } });
+        let cuentaNueva = false;
         if (!user) {
           const userByEmail = await prisma.user.findUnique({
             where: { email },
@@ -630,6 +631,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
               googleId,
             });
             user = result.user;
+            cuentaNueva = true;
             await bootstrapBusinessAgent(result.business.id, email);
           }
         }
@@ -642,7 +644,10 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
           { businessId: user.businessId }
         );
         setGoogleSessionCookie(reply, sessionId, GOOGLE_SESSION_TTL_SECONDS);
-        return reply.redirect(callbackUrl);
+        // `alta=1`: la app mide el alta completada (evento `sign_up` de GA4,
+        // docs/eventos-de-analitica.md); sin él, entrar con una cuenta que
+        // ya existía y crearla serían lo mismo para la analítica.
+        return reply.redirect(cuentaNueva ? `${callbackUrl}?alta=1` : callbackUrl);
       } catch (callbackError) {
         fastify.log.error(
           { err: callbackError },
@@ -821,6 +826,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
         }
 
         let user = await prisma.user.findUnique({ where: { facebookId } });
+        let cuentaNueva = false;
         if (!user) {
           const userByEmail = await prisma.user.findUnique({
             where: { email },
@@ -843,6 +849,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
               facebookId,
             });
             user = result.user;
+            cuentaNueva = true;
             await bootstrapBusinessAgent(result.business.id, email);
           }
         }
@@ -855,7 +862,8 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
           { businessId: user.businessId }
         );
         setFacebookSessionCookie(reply, sessionId, FACEBOOK_SESSION_TTL_SECONDS);
-        return reply.redirect(callbackUrl);
+        // `alta=1`: como en el callback de Google.
+        return reply.redirect(cuentaNueva ? `${callbackUrl}?alta=1` : callbackUrl);
       } catch (callbackError) {
         fastify.log.error(
           { err: callbackError },

@@ -175,7 +175,7 @@ describe("alertas operativas (#5)", () => {
         causa: "minutos",
         recursoId: "minutos:per_1",
         texto:
-          "has usado 80 de los 100 minutos de tu plan este mes. A partir de ahí cada minuto cuesta 0,15 €; puedes cambiar de plan en el panel.",
+          "has usado 80 de los 100 minutos de tu plan este mes. A partir de ahí cada minuto cuesta 0,15 € + IVA; puedes cambiar de plan en el panel.",
         email: undefined,
       })
     );

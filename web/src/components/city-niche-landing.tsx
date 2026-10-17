@@ -108,7 +108,12 @@ export function CityNicheLanding({ nicho, ciudad }: { nicho: NicheSlug; ciudad: 
 
         <Reveal delay={0.08} y={12}>
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-            <Link href={plansHref} className="btn-primary h-12 px-6">
+            <Link
+              href={plansHref}
+              className="btn-primary h-12 px-6"
+              data-evento="clic_probar"
+              data-ubicacion="ciudad"
+            >
               Probar Alhabla 7 días <ArrowRight className="h-4 w-4" aria-hidden="true" />
             </Link>
             <Link href={`/${nicho}`} className="btn-secondary h-12 px-6">

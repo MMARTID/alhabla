@@ -361,7 +361,7 @@ export function MainLanding() {
           </Reveal>
           <Reveal delay={0.12} y={16}>
             <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:justify-center">
-              <Link href="/planes" className="btn-primary h-12 px-6">Probar Alhabla 7 días <ArrowRight className="h-4 w-4" aria-hidden="true" /></Link>
+              <Link href="/planes" className="btn-primary h-12 px-6" data-evento="clic_probar" data-ubicacion="portada">Probar Alhabla 7 días <ArrowRight className="h-4 w-4" aria-hidden="true" /></Link>
               <button type="button" onClick={() => setIsDemoOpen(true)} className="btn-secondary h-12 px-6"><Headphones className="h-4 w-4" aria-hidden="true" /> Escuchar cómo atiende</button>
             </div>
           </Reveal>
@@ -491,7 +491,7 @@ export function MainLanding() {
         </div>
       </section>
 
-      <section className="bg-[#0a0a0a] text-white"><Reveal className="mx-auto flex max-w-7xl flex-col items-start justify-between gap-7 px-4 py-16 sm:px-6 sm:py-20 lg:flex-row lg:items-center lg:px-8"><div><h2 className="max-w-xl text-3xl font-black tracking-tight sm:text-5xl">Prueba qué pasa cuando nadie deja una llamada sin atender.</h2></div><Link href="/planes" className="btn-purple shrink-0">Empezar ahora <ArrowRight className="h-4 w-4" aria-hidden="true" /></Link></Reveal></section>
+      <section className="bg-[#0a0a0a] text-white"><Reveal className="mx-auto flex max-w-7xl flex-col items-start justify-between gap-7 px-4 py-16 sm:px-6 sm:py-20 lg:flex-row lg:items-center lg:px-8"><div><h2 className="max-w-xl text-3xl font-black tracking-tight sm:text-5xl">Prueba qué pasa cuando nadie deja una llamada sin atender.</h2></div><Link href="/planes" className="btn-purple shrink-0" data-evento="clic_probar" data-ubicacion="portada_cierre">Empezar ahora <ArrowRight className="h-4 w-4" aria-hidden="true" /></Link></Reveal></section>
       <SiteFooter />
       <DemoVoiceCall open={isDemoOpen} onClose={() => setIsDemoOpen(false)} />
     </main>

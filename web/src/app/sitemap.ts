@@ -46,6 +46,11 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: "weekly",
       priority: 0.6,
     },
+    {
+      url: absoluteUrl("/contacto"),
+      changeFrequency: "yearly",
+      priority: 0.5,
+    },
     ...listarArticulos().map((a) => ({
       url: absoluteUrl(`/blog/${a.slug}`),
       lastModified: new Date(`${a.actualizado ?? a.fecha}T08:00:00Z`),

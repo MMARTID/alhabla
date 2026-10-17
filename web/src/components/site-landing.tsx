@@ -138,7 +138,7 @@ export function SiteLanding({ content }: { content?: NicheLandingContent }) {
 
       {/*
         Orden decidido (2026-09-16): la calculadora vive justo antes de
-        Precios. La cifra de pérdida queda fresca al ver los 69€, y /planes
+        Precios. La cifra de pérdida queda fresca al ver los precios, y /planes
         reutiliza esa estimación (plans-with-roi) — su CTA ya no pide
         comprar antes de haber visto cómo funciona el producto.
       */}
@@ -228,7 +228,12 @@ export function SiteLanding({ content }: { content?: NicheLandingContent }) {
             {content?.closingTitle ?? "Empieza a no perder llamadas esta semana."}
           </h2>
           <div className="shrink-0">
-            <Link href={plansHref} className="btn-purple">
+            <Link
+              href={plansHref}
+              className="btn-purple"
+              data-evento="clic_probar"
+              data-ubicacion="sector_cierre"
+            >
               Empezar ahora
               <ArrowRight className="h-4 w-4" aria-hidden="true" />
             </Link>

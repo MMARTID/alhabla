@@ -7,6 +7,7 @@ import { AlertTriangle, ArrowLeft, LoaderCircle, ShieldCheck } from "lucide-reac
 import { createCheckoutSession } from "@/lib/api";
 import type { PlanId } from "@/lib/types";
 import { webUrl } from "@/lib/web-url";
+import { medirEvento } from "@/components/google-analytics";
 
 const stripePromise = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
   ? loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)
@@ -37,7 +38,11 @@ export default function CheckoutPage(props: { searchParams: Promise<{ plan?: str
 
     createCheckoutSession(planId)
       .then((session) => {
-        if (!cancelled) setClientSecret(session.clientSecret);
+        if (cancelled) return;
+        setClientSecret(session.clientSecret);
+        // Con la sesión de Stripe ya creada: un 401 o un 409 no son un
+        // checkout empezado (docs/eventos-de-analitica.md).
+        medirEvento("begin_checkout", { plan: planId });
       })
       .catch((error: unknown) => {
         if (cancelled) return;

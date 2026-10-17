@@ -10,8 +10,10 @@ import { FacebookAuthButton } from "@/components/facebook-auth-button";
 import { BrandMark } from "@/components/brand-mark";
 import { ParticleField } from "@/components/particle-field";
 import { ParticleMouseLayer } from "@/components/particle-mouse-layer";
+import { medirEvento, medirEventoYSeguir } from "@/components/google-analytics";
 import { normalizeBusinessType } from "@/lib/business-type";
 import { buildAppEntryUrl, describeRegisterError } from "@/lib/register";
+import { isPlanId } from "@/lib/billing-navigation";
 
 const TERMINOS_PENDIENTES =
   "Debes aceptar los Términos y Condiciones y la Política de privacidad.";
@@ -26,6 +28,16 @@ export default function RegisterPage() {
   const [niche, setNiche] = useState<string | null>(null);
   const [plan, setPlan] = useState<string | null>(null);
   const casillaTerminos = useRef<HTMLInputElement>(null);
+  const registroEmpezado = useRef(false);
+
+  // Abrir /register ya lo cuenta el `page_view`; esto separa a quien empieza
+  // a rellenar (o pulsa Google o Facebook) de quien mira y se va. Puntero y
+  // foco: Safari no enfoca un botón al pulsarlo con el ratón.
+  const medirInicioDelRegistro = () => {
+    if (registroEmpezado.current) return;
+    registroEmpezado.current = true;
+    medirEvento("empezar_registro", isPlanId(plan) ? { plan } : {});
+  };
 
   // El aviso queda debajo del formulario, fuera de la vista al pulsar
   // Google o Facebook: llevar el foco a la casilla lo trae a pantalla con ella.
@@ -65,11 +77,17 @@ export default function RegisterPage() {
       if (!data.pase) {
         // Backend anterior o Redis caído: la cuenta existe, pero no hay pase
         // con el que entrar en la app sin escribir la contraseña otra vez.
+        medirEvento("sign_up", { method: "email" });
         setError("Tu cuenta está creada. Entra en la app con tu email y contraseña.");
         setLoading(false);
         return;
       }
-      window.location.assign(buildAppEntryUrl({ pase: data.pase, plan, niche }));
+      const entrada = buildAppEntryUrl({ pase: data.pase, plan, niche });
+      // El alta con Google o Facebook la mide la app, que es donde acaba
+      // (callback con `alta=1`).
+      medirEventoYSeguir("sign_up", { method: "email" }, () =>
+        window.location.assign(entrada)
+      );
     } catch (error) {
       setError(describeRegisterError(error));
       setLoading(false);
@@ -80,7 +98,11 @@ export default function RegisterPage() {
     <div className="tema-sistema relative isolate flex min-h-screen items-center justify-center px-4 py-12 sm:px-6 lg:px-8">
       <ParticleField />
       <ParticleMouseLayer />
-      <div className="panel w-full max-w-lg p-8">
+      <div
+        className="panel w-full max-w-lg p-8"
+        onPointerDownCapture={medirInicioDelRegistro}
+        onFocusCapture={medirInicioDelRegistro}
+      >
         <div className="space-y-4 text-center">
           <BrandMark className="mx-auto h-14 w-14" />
           <h2 className="text-3xl font-black tracking-tight text-tinta">Crear cuenta</h2>
