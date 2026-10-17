@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import Telnyx from "telnyx";
 import {
   extractTelnyxEventEnvelope,
   handleCallInitiated,
@@ -412,6 +413,86 @@ describe("handleCallInitiated", () => {
       expect.stringMatching(/rechazó contestar con la voz Soniox\.tts-rt-v2\.Marta \(negocio biz1\).*422/)
     );
     errorLog.mockRestore();
+  });
+
+  // Decisión del usuario del 17-10 (PLAN-RETIRAR-RETELL.md, PR 4): si
+  // Telnyx no deja contestar ni reintentando, se cuelga para que el cliente
+  // note el corte y vuelva a llamar; antes la llamada sonaba sin fin.
+  describe("cuando Telnyx no deja contestar", () => {
+    const errorDeTelnyx = (status: number) =>
+      Telnyx.APIError.generate(
+        status,
+        { errors: [] },
+        undefined,
+        new Headers()
+      );
+
+    beforeEach(() => {
+      mockedBusinessFindUnique.mockResolvedValue({
+        id: "biz1",
+        callsSuspendedAt: null,
+        paymentFailureSuspensionAt: null,
+        agents: [{ id: "agent1", telnyxAssistantId: "assistant_1" }],
+      } as any);
+      mockedCallUpsert.mockResolvedValue({} as any);
+      vi.useFakeTimers();
+    });
+    afterEach(() => {
+      vi.useRealTimers();
+      // mockRejectedValue no lo quita clearAllMocks: los demás tests
+      // esperan el answer por defecto, que resuelve.
+      mockedAnswerCallWithAssistant.mockReset();
+    });
+
+    it("reintenta los 5xx y, si siguen, cuelga con un log que dice cuántas veces lo intentó", async () => {
+      mockedAnswerCallWithAssistant.mockRejectedValue(errorDeTelnyx(503));
+      vi.spyOn(console, "warn").mockImplementation(() => {});
+      const errorLog = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      const resultado = handleCallInitiated(basePayload);
+      await vi.runAllTimersAsync();
+
+      expect(await resultado).toEqual({ success: false });
+      expect(mockedAnswerCallWithAssistant).toHaveBeenCalledTimes(3);
+      expect(mockedHangupCall).toHaveBeenCalledWith("call_ctrl_1");
+      expect(errorLog).toHaveBeenCalledWith(
+        expect.stringMatching(
+          /No se pudo contestar llamada call_ctrl_1 del negocio biz1 con el assistant assistant_1 tras 3 intentos; se cuelga/
+        )
+      );
+    });
+
+    it("un 503 suelto se arregla reintentando y la llamada se contesta", async () => {
+      mockedAnswerCallWithAssistant
+        .mockRejectedValueOnce(errorDeTelnyx(503))
+        .mockResolvedValueOnce(undefined);
+      vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      const resultado = handleCallInitiated(basePayload);
+      await vi.runAllTimersAsync();
+
+      expect(await resultado).toEqual({ success: true });
+      expect(mockedHangupCall).not.toHaveBeenCalled();
+    });
+
+    it("si un intento agotó el tiempo, no cuelga: Telnyx pudo contestarla", async () => {
+      mockedAnswerCallWithAssistant
+        .mockRejectedValueOnce(new Telnyx.APIConnectionTimeoutError())
+        .mockRejectedValueOnce(errorDeTelnyx(422));
+      vi.spyOn(console, "warn").mockImplementation(() => {});
+      const errorLog = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      const resultado = handleCallInitiated(basePayload);
+      await vi.runAllTimersAsync();
+
+      expect(await resultado).toEqual({ success: false });
+      expect(mockedHangupCall).not.toHaveBeenCalled();
+      expect(errorLog).toHaveBeenCalledWith(
+        expect.stringMatching(
+          /puede que Telnyx la contestara, así que no se cuelga/
+        )
+      );
+    });
   });
 
   it("si no se puede saber quién llama, contesta con el saludo del assistant y sin grabar", async () => {

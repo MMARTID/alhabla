@@ -1,6 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { generateKeyPairSync, sign as cryptoSign } from "node:crypto";
-import { TelnyxAiAdapter } from "../../../src/adapters/telnyx/TelnyxAiAdapter.js";
+import {
+  TelnyxAiAdapter,
+  TIEMPO_PARA_CONTESTAR_MS,
+} from "../../../src/adapters/telnyx/TelnyxAiAdapter.js";
 
 const mockAssistantsCreate = vi.fn();
 const mockAssistantsUpdate = vi.fn();
@@ -637,10 +640,17 @@ describe("TelnyxAiAdapter", () => {
 
       await adapter.answerCallWithAssistant("call_ctrl_1", "assistant_123");
 
-      expect(mockAnswer).toHaveBeenCalledWith("call_ctrl_1", {
-        assistant: { id: "assistant_123" },
-        client_state: undefined,
-      });
+      // Con su propio timeout, corto: contestar va dentro del webhook y se
+      // reintenta (adapters/telnyx/contestarLlamada.ts).
+      expect(mockAnswer).toHaveBeenCalledWith(
+        "call_ctrl_1",
+        {
+          assistant: { id: "assistant_123" },
+          client_state: undefined,
+        },
+        { timeout: TIEMPO_PARA_CONTESTAR_MS }
+      );
+      expect(TIEMPO_PARA_CONTESTAR_MS).toBe(3_000);
     });
 
     it("con saludo, variables, voz y grabación de esa llamada", async () => {
@@ -658,18 +668,22 @@ describe("TelnyxAiAdapter", () => {
         grabar: true,
       });
 
-      expect(mockAnswer).toHaveBeenCalledWith("call_ctrl_1", {
-        assistant: {
-          id: "assistant_123",
-          greeting: "Hola, Lucía",
-          dynamic_variables: { nombre_cliente: "Lucía" },
-          voice_settings: voz,
+      expect(mockAnswer).toHaveBeenCalledWith(
+        "call_ctrl_1",
+        {
+          assistant: {
+            id: "assistant_123",
+            greeting: "Hola, Lucía",
+            dynamic_variables: { nombre_cliente: "Lucía" },
+            voice_settings: voz,
+          },
+          client_state: undefined,
+          record: "record-from-answer",
+          record_format: "mp3",
+          record_channels: "dual",
         },
-        client_state: undefined,
-        record: "record-from-answer",
-        record_format: "mp3",
-        record_channels: "dual",
-      });
+        { timeout: TIEMPO_PARA_CONTESTAR_MS }
+      );
     });
 
     it("sin voz propia, la del assistant: no manda voice_settings", async () => {
