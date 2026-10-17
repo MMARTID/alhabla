@@ -479,12 +479,21 @@ Tomadas por el usuario el 17-10:
    preguntar, con verificación en producción después. Las acciones irreversibles en cuentas
    externas (borrar en Retell, darse de baja) se preguntan aparte.
 4. **Sin esperas:** no hay usuarios reales, así que la PR 3 no espera una semana.
+5. **Limpieza de la PR 3 (hecha el 17-10, tras verificar la PR 2 en producción):** vaciar la
+   cuenta de Retell (6 números importados, 13 agentes y 13 LLM borrados; quedan 0); pasar
+   `+34930453216`, el último número del trunk, al Call Control App de producción con la etiqueta
+   `sin-negocio` (no darlo de baja); borrar la FQDN connection «Alhabla» de Telnyx; quitar de
+   Cloud Run las variables de Retell, Vapi, rollout y failover, y borrar de Secret Manager
+   `RETELL_API_KEY`, `RETELL_SIP_TRUNK_AUTH_PASSWORD`, `VAPI_API_KEY` y `VAPI_WEBHOOK_SECRET`.
+   Respaldo de la configuración del job `telnyx-health-check` y del trunk en las notas de la
+   sesión.
 
 El resto se pregunta cuando surja. Por ahora quedan, con la recomendación primero:
 
 - **`fallback_destination` (PR 6).** (a) Solo si el dueño aceptó que le pasen llamadas;
   (b) siempre que haya un móvil válido.
-- **Cuenta de Retell (PR 3).** (a) Baja tras la PR 3; (b) un mes más sin uso.
+- **La cuenta de Retell en sí.** Ya está vacía; darla de baja y revocar su clave lo hace el
+  usuario cuando quiera.
 
 ## Apéndice: el contestador, aparcado
 

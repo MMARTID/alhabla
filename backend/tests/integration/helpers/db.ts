@@ -14,7 +14,7 @@ export async function resetDb(): Promise<void> {
   // El estado efímero que antes vivía en Redis (cerrojos, contadores del
   // limitador…): sin esto, un cerrojo o un contador de un test seguiría vivo
   // en el siguiente.
-  await prisma.$executeRaw`TRUNCATE "cerrojos", "claves_temporales", "contadores", "salud_telnyx"`;
+  await prisma.$executeRaw`TRUNCATE "cerrojos", "claves_temporales", "contadores"`;
   await prisma.$transaction([
     // Sin FK obligatoria con Call (onDelete: SetNull): borrar llamadas no lo
     // limpia, y un evento ya procesado en un test se daría por duplicado en

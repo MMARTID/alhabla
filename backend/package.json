@@ -46,7 +46,6 @@
     "ical.js": "^2.2.1",
     "ioredis": "^5.3.6",
     "jsonwebtoken": "^9.0.3",
-    "retell-sdk": "^5.63.0",
     "stripe": "^22.4.0",
     "telnyx": "^7.24.0",
     "tsdav": "^2.3.3",

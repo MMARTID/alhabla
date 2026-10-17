@@ -32,7 +32,7 @@ describe("contadores de ventana fija (Postgres real)", () => {
       { relname: string; relpersistence: string; reloptions: string[] | null }[]
     >`SELECT relname, relpersistence::text AS relpersistence, reloptions
       FROM pg_class
-      WHERE relname IN ('cerrojos', 'claves_temporales', 'contadores', 'salud_telnyx')
+      WHERE relname IN ('cerrojos', 'claves_temporales', 'contadores')
         AND relnamespace = current_schema()::regnamespace
       ORDER BY relname`;
 
@@ -44,7 +44,6 @@ describe("contadores de ventana fija (Postgres real)", () => {
         relpersistence: "u",
         reloptions: ["fillfactor=70", "autovacuum_vacuum_scale_factor=0.05"],
       },
-      { relname: "salud_telnyx", relpersistence: "p", reloptions: null },
     ]);
   });
 

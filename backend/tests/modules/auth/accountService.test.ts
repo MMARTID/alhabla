@@ -21,9 +21,6 @@ vi.mock("../../../src/lib/prisma.js", () => ({
 vi.mock("../../../src/lib/cloudTasks.js", () => ({ enqueueEmailJob: vi.fn() }));
 vi.mock("../../../src/lib/stripe.js", () => ({ getStripeClient: vi.fn() }));
 vi.mock("../../../src/lib/storage.js", () => ({ deleteStorageObject: vi.fn() }));
-vi.mock("../../../src/adapters/retell/RetellAdapter.js", () => ({
-  retellAdapter: { deletePhoneNumber: vi.fn(), deleteAgent: vi.fn(), deleteLlm: vi.fn() },
-}));
 vi.mock("../../../src/adapters/telnyx/TelnyxAdapter.js", () => ({
   telnyxAdapter: { releaseNumber: vi.fn() },
 }));
