@@ -3,6 +3,7 @@ import {
   esLineaDeClientesEspanola,
   formatearTelefonoLegible,
   isValidE164Phone,
+  normalizarTelefono,
 } from "../../src/lib/phone.js";
 
 describe("formatearTelefonoLegible", () => {
@@ -20,6 +21,27 @@ describe("isValidE164Phone", () => {
     expect(isValidE164Phone("+34600123456")).toBe(true);
     expect(isValidE164Phone("600123456")).toBe(false);
     expect(isValidE164Phone("+34 600 123 456")).toBe(false);
+  });
+});
+
+describe("normalizarTelefono", () => {
+  it("lleva a E.164 lo que dicta un cliente", () => {
+    expect(normalizarTelefono("612 345 678")).toBe("+34612345678");
+    expect(normalizarTelefono("+34 612-345-678")).toBe("+34612345678");
+    expect(normalizarTelefono("0034612345678")).toBe("+34612345678");
+    expect(normalizarTelefono("34612345678")).toBe("+34612345678");
+    expect(normalizarTelefono("(91) 122.23.33")).toBe("+34911222333");
+    expect(normalizarTelefono("+33 6 12 34 56 78")).toBe("+33612345678");
+  });
+
+  it("descarta lo que no es un teléfono utilizable", () => {
+    expect(normalizarTelefono("el de siempre")).toBeNull();
+    expect(normalizarTelefono("612 345 67")).toBeNull();
+    expect(normalizarTelefono("512345678")).toBeNull();
+    expect(normalizarTelefono("anonymous")).toBeNull();
+    expect(normalizarTelefono("")).toBeNull();
+    expect(normalizarTelefono(null)).toBeNull();
+    expect(normalizarTelefono(undefined)).toBeNull();
   });
 });
 

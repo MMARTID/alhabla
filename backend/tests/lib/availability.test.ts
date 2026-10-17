@@ -977,12 +977,96 @@ describe("checkAvailability — niveles por servicio", () => {
 
       expect(mockedBookingFindMany).toHaveBeenLastCalledWith(
         expect.objectContaining({
-          where: expect.objectContaining({ id: { not: "booking_0" } }),
+          where: expect.objectContaining({ id: { notIn: ["booking_0"] } }),
         })
       );
       // El mock devuelve la reserva igualmente (no filtra por id): lo que se
       // comprueba aquí es que su evento externo tampoco cuenta.
       expect(result.available).toBe(true);
+    });
+
+    // La recepcionista cambia una cita en una conversación que ya tiene la
+    // suya: no cuentan ni la que se cambia ni la de esta conversación.
+    it("excluye varias reservas y sus eventos a la vez; los demás eventos siguen contando", async () => {
+      givenProfessionals([{ id: "laura", name: "Laura", serviceIds: [] }]);
+      givenBookings([]);
+      const evento = (
+        externalEventId: string,
+        inicio: string,
+        fin: string
+      ) => ({
+        externalEventId,
+        start: new Date(inicio),
+        end: new Date(fin),
+      });
+
+      const libre = await checkAvailability({
+        businessId,
+        schedule: DEFAULT_BUSINESS_SCHEDULE,
+        timezone: europeMadrid,
+        bookingCapacity: 1,
+        startDateTime: "2026-08-10T10:30:00Z",
+        durationMinutes: 60,
+        professionalId: "laura",
+        externalBusyIntervals: [
+          evento(
+            "evento-cambiada",
+            "2026-08-10T10:00:00Z",
+            "2026-08-10T11:00:00Z"
+          ),
+          evento(
+            "evento-conversacion",
+            "2026-08-10T11:00:00Z",
+            "2026-08-10T11:30:00Z"
+          ),
+        ],
+        calendarAvailabilityKnown: true,
+        calendarOrigin: { provider: "google", calendarId: "primary" },
+        excluir: [
+          { bookingId: "booking_cambiada", externalEventId: "evento-cambiada" },
+          {
+            bookingId: "booking_conversacion",
+            externalEventId: "evento-conversacion",
+          },
+        ],
+      });
+
+      expect(mockedBookingFindMany).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            id: { notIn: ["booking_cambiada", "booking_conversacion"] },
+          }),
+        })
+      );
+      expect(libre.available).toBe(true);
+
+      const ocupado = await checkAvailability({
+        businessId,
+        schedule: DEFAULT_BUSINESS_SCHEDULE,
+        timezone: europeMadrid,
+        bookingCapacity: 1,
+        startDateTime: "2026-08-10T10:30:00Z",
+        durationMinutes: 60,
+        professionalId: "laura",
+        externalBusyIntervals: [
+          evento(
+            "evento-cambiada",
+            "2026-08-10T10:00:00Z",
+            "2026-08-10T11:00:00Z"
+          ),
+          evento(
+            "evento-ajeno",
+            "2026-08-10T11:00:00Z",
+            "2026-08-10T11:30:00Z"
+          ),
+        ],
+        calendarAvailabilityKnown: true,
+        calendarOrigin: { provider: "google", calendarId: "primary" },
+        excluir: [
+          { bookingId: "booking_cambiada", externalEventId: "evento-cambiada" },
+        ],
+      });
+      expect(ocupado.available).toBe(false);
     });
   });
 });

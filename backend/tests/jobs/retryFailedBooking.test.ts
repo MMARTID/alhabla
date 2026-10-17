@@ -20,6 +20,7 @@ import {
   almacenEnMemoria,
   reiniciarAlmacenEnMemoria,
 } from "../helpers/almacenEnMemoria.js";
+import { anularLaCitaCambiada } from "../../src/modules/bookings/reservaModificada.js";
 
 vi.mock("../../src/lib/cloudTasks.js", () => ({
   enqueueRetryBookingJob: vi.fn(),
@@ -35,6 +36,11 @@ vi.mock("../../src/modules/whatsapp/mensajesCliente.js", () => ({
 vi.mock("../../src/adapters/whatsapp/WhatsAppAdapter.js", () => ({
   whatsappAdapter: { isConfigured: vi.fn().mockReturnValue(true) },
 }));
+// La anulación de la cita que se cambia tiene sus tests en
+// reservaModificada.test.ts.
+vi.mock("../../src/modules/bookings/reservaModificada.js", () => ({
+  anularLaCitaCambiada: vi.fn().mockResolvedValue("anulada"),
+}));
 vi.mock("../../src/lib/prisma.js", () => ({
   prisma: {
     lead: { findUnique: vi.fn(), update: vi.fn() },
@@ -43,7 +49,7 @@ vi.mock("../../src/lib/prisma.js", () => ({
     calendarConnection: { updateMany: vi.fn() },
     service: { findMany: vi.fn() },
     professional: { findFirst: vi.fn() },
-    booking: { findUnique: vi.fn() },
+    booking: { findUnique: vi.fn(), findFirst: vi.fn() },
     $transaction: vi.fn(),
   },
 }));
@@ -85,6 +91,8 @@ const mockedBusinessUpdate = vi.mocked(prisma.business.update);
 const mockedServiceFindMany = vi.mocked(prisma.service.findMany);
 const mockedProfessionalFindFirst = vi.mocked(prisma.professional.findFirst);
 const mockedBookingFindUnique = vi.mocked(prisma.booking.findUnique);
+const mockedBookingFindFirst = vi.mocked(prisma.booking.findFirst);
+const mockedAnularLaCitaCambiada = vi.mocked(anularLaCitaCambiada);
 const mockedTransaction = vi.mocked(prisma.$transaction);
 const mockedBookAppointment = vi.mocked(calendarService.bookAppointment);
 const mockedGetBusyIntervals = vi.mocked(calendarService.getBusyIntervals);
@@ -596,6 +604,137 @@ describe("processRetryFailedBookingJob", () => {
     expect(mockedLeadUpdate).toHaveBeenCalledWith({
       where: { id: leadId },
       data: { resolvedAt: expect.any(Date) },
+    });
+  });
+
+  // Auditoría del 16-10: con número oculto el evento decía «Teléfono:
+  // anonymous», y el teléfono dictado se guardaba tal cual.
+  it("con número oculto la reserva recuperada queda sin teléfono, no con «anonymous»", async () => {
+    mockedLeadFindUnique.mockResolvedValue(
+      buildLead({ data: { ...pendingBookingData, clientPhone: null } }) as any
+    );
+    mockedCallFindUnique.mockResolvedValue({
+      businessId: "biz_1",
+      fromNumber: "anonymous",
+    } as any);
+    mockedBusinessFindUnique.mockResolvedValue(buildBusiness() as any);
+
+    await processRetryFailedBookingJob({ leadId });
+
+    expect(mockedBookAppointment).toHaveBeenCalledWith(
+      expect.objectContaining({ clientPhone: undefined })
+    );
+    expect(mockUpsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({ clientPhone: undefined }),
+      })
+    );
+  });
+
+  it("normaliza el teléfono de un lead guardado antes de normalizarlos", async () => {
+    mockedLeadFindUnique.mockResolvedValue(
+      buildLead({
+        data: { ...pendingBookingData, clientPhone: "612 34 56 78" },
+      }) as any
+    );
+    mockedCallFindUnique.mockResolvedValue({
+      businessId: "biz_1",
+      fromNumber: "+34611222333",
+    } as any);
+    mockedBusinessFindUnique.mockResolvedValue(buildBusiness() as any);
+
+    await processRetryFailedBookingJob({ leadId });
+
+    expect(mockUpsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({ clientPhone: "+34612345678" }),
+      })
+    );
+  });
+
+  describe("cambio de cita (replacesBookingId)", () => {
+    beforeEach(() => {
+      mockedLeadFindUnique.mockResolvedValue(
+        buildLead({
+          data: { ...pendingBookingData, replacesBookingId: "booking_vieja" },
+        }) as any
+      );
+      mockedCallFindUnique.mockResolvedValue({
+        businessId: "biz_1",
+        fromNumber: "+34611222333",
+        voiceProvider: "telnyx",
+      } as any);
+      mockedBusinessFindUnique.mockResolvedValue(buildBusiness() as any);
+      mockedBookingFindFirst.mockResolvedValue({
+        id: "booking_vieja",
+        externalEventId: "evt_viejo",
+      } as any);
+      mockUpsert.mockResolvedValue({ id: "booking_nueva" });
+    });
+
+    it("no cuenta la vieja como ocupada y la anula cuando la nueva entra", async () => {
+      await processRetryFailedBookingJob({ leadId });
+
+      expect(mockedBookingFindFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            id: "booking_vieja",
+            call: { businessId: "biz_1" },
+            isCancelled: false,
+          },
+        })
+      );
+      expect(mockedCheckAvailability).toHaveBeenCalledWith(
+        expect.objectContaining({
+          excluir: { bookingId: "booking_vieja", externalEventId: "evt_viejo" },
+        })
+      );
+      expect(mockedAnularLaCitaCambiada).toHaveBeenCalledWith({
+        businessId: "biz_1",
+        citaAnteriorId: "booking_vieja",
+        nuevaReservaId: "booking_nueva",
+        cancelledBy: "client_voice",
+        etiqueta: `lead ${leadId}`,
+      });
+    });
+
+    it("desde un chat de WhatsApp la anula con client_chat", async () => {
+      mockedCallFindUnique.mockResolvedValue({
+        businessId: "biz_1",
+        fromNumber: "+34611222333",
+        voiceProvider: "whatsapp",
+      } as any);
+
+      await processRetryFailedBookingJob({ leadId });
+
+      expect(mockedAnularLaCitaCambiada).toHaveBeenCalledWith(
+        expect.objectContaining({ cancelledBy: "client_chat" })
+      );
+    });
+
+    it("si el hueco ya no está libre, la vieja sigue en pie", async () => {
+      mockedCheckAvailability.mockResolvedValue({
+        available: false,
+        code: "NO_CAPACITY",
+        message: "",
+      } as any);
+
+      await processRetryFailedBookingJob({ leadId });
+
+      expect(mockedBookAppointment).not.toHaveBeenCalled();
+      expect(mockedAnularLaCitaCambiada).not.toHaveBeenCalled();
+    });
+
+    it("si la vieja ya no está activa, reserva la nueva sin anular nada", async () => {
+      mockedBookingFindFirst.mockResolvedValue(null);
+
+      await processRetryFailedBookingJob({ leadId });
+
+      expect(mockedBookAppointment).toHaveBeenCalled();
+      expect(mockedCheckAvailability).toHaveBeenCalledWith(
+        expect.not.objectContaining({ excluir: expect.anything() })
+      );
+      expect(mockedAnularLaCitaCambiada).not.toHaveBeenCalled();
     });
   });
 });

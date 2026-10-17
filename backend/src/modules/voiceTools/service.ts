@@ -8,7 +8,11 @@ import {
 import { nombreParaElCliente } from "../../lib/nombreProfesional.js";
 import { esNombreDeClienteValido } from "../../lib/nombreDelCliente.js";
 import { guardarIdiomaDelCliente } from "../../lib/idiomaDelCliente.js";
-import { enlazarReservaModificada } from "../bookings/reservaModificada.js";
+import {
+  anularLaCitaCambiada,
+  enlazarConLaReservaNueva,
+  enlazarReservaModificada,
+} from "../bookings/reservaModificada.js";
 import {
   claveDeCacheDeVoz,
   invalidarCacheDeVoz,
@@ -23,6 +27,7 @@ import {
   computeAvailabilityLookaheadMs,
   inicioDeBusquedaHaciaAtras,
   type ExternalBusyInterval,
+  type ReservaExcluida,
 } from "../../lib/availability.js";
 import { calendarService } from "../calendar/service.js";
 import {
@@ -76,7 +81,7 @@ import {
   sanearNombre,
 } from "../whatsapp/mensajesCliente.js";
 import { cancelarReserva } from "../bookings/cancelacion.js";
-import { isValidE164Phone } from "../../lib/phone.js";
+import { isValidE164Phone, normalizarTelefono } from "../../lib/phone.js";
 import { procesarInformeFinal } from "../whatsapp/recados.js";
 import {
   servicioSuspendidoPorPago,
@@ -149,6 +154,10 @@ type AvailabilityDraft = {
     professionalName: string;
     availabilityToken: string;
   };
+  /** La cita que el cliente cambia (`replacesBookingId` de
+   * check_availability, ya comprobada como suya): book_appointment no la
+   * cuenta como ocupada y la anula si la nueva queda guardada. */
+  replacesBookingId?: string;
 };
 
 /** Lo que el agente lee cuando hay alguien mejor que proponer. Lleva su
@@ -454,6 +463,10 @@ async function executeCheckAvailability(
     // true solo cuando el cliente ya oyó la recomendación e insistió en la
     // persona que pidió: entonces no se vuelve a proponer a nadie.
     const professionalConfirmed = params?.professionalConfirmed === true;
+    const replacesBookingId =
+      typeof params?.replacesBookingId === "string" && params.replacesBookingId
+        ? params.replacesBookingId
+        : undefined;
 
     // El LLM puede corromper un ID largo al copiarlo (llamada real del
     // 2026-09-14: envió "cmu1h326w001ts601zp5xut70", un híbrido de dos IDs
@@ -509,6 +522,37 @@ async function executeCheckAvailability(
       }
     }
 
+    // Cambio de cita: la que se cambia no cuenta como ocupada (la hora nueva
+    // puede solaparse con la vieja: media hora más tarde, con una sola
+    // persona en el negocio) y viaja en el token para que book_appointment
+    // la anule solo si la nueva queda reservada.
+    let citaCambiada: ReservaExcluida | null = null;
+    if (replacesBookingId) {
+      const call = await resolveCallForBusiness(callId, business.id, callLabel);
+      citaCambiada = await citaQueSeCambia(
+        business.id,
+        replacesBookingId,
+        call?.fromNumber
+      );
+      if (!citaCambiada) {
+        console.warn(
+          `[VoiceTools] ${callLabel} check_availability para cambiar la cita ${replacesBookingId}, que no es una cita activa de quien llama (negocio ${business.id})`
+        );
+        return {
+          success: true,
+          result: {
+            available: false,
+            code: "APPOINTMENT_TO_CHANGE_NOT_FOUND",
+            message:
+              "No encuentro con este número la cita que quiere cambiar. Búscala con find_my_appointment y usa su bookingId en replacesBookingId; si no aparece, no le prometas cambiarla.",
+          },
+        };
+      }
+    }
+    const delCambio = citaCambiada
+      ? { replacesBookingId: citaCambiada.bookingId }
+      : {};
+
     // Si la hora pedida no cabe, la alternativa es la más cercana, antes o
     // después (decisión de producto del 2026-10-10), sin bajar de la
     // antelación mínima. El calendario se lee desde ese mismo inicio: una
@@ -537,6 +581,7 @@ async function executeCheckAvailability(
         resolverConexionDeCalendario(business)
       ),
       buscarTambienAntes: { noAntesDe },
+      excluir: citaCambiada,
     });
 
     // Lo que se le devuelve al LLM no lleva los campos internos del ranking
@@ -572,6 +617,7 @@ async function executeCheckAvailability(
               serviceIds: serviceIds ?? [],
               professionalId: recommendedProfessional.professional.id,
               professionalRequested: true,
+              ...delCambio,
             }),
             instructions: instruccionesDeRecomendacion(
               nombreParaElCliente(recommendedProfessional.professional.name),
@@ -592,6 +638,7 @@ async function executeCheckAvailability(
         serviceIds: serviceIds ?? [],
         professionalId: professionalId ?? asignado?.id,
         professionalRequested: Boolean(professionalId),
+        ...delCambio,
         ...(recommendation && professionalId
           ? {
               recommendationOffered: {
@@ -660,6 +707,7 @@ async function executeCheckAvailability(
         professionalId:
           professionalId ?? alternativa.availableProfessionals[0]?.id,
         professionalRequested: Boolean(professionalId),
+        ...delCambio,
       });
       return {
         success: true,
@@ -881,6 +929,93 @@ async function resolveCallForBusiness(
 }
 
 /**
+ * ¿Llama con número oculto? Telnyx guarda en `from` lo que le llega
+ * («anonymous», según la auditoría del 16-10; a esa fecha no había ninguna
+ * llamada así ni en producción ni en dev): cualquier valor que no sea un
+ * teléfono. Un `fromNumber` vacío no cuenta: es lo que deja el heurístico de
+ * resolveCallForBusiness, que no sabe quién llama.
+ */
+function esNumeroOculto(fromNumber: string | null | undefined): boolean {
+  return (
+    typeof fromNumber === "string" &&
+    fromNumber !== "" &&
+    !isValidE164Phone(fromNumber)
+  );
+}
+
+/**
+ * Con número oculto la cita se queda sin ningún teléfono: book_appointment
+ * frena UNA vez por llamada para que la recepcionista lo pida. La segunda
+ * vez reserva sin él (el cliente puede no querer darlo). Si el almacén
+ * falla, no se frena: mejor la cita sin teléfono que sin cita.
+ */
+async function primeraVezQueSePideElTelefono(
+  callRowId: string,
+  businessId: string,
+  callLabel: string
+): Promise<boolean> {
+  try {
+    return await guardarClaveSiNoExiste(
+      `telefono_pedido:${callRowId}`,
+      "1",
+      60 * 60 * 1000,
+      { businessId }
+    );
+  } catch (error) {
+    console.error(
+      `[VoiceTools] ${callLabel}: no se pudo anotar que se pidió el teléfono (negocio ${businessId}); se reserva sin pedirlo: ${errorMessage(error)}`
+    );
+    return false;
+  }
+}
+
+/**
+ * ¿Es de quien llama esta cita? Por el número desde el que llama: el
+ * teléfono de la reserva o, si no tiene, el de la llamada en que se
+ * reservó. No por el consentimiento de mensajería (smsConsent): ese dice
+ * «puedes escribirme», no «esta cita es mía».
+ */
+function esCitaDeQuienLlama(
+  booking: { clientPhone: string | null; call: { fromNumber: string | null } },
+  callerNumber: string | null | undefined
+): boolean {
+  if (!callerNumber) return false;
+  return booking.clientPhone
+    ? booking.clientPhone === callerNumber
+    : booking.call.fromNumber === callerNumber;
+}
+
+/**
+ * La cita que el cliente quiere cambiar (`replacesBookingId`), si es suya,
+ * sigue activa y no ha pasado; null si no. Mismo criterio que
+ * cancel_appointment: nunca se fía de que el LLM solo pase ids de citas
+ * propias.
+ */
+async function citaQueSeCambia(
+  businessId: string,
+  bookingId: string,
+  callerNumber: string | null | undefined
+): Promise<ReservaExcluida | null> {
+  if (!callerNumber) return null;
+  const booking = await prisma.booking.findFirst({
+    where: {
+      id: bookingId,
+      call: { businessId },
+      isCancelled: false,
+      programedAt: { gte: new Date() },
+    },
+    select: {
+      id: true,
+      clientPhone: true,
+      externalEventId: true,
+      call: { select: { fromNumber: true } },
+    },
+  });
+  if (!booking || !esCitaDeQuienLlama(booking, callerNumber)) return null;
+  return { bookingId: booking.id, externalEventId: booking.externalEventId };
+}
+
+/**
  * Lo que el agente le dice al cliente cuando la reserva no ha salido. Si el
  * lead no se ha podido guardar, NADIE tiene sus datos: prometerle que le
  * confirmaremos en breve es mentirle, y el cliente no vuelve a llamar porque
@@ -918,6 +1053,8 @@ async function capturePendingBookingLead(args: {
   durationMinutes: number;
   serviceIds?: string[];
   professionalId?: string;
+  /** Cambio de cita: el reintento la anula si la nueva acaba entrando. */
+  replacesBookingId?: string;
   failureCode: string;
   callLabel: string;
   /** Consentimiento del resumen: sin él la cita recuperada no se confirma. */
@@ -947,6 +1084,9 @@ async function capturePendingBookingLead(args: {
           durationMinutes: args.durationMinutes,
           serviceIds: args.serviceIds ?? [],
           professionalId: args.professionalId ?? null,
+          ...(args.replacesBookingId
+            ? { replacesBookingId: args.replacesBookingId }
+            : {}),
           failureCode: args.failureCode,
           smsConsent: args.smsConsent,
           createdVia: args.createdVia,
@@ -1363,7 +1503,16 @@ async function executeBookAppointment(
   };
   const clientName = rawParams.clientName;
   const clientEmail = rawParams.clientEmail;
-  const clientPhone = rawParams.clientPhone;
+  // El teléfono que dicta el cliente, en E.164 (lib/phone.ts). Antes se
+  // guardaba tal cual lo escribía el modelo («612 345 678»): el WhatsApp no
+  // salía y nadie le reconocía en la siguiente llamada (auditoría del 16-10).
+  const telefonoDictado =
+    typeof rawParams.clientPhone === "string" && rawParams.clientPhone.trim()
+      ? rawParams.clientPhone
+      : undefined;
+  const telefonoNormalizado = telefonoDictado
+    ? normalizarTelefono(telefonoDictado)
+    : null;
   const smsConsent = rawParams.smsConsent === true;
   const draft = typeof rawParams.availabilityToken === "string"
     ? await readAvailabilityDraft(
@@ -1446,6 +1595,23 @@ async function executeBookAppointment(
         code: "CLIENT_NAME_REQUIRED",
         message:
           "Falta el nombre de quien reserva. Pregúntaselo y vuelve a llamar a book_appointment con su nombre en clientName.",
+      },
+    };
+  }
+
+  // Sin el número no se guarda nada: se pide otra vez (el teléfono no va en
+  // el log, solo que no se pudo normalizar).
+  if (telefonoDictado && !telefonoNormalizado) {
+    console.warn(
+      `[VoiceTools] ${callLabel} book_appointment con un teléfono que no se puede normalizar (negocio ${business.id}); se pide otra vez`
+    );
+    return {
+      success: true,
+      result: {
+        success: false,
+        code: "CLIENT_PHONE_INVALID",
+        message:
+          "Ese teléfono no es válido. Pídeselo otra vez, repíteselo en grupos de tres cifras y, cuando lo confirme, vuelve a llamar a book_appointment con el mismo availabilityToken y el teléfono en clientPhone.",
       },
     };
   }
@@ -1550,7 +1716,54 @@ async function executeBookAppointment(
     // fromNumber como fallback del teléfono de contacto del evento cuando
     // el cliente no pidió uno distinto (ver resolveCallForBusiness).
     const call = await resolveCallForBusiness(callId, business.id, callLabel);
-    const effectiveClientPhone = clientPhone || call?.fromNumber || undefined;
+    // Booking.clientPhone solo guarda un teléfono distinto del de la llamada
+    // (schema.prisma): si dicta el mismo, se queda en null.
+    const clientPhone =
+      telefonoNormalizado && telefonoNormalizado !== call?.fromNumber
+        ? telefonoNormalizado
+        : undefined;
+    // Con número oculto, `fromNumber` no es un teléfono: el evento del
+    // calendario decía «Teléfono: anonymous».
+    const telefonoDeLaLlamada =
+      call?.fromNumber && isValidE164Phone(call.fromNumber)
+        ? call.fromNumber
+        : undefined;
+    const effectiveClientPhone = clientPhone || telefonoDeLaLlamada;
+
+    if (
+      !effectiveClientPhone &&
+      call &&
+      canalDeLaTool(callId) === "voice" &&
+      esNumeroOculto(call.fromNumber) &&
+      (await primeraVezQueSePideElTelefono(call.id, business.id, callLabel))
+    ) {
+      return {
+        success: true,
+        result: {
+          success: false,
+          code: "CLIENT_PHONE_REQUIRED",
+          message:
+            "Llama con número oculto y la cita se quedaría sin teléfono de contacto. Pídeselo, repíteselo en grupos de tres cifras y, cuando lo confirme, vuelve a llamar a book_appointment con el mismo availabilityToken y el teléfono en clientPhone. Si no quiere darlo, vuelve a llamar sin él: la cita se guarda igual.",
+        },
+      };
+    }
+
+    // Cambio de cita (replacesBookingId del token): se vuelve a comprobar
+    // que sigue siendo suya y activa. Si ya no lo es (el dueño la canceló
+    // entre medias), la nueva se reserva igual y no hay nada que anular.
+    const citaCambiada = draft?.replacesBookingId
+      ? await citaQueSeCambia(
+          business.id,
+          draft.replacesBookingId,
+          call?.fromNumber
+        )
+      : null;
+    if (draft?.replacesBookingId && !citaCambiada) {
+      console.warn(
+        `[VoiceTools] ${callLabel} la cita que se cambia (${draft.replacesBookingId}) ya no es una cita activa de quien llama (negocio ${business.id}); se reserva la nueva sin anular nada`
+      );
+    }
+    const replacesBookingId = citaCambiada?.bookingId;
 
     if (!hasCalendarConnection) {
       const reconnectCode = codigoDeReconexion(conexion.provider);
@@ -1568,6 +1781,7 @@ async function executeBookAppointment(
         durationMinutes: effectiveDuration,
         serviceIds: requestedServiceIds,
         professionalId,
+        replacesBookingId,
         failureCode: reconnectCode,
         callLabel,
         smsConsent,
@@ -1668,6 +1882,7 @@ async function executeBookAppointment(
         durationMinutes: effectiveDuration,
         serviceIds: verifiedServiceIds,
         professionalId: verifiedProfessionalId,
+        replacesBookingId,
         failureCode: codigoDelCerrojo,
         callLabel,
         smsConsent,
@@ -1743,7 +1958,9 @@ async function executeBookAppointment(
         calendarOrigin: origenDeCalendario(
           resolverConexionDeCalendario(business)
         ),
-        excluir: reservaQueSeSustituye,
+        excluir: [reservaQueSeSustituye, citaCambiada].filter(
+          (reserva): reserva is ReservaExcluida => reserva !== null
+        ),
       });
 
       if (!availability.available) {
@@ -1783,6 +2000,7 @@ async function executeBookAppointment(
           professionalId:
             verifiedProfessionalId ??
             availability.availableProfessionals[0]?.id,
+          replacesBookingId,
           failureCode: "CALENDAR_UNAVAILABLE",
           callLabel,
           smsConsent,
@@ -1941,7 +2159,8 @@ async function executeBookAppointment(
           // Si el cliente acaba de cancelar otra cita en esta misma
           // conversación, esto es un cambio, no una cita nueva: se enlaza
           // para que la conversación original diga «Reserva modificada».
-          if (reservaGuardadaId) {
+          // Con replacesBookingId el enlace lo hace anularLaCitaCambiada.
+          if (reservaGuardadaId && !citaCambiada) {
             try {
               await enlazarReservaModificada({
                 businessId: business.id,
@@ -2044,6 +2263,27 @@ async function executeBookAppointment(
 
         console.log(`[VoiceTools] ${callLabel} agendó la cita correctamente`);
 
+        // Cambio de cita: con la nueva ya guardada, se anula la que cambia
+        // (antes el prompt mandaba cancelar primero, y si la reserva fallaba
+        // el cliente se quedaba sin ninguna: chat real del 13-10).
+        let citaAnterior: "anulada" | "sigue_reservada" | undefined;
+        if (citaCambiada) {
+          const anulacion = reservaGuardadaId
+            ? await anularLaCitaCambiada({
+                businessId: business.id,
+                citaAnteriorId: citaCambiada.bookingId,
+                nuevaReservaId: reservaGuardadaId,
+                cancelledBy:
+                  canalDeLaTool(callId) === "client_chat"
+                    ? "client_chat"
+                    : "client_voice",
+                etiqueta: callLabel,
+              })
+            : "error";
+          citaAnterior =
+            anulacion === "anulada" ? "anulada" : "sigue_reservada";
+        }
+
         // Aviso #1 al dueño por WhatsApp (PLAN-CANAL-DUENO.md § 4). Nunca
         // lanza y es idempotente por reserva; se espera por la misma razón
         // que el SMS de respaldo (Cloud Run congela el proceso al responder).
@@ -2115,7 +2355,13 @@ async function executeBookAppointment(
           success: true,
           result: {
             success: true,
-            message: "Cita agendada correctamente.",
+            message:
+              citaAnterior === "anulada"
+                ? "Cita cambiada: la nueva queda reservada y la anterior, anulada."
+                : citaAnterior === "sigue_reservada"
+                  ? "La cita nueva queda reservada, pero no he podido anular la anterior: anúlala con cancel_appointment."
+                  : "Cita agendada correctamente.",
+            ...(citaAnterior ? { citaAnterior } : {}),
             cuando: cuandoParaDecir(startDateTime, business.timezone || "Europe/Madrid"),
             eventLink: (result as { htmlLink?: string })?.htmlLink,
             professionalId: resolvedProfessionalId,
@@ -2152,6 +2398,7 @@ async function executeBookAppointment(
             durationMinutes: effectiveDuration,
             serviceIds: verifiedServiceIds,
             professionalId: resolvedProfessionalId,
+            replacesBookingId,
             failureCode: codigoReconexion,
             callLabel,
             smsConsent,
@@ -2198,6 +2445,7 @@ async function executeBookAppointment(
           durationMinutes: effectiveDuration,
           serviceIds: verifiedServiceIds,
           professionalId: resolvedProfessionalId,
+          replacesBookingId,
           failureCode: code,
           callLabel,
           smsConsent,
@@ -2239,11 +2487,9 @@ async function executeBookAppointment(
 
 /**
  * Localiza la próxima cita del negocio asociada al número desde el que llama
- * quien marca — solo si esa cita se reservó con smsConsent=true (consentimiento
- * explícito para usar ese número, dado por voz durante la reserva original).
- * Sin ese consentimiento, aunque exista una cita con ese número, se responde
- * como si no se hubiera encontrado nada: no se filtra información de una
- * reserva que el cliente no autorizó a asociar a su número.
+ * quien marca (esCitaDeQuienLlama): el teléfono de la reserva o, si no
+ * tiene, el de la llamada en que se reservó. Desde el 2026-09-15 no exige
+ * smsConsent (ver el comentario de la consulta).
  */
 async function executeFindMyAppointment(
   business: BusinessVoiceConfig,
@@ -2427,8 +2673,8 @@ async function executeNotifyWhenAvailable(
 
 /**
  * Cancela una cita identificada por find_my_appointment. Vuelve a comprobar
- * en servidor que el número de quien llama coincide y que dio consentimiento
- * — nunca se fía de que el LLM solo pase ids de citas propias.
+ * en servidor que el número de quien llama coincide (esCitaDeQuienLlama):
+ * nunca se fía de que el LLM solo pase ids de citas propias.
  */
 async function executeCancelAppointment(
   business: BusinessVoiceConfig,
@@ -2461,16 +2707,7 @@ async function executeCancelAppointment(
     include: { call: { select: { fromNumber: true } } },
   });
 
-  // Mismo criterio que find_my_appointment: la pertenencia se comprueba por
-  // el número desde el que llama, no por el consentimiento de mensajería.
-  const ownsBooking =
-    booking &&
-    callerNumber &&
-    (booking.clientPhone
-      ? booking.clientPhone === callerNumber
-      : booking.call.fromNumber === callerNumber);
-
-  if (!booking || !ownsBooking) {
+  if (!booking || !esCitaDeQuienLlama(booking, callerNumber)) {
     return notFoundResult;
   }
 
@@ -2503,6 +2740,22 @@ async function executeCancelAppointment(
     return notFoundResult;
   }
 
+  // Si la recepcionista ya reservó la nueva en esta conversación y cancela
+  // después la vieja sin replacesBookingId, también es un cambio: se enlaza
+  // para que el panel diga «Reserva modificada» (reservaModificada.ts).
+  if (call) {
+    try {
+      await enlazarConLaReservaNueva({
+        canceladaId: booking.id,
+        conversacion: call,
+      });
+    } catch (error) {
+      console.error(
+        `[VoiceTools] ${callLabel} canceló la cita ${booking.id} pero no pudo enlazarla con la reserva de esta conversación: ${errorMessage(error)}`
+      );
+    }
+  }
+
   return {
     success: true,
     result: { success: true, message: "Cita cancelada correctamente." },
@@ -2513,6 +2766,14 @@ async function executeCancelAppointment(
  * Ejecuta una tool de voz de forma neutral al orquestador.
  * Recibe el businessId ya resuelto y los parámetros de la tool.
  */
+/** Respuestas de book_appointment que piden un dato al cliente: no son un
+ * intento de reserva fallido. */
+const DATOS_QUE_SE_PIDEN_EN_LA_LLAMADA: ReadonlySet<string> = new Set([
+  "CLIENT_NAME_REQUIRED",
+  "CLIENT_PHONE_INVALID",
+  "CLIENT_PHONE_REQUIRED",
+]);
+
 /**
  * Deja apuntado qué intentó reservar el cliente cuando book_appointment
  * falla: si la recepcionista acaba escalando por fallo técnico sin recado,
@@ -2660,12 +2921,12 @@ export async function executeVoiceTool(
       );
     case "book_appointment": {
       const reserva = await executeBookAppointment(business, params, callLabel, callId);
-      // Sin nombre no es un fallo de la reserva: la recepcionista lo pregunta
-      // y vuelve a intentarlo.
+      // Sin nombre o sin un teléfono válido no es un fallo de la reserva: la
+      // recepcionista lo pregunta y vuelve a intentarlo.
       if (
         callId &&
         reserva.result?.success === false &&
-        reserva.result.code !== "CLIENT_NAME_REQUIRED"
+        !DATOS_QUE_SE_PIDEN_EN_LA_LLAMADA.has(String(reserva.result.code))
       ) {
         const code = reserva.result.code;
         await registrarIntentoFallido(business, params, callId, typeof code === "string" ? code : null);

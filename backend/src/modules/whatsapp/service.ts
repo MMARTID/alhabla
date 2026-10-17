@@ -265,7 +265,84 @@ export async function refrescarPlantillasConClave(): Promise<void> {
   }
 }
 
-/** Clave de la plantilla cuya aprobación activa la lista de espera. */
+/**
+ * Da de alta en `WhatsappTemplate` las plantillas del WABA que aún no tienen
+ * fila (una versión nueva, un idioma nuevo). Sin fila el código no ve una
+ * plantilla aunque Meta la apruebe; antes solo entraban con
+ * scripts/manual/sincronizarWhatsapp.mts. La clave es el nombre cuando nadie
+ * más lo lleva (ni en el WABA ni en otra fila), igual que en ese script; con
+ * varios idiomas del mismo nombre queda sin clave. No toca las filas que ya
+ * existen (de su estado se ocupa `refrescarPlantilla`). Devuelve cuántas
+ * creó; nunca lanza.
+ */
+export async function incorporarPlantillasNuevas(): Promise<number> {
+  const wabaId = process.env.WHATSAPP_WABA_ID;
+  if (!wabaId) {
+    return 0;
+  }
+  try {
+    const remotas = await whatsappAdapter.listTemplates(wabaId);
+    const conocidas = await prisma.whatsappTemplate.findMany({
+      select: { telnyxTemplateId: true, key: true },
+    });
+    const ids = new Set(conocidas.map((f) => f.telnyxTemplateId));
+    const claves = new Set(conocidas.map((f) => f.key).filter(Boolean));
+    const porNombre = new Map<string, number>();
+    for (const t of remotas) {
+      porNombre.set(t.name, (porNombre.get(t.name) ?? 0) + 1);
+    }
+    let creadas = 0;
+    for (const t of remotas) {
+      if (ids.has(t.telnyxTemplateId)) {
+        continue;
+      }
+      const key =
+        porNombre.get(t.name) === 1 && !claves.has(t.name) ? t.name : null;
+      try {
+        await prisma.whatsappTemplate.create({
+          data: {
+            key,
+            name: t.name,
+            language: t.language,
+            telnyxTemplateId: t.telnyxTemplateId,
+            metaTemplateId: t.metaTemplateId,
+            category: t.category,
+            status: t.status,
+            qualityRating: t.qualityRating,
+            rejectionReason: t.rejectionReason,
+            components: t.components as Prisma.InputJsonValue | undefined,
+            lastSyncedAt: new Date(),
+          },
+        });
+      } catch (error) {
+        // Otra instancia la creó a la vez (único por id o por nombre+idioma).
+        if (isUniqueConstraintError(error)) {
+          continue;
+        }
+        throw error;
+      }
+      if (key) {
+        claves.add(key);
+      }
+      creadas += 1;
+      console.log(
+        `[WhatsApp] Plantilla nueva en WhatsappTemplate: ${t.name}/${t.language} · ${t.status} · clave ${key ?? "—"}`
+      );
+    }
+    return creadas;
+  } catch (error) {
+    console.error(
+      `[WhatsApp] No se pudieron incorporar las plantillas nuevas del WABA: ${errorMessage(error)}`
+    );
+    return 0;
+  }
+}
+
+/** Clave de la plantilla cuya aprobación activa la lista de espera. Su
+ * versión nueva (`hueco_libre_v2`) no la sustituye: la vieja sigue aprobada
+ * y el envío elige la más nueva aprobada (mensajesCliente ›
+ * VERSIONES_HUECO_LIBRE). Si algún día se retira `hueco_libre`, este gate
+ * tiene que mirar la nueva. */
 export const CLAVE_LISTA_DE_ESPERA = "hueco_libre";
 const LISTA_DE_ESPERA_CACHE_TTL_MS = 60_000;
 
@@ -979,7 +1056,9 @@ async function efectosDeFalloAlCliente(input: {
       input.errorCode &&
       CODIGOS_DE_PLANTILLA.includes(input.errorCode) &&
       !esRespaldo &&
-      input.templateName === "confirmacion_cita_v2" &&
+      // confirmacion_cita_v2 y sus versiones nuevas (v3…): las que llevan el
+      // botón de ruta (mensajesCliente › VERSIONES_CONFIRMACION_CON_RUTA).
+      /^confirmacion_cita_v\d+$/.test(input.templateName ?? "") &&
       input.idempotencyKey &&
       input.toNumber
     ) {

@@ -314,6 +314,91 @@ describe("helpers puros", () => {
 // ---------------------------------------------------------------------------
 
 describe("elegirPlantillaCliente", () => {
+  // Versiones con estilo nuevo (título, negritas y emojis, 16-10): se crean
+  // con otro nombre y la cascada elige la más nueva APROBADA; mientras Meta
+  // la revisa, sale la de ahora.
+  describe("versiones nuevas", () => {
+    const FILA_V3 = {
+      ...FILA_V2,
+      telnyxTemplateId: "tpl-conf-v3",
+      name: "confirmacion_cita_v3",
+      components: [
+        { type: "HEADER", format: "TEXT", text: "Reserva confirmada" },
+        ...FILA_V2.components,
+      ],
+    };
+    const fila = (name: string) => ({
+      telnyxTemplateId: `tpl-${name}`,
+      name,
+      language: "es",
+      components: null,
+    });
+
+    it("confirmación: con la v3 aprobada la elige, con los mismos parámetros y el botón de ruta en su posición", async () => {
+      plantillas({
+        confirmacion_cita_v3: FILA_V3,
+        confirmacion_cita_v2: FILA_V2,
+        confirmacion_cita: FILA_APROBADA,
+      });
+
+      const elegida = await elegirPlantillaCliente("confirmacion", CTX);
+
+      expect(elegida).toMatchObject({
+        etiqueta: "confirmacion_cita_v3",
+        template: { id: "tpl-conf-v3" },
+        templateName: "confirmacion_cita_v3",
+        buttonUrlParams: [{ index: 1, text: "ChIJd8BlQ2BZwokRAFUEcm_qrcA" }],
+        conBotones: true,
+      });
+      expect(
+        Object.keys((elegida as { bodyParams: object }).bodyParams).sort()
+      ).toEqual(["cita", "negocio_nombre", "negocio_telefono", "servicio"]);
+    });
+
+    it("confirmación: sin la v3 aprobada sale la v2, y con sinV2 ninguna de las dos", async () => {
+      plantillas({
+        confirmacion_cita_v2: FILA_V2,
+        confirmacion_cita: FILA_APROBADA,
+      });
+      expect(await elegirPlantillaCliente("confirmacion", CTX)).toMatchObject({
+        etiqueta: "confirmacion_cita_v2",
+      });
+
+      plantillas({
+        confirmacion_cita_v3: FILA_V3,
+        confirmacion_cita_v2: FILA_V2,
+        confirmacion_cita: FILA_APROBADA,
+      });
+      expect(
+        await elegirPlantillaCliente("confirmacion", CTX, { sinV2: true })
+      ).toMatchObject({ etiqueta: "confirmacion_cita" });
+    });
+
+    it.each([
+      ["recordatorio", "recordatorio_cita_v3", "recordatorio_cita_v2"],
+      ["cambio", "cambio_cita_cliente_v2", "cambio_cita_cliente"],
+      ["cancelacion", "cancelacion_cita_cliente_v2", "cancelacion_cita_cliente"],
+      ["hueco_libre", "hueco_libre_v2", "hueco_libre"],
+    ] as const)(
+      "%s: elige %s si está aprobada y, si no, %s",
+      async (proposito, nueva, actual) => {
+        plantillas({ [nueva]: fila(nueva), [actual]: fila(actual) });
+        expect(await elegirPlantillaCliente(proposito, CTX)).toMatchObject({
+          etiqueta: nueva,
+          templateName: nueva,
+          conBotones: true,
+        });
+
+        plantillas({ [actual]: fila(actual) });
+        expect(await elegirPlantillaCliente(proposito, CTX)).toMatchObject({
+          etiqueta: actual,
+          templateName: actual,
+          conBotones: true,
+        });
+      }
+    );
+  });
+
   it("confirmación: con v2 aprobada y placeId elige confirmacion_cita_v2 por id con exactamente {negocio_nombre, servicio, cita, negocio_telefono}, templateName/templateLanguage de la fila y buttonUrlParams [{index: <posición del URL en components>, text: placeId}]", async () => {
     plantillas({
       confirmacion_cita_v2: FILA_V2,

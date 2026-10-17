@@ -100,8 +100,10 @@ Cómo funciona hoy:
 
 `backend/scripts/manual/plantillasWhatsapp/` contiene:
 
-- `traducciones.json`: las 42 traducciones. Las 5 plantillas al cliente van en `ca`, `en`, `fr`,
-  `de`, `it`, `pt_PT` y `nl`; las 7 al dueño, solo en `ca`.
+- `plantillas.json`: las 5 plantillas al cliente con el estilo que eligió el usuario el 16-10
+  (título, el negocio en negrita y una línea con emoji por dato). En español editan las aprobadas,
+  con el mismo nombre y los mismos parámetros. En `ca`, `en`, `fr`, `de`, `it`, `pt_PT` y `nl`
+  son nuevas. También van las 7 al dueño, solo en `ca`.
 - `solicitar.mts`: el script que las solicita. Sin `--enviar` solo dice lo que haría.
 
 Nada se ha enviado a Meta:

@@ -14,6 +14,7 @@ import {
   actualizarEstadoEnvio,
   audienciaDelNumero,
   avisarCambioDeListaDeEspera,
+  incorporarPlantillasNuevas,
 } from "../../../src/modules/whatsapp/service.js";
 import { enrutarEntrante } from "../../../src/modules/whatsapp/router.js";
 import { whatsappAdapter } from "../../../src/adapters/whatsapp/WhatsAppAdapter.js";
@@ -46,6 +47,7 @@ vi.mock("../../../src/modules/whatsapp/service.js", () => ({
   actualizarEstadoEnvio: vi.fn(),
   audienciaDelNumero: vi.fn(),
   avisarCambioDeListaDeEspera: vi.fn(),
+  incorporarPlantillasNuevas: vi.fn().mockResolvedValue(0),
 }));
 
 vi.mock("../../../src/modules/whatsapp/router.js", () => ({
@@ -971,8 +973,9 @@ describe("handleTemplateStatusEvent", () => {
     });
   });
 
-  it("avisa si la plantilla no está en la tabla", async () => {
+  it("si la plantilla no está en la tabla, la da de alta desde el WABA y lo avisa", async () => {
     mockedTemplateUpdateMany.mockResolvedValue({ count: 0 });
+    vi.mocked(incorporarPlantillasNuevas).mockResolvedValueOnce(1);
     const warnSpy = vi
       .spyOn(console, "warn")
       .mockImplementation(() => undefined);
@@ -985,8 +988,9 @@ describe("handleTemplateStatusEvent", () => {
       },
     });
 
+    expect(vi.mocked(incorporarPlantillasNuevas)).toHaveBeenCalledTimes(1);
     expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining("sincronizarWhatsapp")
+      expect.stringContaining("incorporadas desde el WABA: 1")
     );
     warnSpy.mockRestore();
   });
