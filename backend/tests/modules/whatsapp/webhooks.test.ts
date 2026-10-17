@@ -14,6 +14,7 @@ import {
   actualizarEstadoEnvio,
   audienciaDelNumero,
   avisarCambioDeListaDeEspera,
+  incorporarPlantillasNuevas,
 } from "../../../src/modules/whatsapp/service.js";
 import { enrutarEntrante } from "../../../src/modules/whatsapp/router.js";
 import { whatsappAdapter } from "../../../src/adapters/whatsapp/WhatsAppAdapter.js";
@@ -46,6 +47,7 @@ vi.mock("../../../src/modules/whatsapp/service.js", () => ({
   actualizarEstadoEnvio: vi.fn(),
   audienciaDelNumero: vi.fn(),
   avisarCambioDeListaDeEspera: vi.fn(),
+  incorporarPlantillasNuevas: vi.fn().mockResolvedValue(0),
 }));
 
 vi.mock("../../../src/modules/whatsapp/router.js", () => ({
@@ -666,7 +668,7 @@ describe("handleWhatsappMessages", () => {
       );
       expect(mockedInboundUpdateMany).toHaveBeenCalledWith({
         where: { id: "in_viejo", handledAt: null, handler: null },
-        data: { handler: "reintento:en-curso" },
+        data: { handler: "reintento:en-curso:1" },
       });
       expect(mockedEnrutar).toHaveBeenCalledWith(
         expect.objectContaining({ id: "in_viejo" })
@@ -679,6 +681,62 @@ describe("handleWhatsappMessages", () => {
       expect(mockedEnrutar).toHaveBeenCalledWith(
         expect.objectContaining({ id: "in_1" })
       );
+    });
+
+    it("cuenta los reintentos en el handler del reclamo y, tras el tercero, cierra la fila (reintento:agotado) sin volver a enrutarla", async () => {
+      const errorSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => undefined);
+      mockedInboundFindMany.mockResolvedValue([
+        { ...filaVieja, handler: "reintento:en-curso:2", error: "BD caída" },
+      ] as never);
+      await handleWhatsappMessages(eventoMensajes([TEXTO]));
+      expect(mockedInboundUpdateMany).toHaveBeenCalledWith({
+        where: {
+          id: "in_viejo",
+          handledAt: null,
+          handler: "reintento:en-curso:2",
+        },
+        data: { handler: "reintento:en-curso:3" },
+      });
+      expect(mockedEnrutar).toHaveBeenCalledWith(
+        expect.objectContaining({ id: "in_viejo" })
+      );
+
+      // Las de antes del tope (sin número) cuentan como un reintento.
+      mockedInboundUpdateMany.mockClear();
+      mockedInboundFindMany.mockResolvedValue([
+        { ...filaVieja, handler: "reintento:en-curso" },
+      ] as never);
+      await handleWhatsappMessages(eventoMensajes([TEXTO]));
+      expect(mockedInboundUpdateMany).toHaveBeenCalledWith(
+        expect.objectContaining({ data: { handler: "reintento:en-curso:2" } })
+      );
+
+      mockedEnrutar.mockClear();
+      mockedInboundUpdateMany.mockClear();
+      mockedInboundFindMany.mockResolvedValue([
+        { ...filaVieja, handler: "reintento:en-curso:3", error: "BD caída" },
+      ] as never);
+      await handleWhatsappMessages(eventoMensajes([TEXTO]));
+      expect(mockedInboundUpdateMany).toHaveBeenCalledWith({
+        where: {
+          id: "in_viejo",
+          handledAt: null,
+          handler: "reintento:en-curso:3",
+        },
+        data: { handledAt: expect.any(Date), handler: "reintento:agotado" },
+      });
+      expect(mockedEnrutar).not.toHaveBeenCalledWith(
+        expect.objectContaining({ id: "in_viejo" })
+      );
+      expect(errorSpy).toHaveBeenCalledWith(
+        expect.stringContaining("tras 3 reintentos del barrido")
+      );
+      expect(errorSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Último error: BD caída")
+      );
+      errorSpy.mockRestore();
     });
 
     it("si otro proceso la reclamó antes (count 0) no la enruta", async () => {
@@ -773,6 +831,21 @@ describe("handleMessageStatusEvent", () => {
         errorCode: "40008",
         errorDetail: "The recipient carrier did not accept the message.",
         at: new Date("2026-09-19T21:15:34.290+00:00"),
+      })
+    );
+  });
+
+  it("message.finalized con delivery_unconfirmed cuenta como enviado y guarda el coste", async () => {
+    await handleMessageStatusEvent(
+      evento("message.finalized", "delivery_unconfirmed", {
+        cost: { amount: "0.0240", currency: "USD" },
+      })
+    );
+    expect(mockedActualizarEstado).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: "sent",
+        costAmount: "0.0240",
+        costCurrency: "USD",
       })
     );
   });
@@ -900,8 +973,9 @@ describe("handleTemplateStatusEvent", () => {
     });
   });
 
-  it("avisa si la plantilla no está en la tabla", async () => {
+  it("si la plantilla no está en la tabla, la da de alta desde el WABA y lo avisa", async () => {
     mockedTemplateUpdateMany.mockResolvedValue({ count: 0 });
+    vi.mocked(incorporarPlantillasNuevas).mockResolvedValueOnce(1);
     const warnSpy = vi
       .spyOn(console, "warn")
       .mockImplementation(() => undefined);
@@ -914,8 +988,9 @@ describe("handleTemplateStatusEvent", () => {
       },
     });
 
+    expect(vi.mocked(incorporarPlantillasNuevas)).toHaveBeenCalledTimes(1);
     expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining("sincronizarWhatsapp")
+      expect.stringContaining("incorporadas desde el WABA: 1")
     );
     warnSpy.mockRestore();
   });

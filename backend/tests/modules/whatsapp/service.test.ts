@@ -8,6 +8,7 @@ import {
   enviarContacto,
   enviarPlantilla,
   enviarTexto,
+  incorporarPlantillasNuevas,
   invalidarCacheListaDeEspera,
   invalidarCacheRemitentes,
   listaDeEsperaDisponible,
@@ -33,6 +34,7 @@ vi.mock("../../../src/lib/prisma.js", () => ({
       findUnique: vi.fn(),
       findMany: vi.fn(),
       update: vi.fn(),
+      create: vi.fn(),
     },
     sentMessage: {
       upsert: vi.fn(),
@@ -654,6 +656,93 @@ describe("refrescarPlantilla", () => {
   });
 });
 
+describe("incorporarPlantillasNuevas", () => {
+  const remota = (
+    telnyxTemplateId: string,
+    name: string,
+    language = "es",
+    status = "PENDING"
+  ) => ({
+    telnyxTemplateId,
+    metaTemplateId: null,
+    name,
+    language,
+    category: "UTILITY",
+    status,
+    qualityRating: null,
+    rejectionReason: null,
+    components: [],
+  });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.spyOn(console, "log").mockImplementation(() => undefined);
+    process.env.WHATSAPP_WABA_ID = "waba-1";
+  });
+
+  it("crea solo las que no tienen fila: con clave si el nombre es único, sin clave si comparte nombre con otro idioma", async () => {
+    mockedListTemplates.mockResolvedValue([
+      remota("tpl-v2-es", "confirmacion_cita_v2"),
+      remota("tpl-v2-ca", "confirmacion_cita_v2", "ca"),
+      remota("tpl-v3-es", "confirmacion_cita_v3", "es", "APPROVED"),
+    ] as never);
+    mockedTemplateFindMany.mockResolvedValue([
+      { telnyxTemplateId: "tpl-v2-es", key: "confirmacion_cita_v2" },
+    ] as never);
+    const create = vi.mocked(prisma.whatsappTemplate.create);
+    create.mockResolvedValue({} as never);
+
+    expect(await incorporarPlantillasNuevas()).toBe(2);
+
+    expect(create).toHaveBeenCalledTimes(2);
+    expect(create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        telnyxTemplateId: "tpl-v2-ca",
+        name: "confirmacion_cita_v2",
+        language: "ca",
+        key: null,
+      }),
+    });
+    expect(create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        telnyxTemplateId: "tpl-v3-es",
+        key: "confirmacion_cita_v3",
+        status: "APPROVED",
+      }),
+    });
+  });
+
+  it("no pisa una clave que ya usa otra fila, no lanza si el WABA falla y sin WHATSAPP_WABA_ID no hace nada", async () => {
+    mockedListTemplates.mockResolvedValue([
+      remota("tpl-nueva", "hueco_libre"),
+    ] as never);
+    mockedTemplateFindMany.mockResolvedValue([
+      { telnyxTemplateId: "tpl-vieja", key: "hueco_libre" },
+    ] as never);
+    const create = vi.mocked(prisma.whatsappTemplate.create);
+    create.mockResolvedValue({} as never);
+    await incorporarPlantillasNuevas();
+    expect(create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ telnyxTemplateId: "tpl-nueva", key: null }),
+    });
+
+    const errorSpy = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+    mockedListTemplates.mockRejectedValue(new Error("WABA caído"));
+    expect(await incorporarPlantillasNuevas()).toBe(0);
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.stringContaining("No se pudieron incorporar")
+    );
+    errorSpy.mockRestore();
+
+    delete process.env.WHATSAPP_WABA_ID;
+    mockedListTemplates.mockClear();
+    expect(await incorporarPlantillasNuevas()).toBe(0);
+    expect(mockedListTemplates).not.toHaveBeenCalled();
+  });
+});
+
 describe("listaDeEsperaDisponible (gate del prompt)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -1140,6 +1229,25 @@ describe("efectos de entrega sobre los envíos al cliente (PR 4)", () => {
     mockedEnqueue.mockResolvedValue(undefined);
   });
 
+  it("la confirmación v3 (versión nueva con botón de ruta) también tiene respaldo con sinV2 si Meta la rechaza en diferido", async () => {
+    mockedSentFindUnique.mockResolvedValue({
+      ...filaCliente,
+      templateName: "confirmacion_cita_v3",
+    } as never);
+
+    await actualizarEstadoEnvio({
+      providerMessageId: "msg-v3",
+      status: "failed",
+      at,
+      errorCode: "132012",
+    });
+
+    expect(mockedEnqueue).toHaveBeenCalledWith(
+      expect.objectContaining({ proposito: "confirmacion", sinV2: true }),
+      { taskId: "booking-booking_1-confirmacion-1-respaldo" }
+    );
+  });
+
   it("un statuses failed 132012 sobre cliente:confirmacion:<id> (plantilla confirmacion_cita_v2) loguea con la plantilla, deja clientNotifiedAt en null y encola una vez el respaldo -respaldo con sinV2; sobre la fila -respaldo no encola nada más", async () => {
     mockedSentFindUnique.mockResolvedValue(filaCliente as never);
 
@@ -1175,10 +1283,26 @@ describe("efectos de entrega sobre los envíos al cliente (PR 4)", () => {
         audience: "client",
         sinV2: true,
       },
-      {
-        taskId: `booking-booking_1-confirmacion-${Math.floor(CITA.getTime() / 1000)}-respaldo`,
-      }
+      // De la clave de la fila: conserva la huella del destino (y el
+      // sufijo de un reenvío del Gestor).
+      { taskId: "booking-booking_1-confirmacion-1-respaldo" }
     );
+
+    // Reenvío del Gestor: su respaldo no choca con el de la confirmación.
+    mockedEnqueue.mockClear();
+    mockedSentFindUnique.mockResolvedValue({
+      ...filaCliente,
+      idempotencyKey: "booking-booking_1-confirmacion-1-gacc_1",
+    } as never);
+    await actualizarEstadoEnvio({
+      providerMessageId: "msg-4",
+      status: "failed",
+      at,
+      errorCode: "132012",
+    });
+    expect(mockedEnqueue.mock.calls[0][1]).toEqual({
+      taskId: "booking-booking_1-confirmacion-1-gacc_1-respaldo",
+    });
 
     // La fila del respaldo rechazada: solo limpia y loguea.
     mockedEnqueue.mockClear();
@@ -1208,7 +1332,7 @@ describe("efectos de entrega sobre los envíos al cliente (PR 4)", () => {
     expect(mockedEnqueue).not.toHaveBeenCalled();
   });
 
-  it("si el statuses[] se adelantó al registro (fila adhoc:<wamid>), el respaldo se encola igual con un taskId válido para Cloud Tasks (solo [A-Za-z0-9_-]) derivado de la reserva", async () => {
+  it("si el statuses[] se adelantó al registro (fila adhoc:<wamid>), el respaldo se encola igual con un taskId válido para Cloud Tasks (solo [A-Za-z0-9_-]) derivado de la reserva y del destino", async () => {
     mockedSentFindUnique.mockResolvedValue({
       ...filaCliente,
       idempotencyKey:
@@ -1226,8 +1350,9 @@ describe("efectos de entrega sobre los envíos al cliente (PR 4)", () => {
     expect(mockedEnqueue).toHaveBeenCalledTimes(1);
     const taskId = (mockedEnqueue.mock.calls[0][1] as { taskId: string })
       .taskId;
+    // 8 primeros hex de sha256("+34600111222").
     expect(taskId).toBe(
-      `booking-booking_1-confirmacion-${Math.floor(CITA.getTime() / 1000)}-respaldo`
+      `booking-booking_1-confirmacion-${Math.floor(CITA.getTime() / 1000)}-cb24629d-respaldo`
     );
     expect(taskId).toMatch(/^[A-Za-z0-9_-]+$/);
   });

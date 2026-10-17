@@ -1,6 +1,7 @@
 import { prisma } from "../lib/prisma.js";
 import { enqueueRecordingJob } from "../lib/cloudTasks.js";
 import { errorMessage } from "../lib/logUtils.js";
+import { incrementarContador } from "../lib/almacenTemporal.js";
 import { diasDeRetencionDeAudio } from "./purgeOldRecordings.js";
 
 // Margen antes de considerar una grabación "atascada": el procesamiento
@@ -11,6 +12,15 @@ const STUCK_RECORDING_THRESHOLD_MINUTES = 15;
 const MAX_RECORDINGS_PER_RUN = 50;
 // El mismo plazo que purgeOldRecordings: es lo que pedimos conservar a Retell
 // y Telnyx, así que más allá no hay nada que descargar.
+
+// Tope de reencolados por grabación: 96 barridos de 15 min son 24 h, cada
+// uno con los 5 intentos de la cola `process-recording`. Un fallo que dura
+// más (no es un 4xx ni un fallo definitivo, que ya salen solos) no se va a
+// arreglar a la vuelta de 15 min; antes se reintentaba los 30 días de la
+// retención. La grabación sigue en el proveedor: quitando la marca
+// `processingFailedAt` vuelve a la cola.
+const MAX_REENCOLADOS_POR_GRABACION = 96;
+const DIA_MS = 24 * 60 * 60 * 1000;
 
 /**
  * Reintenta encolar el copiado a R2 de grabaciones que se quedaron sin
@@ -81,8 +91,27 @@ export async function retryStuckRecordingsJob(): Promise<void> {
   );
 
   let succeeded = 0;
+  let agotadas = 0;
   for (const recording of stuckRecordings) {
     try {
+      const reencolados = await incrementarContador(
+        `grabacion-reencolada:${recording.id}`,
+        (retencion + 1) * DIA_MS
+      );
+      if (reencolados > MAX_REENCOLADOS_POR_GRABACION) {
+        await prisma.recording.updateMany({
+          where: { id: recording.id, storageKey: null },
+          data: {
+            processingFailedAt: new Date(),
+            processingError: `Sin copiar a R2 tras ${MAX_REENCOLADOS_POR_GRABACION} reintentos (24 h); el último error está en los logs de process-recording`,
+          },
+        });
+        console.error(
+          `[Recordings] Grabación ${recording.id} (call ${recording.callId}, negocio ${recording.call.businessId}) sin copiar a R2 tras ${MAX_REENCOLADOS_POR_GRABACION} reintentos: marcada irrecuperable`
+        );
+        agotadas++;
+        continue;
+      }
       // Sin taskId (a diferencia del intento original en webhookHandlers.ts,
       // que usa `process-recording-${callId}`): Cloud Tasks rechaza con
       // ALREADY_EXISTS un nombre de tarea reutilizado hasta ~1h después de
@@ -105,6 +134,6 @@ export async function retryStuckRecordingsJob(): Promise<void> {
   }
 
   console.log(
-    `[Recordings] Reintento completado: ${succeeded}/${stuckRecordings.length} encoladas.`
+    `[Recordings] Reintento completado: ${succeeded}/${stuckRecordings.length} encoladas${agotadas > 0 ? `, ${agotadas} agotadas` : ""}.`
   );
 }

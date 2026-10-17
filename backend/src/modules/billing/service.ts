@@ -54,14 +54,18 @@ function stripeId(value: string | { id: string } | null | undefined) {
   return typeof value === "string" ? value : value.id;
 }
 
-async function enqueueEmail(input: {
-  fromAlias: "welcome" | "support";
-  toAddress: string;
-  subject: string;
-  html: string;
-}) {
+async function enqueueEmail(
+  input: {
+    fromAlias: "welcome" | "support";
+    toAddress: string;
+    subject: string;
+    html: string;
+  },
+  /** Nombre de la tarea y clave del envío: un reintento no lo duplica. */
+  taskId: string
+) {
   try {
-    await enqueueEmailJob(input);
+    await enqueueEmailJob(input, taskId);
   } catch (error) {
     console.error(
       `[Billing] No se pudo encolar el email "${input.subject}" a ${input.toAddress}:`,
@@ -604,9 +608,10 @@ async function sendCancellationInstructions(input: {
 }) {
   // La transición puede llegar más de una vez; se reclama el aviso en la
   // misma sentencia que comprueba que aún no se ha enviado.
+  const reclamadoAt = new Date();
   const claimed = await prisma.business.updateMany({
     where: { id: input.businessId, cancellationNoticeSentAt: null },
-    data: { cancellationNoticeSentAt: new Date() },
+    data: { cancellationNoticeSentAt: reclamadoAt },
   });
   if (claimed.count === 0) return;
 
@@ -623,7 +628,10 @@ async function sendCancellationInstructions(input: {
     serviceEndsAt: input.serviceEndsAt,
     manageBillingUrl: `${frontendUrl}/ajustes/facturacion`,
   });
-  await enqueueEmail({ fromAlias: "support", toAddress: email, subject, html });
+  await enqueueEmail(
+    { fromAlias: "support", toAddress: email, subject, html },
+    `baja-${input.businessId}-${reclamadoAt.getTime()}`
+  );
 }
 
 async function processStripeEvent(event: Stripe.Event) {
@@ -671,12 +679,15 @@ async function processStripeEvent(event: Stripe.Event) {
               businessName: business.name,
               planName,
             });
-            await enqueueEmail({
-              fromAlias: "welcome",
-              toAddress: customerEmail,
-              subject,
-              html,
-            });
+            await enqueueEmail(
+              {
+                fromAlias: "welcome",
+                toAddress: customerEmail,
+                subject,
+                html,
+              },
+              `bienvenida-${session.id}`
+            );
           }
         }
       }
@@ -782,12 +793,15 @@ async function processStripeEvent(event: Stripe.Event) {
               invoice.hosted_invoice_url ??
               `${frontendUrl}/ajustes/facturacion`,
           });
-          await enqueueEmail({
-            fromAlias: "support",
-            toAddress: email,
-            subject,
-            html,
-          });
+          await enqueueEmail(
+            {
+              fromAlias: "support",
+              toAddress: email,
+              subject,
+              html,
+            },
+            `pago-fallido-${invoice.id}`
+          );
         }
         // Alerta #5 por WhatsApp además del email (idempotente por factura).
         await alertarPagoFallido({

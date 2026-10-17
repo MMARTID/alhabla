@@ -24,32 +24,21 @@ Severidad: **alta** = incumple lo que prometemos o expone datos de un cliente a 
 | P3 | **El reintento de una reserva pendiente podía reservar a ciegas.** Si el calendario seguía sin poder leerse, `getBusyIntervals` devolvía la ocupación como desconocida y `checkAvailability` la ignoraba: la cita podía entrar encima de una apuntada a mano. La reserva en vivo y la lista de espera ya lo evitaban. | Con un calendario externo ilegible, el job lanza un error (Cloud Tasks reintenta) y no reserva. |
 | P5 | La cita recuperada en segundo plano se guardaba **sin nombre** (salía anónima en el panel). | `clientName` del lead pasa al `Booking`. |
 
-## Pipelines: pendiente
+## Pipelines: arreglado después (PR siguiente)
 
-1. **Media-baja. La clave de la confirmación y del recordatorio no lleva el número de destino.**
-   La clave es `booking-<id>-confirmacion-<epoch de la cita>`. Si en la llamada se corrige el
-   teléfono y se vuelve a reservar a la misma hora, la tarea nueva choca con `ALREADY_EXISTS`. La
-   vieja se descarta con `DESTINO_CAMBIADO`, así que no le llega nada a nadie. Lo mismo pasa al
-   reenviar la confirmación desde el Gestor: «ya enviado». Arreglo: un hash corto del número en la
-   clave, y un sufijo por petición en el reenvío (`mensajesCliente.ts:706` y `:767`).
-2. **Baja. La cita recuperada no guarda el consentimiento ni el canal.** `smsConsent` no se guarda
-   en el lead (`capturePendingBookingLead`), así que el cliente nunca recibe la confirmación. Además
-   `createdVia` es siempre `voice`, aunque la cita venga del chat.
-3. **Baja. Grabaciones con fallos que no son 4xx se reintentan 30 días sin tope.** Un ejemplo es
-   «Recording exceeds the maximum accepted size». Además, el timeout de descarga (5 min) supera el
-   plazo de Cloud Tasks (180 s), así que dos intentos pueden solaparse. Hoy no ocurre: 957 de 957
-   ejecuciones con 2xx.
-4. **Baja. El barrido de WhatsApp entrante sin enrutar no tiene tope.** Una fila que lanza vuelve a
-   procesarse en cada webhook durante 7 días, y puede repetir la respuesta al cliente. Hoy hay 0
-   filas así.
-5. **Baja. Un recado se pierde si falla la creación del `Lead`.** El informe ya lo reclamó, así que
-   ni `completarInforme` ni `revisarEscalada` lo recuperan.
-6. **Info.**
-   - `delivery_unconfirmed` (17 veces en 14 días) no está en `mapEstadoTelnyx`.
-   - Varios correos se encolan sin `taskId`.
-   - Un pedido de número `pending` no tiene ningún job que lo reanude.
-   - En `/jobs/purge-old-recordings`, las dos purgas van en serie: si la del audio lanza, la del
-     texto (RGPD) no corre.
+Los cinco pendientes y tres de los cuatro de «Info», comprobados en el código antes de tocarlos.
+Ninguno había ocurrido en producción.
+
+| # | Qué pasaba | Arreglo |
+|---|------------|---------|
+| 1 | **La clave de la confirmación y del recordatorio no llevaba el número de destino.** Corregir el teléfono y volver a reservar a la misma hora chocaba con `ALREADY_EXISTS` y la tarea vieja se descartaba con `DESTINO_CAMBIADO`: no le llegaba nada a nadie. El reenvío desde el Gestor daba «ya enviado». | `booking-<id>-<propósito>-<epoch>-<huella>`: 8 hex del sha256 del E.164 (`lib/clavesDeMensajes.ts`). El Gestor añade `-g<accionId>` a la confirmación. El respaldo de la v2 parte de la clave de la fila. |
+| 2 | **La cita recuperada no guardaba el consentimiento ni el canal**, así que el cliente nunca recibía la confirmación, y `createdVia` era siempre `voice`. | El lead guarda `smsConsent` y `createdVia`; el job los copia al `Booking` y programa la confirmación con `programarMensajesAlCliente`. |
+| 3 | **Grabaciones sin tope de reintentos** («Recording exceeds the maximum accepted size» volvía 30 días) y **timeout de descarga de 5 min** con Cloud Tasks cortando a los 180 s. | Tamaño y URL no permitida: irrecuperables (`PermanentJobError`). Plazo único de 150 s para la descarga y la subida. Tope de 96 reencolados (24 h) en `retry-stuck-recordings`. Además, un corte a mitad de la descarga ya no tumba el proceso: `pipeline` en vez de `pipe`, y el error aborta el PUT a R2. |
+| 4 | **El barrido de WhatsApp entrante sin enrutar no tenía tope.** | Como mucho 3 reintentos por fila, contados en el `handler` del reclamo (`reintento:en-curso:<n>`). Después la fila se cierra con `reintento:agotado`, su último error y un `console.error`. |
+| 5 | **Un recado se perdía si fallaba `lead.create`.** | Un lead `message` por llamada, creado con un cerrojo de transacción. Si falla, se programa la revisión diferida. `completarInforme` y `revisarEscaladaSinRecado` recuperan el recado del informe que no tiene lead. |
+| Info | `delivery_unconfirmed` no reconocido; correos sin `taskId`; las dos purgas en serie. | `delivery_unconfirmed` cuenta como `sent` (guarda el coste). Todos los correos llevan `taskId`. Cada purga va en su propio `try` y el endpoint responde 500 si falla alguna. |
+
+Sigue pendiente: un pedido de número `pending` no tiene ningún job que lo reanude.
 
 Comprobado y bien:
 
@@ -111,8 +100,10 @@ Cómo funciona hoy:
 
 `backend/scripts/manual/plantillasWhatsapp/` contiene:
 
-- `traducciones.json`: las 42 traducciones. Las 5 plantillas al cliente van en `ca`, `en`, `fr`,
-  `de`, `it`, `pt_PT` y `nl`; las 7 al dueño, solo en `ca`.
+- `plantillas.json`: las 5 plantillas al cliente con el estilo que eligió el usuario el 16-10
+  (título, el negocio en negrita y una línea con emoji por dato). En español editan las aprobadas,
+  con el mismo nombre y los mismos parámetros. En `ca`, `en`, `fr`, `de`, `it`, `pt_PT` y `nl`
+  son nuevas. También van las 7 al dueño, solo en `ca`.
 - `solicitar.mts`: el script que las solicita. Sin `--enviar` solo dice lo que haría.
 
 Nada se ha enviado a Meta:

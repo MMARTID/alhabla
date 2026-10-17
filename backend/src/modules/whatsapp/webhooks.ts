@@ -9,6 +9,7 @@ import {
   actualizarEstadoEnvio,
   audienciaDelNumero,
   avisarCambioDeListaDeEspera,
+  incorporarPlantillasNuevas,
   type EstadoEntrega,
 } from "./service.js";
 import { enrutarEntrante } from "./router.js";
@@ -605,14 +606,32 @@ async function enrutarYGuardar(row: InboundMessage): Promise<void> {
 const BARRIDO_EDAD_MINIMA_MS = 2 * 60 * 1000;
 const BARRIDO_EDAD_MAXIMA_MS = 7 * 24 * 60 * 60 * 1000;
 const BARRIDO_MAX_FILAS = 20;
+/**
+ * Reintentos del barrido por fila. Una fila que lanza al enrutarse (no un
+ * proceso muerto) volvía en cada webhook durante 7 días, y si lanzaba tras
+ * contestar, el cliente recibía la respuesta otra vez cada vez.
+ */
+const BARRIDO_MAX_REINTENTOS = 3;
+const HANDLER_EN_CURSO = "reintento:en-curso";
+const HANDLER_AGOTADO = "reintento:agotado";
+
+/** Reintentos que ya hizo el barrido, según el `handler` de su reclamo
+ * (`reintento:en-curso:<n>`; sin número, de antes del tope, cuenta 1). */
+function reintentosDelBarrido(handler: string | null): number {
+  if (!handler?.startsWith(HANDLER_EN_CURSO)) return 0;
+  const n = Number(handler.slice(HANDLER_EN_CURSO.length + 1));
+  return Number.isInteger(n) && n > 0 ? n : 1;
+}
 
 /**
  * Barrido de filas con `handledAt` null de más de 2 min (y menos de 7 d).
- * Reclamo atómico por fila (`handler: "reintento:en-curso"` con el handler
- * previo en el `where`): dos webhooks concurrentes no la enrutan dos veces.
- * Una fila que ya estaba `reintento:en-curso` y sigue sin `handledAt`
- * vuelve a ser candidata (el proceso anterior también murió). Nunca afecta
- * al evento actual: cualquier fallo se queda en el log.
+ * Reclamo atómico por fila (`handler: "reintento:en-curso:<n>"` con el
+ * handler previo en el `where`): dos webhooks concurrentes no la enrutan dos
+ * veces. Una fila ya reclamada que sigue sin `handledAt` vuelve a ser
+ * candidata (el proceso anterior murió o el enrutado lanzó) hasta
+ * `BARRIDO_MAX_REINTENTOS`; después se cierra con `handler:
+ * "reintento:agotado"` y su último `error`. Nunca afecta al evento actual:
+ * cualquier fallo se queda en el log.
  */
 async function barrerEntrantesSinEnrutar(): Promise<void> {
   try {
@@ -633,15 +652,28 @@ async function barrerEntrantesSinEnrutar(): Promise<void> {
       take: BARRIDO_MAX_FILAS,
     });
     for (const fila of pendientes) {
+      const hechos = reintentosDelBarrido(fila.handler);
+      if (hechos >= BARRIDO_MAX_REINTENTOS) {
+        const cerrada = await prisma.inboundMessage.updateMany({
+          where: { id: fila.id, handledAt: null, handler: fila.handler },
+          data: { handledAt: new Date(), handler: HANDLER_AGOTADO },
+        });
+        if (cerrada.count > 0) {
+          console.error(
+            `[WhatsApp] Entrante ${fila.providerMessageId} (${fila.kind}, ${fila.role}, negocio ${fila.businessId ?? "—"}) sin enrutar tras ${hechos} reintentos del barrido; se deja de intentar. Último error: ${fila.error ?? "ninguno (el proceso murió)"}`
+          );
+        }
+        continue;
+      }
       const reclamada = await prisma.inboundMessage.updateMany({
         where: { id: fila.id, handledAt: null, handler: fila.handler },
-        data: { handler: "reintento:en-curso" },
+        data: { handler: `${HANDLER_EN_CURSO}:${hechos + 1}` },
       });
       if (reclamada.count === 0) {
         continue;
       }
       console.log(
-        `[WhatsApp] Entrante ${fila.providerMessageId} sin enrutar desde ${fila.receivedAt.toISOString()}; se reintenta`
+        `[WhatsApp] Entrante ${fila.providerMessageId} sin enrutar desde ${fila.receivedAt.toISOString()}; reintento ${hechos + 1} de ${BARRIDO_MAX_REINTENTOS}`
       );
       await enrutarYGuardar(fila);
     }
@@ -714,7 +746,12 @@ function mapEstadoTelnyx(
     case "queued":
     case "sending":
       return "queued";
+    // `delivery_unconfirmed`: salió, pero el operador no confirmó la
+    // entrega (17 veces en 14 días en producción, auditoría del 16-10).
+    // Antes se descartaba con aviso y se perdía su coste; como `sent`, nunca
+    // pisa un estado posterior.
     case "sent":
+    case "delivery_unconfirmed":
       return "sent";
     case "delivered":
       return "delivered";
@@ -787,8 +824,11 @@ export async function handleTemplateStatusEvent(
     },
   });
   if (updated.count === 0) {
+    // Una plantilla nueva (otra versión u otro idioma) que aún no tenía
+    // fila: se da de alta desde el WABA, ya con su estado.
+    const creadas = await incorporarPlantillasNuevas();
     console.warn(
-      `[WhatsApp] ${data.event_type} para una plantilla que no está en WhatsappTemplate (${JSON.stringify(where)}); ejecuta scripts/manual/sincronizarWhatsapp.mts`
+      `[WhatsApp] ${data.event_type} para una plantilla que no estaba en WhatsappTemplate (${JSON.stringify(where)}); incorporadas desde el WABA: ${creadas}`
     );
   } else {
     console.log(

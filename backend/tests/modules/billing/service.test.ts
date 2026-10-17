@@ -186,7 +186,8 @@ describe("handleStripeEvent", () => {
         fromAlias: "welcome",
         toAddress: "cliente@example.com",
         subject: expect.stringContaining(buildBusiness().name),
-      })
+      }),
+      "bienvenida-cs_test_1"
     );
   });
 
@@ -222,7 +223,8 @@ describe("handleStripeEvent", () => {
       expect.objectContaining({
         fromAlias: "support",
         toAddress: "cliente@example.com",
-      })
+      }),
+      "pago-fallido-inv_test_1"
     );
     expect(mockedBusinessUpdateMany).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -288,7 +290,8 @@ describe("handleStripeEvent", () => {
         fromAlias: "support",
         toAddress: "test@example.com",
         subject: expect.stringContaining("Acción necesaria"),
-      })
+      }),
+      expect.stringMatching(new RegExp(`^baja-${businessId}-\\d+$`))
     );
     expect(mockedBusinessUpdateMany).toHaveBeenCalledWith(
       expect.objectContaining({

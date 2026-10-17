@@ -364,6 +364,10 @@ exports[`payloads de asistentes (instantáneas) > assistant de la recepcionista,
               "description": "ID exacto copiado tal cual de get_catalog, solo si el cliente pidió a un profesional concreto por su nombre (opcional). Déjalo vacío si no lo nombró: nunca elijas tú a nadie.",
               "type": "string",
             },
+            "replacesBookingId": {
+              "description": "Solo para cambiar una cita que ya tiene: el bookingId que devolvió find_my_appointment. Su hora no cuenta como ocupada y, al reservar con el token de esta comprobación, el sistema anula la cita antigua (solo si la nueva queda reservada).",
+              "type": "string",
+            },
             "serviceIds": {
               "description": "IDs de los servicios pedidos, copiados exactamente de get_catalog carácter a carácter (opcional; puede ser más de uno si el cliente pide varios servicios en la misma cita, ej. corte y mechas). Se prioriza al profesional que domine todos esos servicios.",
               "items": {
@@ -404,16 +408,12 @@ exports[`payloads de asistentes (instantáneas) > assistant de la recepcionista,
               "description": "Token exacto devuelto por check_availability para la opción confirmada.",
               "type": "string",
             },
-            "clientEmail": {
-              "description": "El correo electrónico del cliente, si lo proporciona (opcional)",
-              "type": "string",
-            },
             "clientName": {
               "description": "El nombre del cliente que hace la reserva",
               "type": "string",
             },
             "clientPhone": {
-              "description": "Teléfono de contacto solo si el cliente eligió uno distinto al detectado automáticamente (opcional).",
+              "description": "Teléfono de contacto solo si el cliente da uno distinto al número desde el que llama o book_appointment te lo pidió, tal como lo confirmó al repetírselo (opcional).",
               "type": "string",
             },
             "professionalConfirmed": {
@@ -431,7 +431,7 @@ exports[`payloads de asistentes (instantáneas) > assistant de la recepcionista,
           ],
           "type": "object",
         },
-        "description": "Agenda una cita en el calendario activo. Úsala solo tras confirmación explícita y con el availabilityToken de check_availability.",
+        "description": "Agenda una cita en el calendario activo. Úsala solo tras confirmación explícita y con el availabilityToken de check_availability. Si la comprobación se hizo con replacesBookingId, la cita antigua se anula al reservar la nueva.",
         "headers": [
           {
             "name": "X-Alhabla-Call-Control-Id",
@@ -452,7 +452,7 @@ exports[`payloads de asistentes (instantáneas) > assistant de la recepcionista,
           "required": undefined,
           "type": "object",
         },
-        "description": "Busca la próxima cita del negocio asociada al número desde el que llama, si el cliente aceptó los mensajes por WhatsApp al reservarla. Devuelve también clientName (el nombre con el que se reservó; puede venir vacío en citas antiguas) — úsalo si el cliente quiere recrear la cita al mismo nombre. Úsala solo si quien llama pide cambiar o cancelar una cita existente y no te ha dado datos concretos.",
+        "description": "Busca la próxima cita del negocio asociada al número desde el que llama. Devuelve su bookingId (para cancelarla, o para cambiarla con replacesBookingId en check_availability) y clientName (el nombre con el que se reservó; puede venir vacío en citas antiguas): úsalo si el cliente quiere la cita nueva al mismo nombre. Úsala solo si quien llama pide cambiar o cancelar una cita existente y no te ha dado datos concretos.",
         "headers": [
           {
             "name": "X-Alhabla-Call-Control-Id",
@@ -480,7 +480,7 @@ exports[`payloads de asistentes (instantáneas) > assistant de la recepcionista,
           ],
           "type": "object",
         },
-        "description": "Cancela la cita cuyo id devolvió find_my_appointment. Úsala solo tras confirmación explícita del cliente. Para 'modificar' una cita: cancélala con esta tool y reserva la nueva con check_availability + book_appointment.",
+        "description": "Cancela la cita cuyo id devolvió find_my_appointment. Úsala solo si el cliente quiere anularla, tras su confirmación explícita. Para cambiarla no la uses: comprueba la hora nueva con check_availability y replacesBookingId, y la antigua se anula al reservar la nueva.",
         "headers": [
           {
             "name": "X-Alhabla-Call-Control-Id",
@@ -1101,7 +1101,7 @@ Si te escriben en catalán, gallego, euskera o inglés, responde en ese idioma; 
 exports[`payloads de asistentes (instantáneas) > el JSON enviado es idéntico byte a byte (hash) 1`] = `
 {
   "gestor": "d42493dfb458dbe1ef8fa7fab6dbf284ec727a79d37293a97bff584963af6abf",
-  "recepcionista": "003c2f4dbb4e93626b4f73be52551dc1247148917f63d383806b3431d8ed633b",
+  "recepcionista": "d4f96fc8793f8fe1d2e542eaa4330938e9f93c19a549afff6b0580b3be4a01a3",
 }
 `;
 
@@ -1144,6 +1144,10 @@ exports[`payloads de asistentes (instantáneas) > tools de voz de la recepcionis
         "description": "ID exacto copiado tal cual de get_catalog, solo si el cliente pidió a un profesional concreto por su nombre (opcional). Déjalo vacío si no lo nombró: nunca elijas tú a nadie.",
         "type": "string",
       },
+      "replacesBookingId": {
+        "description": "Solo para cambiar una cita que ya tiene: el bookingId que devolvió find_my_appointment. Su hora no cuenta como ocupada y, al reservar con el token de esta comprobación, el sistema anula la cita antigua (solo si la nueva queda reservada).",
+        "type": "string",
+      },
       "serviceIds": {
         "description": "IDs de los servicios pedidos, copiados exactamente de get_catalog carácter a carácter (opcional; puede ser más de uno si el cliente pide varios servicios en la misma cita, ej. corte y mechas). Se prioriza al profesional que domine todos esos servicios.",
         "items": {
@@ -1164,7 +1168,7 @@ exports[`payloads de asistentes (instantáneas) > tools de voz de la recepcionis
     "url": "https://api.alhabla.test/webhooks/telnyx/tools/check_availability",
   },
   {
-    "description": "Agenda una cita en el calendario activo. Úsala solo tras confirmación explícita y con el availabilityToken de check_availability.",
+    "description": "Agenda una cita en el calendario activo. Úsala solo tras confirmación explícita y con el availabilityToken de check_availability. Si la comprobación se hizo con replacesBookingId, la cita antigua se anula al reservar la nueva.",
     "headers": [
       {
         "name": "X-Alhabla-Call-Control-Id",
@@ -1178,16 +1182,12 @@ exports[`payloads de asistentes (instantáneas) > tools de voz de la recepcionis
         "description": "Token exacto devuelto por check_availability para la opción confirmada.",
         "type": "string",
       },
-      "clientEmail": {
-        "description": "El correo electrónico del cliente, si lo proporciona (opcional)",
-        "type": "string",
-      },
       "clientName": {
         "description": "El nombre del cliente que hace la reserva",
         "type": "string",
       },
       "clientPhone": {
-        "description": "Teléfono de contacto solo si el cliente eligió uno distinto al detectado automáticamente (opcional).",
+        "description": "Teléfono de contacto solo si el cliente da uno distinto al número desde el que llama o book_appointment te lo pidió, tal como lo confirmó al repetírselo (opcional).",
         "type": "string",
       },
       "professionalConfirmed": {
@@ -1207,7 +1207,7 @@ exports[`payloads de asistentes (instantáneas) > tools de voz de la recepcionis
     "url": "https://api.alhabla.test/webhooks/telnyx/tools/book_appointment",
   },
   {
-    "description": "Busca la próxima cita del negocio asociada al número desde el que llama, si el cliente aceptó los mensajes por WhatsApp al reservarla. Devuelve también clientName (el nombre con el que se reservó; puede venir vacío en citas antiguas) — úsalo si el cliente quiere recrear la cita al mismo nombre. Úsala solo si quien llama pide cambiar o cancelar una cita existente y no te ha dado datos concretos.",
+    "description": "Busca la próxima cita del negocio asociada al número desde el que llama. Devuelve su bookingId (para cancelarla, o para cambiarla con replacesBookingId en check_availability) y clientName (el nombre con el que se reservó; puede venir vacío en citas antiguas): úsalo si el cliente quiere la cita nueva al mismo nombre. Úsala solo si quien llama pide cambiar o cancelar una cita existente y no te ha dado datos concretos.",
     "headers": [
       {
         "name": "X-Alhabla-Call-Control-Id",
@@ -1221,7 +1221,7 @@ exports[`payloads de asistentes (instantáneas) > tools de voz de la recepcionis
     "url": "https://api.alhabla.test/webhooks/telnyx/tools/find_my_appointment",
   },
   {
-    "description": "Cancela la cita cuyo id devolvió find_my_appointment. Úsala solo tras confirmación explícita del cliente. Para 'modificar' una cita: cancélala con esta tool y reserva la nueva con check_availability + book_appointment.",
+    "description": "Cancela la cita cuyo id devolvió find_my_appointment. Úsala solo si el cliente quiere anularla, tras su confirmación explícita. Para cambiarla no la uses: comprueba la hora nueva con check_availability y replacesBookingId, y la antigua se anula al reservar la nueva.",
     "headers": [
       {
         "name": "X-Alhabla-Call-Control-Id",

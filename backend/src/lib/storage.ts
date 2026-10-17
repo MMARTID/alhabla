@@ -43,7 +43,9 @@ export async function uploadRecording(
   key: string,
   stream: Readable,
   contentType: string = "audio/mpeg",
-  contentLength?: number
+  contentLength?: number,
+  /** Corta el PUT (plazo del job o error del audio a mitad de subida). */
+  abortSignal?: AbortSignal
 ): Promise<string> {
   const client = getStorageClient();
 
@@ -62,7 +64,7 @@ export async function uploadRecording(
     ContentLength: contentLength,
   });
 
-  await client.send(command);
+  await client.send(command, { abortSignal });
 
   // Return the storage location used by the app for later retrieval.
   return getStorageUrl(key);

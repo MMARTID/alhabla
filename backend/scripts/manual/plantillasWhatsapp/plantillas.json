@@ -1,7 +1,62 @@
 {
   "generado": "2026-10-16",
-  "nota": "Traducciones de las plantillas vigentes en español. Sin enviar a Meta.",
+  "nota": "Plantillas al cliente con cabecera, negritas y emojis y del dueño en catalán. En español van con nombre nuevo (confirmacion_cita_v3, recordatorio_cita_v3, *_v2): la cascada de mensajesCliente elige la más nueva aprobada. Las traducciones conservan el nombre de la versión española anterior (ya enviadas el 16-10).",
   "plantillas": [
+    {
+      "name": "confirmacion_cita_v3",
+      "language": "es",
+      "category": "UTILITY",
+      "audiencia": "cliente",
+      "parameter_format": "NAMED",
+      "components": [
+        {
+          "type": "HEADER",
+          "format": "TEXT",
+          "text": "Reserva confirmada"
+        },
+        {
+          "type": "BODY",
+          "text": "Tu reserva en *{{negocio_nombre}}* está confirmada ✅\n\n🛎️ *{{servicio}}*\n📅 {{cita}}\n\n_Para cambiarla o cancelarla, llama al {{negocio_telefono}}._",
+          "example": {
+            "body_text_named_params": [
+              {
+                "param_name": "negocio_nombre",
+                "example": "Peluquería Ana"
+              },
+              {
+                "param_name": "servicio",
+                "example": "Corte y peinado, con Laura"
+              },
+              {
+                "param_name": "cita",
+                "example": "jueves 24 de septiembre a las 17:00"
+              },
+              {
+                "param_name": "negocio_telefono",
+                "example": "930 000 000"
+              }
+            ]
+          }
+        },
+        {
+          "type": "BUTTONS",
+          "buttons": [
+            {
+              "type": "QUICK_REPLY",
+              "text": "Guardar contacto"
+            },
+            {
+              "type": "URL",
+              "text": "Cómo llegar",
+              "url": "https://www.google.com/maps/search/?api=1&query=place_id:{{1}}",
+              "example": [
+                "ChIJrTLr-GyuEmsRBfy61i59si0"
+              ]
+            }
+          ]
+        }
+      ]
+    },
     {
       "name": "confirmacion_cita_v2",
       "language": "ca",
@@ -10,8 +65,13 @@
       "parameter_format": "NAMED",
       "components": [
         {
+          "type": "HEADER",
+          "format": "TEXT",
+          "text": "Reserva confirmada"
+        },
+        {
           "type": "BODY",
-          "text": "Hola, sóc Alhabla i gestiono les reserves de {{negocio_nombre}}. La teva cita per a {{servicio}} queda confirmada el {{cita}}. Si l'has de canviar, truca al negoci al {{negocio_telefono}} i t'atendrà la recepcionista.",
+          "text": "La teva reserva a *{{negocio_nombre}}* està confirmada ✅\n\n🛎️ *{{servicio}}*\n📅 {{cita}}\n\n_Per canviar-la o anul·lar-la, truca al {{negocio_telefono}}._",
           "example": {
             "body_text_named_params": [
               {
@@ -20,7 +80,7 @@
               },
               {
                 "param_name": "servicio",
-                "example": "tall i pentinat, amb la Laura"
+                "example": "Tall i pentinat, amb la Laura"
               },
               {
                 "param_name": "cita",
@@ -60,8 +120,13 @@
       "parameter_format": "NAMED",
       "components": [
         {
+          "type": "HEADER",
+          "format": "TEXT",
+          "text": "Booking confirmed"
+        },
+        {
           "type": "BODY",
-          "text": "Hi, I'm Alhabla and I handle bookings for {{negocio_nombre}}. Your appointment for {{servicio}} is confirmed for {{cita}}. If you need to change it, call the business on {{negocio_telefono}} and the receptionist will help you.",
+          "text": "Your booking at *{{negocio_nombre}}* is confirmed ✅\n\n🛎️ *{{servicio}}*\n📅 {{cita}}\n\n_To change or cancel it, call {{negocio_telefono}}._",
           "example": {
             "body_text_named_params": [
               {
@@ -70,7 +135,7 @@
               },
               {
                 "param_name": "servicio",
-                "example": "cut and blow-dry, with Laura"
+                "example": "Cut and blow-dry, with Laura"
               },
               {
                 "param_name": "cita",
@@ -110,8 +175,13 @@
       "parameter_format": "NAMED",
       "components": [
         {
+          "type": "HEADER",
+          "format": "TEXT",
+          "text": "Réservation confirmée"
+        },
+        {
           "type": "BODY",
-          "text": "Bonjour, je suis Alhabla et je gère les réservations de {{negocio_nombre}}. Votre rendez-vous pour {{servicio}} est confirmé le {{cita}}. Pour le modifier, appelez l'établissement au {{negocio_telefono}} : la réceptionniste vous répondra.",
+          "text": "Votre réservation chez *{{negocio_nombre}}* est confirmée ✅\n\n🛎️ *{{servicio}}*\n📅 {{cita}}\n\n_Pour la modifier ou l'annuler, appelez le {{negocio_telefono}}._",
           "example": {
             "body_text_named_params": [
               {
@@ -120,7 +190,7 @@
               },
               {
                 "param_name": "servicio",
-                "example": "coupe et brushing, avec Laura"
+                "example": "Coupe et brushing, avec Laura"
               },
               {
                 "param_name": "cita",
@@ -160,8 +230,13 @@
       "parameter_format": "NAMED",
       "components": [
         {
+          "type": "HEADER",
+          "format": "TEXT",
+          "text": "Termin bestätigt"
+        },
+        {
           "type": "BODY",
-          "text": "Hallo, ich bin Alhabla und verwalte die Termine von {{negocio_nombre}}. Ihr Termin für {{servicio}} ist bestätigt: {{cita}}. Wenn Sie ihn ändern möchten, rufen Sie bitte unter {{negocio_telefono}} an, die Rezeption hilft Ihnen gern.",
+          "text": "Ihr Termin bei *{{negocio_nombre}}* ist bestätigt ✅\n\n🛎️ *{{servicio}}*\n📅 {{cita}}\n\n_Zum Ändern oder Absagen rufen Sie bitte {{negocio_telefono}} an._",
           "example": {
             "body_text_named_params": [
               {
@@ -210,8 +285,13 @@
       "parameter_format": "NAMED",
       "components": [
         {
+          "type": "HEADER",
+          "format": "TEXT",
+          "text": "Prenotazione confermata"
+        },
+        {
           "type": "BODY",
-          "text": "Ciao, sono Alhabla e gestisco le prenotazioni di {{negocio_nombre}}. Il tuo appuntamento per {{servicio}} è confermato per {{cita}}. Se devi cambiarlo, chiama il {{negocio_telefono}} e ti risponderà la receptionist.",
+          "text": "La tua prenotazione da *{{negocio_nombre}}* è confermata ✅\n\n🛎️ *{{servicio}}*\n📅 {{cita}}\n\n_Per modificarla o annullarla, chiama il {{negocio_telefono}}._",
           "example": {
             "body_text_named_params": [
               {
@@ -220,7 +300,7 @@
               },
               {
                 "param_name": "servicio",
-                "example": "taglio e piega, con Laura"
+                "example": "Taglio e piega, con Laura"
               },
               {
                 "param_name": "cita",
@@ -260,8 +340,13 @@
       "parameter_format": "NAMED",
       "components": [
         {
+          "type": "HEADER",
+          "format": "TEXT",
+          "text": "Marcação confirmada"
+        },
+        {
           "type": "BODY",
-          "text": "Olá, sou a Alhabla e faço a gestão das marcações de {{negocio_nombre}}. A sua marcação para {{servicio}} está confirmada para {{cita}}. Se precisar de a alterar, ligue para o {{negocio_telefono}} e a rececionista ajuda-o.",
+          "text": "A sua marcação em *{{negocio_nombre}}* está confirmada ✅\n\n🛎️ *{{servicio}}*\n📅 {{cita}}\n\n_Para a alterar ou cancelar, ligue para o {{negocio_telefono}}._",
           "example": {
             "body_text_named_params": [
               {
@@ -270,7 +355,7 @@
               },
               {
                 "param_name": "servicio",
-                "example": "corte e brushing, com a Laura"
+                "example": "Corte e brushing, com a Laura"
               },
               {
                 "param_name": "cita",
@@ -310,8 +395,13 @@
       "parameter_format": "NAMED",
       "components": [
         {
+          "type": "HEADER",
+          "format": "TEXT",
+          "text": "Afspraak bevestigd"
+        },
+        {
           "type": "BODY",
-          "text": "Hallo, ik ben Alhabla en ik beheer de afspraken van {{negocio_nombre}}. Je afspraak voor {{servicio}} is bevestigd op {{cita}}. Wil je die wijzigen? Bel dan naar {{negocio_telefono}}, de receptioniste helpt je graag.",
+          "text": "Je afspraak bij *{{negocio_nombre}}* is bevestigd ✅\n\n🛎️ *{{servicio}}*\n📅 {{cita}}\n\n_Wijzigen of annuleren? Bel {{negocio_telefono}}._",
           "example": {
             "body_text_named_params": [
               {
@@ -320,7 +410,7 @@
               },
               {
                 "param_name": "servicio",
-                "example": "knippen en föhnen, bij Laura"
+                "example": "Knippen en föhnen, bij Laura"
               },
               {
                 "param_name": "cita",
@@ -353,6 +443,57 @@
       ]
     },
     {
+      "name": "recordatorio_cita_v3",
+      "language": "es",
+      "category": "UTILITY",
+      "audiencia": "cliente",
+      "parameter_format": "NAMED",
+      "components": [
+        {
+          "type": "HEADER",
+          "format": "TEXT",
+          "text": "Recordatorio de cita"
+        },
+        {
+          "type": "BODY",
+          "text": "Mañana tienes cita en *{{negocio_nombre}}* ⏰\n\n🛎️ *{{servicio}}*\n📅 {{cita}}\n\n_¿La mantienes? Contesta con un botón._",
+          "example": {
+            "body_text_named_params": [
+              {
+                "param_name": "negocio_nombre",
+                "example": "Peluquería Ana"
+              },
+              {
+                "param_name": "servicio",
+                "example": "Corte y peinado, con Laura"
+              },
+              {
+                "param_name": "cita",
+                "example": "jueves 24 de septiembre a las 17:00"
+              }
+            ]
+          }
+        },
+        {
+          "type": "BUTTONS",
+          "buttons": [
+            {
+              "type": "QUICK_REPLY",
+              "text": "Confirmo"
+            },
+            {
+              "type": "QUICK_REPLY",
+              "text": "Cancelar"
+            },
+            {
+              "type": "QUICK_REPLY",
+              "text": "Cambiar"
+            }
+          ]
+        }
+      ]
+    },
+    {
       "name": "recordatorio_cita_v2",
       "language": "ca",
       "category": "UTILITY",
@@ -360,8 +501,13 @@
       "parameter_format": "NAMED",
       "components": [
         {
+          "type": "HEADER",
+          "format": "TEXT",
+          "text": "Recordatori de cita"
+        },
+        {
           "type": "BODY",
-          "text": "Hola, t'escrivim des de {{negocio_nombre}} per recordar-te la teva cita de {{servicio}} demà, {{cita}}. Digues-nos si la mantens o si l'has d'anul·lar o canviar.",
+          "text": "Demà tens cita a *{{negocio_nombre}}* ⏰\n\n🛎️ *{{servicio}}*\n📅 {{cita}}\n\n_La mantens? Respon amb un botó._",
           "example": {
             "body_text_named_params": [
               {
@@ -370,7 +516,7 @@
               },
               {
                 "param_name": "servicio",
-                "example": "tall"
+                "example": "Tall i pentinat, amb la Laura"
               },
               {
                 "param_name": "cita",
@@ -406,8 +552,13 @@
       "parameter_format": "NAMED",
       "components": [
         {
+          "type": "HEADER",
+          "format": "TEXT",
+          "text": "Appointment reminder"
+        },
+        {
           "type": "BODY",
-          "text": "Hi, this is {{negocio_nombre}} reminding you of your {{servicio}} appointment tomorrow, {{cita}}. Let us know if you're keeping it or if you need to cancel or change it.",
+          "text": "You have an appointment tomorrow at *{{negocio_nombre}}* ⏰\n\n🛎️ *{{servicio}}*\n📅 {{cita}}\n\n_Are you keeping it? Reply with a button._",
           "example": {
             "body_text_named_params": [
               {
@@ -416,7 +567,7 @@
               },
               {
                 "param_name": "servicio",
-                "example": "haircut"
+                "example": "Cut and blow-dry, with Laura"
               },
               {
                 "param_name": "cita",
@@ -452,8 +603,13 @@
       "parameter_format": "NAMED",
       "components": [
         {
+          "type": "HEADER",
+          "format": "TEXT",
+          "text": "Rappel de rendez-vous"
+        },
+        {
           "type": "BODY",
-          "text": "Bonjour, {{negocio_nombre}} vous rappelle votre rendez-vous pour {{servicio}} demain, {{cita}}. Dites-nous si vous le maintenez ou si vous souhaitez l'annuler ou le modifier.",
+          "text": "Vous avez rendez-vous demain chez *{{negocio_nombre}}* ⏰\n\n🛎️ *{{servicio}}*\n📅 {{cita}}\n\n_Vous le maintenez ? Répondez avec un bouton._",
           "example": {
             "body_text_named_params": [
               {
@@ -462,7 +618,7 @@
               },
               {
                 "param_name": "servicio",
-                "example": "une coupe"
+                "example": "Coupe et brushing, avec Laura"
               },
               {
                 "param_name": "cita",
@@ -498,8 +654,13 @@
       "parameter_format": "NAMED",
       "components": [
         {
+          "type": "HEADER",
+          "format": "TEXT",
+          "text": "Terminerinnerung"
+        },
+        {
           "type": "BODY",
-          "text": "Hallo, hier ist {{negocio_nombre}}. Wir erinnern Sie an Ihren Termin für {{servicio}} morgen, {{cita}}. Bitte sagen Sie uns, ob Sie ihn wahrnehmen oder absagen bzw. verschieben möchten.",
+          "text": "Morgen haben Sie einen Termin bei *{{negocio_nombre}}* ⏰\n\n🛎️ *{{servicio}}*\n📅 {{cita}}\n\n_Bleibt es dabei? Tippen Sie auf eine Antwort._",
           "example": {
             "body_text_named_params": [
               {
@@ -508,7 +669,7 @@
               },
               {
                 "param_name": "servicio",
-                "example": "Haarschnitt"
+                "example": "Schneiden und Föhnen, bei Laura"
               },
               {
                 "param_name": "cita",
@@ -544,8 +705,13 @@
       "parameter_format": "NAMED",
       "components": [
         {
+          "type": "HEADER",
+          "format": "TEXT",
+          "text": "Promemoria appuntamento"
+        },
+        {
           "type": "BODY",
-          "text": "Ciao, ti scriviamo da {{negocio_nombre}} per ricordarti il tuo appuntamento per {{servicio}} domani, {{cita}}. Facci sapere se lo confermi o se devi disdirlo o spostarlo.",
+          "text": "Domani hai un appuntamento da *{{negocio_nombre}}* ⏰\n\n🛎️ *{{servicio}}*\n📅 {{cita}}\n\n_Lo confermi? Rispondi con un pulsante._",
           "example": {
             "body_text_named_params": [
               {
@@ -554,7 +720,7 @@
               },
               {
                 "param_name": "servicio",
-                "example": "taglio"
+                "example": "Taglio e piega, con Laura"
               },
               {
                 "param_name": "cita",
@@ -590,8 +756,13 @@
       "parameter_format": "NAMED",
       "components": [
         {
+          "type": "HEADER",
+          "format": "TEXT",
+          "text": "Lembrete de marcação"
+        },
+        {
           "type": "BODY",
-          "text": "Olá, escrevemos de {{negocio_nombre}} para lhe lembrar a sua marcação de {{servicio}} amanhã, {{cita}}. Diga-nos se a mantém ou se precisa de a cancelar ou alterar.",
+          "text": "Amanhã tem uma marcação em *{{negocio_nombre}}* ⏰\n\n🛎️ *{{servicio}}*\n📅 {{cita}}\n\n_Mantém a marcação? Responda com um botão._",
           "example": {
             "body_text_named_params": [
               {
@@ -600,7 +771,7 @@
               },
               {
                 "param_name": "servicio",
-                "example": "corte"
+                "example": "Corte e brushing, com a Laura"
               },
               {
                 "param_name": "cita",
@@ -636,8 +807,13 @@
       "parameter_format": "NAMED",
       "components": [
         {
+          "type": "HEADER",
+          "format": "TEXT",
+          "text": "Herinnering afspraak"
+        },
+        {
           "type": "BODY",
-          "text": "Hallo, {{negocio_nombre}} herinnert je aan je afspraak voor {{servicio}} morgen, {{cita}}. Laat je ons weten of je komt, of dat je wilt annuleren of verzetten?",
+          "text": "Morgen heb je een afspraak bij *{{negocio_nombre}}* ⏰\n\n🛎️ *{{servicio}}*\n📅 {{cita}}\n\n_Blijft het staan? Antwoord met een knop._",
           "example": {
             "body_text_named_params": [
               {
@@ -646,7 +822,7 @@
               },
               {
                 "param_name": "servicio",
-                "example": "knippen"
+                "example": "Knippen en föhnen, bij Laura"
               },
               {
                 "param_name": "cita",
@@ -675,6 +851,57 @@
       ]
     },
     {
+      "name": "cambio_cita_cliente_v2",
+      "language": "es",
+      "category": "UTILITY",
+      "audiencia": "cliente",
+      "parameter_format": "NAMED",
+      "components": [
+        {
+          "type": "HEADER",
+          "format": "TEXT",
+          "text": "Cita cambiada"
+        },
+        {
+          "type": "BODY",
+          "text": "Tu cita en *{{negocio_nombre}}* ha cambiado de hora 🔄\n\n🛎️ *{{servicio}}*\n📅 Nueva hora: {{cita}}\n\n_Si no te viene bien, llama al {{negocio_telefono}} y buscamos otra._",
+          "example": {
+            "body_text_named_params": [
+              {
+                "param_name": "negocio_nombre",
+                "example": "Peluquería Ana"
+              },
+              {
+                "param_name": "servicio",
+                "example": "Corte y peinado, con Laura"
+              },
+              {
+                "param_name": "cita",
+                "example": "jueves 24 de septiembre a las 17:00"
+              },
+              {
+                "param_name": "negocio_telefono",
+                "example": "930 000 000"
+              }
+            ]
+          }
+        },
+        {
+          "type": "BUTTONS",
+          "buttons": [
+            {
+              "type": "QUICK_REPLY",
+              "text": "Vale"
+            },
+            {
+              "type": "QUICK_REPLY",
+              "text": "No me va bien"
+            }
+          ]
+        }
+      ]
+    },
+    {
       "name": "cambio_cita_cliente",
       "language": "ca",
       "category": "UTILITY",
@@ -682,8 +909,13 @@
       "parameter_format": "NAMED",
       "components": [
         {
+          "type": "HEADER",
+          "format": "TEXT",
+          "text": "Cita canviada"
+        },
+        {
           "type": "BODY",
-          "text": "Hola, {{negocio_nombre}} ha mogut la teva cita de {{servicio}} a una hora nova: {{cita}}. Si no et va bé, truca al {{negocio_telefono}} i en busquem una altra.",
+          "text": "La teva cita a *{{negocio_nombre}}* ha canviat d'hora 🔄\n\n🛎️ *{{servicio}}*\n📅 Nova hora: {{cita}}\n\n_Si no et va bé, truca al {{negocio_telefono}} i en busquem una altra._",
           "example": {
             "body_text_named_params": [
               {
@@ -692,11 +924,11 @@
               },
               {
                 "param_name": "servicio",
-                "example": "tall"
+                "example": "Tall i pentinat, amb la Laura"
               },
               {
                 "param_name": "cita",
-                "example": "divendres 25 de setembre a les 18:00"
+                "example": "dijous 24 de setembre a les 17:00"
               },
               {
                 "param_name": "negocio_telefono",
@@ -728,8 +960,13 @@
       "parameter_format": "NAMED",
       "components": [
         {
+          "type": "HEADER",
+          "format": "TEXT",
+          "text": "Appointment rescheduled"
+        },
+        {
           "type": "BODY",
-          "text": "Hi, {{negocio_nombre}} has moved your {{servicio}} appointment to a new time: {{cita}}. If that doesn't suit you, call {{negocio_telefono}} and we'll find another one.",
+          "text": "Your appointment at *{{negocio_nombre}}* has been moved 🔄\n\n🛎️ *{{servicio}}*\n📅 New time: {{cita}}\n\n_If it doesn't suit you, call {{negocio_telefono}} and we'll find another._",
           "example": {
             "body_text_named_params": [
               {
@@ -738,11 +975,11 @@
               },
               {
                 "param_name": "servicio",
-                "example": "haircut"
+                "example": "Cut and blow-dry, with Laura"
               },
               {
                 "param_name": "cita",
-                "example": "Friday 25 September at 18:00"
+                "example": "Thursday 24 September at 17:00"
               },
               {
                 "param_name": "negocio_telefono",
@@ -774,8 +1011,13 @@
       "parameter_format": "NAMED",
       "components": [
         {
+          "type": "HEADER",
+          "format": "TEXT",
+          "text": "Rendez-vous déplacé"
+        },
+        {
           "type": "BODY",
-          "text": "Bonjour, {{negocio_nombre}} a déplacé votre rendez-vous pour {{servicio}} à un nouvel horaire : {{cita}}. Si cela ne vous convient pas, appelez le {{negocio_telefono}} et nous en trouverons un autre.",
+          "text": "Votre rendez-vous chez *{{negocio_nombre}}* a été déplacé 🔄\n\n🛎️ *{{servicio}}*\n📅 Nouvel horaire : {{cita}}\n\n_Si cela ne vous convient pas, appelez le {{negocio_telefono}} et nous en trouverons un autre._",
           "example": {
             "body_text_named_params": [
               {
@@ -784,11 +1026,11 @@
               },
               {
                 "param_name": "servicio",
-                "example": "une coupe"
+                "example": "Coupe et brushing, avec Laura"
               },
               {
                 "param_name": "cita",
-                "example": "vendredi 25 septembre à 18h00"
+                "example": "jeudi 24 septembre à 17h00"
               },
               {
                 "param_name": "negocio_telefono",
@@ -820,8 +1062,13 @@
       "parameter_format": "NAMED",
       "components": [
         {
+          "type": "HEADER",
+          "format": "TEXT",
+          "text": "Termin verschoben"
+        },
+        {
           "type": "BODY",
-          "text": "Hallo, {{negocio_nombre}} hat Ihren Termin für {{servicio}} verlegt. Neuer Termin: {{cita}}. Falls das nicht passt, rufen Sie unter {{negocio_telefono}} an und wir finden einen anderen.",
+          "text": "Ihr Termin bei *{{negocio_nombre}}* wurde verschoben 🔄\n\n🛎️ *{{servicio}}*\n📅 Neuer Termin: {{cita}}\n\n_Passt es nicht? Rufen Sie {{negocio_telefono}} an, wir finden einen anderen._",
           "example": {
             "body_text_named_params": [
               {
@@ -830,11 +1077,11 @@
               },
               {
                 "param_name": "servicio",
-                "example": "Haarschnitt"
+                "example": "Schneiden und Föhnen, bei Laura"
               },
               {
                 "param_name": "cita",
-                "example": "Freitag, 25. September, um 18:00 Uhr"
+                "example": "Donnerstag, 24. September, um 17:00 Uhr"
               },
               {
                 "param_name": "negocio_telefono",
@@ -866,8 +1113,13 @@
       "parameter_format": "NAMED",
       "components": [
         {
+          "type": "HEADER",
+          "format": "TEXT",
+          "text": "Appuntamento spostato"
+        },
+        {
           "type": "BODY",
-          "text": "Ciao, {{negocio_nombre}} ha spostato il tuo appuntamento per {{servicio}} a un nuovo orario: {{cita}}. Se non ti va bene, chiama il {{negocio_telefono}} e ne cerchiamo un altro.",
+          "text": "Il tuo appuntamento da *{{negocio_nombre}}* è stato spostato 🔄\n\n🛎️ *{{servicio}}*\n📅 Nuovo orario: {{cita}}\n\n_Se non ti va bene, chiama il {{negocio_telefono}} e ne cerchiamo un altro._",
           "example": {
             "body_text_named_params": [
               {
@@ -876,11 +1128,11 @@
               },
               {
                 "param_name": "servicio",
-                "example": "taglio"
+                "example": "Taglio e piega, con Laura"
               },
               {
                 "param_name": "cita",
-                "example": "venerdì 25 settembre alle 18:00"
+                "example": "giovedì 24 settembre alle 17:00"
               },
               {
                 "param_name": "negocio_telefono",
@@ -912,8 +1164,13 @@
       "parameter_format": "NAMED",
       "components": [
         {
+          "type": "HEADER",
+          "format": "TEXT",
+          "text": "Marcação alterada"
+        },
+        {
           "type": "BODY",
-          "text": "Olá, {{negocio_nombre}} mudou a sua marcação de {{servicio}} para uma nova hora: {{cita}}. Se não lhe der jeito, ligue para o {{negocio_telefono}} e procuramos outra.",
+          "text": "A sua marcação em *{{negocio_nombre}}* mudou de hora 🔄\n\n🛎️ *{{servicio}}*\n📅 Nova hora: {{cita}}\n\n_Se não lhe der jeito, ligue para o {{negocio_telefono}} e procuramos outra._",
           "example": {
             "body_text_named_params": [
               {
@@ -922,11 +1179,11 @@
               },
               {
                 "param_name": "servicio",
-                "example": "corte"
+                "example": "Corte e brushing, com a Laura"
               },
               {
                 "param_name": "cita",
-                "example": "sexta-feira, 25 de setembro, às 18:00"
+                "example": "quinta-feira, 24 de setembro, às 17:00"
               },
               {
                 "param_name": "negocio_telefono",
@@ -958,8 +1215,13 @@
       "parameter_format": "NAMED",
       "components": [
         {
+          "type": "HEADER",
+          "format": "TEXT",
+          "text": "Afspraak verzet"
+        },
+        {
           "type": "BODY",
-          "text": "Hallo, {{negocio_nombre}} heeft je afspraak voor {{servicio}} verplaatst naar een nieuw tijdstip: {{cita}}. Komt dat niet uit? Bel {{negocio_telefono}}, dan zoeken we een ander moment.",
+          "text": "Je afspraak bij *{{negocio_nombre}}* is verplaatst 🔄\n\n🛎️ *{{servicio}}*\n📅 Nieuw tijdstip: {{cita}}\n\n_Komt het niet uit? Bel {{negocio_telefono}}, dan zoeken we een ander moment._",
           "example": {
             "body_text_named_params": [
               {
@@ -968,11 +1230,11 @@
               },
               {
                 "param_name": "servicio",
-                "example": "knippen"
+                "example": "Knippen en föhnen, bij Laura"
               },
               {
                 "param_name": "cita",
-                "example": "vrijdag 25 september om 18:00"
+                "example": "donderdag 24 september om 17:00"
               },
               {
                 "param_name": "negocio_telefono",
@@ -997,6 +1259,49 @@
       ]
     },
     {
+      "name": "cancelacion_cita_cliente_v2",
+      "language": "es",
+      "category": "UTILITY",
+      "audiencia": "cliente",
+      "parameter_format": "NAMED",
+      "components": [
+        {
+          "type": "HEADER",
+          "format": "TEXT",
+          "text": "Cita cancelada"
+        },
+        {
+          "type": "BODY",
+          "text": "Tu cita en *{{negocio_nombre}}* se ha cancelado ❌\n\n📅 {{cita}}\n\nSentimos las molestias.\n_Para pedir otra hora, llama al {{negocio_telefono}}._",
+          "example": {
+            "body_text_named_params": [
+              {
+                "param_name": "negocio_nombre",
+                "example": "Peluquería Ana"
+              },
+              {
+                "param_name": "cita",
+                "example": "jueves 24 de septiembre a las 17:00"
+              },
+              {
+                "param_name": "negocio_telefono",
+                "example": "930 000 000"
+              }
+            ]
+          }
+        },
+        {
+          "type": "BUTTONS",
+          "buttons": [
+            {
+              "type": "QUICK_REPLY",
+              "text": "Vale"
+            }
+          ]
+        }
+      ]
+    },
+    {
       "name": "cancelacion_cita_cliente",
       "language": "ca",
       "category": "UTILITY",
@@ -1004,8 +1309,13 @@
       "parameter_format": "NAMED",
       "components": [
         {
+          "type": "HEADER",
+          "format": "TEXT",
+          "text": "Cita anul·lada"
+        },
+        {
           "type": "BODY",
-          "text": "Hola, {{negocio_nombre}} ha hagut d'anul·lar la teva cita del {{cita}}. Disculpa les molèsties. Si vols demanar una altra hora, truca al {{negocio_telefono}} i t'atendrà la recepcionista.",
+          "text": "La teva cita a *{{negocio_nombre}}* s'ha anul·lat ❌\n\n📅 {{cita}}\n\nDisculpa les molèsties.\n_Per demanar una altra hora, truca al {{negocio_telefono}}._",
           "example": {
             "body_text_named_params": [
               {
@@ -1042,8 +1352,13 @@
       "parameter_format": "NAMED",
       "components": [
         {
+          "type": "HEADER",
+          "format": "TEXT",
+          "text": "Appointment cancelled"
+        },
+        {
           "type": "BODY",
-          "text": "Hi, unfortunately {{negocio_nombre}} has had to cancel your appointment on {{cita}}. We're sorry for the inconvenience. To book another time, call {{negocio_telefono}} and the receptionist will help you.",
+          "text": "Your appointment at *{{negocio_nombre}}* has been cancelled ❌\n\n📅 {{cita}}\n\nWe're sorry for the inconvenience.\n_To book another time, call {{negocio_telefono}}._",
           "example": {
             "body_text_named_params": [
               {
@@ -1080,8 +1395,13 @@
       "parameter_format": "NAMED",
       "components": [
         {
+          "type": "HEADER",
+          "format": "TEXT",
+          "text": "Rendez-vous annulé"
+        },
+        {
           "type": "BODY",
-          "text": "Bonjour, {{negocio_nombre}} a dû annuler votre rendez-vous du {{cita}}. Veuillez nous excuser pour la gêne occasionnée. Pour prendre un autre rendez-vous, appelez le {{negocio_telefono}} : la réceptionniste vous répondra.",
+          "text": "Votre rendez-vous chez *{{negocio_nombre}}* a été annulé ❌\n\n📅 {{cita}}\n\nVeuillez nous excuser pour la gêne occasionnée.\n_Pour prendre un autre rendez-vous, appelez le {{negocio_telefono}}._",
           "example": {
             "body_text_named_params": [
               {
@@ -1118,8 +1438,13 @@
       "parameter_format": "NAMED",
       "components": [
         {
+          "type": "HEADER",
+          "format": "TEXT",
+          "text": "Termin abgesagt"
+        },
+        {
           "type": "BODY",
-          "text": "Hallo, {{negocio_nombre}} musste Ihren Termin am {{cita}} leider absagen. Wir bitten um Entschuldigung. Für einen neuen Termin rufen Sie bitte unter {{negocio_telefono}} an, die Rezeption hilft Ihnen gern.",
+          "text": "Ihr Termin bei *{{negocio_nombre}}* wurde abgesagt ❌\n\n📅 {{cita}}\n\nWir bitten um Entschuldigung.\n_Für einen neuen Termin rufen Sie bitte {{negocio_telefono}} an._",
           "example": {
             "body_text_named_params": [
               {
@@ -1156,8 +1481,13 @@
       "parameter_format": "NAMED",
       "components": [
         {
+          "type": "HEADER",
+          "format": "TEXT",
+          "text": "Appuntamento annullato"
+        },
+        {
           "type": "BODY",
-          "text": "Ciao, {{negocio_nombre}} ha dovuto annullare il tuo appuntamento di {{cita}}. Ci scusiamo per il disagio. Se vuoi prenotare un altro orario, chiama il {{negocio_telefono}} e ti risponderà la receptionist.",
+          "text": "Il tuo appuntamento da *{{negocio_nombre}}* è stato annullato ❌\n\n📅 {{cita}}\n\nCi scusiamo per il disagio.\n_Per prenotare un altro orario, chiama il {{negocio_telefono}}._",
           "example": {
             "body_text_named_params": [
               {
@@ -1194,8 +1524,13 @@
       "parameter_format": "NAMED",
       "components": [
         {
+          "type": "HEADER",
+          "format": "TEXT",
+          "text": "Marcação cancelada"
+        },
+        {
           "type": "BODY",
-          "text": "Olá, {{negocio_nombre}} teve de cancelar a sua marcação de {{cita}}. Lamentamos o incómodo. Se quiser marcar outra hora, ligue para o {{negocio_telefono}} e a rececionista ajuda-o.",
+          "text": "A sua marcação em *{{negocio_nombre}}* foi cancelada ❌\n\n📅 {{cita}}\n\nLamentamos o incómodo.\n_Para marcar outra hora, ligue para o {{negocio_telefono}}._",
           "example": {
             "body_text_named_params": [
               {
@@ -1232,8 +1567,13 @@
       "parameter_format": "NAMED",
       "components": [
         {
+          "type": "HEADER",
+          "format": "TEXT",
+          "text": "Afspraak geannuleerd"
+        },
+        {
           "type": "BODY",
-          "text": "Hallo, {{negocio_nombre}} heeft je afspraak van {{cita}} helaas moeten annuleren. Excuses voor het ongemak. Wil je een nieuwe afspraak maken? Bel {{negocio_telefono}}, de receptioniste helpt je graag.",
+          "text": "Je afspraak bij *{{negocio_nombre}}* is geannuleerd ❌\n\n📅 {{cita}}\n\nExcuses voor het ongemak.\n_Een nieuwe afspraak maken? Bel {{negocio_telefono}}._",
           "example": {
             "body_text_named_params": [
               {
@@ -1263,6 +1603,49 @@
       ]
     },
     {
+      "name": "hueco_libre_v2",
+      "language": "es",
+      "category": "MARKETING",
+      "audiencia": "cliente",
+      "parameter_format": "NAMED",
+      "components": [
+        {
+          "type": "HEADER",
+          "format": "TEXT",
+          "text": "Hora disponible"
+        },
+        {
+          "type": "BODY",
+          "text": "Se ha liberado la hora que pediste en *{{negocio_nombre}}* 🎉\n\n📅 {{cita}}\n\n_¿La quieres? Pulsa un botón y la reservamos a tu nombre._",
+          "example": {
+            "body_text_named_params": [
+              {
+                "param_name": "negocio_nombre",
+                "example": "Peluquería Ana"
+              },
+              {
+                "param_name": "cita",
+                "example": "jueves 24 de septiembre a las 17:00"
+              }
+            ]
+          }
+        },
+        {
+          "type": "BUTTONS",
+          "buttons": [
+            {
+              "type": "QUICK_REPLY",
+              "text": "Sí, resérvala"
+            },
+            {
+              "type": "QUICK_REPLY",
+              "text": "Ya no"
+            }
+          ]
+        }
+      ]
+    },
+    {
       "name": "hueco_libre",
       "language": "ca",
       "category": "MARKETING",
@@ -1270,8 +1653,13 @@
       "parameter_format": "NAMED",
       "components": [
         {
+          "type": "HEADER",
+          "format": "TEXT",
+          "text": "Hora disponible"
+        },
+        {
           "type": "BODY",
-          "text": "Hola, t'escrivim des de {{negocio_nombre}} perquè ha quedat lliure l'hora que ens vas demanar: {{cita}}. Digues-nos si la vols i te la reservem.",
+          "text": "S'ha alliberat l'hora que vas demanar a *{{negocio_nombre}}* 🎉\n\n📅 {{cita}}\n\n_La vols? Prem un botó i te la reservem._",
           "example": {
             "body_text_named_params": [
               {
@@ -1280,7 +1668,7 @@
               },
               {
                 "param_name": "cita",
-                "example": "dijous 24 de setembre a les 12:00"
+                "example": "dijous 24 de setembre a les 17:00"
               }
             ]
           }
@@ -1308,8 +1696,13 @@
       "parameter_format": "NAMED",
       "components": [
         {
+          "type": "HEADER",
+          "format": "TEXT",
+          "text": "Time slot available"
+        },
+        {
           "type": "BODY",
-          "text": "Hi, this is {{negocio_nombre}}: the time you asked us for is now free: {{cita}}. Let us know if you want it and we'll book it for you.",
+          "text": "The time you asked for at *{{negocio_nombre}}* is now free 🎉\n\n📅 {{cita}}\n\n_Want it? Tap a button and we'll book it for you._",
           "example": {
             "body_text_named_params": [
               {
@@ -1318,7 +1711,7 @@
               },
               {
                 "param_name": "cita",
-                "example": "Thursday 24 September at 12:00"
+                "example": "Thursday 24 September at 17:00"
               }
             ]
           }
@@ -1346,8 +1739,13 @@
       "parameter_format": "NAMED",
       "components": [
         {
+          "type": "HEADER",
+          "format": "TEXT",
+          "text": "Créneau disponible"
+        },
+        {
           "type": "BODY",
-          "text": "Bonjour, ici {{negocio_nombre}} : le créneau que vous nous aviez demandé s'est libéré : {{cita}}. Dites-nous si vous le voulez et nous le réservons à votre nom.",
+          "text": "Le créneau que vous aviez demandé chez *{{negocio_nombre}}* s'est libéré 🎉\n\n📅 {{cita}}\n\n_Vous le voulez ? Touchez un bouton et nous le réservons à votre nom._",
           "example": {
             "body_text_named_params": [
               {
@@ -1356,7 +1754,7 @@
               },
               {
                 "param_name": "cita",
-                "example": "jeudi 24 septembre à 12h00"
+                "example": "jeudi 24 septembre à 17h00"
               }
             ]
           }
@@ -1384,8 +1782,13 @@
       "parameter_format": "NAMED",
       "components": [
         {
+          "type": "HEADER",
+          "format": "TEXT",
+          "text": "Termin frei"
+        },
+        {
           "type": "BODY",
-          "text": "Hallo, hier ist {{negocio_nombre}}: Der gewünschte Termin ist frei geworden: {{cita}}. Sagen Sie uns, ob Sie ihn möchten, dann reservieren wir ihn für Sie.",
+          "text": "Der gewünschte Termin bei *{{negocio_nombre}}* ist frei geworden 🎉\n\n📅 {{cita}}\n\n_Möchten Sie ihn? Tippen Sie auf eine Antwort, dann reservieren wir ihn für Sie._",
           "example": {
             "body_text_named_params": [
               {
@@ -1394,7 +1797,7 @@
               },
               {
                 "param_name": "cita",
-                "example": "Donnerstag, 24. September, um 12:00 Uhr"
+                "example": "Donnerstag, 24. September, um 17:00 Uhr"
               }
             ]
           }
@@ -1422,8 +1825,13 @@
       "parameter_format": "NAMED",
       "components": [
         {
+          "type": "HEADER",
+          "format": "TEXT",
+          "text": "Orario disponibile"
+        },
+        {
           "type": "BODY",
-          "text": "Ciao, ti scriviamo da {{negocio_nombre}} perché si è liberato l'orario che ci avevi chiesto: {{cita}}. Facci sapere se lo vuoi e lo prenotiamo a tuo nome.",
+          "text": "Si è liberato l'orario che avevi chiesto da *{{negocio_nombre}}* 🎉\n\n📅 {{cita}}\n\n_Lo vuoi? Tocca un pulsante e lo prenotiamo a tuo nome._",
           "example": {
             "body_text_named_params": [
               {
@@ -1432,7 +1840,7 @@
               },
               {
                 "param_name": "cita",
-                "example": "giovedì 24 settembre alle 12:00"
+                "example": "giovedì 24 settembre alle 17:00"
               }
             ]
           }
@@ -1460,8 +1868,13 @@
       "parameter_format": "NAMED",
       "components": [
         {
+          "type": "HEADER",
+          "format": "TEXT",
+          "text": "Horário disponível"
+        },
+        {
           "type": "BODY",
-          "text": "Olá, escrevemos de {{negocio_nombre}} porque ficou livre a hora que nos pediu: {{cita}}. Diga-nos se a quer e reservamo-la em seu nome.",
+          "text": "Ficou livre a hora que pediu em *{{negocio_nombre}}* 🎉\n\n📅 {{cita}}\n\n_Quer ficar com ela? Toque num botão e reservamo-la em seu nome._",
           "example": {
             "body_text_named_params": [
               {
@@ -1470,7 +1883,7 @@
               },
               {
                 "param_name": "cita",
-                "example": "quinta-feira, 24 de setembro, às 12:00"
+                "example": "quinta-feira, 24 de setembro, às 17:00"
               }
             ]
           }
@@ -1498,8 +1911,13 @@
       "parameter_format": "NAMED",
       "components": [
         {
+          "type": "HEADER",
+          "format": "TEXT",
+          "text": "Tijdstip beschikbaar"
+        },
+        {
           "type": "BODY",
-          "text": "Hallo, {{negocio_nombre}} hier: het tijdstip waar je om vroeg is vrijgekomen: {{cita}}. Laat je weten of je het wilt? Dan reserveren we het op jouw naam.",
+          "text": "Het tijdstip waar je om vroeg bij *{{negocio_nombre}}* is vrijgekomen 🎉\n\n📅 {{cita}}\n\n_Wil je het? Tik op een knop, dan reserveren we het voor je._",
           "example": {
             "body_text_named_params": [
               {
@@ -1508,7 +1926,7 @@
               },
               {
                 "param_name": "cita",
-                "example": "donderdag 24 september om 12:00"
+                "example": "donderdag 24 september om 17:00"
               }
             ]
           }

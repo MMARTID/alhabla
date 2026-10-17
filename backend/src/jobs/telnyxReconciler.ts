@@ -7,7 +7,10 @@ import {
 import { sendZohoMail } from "../lib/zohoMail.js";
 import { errorMessage } from "../lib/logUtils.js";
 import { buildTelnyxAssistantName } from "../lib/telnyxAssistantPayload.js";
-import { refrescarPlantillasConClave } from "../modules/whatsapp/service.js";
+import {
+  incorporarPlantillasNuevas,
+  refrescarPlantillasConClave,
+} from "../modules/whatsapp/service.js";
 import { sincronizarGestor } from "../lib/gestorSync.js";
 import { isVoiceTelnyxRolloutEnabled } from "../lib/voiceRollout.js";
 import { acquireLock, releaseLock } from "../lib/bookingLock.js";
@@ -87,6 +90,9 @@ export async function telnyxReconcilerJob(): Promise<TelnyxReconcilerResult> {
   // (gate de la frase de la lista de espera en el prompt) entre en este mismo
   // ciclo. Nunca lanza; un fallo suyo no aborta la reconciliación.
   try {
+    // Primero las que falten (versión o idioma nuevos), después el estado
+    // de las que tienen clave.
+    await incorporarPlantillasNuevas();
     await refrescarPlantillasConClave();
   } catch (error) {
     console.error(

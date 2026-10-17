@@ -3,6 +3,7 @@ import { nombreParaElCliente } from "../../lib/nombreProfesional.js";
 import { prisma } from "../../lib/prisma.js";
 import { errorMessage } from "../../lib/logUtils.js";
 import { reclamarEnvio } from "../../lib/messageIdempotency.js";
+import { claveDeMensajeAlCliente } from "../../lib/clavesDeMensajes.js";
 import { enqueueWhatsappJob } from "../../lib/cloudTasks.js";
 import { PermanentJobError } from "../../lib/jobErrors.js";
 import type { SendWhatsappJobPorProposito } from "../../lib/jobTypes.js";
@@ -58,9 +59,9 @@ export interface ContextoCita {
 }
 
 export interface PlantillaElegida {
-  /** "confirmacion_cita_v2" | "confirmacion_cita" | "recordatorio_cita_v2" |
-   * "recordatorio_cita" | "hueco_libre" | "hora_disponible" |
-   * "cambio_cita_cliente" | "cancelacion_cita_cliente" | "env:<nombre>";
+  /** La clave de la fila elegida (una de las `VERSIONES_*`,
+   * "confirmacion_cita", "recordatorio_cita" u "hora_disponible") o
+   * "env:<nombre>";
    * va al log y decide los efectos sobre el lead. */
   etiqueta: string;
   template: { id: string } | { name: string; language: string };
@@ -70,7 +71,7 @@ export interface PlantillaElegida {
   templateLanguage: string;
   bodyParams: Record<string, string>;
   buttonUrlParams?: Array<{ index: number; text: string }>;
-  /** hueco_libre / recordatorio_cita_v2 / confirmacion_cita_v2 = true. */
+  /** Las de `VERSIONES_*` (llevan botones) = true. */
   conBotones: boolean;
 }
 
@@ -433,6 +434,35 @@ function porVariableDeEntorno(
 }
 
 /**
+ * Versiones de cada plantilla al cliente, de la más nueva a la más vieja,
+ * con los mismos parámetros. Una versión nueva se crea con otro nombre en
+ * vez de editar la aprobada: editar la devuelve a revisión (mientras tanto
+ * no se puede enviar) y Meta lo rechaza mientras haya otro idioma del mismo
+ * nombre pendiente (2388039, visto el 16-10). Así la de ahora sigue saliendo
+ * y la nueva entra sola en cuanto su fila pasa a APPROVED (webhook o
+ * `refrescarPlantilla`), sin deploy. Las v3 / _v2 llevan título, el negocio
+ * en negrita y una línea con emoji por dato (estilo elegido el 16-10;
+ * scripts/manual/plantillasWhatsapp/plantillas.json).
+ */
+export const VERSIONES_CONFIRMACION_CON_RUTA = [
+  "confirmacion_cita_v3",
+  "confirmacion_cita_v2",
+] as const;
+export const VERSIONES_RECORDATORIO = [
+  "recordatorio_cita_v3",
+  "recordatorio_cita_v2",
+] as const;
+export const VERSIONES_CAMBIO = [
+  "cambio_cita_cliente_v2",
+  "cambio_cita_cliente",
+] as const;
+export const VERSIONES_CANCELACION = [
+  "cancelacion_cita_cliente_v2",
+  "cancelacion_cita_cliente",
+] as const;
+export const VERSIONES_HUECO_LIBRE = ["hueco_libre_v2", "hueco_libre"] as const;
+
+/**
  * Cascada por propósito: la primera fila `APPROVED` en `WhatsappTemplate`
  * que cumpla su requisito gana; después la variable de entorno; después
  * nada. Antes de resolver cada clave se llama a `refrescarPlantilla` (solo
@@ -457,25 +487,42 @@ export async function elegirPlantillaCliente(
     await refrescarPlantilla(key);
     return resolverPlantilla({ key });
   };
+  /** La versión más nueva que esté aprobada, con su clave. */
+  const primeraAprobada = async (claves: readonly string[]) => {
+    for (const key of claves) {
+      const fila = await resolver(key);
+      if (fila) {
+        return { key, fila };
+      }
+    }
+    return null;
+  };
 
   if (proposito === "confirmacion") {
+    // `sinV2` (respaldo tras un rechazo diferido de Meta) salta las dos
+    // versiones con botón de ruta y sale la confirmación con cabecera.
     if (!opciones.sinV2) {
-      const v2 = await resolver("confirmacion_cita_v2");
-      if (v2) {
+      const conRuta = await primeraAprobada(VERSIONES_CONFIRMACION_CON_RUTA);
+      if (conRuta) {
         const placeId = placeIdValido(ctx.negocio.placeId, ctx.negocio.id);
         if (!placeId) {
           console.log(
-            `[WhatsApp] Negocio ${ctx.negocio.id} sin placeId: la confirmación de la reserva ${opciones.recursoId ?? "?"} sale con confirmacion_cita en vez de la v2`
+            `[WhatsApp] Negocio ${ctx.negocio.id} sin placeId: la confirmación de la reserva ${opciones.recursoId ?? "?"} sale con confirmacion_cita en vez de ${conRuta.key}`
           );
         } else if (!telefono) {
           sinTelefono();
         } else {
           return porFila(
-            "confirmacion_cita_v2",
-            v2,
+            conRuta.key,
+            conRuta.fila,
             parametrosConfirmacionV2(ctx, telefono),
             true,
-            [{ index: indiceDelBotonUrl(v2.components), text: placeId }]
+            [
+              {
+                index: indiceDelBotonUrl(conRuta.fila.components),
+                text: placeId,
+              },
+            ]
           );
         }
       }
@@ -508,11 +555,11 @@ export async function elegirPlantillaCliente(
   }
 
   if (proposito === "recordatorio") {
-    const v2 = await resolver("recordatorio_cita_v2");
-    if (v2) {
+    const conBotones = await primeraAprobada(VERSIONES_RECORDATORIO);
+    if (conBotones) {
       return porFila(
-        "recordatorio_cita_v2",
-        v2,
+        conBotones.key,
+        conBotones.fila,
         parametrosRecordatorioV2(ctx),
         true
       );
@@ -547,18 +594,16 @@ export async function elegirPlantillaCliente(
   if (proposito === "cambio" || proposito === "cancelacion") {
     // Sin v2 ni variable de entorno: solo existen estas plantillas (ambas
     // llevan el teléfono del negocio, así que sin él no salen).
-    const key =
-      proposito === "cambio"
-        ? "cambio_cita_cliente"
-        : "cancelacion_cita_cliente";
-    const fila = await resolver(key);
-    if (fila) {
+    const aprobada = await primeraAprobada(
+      proposito === "cambio" ? VERSIONES_CAMBIO : VERSIONES_CANCELACION
+    );
+    if (aprobada) {
       if (!telefono) {
         sinTelefono();
       } else {
         return porFila(
-          key,
-          fila,
+          aprobada.key,
+          aprobada.fila,
           proposito === "cambio"
             ? parametrosCambio(ctx, telefono)
             : parametrosCancelacion(ctx, telefono),
@@ -570,9 +615,14 @@ export async function elegirPlantillaCliente(
   }
 
   // hueco_libre
-  const huecoLibre = await resolver("hueco_libre");
+  const huecoLibre = await primeraAprobada(VERSIONES_HUECO_LIBRE);
   if (huecoLibre) {
-    return porFila("hueco_libre", huecoLibre, parametrosHuecoLibre(ctx), true);
+    return porFila(
+      huecoLibre.key,
+      huecoLibre.fila,
+      parametrosHuecoLibre(ctx),
+      true
+    );
   }
   const horaDisponible = await resolver("hora_disponible");
   if (horaDisponible) {
@@ -634,6 +684,11 @@ export async function programarMensajesAlCliente(input: {
   etiqueta: string;
   /** true por defecto. `false` = solo el recordatorio (lista de espera). */
   confirmacion?: boolean;
+  /**
+   * Sufijo de la confirmación por petición: el reenvío del Gestor la manda
+   * otra vez aunque ya saliera (con la misma clave sería «ya enviado»).
+   */
+  sufijoConfirmacion?: string;
 }): Promise<{ confirmacion: "programada" | "no"; motivo?: string }> {
   const conConfirmacion = input.confirmacion !== false;
   const sinMensajes = (motivo: string) => {
@@ -698,12 +753,20 @@ export async function programarMensajesAlCliente(input: {
   }
 
   const now = Date.now();
-  const epoch = epochSegundos(booking.programedAt);
+  const programedAtMs = booking.programedAt.getTime();
   let confirmacion: "programada" | "no" = conConfirmacion ? "no" : "programada";
   let motivo: string | undefined;
 
   if (conConfirmacion) {
-    const taskId = `booking-${booking.id}-confirmacion-${epoch}`;
+    const clave = claveDeMensajeAlCliente(
+      booking.id,
+      "confirmacion",
+      programedAtMs,
+      to
+    );
+    const taskId = input.sufijoConfirmacion
+      ? `${clave}-${input.sufijoConfirmacion}`
+      : clave;
     try {
       await enqueueWhatsappJob(
         {
@@ -764,7 +827,12 @@ export async function programarMensajesAlCliente(input: {
             saltos: 0,
           },
           {
-            taskId: `booking-${booking.id}-recordatorio-${epoch}`,
+            taskId: claveDeMensajeAlCliente(
+              booking.id,
+              "recordatorio",
+              programedAtMs,
+              to
+            ),
             scheduleTime,
           }
         );
@@ -1004,20 +1072,21 @@ export async function enviarMensajeAlCliente(
         );
         return;
       }
-      const epoch = Math.floor(data.programedAtMs / 1000);
       // La clave de la fila es la documentada (sin `-s<n>`): el taskId del
       // salto solo nombra la tarea; `enqueueWhatsappJob` respeta la clave
       // que ya viene en el payload.
+      const clave =
+        data.idempotencyKey ??
+        claveDeMensajeAlCliente(
+          data.bookingId ?? "",
+          "recordatorio",
+          data.programedAtMs,
+          to
+        );
       await enqueueWhatsappJob(
+        { ...data, saltos, idempotencyKey: clave },
         {
-          ...data,
-          saltos,
-          idempotencyKey:
-            data.idempotencyKey ??
-            `booking-${data.bookingId}-recordatorio-${epoch}`,
-        },
-        {
-          taskId: `booking-${data.bookingId}-recordatorio-${epoch}-s${saltos}`,
+          taskId: `${clave}-s${saltos}`,
           scheduleTime: new Date(
             Math.min(reminderAt, now.getTime() + HORIZONTE_CLOUD_TASKS_MS)
           ),
@@ -1265,12 +1334,9 @@ export async function enviarMensajeAlCliente(
         data: { clientNotifiedAt: new Date() },
       });
     } else if (proposito === "hueco_libre") {
-      const via =
-        elegida.etiqueta === "hueco_libre"
-          ? "plantilla:hueco_libre"
-          : elegida.etiqueta === "hora_disponible"
-            ? "plantilla:hora_disponible"
-            : "plantilla:env";
+      const via = elegida.etiqueta.startsWith("env:")
+        ? "plantilla:env"
+        : `plantilla:${elegida.etiqueta}`;
       await prisma.lead.update({
         where: { id: recursoId },
         data: {

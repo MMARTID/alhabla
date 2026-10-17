@@ -708,6 +708,8 @@ el `fetch` equivalente. **Nunca desde un route handler**: todo pasa por
   <epoch ms>` / `entrante:<id>:<tipo>`. `reclamarEnvio(channel, key, extra?)` acepta un tercer
   argumento para que la fila nazca con `businessId/audience/toNumber/callbackData/kind`; si el
   `statuses[]` se adelanta al registro, la fila `adhoc:<id>` se **fusiona** con esos datos.
+- `delivery_unconfirmed` (salió y el operador no confirmó la entrega) cuenta como `sent` en
+  `mapEstadoTelnyx` desde el 16-10: antes se descartaba con aviso y se perdía su coste.
 - 131026 (el destinatario no tiene WhatsApp) llega ASÍNCRONO como fallo de entrega
   (`statuses[].failed` con `errors[].code` o `message.finalized` `delivery_failed`), nunca en
   la respuesta del envío: `actualizarEstadoEnvio` marca `ownerWhatsappUnreachableAt` solo si el
@@ -717,7 +719,8 @@ el `fetch` equivalente. **Nunca desde un route handler**: todo pasa por
   `server.ts` lo descarta como duplicado sin reprocesar nada, así que una fila guardada y no
   enrutada (proceso muerto) la recoge `handleWhatsappMessages` al inicio de cualquier evento
   posterior (`handledAt null`, >2 min y <7 d, reclamo atómico con `handler:
-  "reintento:en-curso"`, 20 por pasada). Si el volumen crece se mueve a Cloud Scheduler.
+  "reintento:en-curso:<n>"`, 20 por pasada, como mucho 3 reintentos por fila; después `handler:
+  "reintento:agotado"` con su último `error`). Si el volumen crece se mueve a Cloud Scheduler.
 - El nombre real del evento `whatsapp.template.*` no está verificado (fase 0): el `default:`
   del switch de `/webhooks/telnyx` avisa con `warn` de cualquier `whatsapp.*`/`message.*` sin
   handler, y el GET refresca la plantilla cada 24 h por `listTemplates`.
@@ -822,7 +825,12 @@ el `fetch` equivalente. **Nunca desde un route handler**: todo pasa por
   (E.164 o null)/motivo/quiereQueLeLlamen/callControlId`) ⇒ aviso #2 `avisarRecado`
   (botones «Atendido» · «Recuérdamelo mañana»; plantilla `recado_negocio` con
   `negocio_nombre/cliente_nombre/cliente_telefono/motivo`; respaldo `messageLeadEmail` al
-  primer usuario del negocio, clave `recado-<leadId>`).
+  primer usuario del negocio, clave `recado-<leadId>`). **Un lead `message` por llamada**
+  (`crearLeadDelRecado`, 2026-10-16): se crea en una transacción con
+  `pg_advisory_xact_lock(hashtext('recado:<Call.id>'))` y solo si la llamada no tiene ya uno.
+  Si `lead.create` falla, el recado sigue en `postCallReport` y se programa `revisar-escalada`,
+  que lo recupera; también lo recupera el informe siguiente (`completarInforme`). Antes se
+  perdía: el informe siguiente ya no lo traía como nuevo y la revisión lo daba por hecho.
 - Botones (`router.ts` › `botonDeRecado`): «Atendido» ⇒ `resolvedAt`; «Recuérdamelo mañana» ⇒
   `Lead.snoozedUntil` = 09:00 del día siguiente en la zona del negocio y job
   `recordar-recado` (`jobs/recordarRecado.ts`, ruta `/internal/jobs/recordar-recado`, cola
@@ -840,8 +848,10 @@ el `fetch` equivalente. **Nunca desde un route handler**: todo pasa por
   2 min: el informe puede llegar a mitad de llamada). La revisión se reprograma mientras la
   llamada siga en curso (hasta 8) y, si al final sigue `FALLO_TECNICO` sin recado, sin cita
   activa y sin `Lead` `message`, guarda el recado en `postCallReport` (con la `postCallReportAt`
-  leída: idempotente) y crea el lead + aviso #2 con el teléfono de la llamada. En dev corre en
-  el proceso tras la misma espera.
+  leída: idempotente) y crea el lead + aviso #2 con el teléfono de la llamada. Si el informe ya
+  trae recado y la llamada no tiene lead (falló su creación), lo crea con ese recado, sea cual
+  sea el motivo de la escalada. Si el lead no se puede crear, lanza para que Cloud Tasks la
+  repita. En dev corre en el proceso tras la misma espera.
 
 **Código (fase 1, PR 4 — lado cliente, 2026-09-20).**
 - `modules/whatsapp/mensajesCliente.ts`: todo lo que sale al CLIENTE por plantilla. Parámetros
@@ -854,9 +864,25 @@ el `fetch` equivalente. **Nunca desde un route handler**: todo pasa por
   aprobada (la confirmación solo con `Business.placeId`) → aprobada actual → variable
   `WHATSAPP_TEMPLATE_*_NAME` → `SIN_PLANTILLA`; antes de cada clave `refrescarPlantilla` (≤ 1
   llamada al WABA/día/clave), así una v2 aprobada entra sola en ≤ 24 h sin deploy.
+  **Versiones (16-10):** una plantilla aprobada nunca se edita para cambiarle el texto. Editar la
+  devuelve a revisión (mientras tanto no se envía), Meta lo limita a una vez al día y lo rechaza con
+  2388039 si hay otro idioma del mismo nombre pendiente. Se crea con otro nombre y la cascada prueba
+  `VERSIONES_*` de la más nueva a la más vieja: `confirmacion_cita_v3` → `_v2`, `recordatorio_cita_v3`
+  → `_v2`, `cambio_cita_cliente_v2` → `cambio_cita_cliente`, `cancelacion_cita_cliente_v2` → …,
+  `hueco_libre_v2` → `hueco_libre`. Las nuevas (título, negocio en negrita, una línea con emoji por
+  dato) y sus traducciones están en `scripts/manual/plantillasWhatsapp/plantillas.json`. Las traducciones
+  van con el nombre de la versión anterior, porque se enviaron antes. Se solicitan con
+  `solicitar.mts --enviar`. El backend todavía no elige por idioma. Las filas nuevas las crea solo
+  `incorporarPlantillasNuevas()` (service.ts): la llama el reconciliador diario y, si llega un
+  `whatsapp.template.*` de una plantilla sin fila, el webhook. La clave es el nombre si es único, y
+  ya no hace falta `sincronizarWhatsapp.mts` para cada versión nueva.
   `programarMensajesAlCliente({ bookingId })` encola la confirmación
-  (`booking-<id>-confirmacion-<epochSeg>`) y, con plan Pro/Scale y > 24 h, el recordatorio
-  (`booking-<id>-recordatorio-<epochSeg>`; a más de 29 d se programa a 29 d y el job se reencola
+  (`booking-<id>-confirmacion-<epochSeg>-<huella>`) y, con plan Pro/Scale y > 24 h, el recordatorio
+  (`booking-<id>-recordatorio-<epochSeg>-<huella>`; la huella son 8 hex del sha256 del E.164 de
+  destino, `lib/clavesDeMensajes.ts`, desde el 16-10: sin ella, corregir el teléfono y volver a
+  reservar a la misma hora chocaba con la tarea del número viejo y no salía nada; el reenvío del
+  Gestor, `avisar_cliente`, añade `-g<accionId>` a la confirmación para que salga otra vez; a
+  más de 29 d se programa a 29 d y el job se reencola
   con taskId `-s<n>`, máximo 12 saltos, conservando esa clave en el payload: `enqueueWhatsappJob`
   solo pone `idempotencyKey = taskId` cuando el payload no trae una, así la fila final de
   `sent_messages` lleva la clave documentada); devuelve si la confirmación quedó programada (sin
@@ -942,9 +968,10 @@ el `fetch` equivalente. **Nunca desde un route handler**: todo pasa por
   130429/131048 tier, 40008, 131026); siempre `console.error` con plantilla, negocio, destino y
   código; `cliente:confirmacion` ⇒ `clientNotifiedAt: null` y, si era la v2 y el código es
   132000/132001/132012/132015/132016, encola UNA vez el respaldo con `sinV2: true` (sale
-  `confirmacion_cita`), con taskId `booking-<id>-confirmacion-<epochSeg>-respaldo` derivado de la
-  RESERVA (si el `statuses[]` se adelantó al registro la fila es `adhoc:<wamid>` y Cloud Tasks
-  rechazaría los `:`); `cliente:hueco` ⇒ reabre el lead (`notifiedAt null`, `notifiedVia
+  `confirmacion_cita`), con taskId `<clave de la fila>-respaldo` (conserva la huella y el sufijo
+  del Gestor) o, si el `statuses[]` se adelantó al registro y la fila es `adhoc:<wamid>` (Cloud
+  Tasks rechazaría los `:`), `booking-<id>-confirmacion-<epochSeg>-<huella>-respaldo` derivado de
+  la RESERVA y del destino; `cliente:hueco` ⇒ reabre el lead (`notifiedAt null`, `notifiedVia
   ninguna:meta:<código>`, `resolvedAt null`) salvo 131026 (`sin_whatsapp`) o si ya respondió;
   `recordatorio`/`contacto` solo log. `SentMessage.templateName/templateLanguage` se escriben
   también al enviar por `{ id }` (campos opcionales nuevos de `EnvioPlantilla`).
@@ -1019,7 +1046,8 @@ el `fetch` equivalente. **Nunca desde un route handler**: todo pasa por
   del negocio> (<zona>)]` y el prompt tiene el bloque «## Chat por WhatsApp»
   (`managedAgentPrompt.ts`: el marcador es la única fuente fiable del número y del momento;
   sin `end_call` ni referencias a voz; `smsConsent: true` sin preguntar; el cliente que «ha
-  pulsado Cambiar» se atiende con find_my_appointment → nueva hora → cancelar + reservar). El
+  pulsado Cambiar» se atiende con find_my_appointment → `check_availability` con
+  `replacesBookingId` → `book_appointment`, que anula la vieja solo si la nueva entra). El
   cambio de prompt resincroniza todos los assistants por el reconciliador (hash de configuración).
 - `modules/whatsapp/chatCliente.ts` › `conversarConRecepcionista({ message, businessId, texto,
   etiqueta? })`: nunca lanza; devuelve `{ atendido: false, motivo }` (`apagado`,
@@ -1731,6 +1759,19 @@ is now a **Cloud Scheduler** job hitting the same kind of endpoint every
      (route answers 200, task leaves the queue). 5xx/network errors still propagate so
      Cloud Tasks retries. Background: ~50 simulation-battery recordings from 14–16 Sep
      looped every 15 min for two days (~8,000 failing requests/day) before this.
+   - **Failures retrying cannot fix (2026-10-16):** audio over 200 MB (declared or counted
+     while streaming) and a URL that is not https or points at an internal host are marked
+     unrecoverable the same way (`PermanentJobError` `recording_too_large` /
+     `recording_url_not_allowed`). Before, they came back every 15 min for the 30 days of
+     retention.
+   - **One deadline for the whole job: 150 s** (`PLAZO_DEL_JOB_MS`), below the 180 s
+     `dispatchDeadline` after which Cloud Tasks retries the task. It covers the download with
+     its redirects, the fresh Telnyx URL and the PUT to R2 (`uploadRecording` takes an
+     `abortSignal`). The old 5-minute download timeout let a second attempt start while the
+     first was still downloading. The audio goes through `stream.pipeline`, and an error in it
+     aborts the PUT: with `pipe`, a cut mid-download (or the size limit tripping) had no
+     listener and crashed the process, and the S3 SDK's `body.pipe(request)` left the PUT
+     waiting for bytes.
    - `filter[call_control_id]` on `GET /v2/recordings` is documented by the SDK but
      **ignored by the API** (returns an empty list — verified against the live account
      2026-09-17). Only `call_leg_id`/`call_session_id` filters work; the adapter no
@@ -1767,11 +1808,12 @@ is now a **Cloud Scheduler** job hitting the same kind of endpoint every
    - Retries a `book_appointment` that failed during a live call for a probably-transient reason (`BOOK_APPOINTMENT_FAILED`, `CALENDAR_TIMEOUT`, `CALENDAR_RATE_LIMITED`, or an unclassified error) — enqueued by `capturePendingBookingLead`/`enqueueRetryFailedBooking` in `voiceTools/service.ts`. Not enqueued for `*_RECONNECT_REQUIRED` failures, since retrying doesn't help until the business reconnects the calendar manually.
    - Loads the pending booking from the `Lead` row (`type: "pending_booking"`) by `leadId`, re-fetches the business's calendar tokens fresh (never trusts stale tokens from the original failed attempt), calls `calendarService.bookAppointment()` again, and on success creates the `Booking` row and sets `Lead.resolvedAt`.
    - Cloud Tasks queue `retry-failed-booking`: 4 attempts, exponential backoff 30s base (the caller already hung up — there's no live request waiting, so a few minutes of backoff is fine).
-   - No customer-facing notification exists yet when a retry succeeds in the background — it only becomes visible via the dashboard.
+   - **Consent and channel (2026-10-16):** the lead stores `smsConsent` and `createdVia` (the tool's channel, `voice` or `client_chat`) and the job copies them to the `Booking`; leads from before that have neither (no consent, `voice`). After booking, with WhatsApp configured, it calls `programarMensajesAlCliente`: the client gets the confirmation (and reminder) under the same conditions as a live booking. Before, the recovered booking was saved without consent, always as `voice`, and the client was never told.
 
 3. **`send-email`** (`backend/src/lib/zohoMail.ts`, `backend/src/lib/emailTemplates.ts`)
    - Sends the welcome email (`checkout.session.completed`, from `welcome@alhabla.ai`) and the payment-failed email (`invoice.payment_failed`, from `support@alhabla.ai`) — see `billing/service.ts`. Both are Zoho Mail aliases of one authenticated account; sending goes through Zoho Mail's REST API (OAuth 2.0, refresh token) rather than SMTP.
    - Cloud Tasks queue `send-email`: 4 attempts, exponential backoff 5s base.
+   - **Every email carries a `taskId` (2026-10-16)**, which is also the job's idempotency key, so a redelivered task does not send it twice: `bienvenida-<checkout session>`, `pago-fallido-<invoice>`, `baja-<business>-<claim ms>`, `aviso-de-minutos-<period>`, `reserva-pendiente-<lead>`, `contrasena-cambiada-<user>-<tokenVersion>`, `cuenta-borrada-<business>`, `restablecer-<user>-<random>` (never the token or its hash: task names show up in the console), plus the ones that already had one (`weekly-summary-…`, `recado-<lead>`, `alerta-…`).
 
 4. **`send-sms`** (`backend/src/adapters/telnyx/TelnyxAdapter.ts` — `sendSms`)
    - **Owner notice (since 2026-10-10): SMS is only the fallback of the WhatsApp notice #1.** After a successful `book_appointment`, `avisarNuevaReserva` goes first; only if it returns `via: "ninguna"` without `deliberado` (owner disabled the notice, already sent, inactive business are deliberate) does `avisarNuevaReservaPorSms` enqueue an SMS — to the owner's mobile (`ownerWhatsappNumber`, read fresh from the DB), **never to `business.phone`**: since "Usar Alhabla como número principal" (`customerLineType = "alhabla"`), `phone` IS the Alhabla number, and the old code sent an SMS from the Alhabla number to itself (`40305 Invalid 'from' address` + 4 Cloud Tasks retries after every booking in INFINITY, 2026-10-09/10). With a landline as `phone` it went to a number that can't receive SMS anyway. Never blocks the booking; every skip logs business/provider/reason (`console.error`).
@@ -1822,6 +1864,11 @@ is now a **Cloud Scheduler** job hitting the same kind of endpoint every
      `process-recording`), and before scanning marks as unrecoverable any un-copied
      recording older than `RECORDING_RETENTION_DAYS` (30): neither Retell nor Telnyx
      keeps the audio beyond that, so re-enqueueing it only produced 403s forever.
+   - **Cap (2026-10-16):** each re-enqueue counts in `contadores`
+     (`grabacion-reencolada:<Recording.id>`); after 96 (24 h of sweeps, each with the 5
+     attempts of the queue) the row is marked unrecoverable with a `console.error` naming
+     recording, call and business. The audio is still at the provider: clearing
+     `processingFailedAt` puts it back in the sweep.
 
 7. **Recording purge** (`backend/src/jobs/purgeOldRecordings.ts`) — added 2026-09-17
    - `POST /internal/jobs/purge-old-recordings`. **Needs a Cloud Scheduler job
@@ -1843,7 +1890,9 @@ is now a **Cloud Scheduler** job hitting the same kind of endpoint every
      honoured.
    - **Call text purge** (`backend/src/jobs/purgarTextoDeLlamadas.ts`) — added
      2026-10-02, runs in the same endpoint right after the audio purge, so it
-     needs no Cloud Scheduler job of its own. Once a call is older than
+     needs no Cloud Scheduler job of its own. Since 2026-10-16 each purge has
+     its own `try`: the text (GDPR) runs even if the audio purge throws, and
+     the endpoint answers 500 at the end if either failed. Once a call is older than
      `CALL_TEXT_RETENTION_DAYS` (default 90, the figure the privacy policy
      publishes) it deletes the `Transcript` row, nulls `Call.summary` and
      `Call.postCallReport`, and deletes `InboundMessage` rows (received
@@ -1945,6 +1994,31 @@ The backend supports two voice-AI orchestrators. `Business.orchestrator` decides
 - Supported Retell webhook events: `call_started`, `call_ended`, `call_analyzed`. Other events are acknowledged (`200`) but ignored.
 - Retell custom tools are exposed under `POST /webhooks/retell/tools/:retellAgentId/:toolName`. The `retellAgentId` path segment is required because Retell never includes an agent identifier in the tool-call body, so it's embedded in the URL itself (done in `buildRetellCalendarTools`, `backend/src/modules/calendar/service.ts`). Our tools are registered with `args_at_root: false` (see `RetellAdapter.createLlm`/`updateLlm`), so Retell sends `{name, call, args}` — `call.call_id` is threaded through as `callId` to `executeVoiceTool` so `book_appointment` can link the booking to the exact call instead of guessing "the most recent call for this business". The route still tolerates a flat args-only body (no `call_id`) for businesses not yet resynced with this config. The endpoint validates the `x-retell-signature` before executing any tool. Execution is delegated to `executeVoiceTool` in `backend/src/modules/voiceTools/service.ts`, which implements `get_catalog`, `check_availability`, `book_appointment`, `find_my_appointment`, `cancel_appointment` and `notify_when_available` (Google, Outlook and Apple/CalDAV supported). The legacy `check_business_hours` handler was removed on 2026-09-29: no agent had registered it since 2026-09-09 (a read-only sweep of the shared Retell account found 0 of 232 LLMs with it, and Telnyx assistants never had it), and `check_availability` checks opening hours and booking restrictions itself. A stale agent that still called it would hit the `default` branch of `executeVoiceTool` (warning log, empty result) and `book_appointment` would still validate everything. `check_availability` also accepts an optional `professionalId` (copied from `get_catalog`; the prompt only sends it when the caller named someone) to check that specific professional instead of "anyone free".
 - **Professional levels in the tool contract (2026-09-17).** `check_availability` translates the ranking into things the agent may say, never the internal tiers: without `professionalId` the success result carries `assignedProfessional: { id, name, isSpecialist }` (= `availableProfessionals[0]`); when the named professional is marked "no sugerir" for the requested services and someone better is free at that time, the result (success or `ALL_PROFESSIONALS_BUSY`) carries `recommendation: { professional, isSpecialist, availabilityToken, instructions }` — its own token so "vale, con Laura" books without another round-trip — and the draft of the *requested* person is flagged `recommendationOffered`. Both tools accept `professionalConfirmed: boolean`: `check_availability` with it skips the recommendation; `book_appointment` **without it on a flagged draft returns `PROFESSIONAL_CONFIRMATION_REQUIRED`** (with the recommendation) instead of booking — the safety net for manually-edited prompts, which receive new tools but not the new prompt text. Booking results now include `professionalName`. Internal fields (`specialistIds`, `recommendedProfessional`) never reach the LLM.
+- **Cambio de cita y teléfono del cliente (auditoría del 16-10,
+  `docs/auditorias/2026-10-16-pipelines-ue-y-datos.md`).** Cambiar una cita ya no es
+  «cancelar y reservar» (en un chat real del 13-10 la reserva nueva falló con la vieja ya
+  cancelada): `check_availability` acepta `replacesBookingId` (el `bookingId` de
+  `find_my_appointment`), comprueba en servidor que la cita es de quien llama, está activa y
+  no ha pasado (`citaQueSeCambia`, mismo criterio de número que `cancel_appointment`; si no,
+  `APPOINTMENT_TO_CHANGE_NOT_FOUND`), no la cuenta como ocupada (`excluir` de
+  `checkAvailability`, que desde entonces admite varias reservas: la de la conversación y la
+  que se cambia) y la guarda en el draft del token. `book_appointment` con ese token, una vez
+  guardada la reserva nueva, la anula con `anularLaCitaCambiada`
+  (`modules/bookings/reservaModificada.ts`: `cancelarReserva` + `rescheduledToId`) y
+  responde `citaAnterior: "anulada"` (o `"sigue_reservada"` si la cancelación falló, con la
+  orden de usar `cancel_appointment`). Si la nueva no entra, la vieja sigue en pie; si se
+  queda pendiente, el lead lleva `replacesBookingId` y `retryFailedBooking` la anula cuando
+  la nueva entra. Si la cita que se cambia es la de la misma conversación, el upsert ya la
+  mueve y no se anula nada. Los otros órdenes también se enlazan: cancelar y luego reservar
+  (`enlazarReservaModificada`, desde `book_appointment`) y reservar y luego cancelar
+  (`enlazarConLaReservaNueva`, desde `cancel_appointment`). El `clientPhone` que dicta el
+  cliente se normaliza a E.164 (`normalizarTelefono` en `lib/phone.ts`, la misma de los
+  recados): si no se puede, `CLIENT_PHONE_INVALID`; si coincide con el de la llamada, la
+  reserva guarda `null`. Con número oculto (`fromNumber` que no es un teléfono, p. ej.
+  «anonymous»; aún no se ha visto ninguna llamada así) el evento ya no dice «Teléfono:
+  anonymous» y `book_appointment` frena una vez por llamada con `CLIENT_PHONE_REQUIRED`
+  (clave `telefono_pedido:<calls.id>`); la segunda vez reserva sin teléfono. Ninguno de los
+  dos códigos cuenta como intento de reserva fallido. `clientEmail` ya no está en la tool.
 - **Tool errors never return HTTP 500 to Retell.** All three tools always resolve to `{success: true, result: {success: false, code, message}}` on failure — a Spanish, LLM-speakable message the agent can relay, never a raw exception. `book_appointment`'s calendar-related failures are classified into `*_RECONNECT_REQUIRED` (Google/Outlook/CalDAV credentials revoked — needs manual reconnect), `CALENDAR_TIMEOUT` / `CALENDAR_RATE_LIMITED` (the provider request took over `CALENDAR_REQUEST_TIMEOUT_MS`/`GRAPH_REQUEST_TIMEOUT_MS`, both 8s — a margin under the 20s tool timeout of Retell and Telnyx so the backend cuts the request itself instead of leaving it dangling; Telnyx only applies it at the tool level, sibling of `type` — until 2026-10-02 it went inside `webhook`, where Telnyx stores it without applying it, so every Telnyx tool ran at its 5s default) or `BOOK_APPOINTMENT_FAILED`/`BOOK_APPOINTMENT_UNEXPECTED_ERROR` (anything else). Every failure except `*_RECONNECT_REQUIRED` also enqueues `retry-failed-booking` (see Background Jobs) after saving a `Lead` with the attempted booking.
 - **`serviceIds`/`professionalId` supplied by the LLM to `book_appointment` are verified against `businessId` before use** (`prisma.service.findFirst`/`prisma.professional.findFirst` scoped by `businessId`). An ID that doesn't belong to the business is treated as if it had never been given (falls back to auto-resolution) rather than failing the booking or silently trusting a cross-tenant ID.
 - When an agent is created or updated for a Retell business, `agentBootstrap.ts` creates/updates the LLM and agent in Retell and stores `retellAgentId`/`retellLlmId` in the `Agent` row.

@@ -292,6 +292,16 @@ describe("enqueueRevisarEscaladaJob", () => {
         intento: 1,
       });
       expect(mockProcessRevisarEscaladaJob).not.toHaveBeenCalled();
+
+      // La de recuperar un recado sin lead lleva nombre propio.
+      await enqueueRevisarEscaladaJob(
+        { callId: "call_row" },
+        scheduleTime,
+        "recado"
+      );
+      expect(mockCreateTask.mock.calls[1][0].task.name).toBe(
+        "projects/project_test/locations/europe-west1/queues/send-whatsapp/tasks/escalada-call_row-1-recado"
+      );
     });
 
     it("ignora la tarea repetida (los dos informes de la llamada piden la misma) y propaga otros errores", async () => {
