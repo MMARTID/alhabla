@@ -2375,6 +2375,20 @@ nuevas: el ajuste vive en `Business.agentSettings.pasarLlamadas`.
   Sin `timeout_secs` (la tool nativa no lo tiene), sin `description` (la genera Telnyx) y
   sin `warm_transfer_acceptance` (la documentación lo limita a llamadas arrancadas con
   `ai_assistant_start`; las nuestras se contestan con `answer` + `assistant`).
+- **Respaldo si la IA falla** (`telephony_settings.fallback_destination`, desde el 18-10,
+  PR 6 de `PLAN-RETIRAR-RETELL.md`): con `activa`, el mismo móvil que la tool `transfer`;
+  sin ella, `null`. Telnyx pasa ahí la llamada cuando la conversación con la IA acaba mal
+  (no si el cliente cuelga, si el assistant termina bien, si hay buzón o si ya transfirió).
+  Probado en dev el 18-10 con `answer` + `assistant` (nuestro camino) y un `external_llm`
+  roto sin `fallback_config`: tres fallos del LLM, uno cada ~12 s (el `user_idle_reply_secs`),
+  unos 40 s de silencio tras el saludo, fin de la conversación y una pata saliente
+  **desde el número de Alhabla** hacia el destino, que el webhook apunta como pata propia
+  (`marcarPataSinCall`). Si el destino no contesta o rechaza, el cliente se queda en
+  silencio hasta colgar. En producción el LLM tiene Kimi-K2.6 de respaldo, así que esto
+  queda para cuando falle algo más que el modelo principal. **Siempre se manda el campo:**
+  Telnyx mezcla `telephony_settings` en cada update y omitirlo dejaría el destino de un
+  dueño que pasó a «nunca»; solo `null` lo borra (comprobado el 18-10). El SDK no admite
+  `null` en el tipo: lo cubre `TelephonySettingsInput` en `TelnyxAiAdapter.ts`.
 - **Reglas del prompt** (`buildTransferInstruction`, `lib/managedAgentPrompt.ts`):
   `si_lo_pide` → solo si el cliente pide hablar con una persona; quejas/urgencias/pagos →
   recado primero, transferencia si insiste. `siempre` → también quejas, urgencias, pagos y

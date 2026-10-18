@@ -763,6 +763,11 @@ describe("transferencia al dueño (fase 4)", () => {
     );
     expect(payload.instructions).toContain("## Pasar la llamada");
     expect(payload.instructions).toContain("Pásala solo si el cliente pide");
+    // Si la IA falla a mitad de llamada, Telnyx la pasa al mismo móvil
+    // (fallback_destination, regla (a) de la PR 6).
+    expect(payload.telephonySettings?.fallback_destination).toBe(
+      MOVIL_DEL_DUENO
+    );
   });
 
   it("con el ajuste «nunca» no registra la tool ni el bloque, aunque haya destino", async () => {
@@ -777,6 +782,12 @@ describe("transferencia al dueño (fase 4)", () => {
     const payload = mockedUpdateAssistant.mock.calls[0][1];
     expect(payload.tools!.some((tool) => tool.type === "transfer")).toBe(false);
     expect(payload.instructions).not.toContain("## Pasar la llamada");
+    // `null` y no ausente: Telnyx mezcla telephony_settings y solo `null`
+    // borra el destino de un dueño que antes aceptaba llamadas.
+    expect(payload.telephonySettings).toHaveProperty(
+      "fallback_destination",
+      null
+    );
   });
 
   it("sin móvil del dueño no registra la tool aunque el ajuste sea «siempre»", async () => {
@@ -792,6 +803,33 @@ describe("transferencia al dueño (fase 4)", () => {
     const payload = mockedUpdateAssistant.mock.calls[0][1];
     expect(payload.tools!.some((tool) => tool.type === "transfer")).toBe(false);
     expect(payload.instructions).not.toContain("## Pasar la llamada");
+    expect(payload.telephonySettings).toHaveProperty(
+      "fallback_destination",
+      null
+    );
+  });
+
+  it("nunca pasa la llamada de respaldo a la línea desviada a Alhabla: volvería a entrar como otra llamada", async () => {
+    // Caso C: los avisos van a la línea de clientes, que está desviada a
+    // Alhabla. destinoDeTransferencia la descarta y no hay respaldo.
+    mockedBusinessFindUnique.mockResolvedValue({
+      ...BUSINESS_PRINCIPAL,
+      customerLineType: "fijo",
+      phone: "+34931112233",
+      ownerWhatsappNumber: null,
+      ownerPhoneIsCustomerLine: true,
+      agentSettings: { ...DEFAULT_AGENT_SETTINGS, pasarLlamadas: "siempre" },
+    } as any);
+    mockedAgentFindMany.mockResolvedValue(agenteSincronizable());
+
+    await syncAgentToTelnyx("biz1");
+
+    const payload = mockedUpdateAssistant.mock.calls[0][1];
+    expect(payload.tools!.some((tool) => tool.type === "transfer")).toBe(false);
+    expect(payload.telephonySettings).toHaveProperty(
+      "fallback_destination",
+      null
+    );
   });
 
   it("con desvío (fijo) no se activa por defecto, pero sí con el ajuste explícito y el modo «siempre» cambia la regla", async () => {
@@ -853,6 +891,9 @@ describe("transferencia al dueño (fase 4)", () => {
       TOOL_TRANSFER_ESPERADA,
     ]);
     expect(payload.instructions).toContain("## Pasar la llamada");
+    expect(payload.telephonySettings?.fallback_destination).toBe(
+      MOVIL_DEL_DUENO
+    );
   });
 });
 

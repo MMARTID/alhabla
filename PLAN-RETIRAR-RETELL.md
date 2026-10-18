@@ -430,6 +430,27 @@ borrado al acabar, según la regla de qué debe existir en Telnyx):
 
 **Hecho cuando** el experimento esté anotado aquí y los assistants de producción lo lleven.
 
+**Experimento (18-10, en dev, con un assistant temporal ya borrado).** Copia del de dev con un
+`external_llm` que devuelve 404 y sin `fallback_config`, el agente de dev apuntado a él unos
+minutos y una llamada lanzada con `dial` (`+34930453237` → `+34930453236`) que dice una frase
+con `speak`; `fallback_destination` hacia `+34930453238`, otro número de dev sin negocio:
+1. **Salta en nuestro camino** (`answer` + `assistant`, no solo con la app TeXML). Con el LLM
+   caído Telnyx no corta enseguida: reintenta en cada `user_idle_reply_secs` (12 s), y al
+   tercer fallo, a los ~40 s del saludo, da la conversación por acabada y transfiere. El
+   cliente solo oye el saludo y silencio hasta entonces.
+2. **La pata sale con el número de Alhabla** del negocio (`+34930453236 → destino`), no con
+   el del cliente: el dueño ve el número de Alhabla, como con la tool `transfer`.
+3. **Eventos:** `call.conversation.ended` normal y después `call.initiated` de una pata
+   `outgoing`, que `handleCallInitiated` ya apunta como pata propia. No llega `call.bridged`
+   (el destino de la prueba no contestó). Si el destino no contesta o rechaza, el cliente se
+   queda en silencio hasta colgar. Si cuelga el cliente antes (primer intento: colgó a los
+   45 s), no salta.
+4. **Telnyx mezcla `telephony_settings` en cada update:** si el campo no va, se queda el
+   valor anterior; `null` lo borra. Por eso el payload lo manda siempre, con `null` cuando no
+   hay transferencia.
+No se ha medido `end_call` ni una transferencia normal: la documentación dice que no la
+disparan, y el código no cambia su camino.
+
 ### PR 7. STT de respaldo (puede no salir)
 
 - El `GET` del assistant devuelve `transcription.fallback_models: null`, pero el SDK 7.24 no lo
@@ -487,11 +508,11 @@ Tomadas por el usuario el 17-10:
    `RETELL_API_KEY`, `RETELL_SIP_TRUNK_AUTH_PASSWORD`, `VAPI_API_KEY` y `VAPI_WEBHOOK_SECRET`.
    Respaldo de la configuración del job `telnyx-health-check` y del trunk en las notas de la
    sesión.
+6. **`fallback_destination` (PR 6, 18-10):** regla (a), solo si el dueño aceptó que le pasen
+   llamadas (`transferencia.activa`).
 
 El resto se pregunta cuando surja. Por ahora quedan, con la recomendación primero:
 
-- **`fallback_destination` (PR 6).** (a) Solo si el dueño aceptó que le pasen llamadas;
-  (b) siempre que haya un móvil válido.
 - **La cuenta de Retell en sí.** Ya está vacía; darla de baja y revocar su clave lo hace el
   usuario cuando quiera.
 
