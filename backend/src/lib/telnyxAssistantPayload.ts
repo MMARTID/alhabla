@@ -895,6 +895,17 @@ export function buildTelnyxAssistantPayload(
       // ai.conversations.messages para llamadas de voz — el historial vuelve
       // vacío aunque hubiera conversación real.
       send_conversation_message_events: true,
+      // Si la conversación con la IA acaba mal (en la prueba del 18-10, tres
+      // fallos seguidos del LLM, unos 40 s de silencio), Telnyx pasa la
+      // llamada a este número en vez de dejar al cliente sin nadie. Solo
+      // cuando el dueño acepta que le pasen llamadas (regla (a) de
+      // PLAN-RETIRAR-RETELL.md, PR 6): el mismo destino que la tool
+      // `transfer`, y la pata sale, como la de la tool, con el número de
+      // Alhabla. No salta si el cliente cuelga, si el assistant termina bien
+      // o si ya transfirió. Siempre se manda: Telnyx mezcla
+      // telephony_settings, y omitirlo dejaría el destino anterior de un
+      // dueño que ya no quiere llamadas; `null` lo borra.
+      fallback_destination: input.transferenciaAlDueno?.to ?? null,
     },
     // Verificado en vivo el 2026-09-11: Telnyx rechaza recording_settings.
     // enabled=true si data_retention=false ("Cannot enable recording when

@@ -90,6 +90,30 @@ describe("buildTelnyxTransferTool", () => {
       ["webhook", "hangup"]
     );
   });
+
+  it("con transferencia, el mismo móvil es el fallback_destination; sin ella va null para borrar el anterior", () => {
+    const base = {
+      businessId: "biz1",
+      agentId: "agent1",
+      businessName: "Peluquería Ejemplo",
+      instructions: "i",
+      greeting: "",
+      idiomas: idiomas(["es-ES"]),
+      voice: "Telnyx.Ultra.isabel",
+    };
+    expect(
+      buildTelnyxAssistantPayload({
+        ...base,
+        transferenciaAlDueno: { from: "+34930453218", to: "+34600111222" },
+      }).telephonySettings?.fallback_destination
+    ).toBe("+34600111222");
+    for (const sin of [
+      buildTelnyxAssistantPayload({ ...base, transferenciaAlDueno: null }),
+      buildTelnyxAssistantPayload(base),
+    ]) {
+      expect(sin.telephonySettings).toHaveProperty("fallback_destination", null);
+    }
+  });
 });
 
 describe("toTelnyxWebhookTool", () => {

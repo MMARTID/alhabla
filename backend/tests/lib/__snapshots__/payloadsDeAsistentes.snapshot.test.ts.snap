@@ -312,6 +312,7 @@ exports[`payloads de asistentes (instantáneas) > assistant de la recepcionista,
     "data_retention": true,
   },
   "telephonySettings": {
+    "fallback_destination": "+34600000000",
     "noise_suppression": "disabled",
     "recording_settings": {
       "channels": "dual",
@@ -749,6 +750,7 @@ exports[`payloads de asistentes (instantáneas) > assistant de la recepcionista,
     "data_retention": true,
   },
   "telephonySettings": {
+    "fallback_destination": null,
     "noise_suppression": "disabled",
     "recording_settings": {
       "channels": "dual",
@@ -1101,7 +1103,7 @@ Si te escriben en catalán, gallego, euskera o inglés, responde en ese idioma; 
 exports[`payloads de asistentes (instantáneas) > el JSON enviado es idéntico byte a byte (hash) 1`] = `
 {
   "gestor": "d42493dfb458dbe1ef8fa7fab6dbf284ec727a79d37293a97bff584963af6abf",
-  "recepcionista": "d4f96fc8793f8fe1d2e542eaa4330938e9f93c19a549afff6b0580b3be4a01a3",
+  "recepcionista": "2e456b1542b87dff647c4cf38384567349868b87ac43cd798b82cd7d19332c6d",
 }
 `;
 

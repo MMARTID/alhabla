@@ -34,9 +34,16 @@ export type TelnyxTransferTool = AssistantTool.Transfer;
 /** `send_conversation_message_events` es un campo real de la API (aparece
  * en la respuesta y la acepta en escritura) que el SDK no declara en
  * `TelephonySettings` — verificado en vivo el 2026-09-11. Sin él,
- * `ai.conversations.messages` nunca se rellena para llamadas de voz. */
-type TelephonySettingsInput = TelephonySettings & {
+ * `ai.conversations.messages` nunca se rellena para llamadas de voz.
+ * `fallback_destination` admite `null`, que el SDK no declara: Telnyx
+ * mezcla `telephony_settings` en cada update, así que omitirlo dejaría el
+ * destino anterior y solo `null` lo borra (comprobado el 2026-10-18). */
+type TelephonySettingsInput = Omit<
+  TelephonySettings,
+  "fallback_destination"
+> & {
   send_conversation_message_events?: boolean;
+  fallback_destination?: string | null;
 };
 
 /** `language` (ISO 639-1) es el idioma en que arranca una voz de Soniox
@@ -129,7 +136,10 @@ function toAssistantCreatePayload(
     voice_settings: input.voiceSettings,
     transcription: input.transcription,
     interruption_settings: input.interruptionSettings,
-    telephony_settings: input.telephonySettings,
+    // El `null` de fallback_destination lo acepta la API aunque el SDK no
+    // lo declare (ver TelephonySettingsInput).
+    telephony_settings: input.telephonySettings as
+      TelephonySettings | undefined,
     privacy_settings: input.privacySettings,
     insight_settings: input.insightGroupId
       ? { insight_group_id: input.insightGroupId }
