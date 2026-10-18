@@ -2,13 +2,12 @@ import type {
   ConversationFlowReq,
   CreateTelnyxAssistantInput,
   HangupTool,
+  RespaldoDeTranscripcion,
   TelnyxTransferTool,
   TelnyxWebhookTool,
+  TranscriptionSettingsInput,
 } from "../adapters/telnyx/TelnyxAiAdapter.js";
-import type {
-  FlowNodeReq,
-  TranscriptionSettings,
-} from "telnyx/resources/ai/assistants/assistants.js";
+import type { FlowNodeReq } from "telnyx/resources/ai/assistants/assistants.js";
 import { resolveManagedPromptTimezone } from "./managedAgentPrompt.js";
 import { VARIABLES_DE_LA_LLAMADA_POR_DEFECTO } from "./seccionesDelPrompt.js";
 import type { CooficialDeLaZona, PerfilDeIdiomas } from "./idiomas/resolver.js";
@@ -515,17 +514,52 @@ export function adaptManagedPromptForTelnyx(
 function transcripcionDeSoniox(
   pistas: readonly string[],
   boostedKeywords: readonly string[] | undefined
-): TranscriptionSettings {
+): TranscriptionSettingsInput {
+  return {
+    ...ajustesDeSoniox(pistas, boostedKeywords),
+    // Si Soniox cae, nova-3 (Deepgram) en `multi`: pierde el catalán, el
+    // euskera o el gallego, pero la llamada sigue entendiendo español e
+    // inglés en vez de quedarse sorda (PLAN-RETIRAR-RETELL.md, PR 7).
+    fallback_models: [respaldoDeNova3("multi", boostedKeywords)],
+  };
+}
+
+function ajustesDeSoniox(
+  pistas: readonly string[] | undefined,
+  boostedKeywords: readonly string[] | undefined
+): RespaldoDeTranscripcion & { language: string } {
   return {
     model: "soniox/stt-rt-v5",
     language: "auto",
     settings: {
-      language_hints: [...pistas],
+      ...(pistas?.length ? { language_hints: [...pistas] } : {}),
       ...(boostedKeywords?.length
         ? { context: boostedKeywords.join(",") }
         : {}),
       enable_endpoint_detection: true,
       max_endpoint_delay_ms: 500,
+    },
+  };
+}
+
+/**
+ * deepgram/nova-3 como respaldo: el mismo proveedor que flux con otro modelo
+ * (sin el fin de turno nativo de flux: lo decide start_speaking_plan) y las
+ * mismas palabras clave y formato de números.
+ */
+function respaldoDeNova3(
+  idioma: string,
+  boostedKeywords: readonly string[] | undefined
+): RespaldoDeTranscripcion {
+  return {
+    model: "deepgram/nova-3",
+    language: idioma,
+    settings: {
+      ...(boostedKeywords?.length
+        ? { keyterm: boostedKeywords.join(",") }
+        : {}),
+      smart_format: true,
+      numerals: true,
     },
   };
 }
@@ -802,6 +836,20 @@ export function buildTelnyxAssistantPayload(
       : {
           model: "deepgram/flux",
           language: transcripcion.idioma,
+          // Respaldo si flux falla al empezar o a mitad de llamada
+          // (PLAN-RETIRAR-RETELL.md, PR 7; validado contra la API el 18-10
+          // con los ocho idiomas de flux y `multi`): nova-3, del mismo
+          // proveedor, y después Soniox, que cubre una caída entera de
+          // Deepgram. Telnyx exige que todos sean de streaming.
+          fallback_models: [
+            respaldoDeNova3(transcripcion.idioma, input.boostedKeywords),
+            ajustesDeSoniox(
+              transcripcion.idioma === "multi"
+                ? undefined
+                : [transcripcion.idioma],
+              input.boostedKeywords
+            ),
+          ],
           settings: {
             ...(input.boostedKeywords?.length
               ? { keyterm: input.boostedKeywords.join(",") }

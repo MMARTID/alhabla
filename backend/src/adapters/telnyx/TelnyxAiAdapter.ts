@@ -46,6 +46,22 @@ type TelephonySettingsInput = Omit<
   fallback_destination?: string | null;
 };
 
+/** Modelos de transcripción de respaldo, en orden (hasta 3, todos de
+ * streaming y distintos del principal): si el que está en uso falla al
+ * empezar o a mitad de llamada, entra el siguiente. Documentado por Telnyx
+ * (ajustes de transcripción, release note del 2026-10-09) pero ausente de
+ * `TranscriptionSettings` en el SDK 7.24; cada uno hereda el idioma del
+ * principal salvo que lleve el suyo. `null` o `[]` los quitan. */
+export type RespaldoDeTranscripcion = {
+  model: NonNullable<TranscriptionSettings["model"]>;
+  language?: string;
+  settings?: TranscriptionSettings["settings"];
+};
+
+export type TranscriptionSettingsInput = TranscriptionSettings & {
+  fallback_models?: RespaldoDeTranscripcion[] | null;
+};
+
 /** `language` (ISO 639-1) es el idioma en que arranca una voz de Soniox
  * (`Soniox.tts-rt-v2.*`), que habla todos los idiomas; documentado por
  * Telnyx para los assistants pero ausente de `VoiceSettings` en el SDK
@@ -88,7 +104,7 @@ export interface CreateTelnyxAssistantInput {
    * telnyxAssistantPayload.ts para la elección real y el porqué. */
   fallbackConfig?: { model?: string };
   voiceSettings?: VoiceSettingsInput;
-  transcription?: TranscriptionSettings;
+  transcription?: TranscriptionSettingsInput;
   /** Con deepgram/flux (modelo con turn-taking propio) solo importa
    * `start_speaking_plan.wait_seconds` de aquí — el resto de detección de
    * fin de turno vive en `transcription.settings` (eot_threshold,
