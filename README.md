@@ -8,9 +8,10 @@ también por WhatsApp con el dueño y con sus clientes.
 
 ## Características principales
 
-- **Recepcionista de voz** orquestada por **Telnyx AI Assistants** (primario) con **Retell.ai**
-  como respaldo (failover automático, hoy inerte). Multilingüe (castellano por defecto; catalán,
-  gallego, euskera e inglés si el cliente los usa).
+- **Recepcionista de voz** orquestada por **Telnyx AI Assistants**, el único orquestador desde
+  que Retell.ai se retiró el 2026-10-17 (`PLAN-RETIRAR-RETELL.md`). Multilingüe: castellano por
+  defecto, la cooficial de la zona (catalán, euskera o gallego) e inglés, francés, alemán,
+  italiano, portugués, neerlandés y ruso si el cliente los usa.
 - **Personalización por tipo de negocio**: el prompt incluye instrucciones propias de cada nicho
   y las tools reciben el catálogo en vivo de servicios y profesionales, para que nunca invente
   datos ni IDs. Asignación por especialidad (especialista / lo hace / no sugerir).
@@ -31,7 +32,7 @@ también por WhatsApp con el dueño y con sus clientes.
 - **Registro guiado**: cuenta en la web pública, asistente del negocio en la app (Google
   Places, servicios, equipo, calendario) y checkout.
 - **Facturación con Stripe** y provisioning automático de números Telnyx tras la suscripción.
-- **Webhooks firmados** (Retell, Telnyx —Ed25519—, Stripe) para eventos, tools y mensajes.
+- **Webhooks firmados** (Telnyx —Ed25519— y Stripe) para eventos, tools y mensajes.
 
 ## Stack tecnológico
 
@@ -43,7 +44,7 @@ también por WhatsApp con el dueño y con sus clientes.
 | Base de datos | PostgreSQL 15 + Prisma |
 | Caché | Postgres (`claves_temporales`, `contadores`, `cerrojos`) desde los PR #277 y PR B; Redis 7 (Memorystore) solo como espejo de los cerrojos mientras exista `REDIS_URL` |
 | Colas | Cloud Tasks / Cloud Scheduler (jobs HTTP internos, sin BullMQ) |
-| Voz | Telnyx AI Assistants (primario), Retell.ai (respaldo) |
+| Voz | Telnyx AI Assistants |
 | WhatsApp | Telnyx (WhatsApp Business Platform de Meta) |
 | Almacenamiento | Cloudflare R2 (S3) |
 | Telefonía | Telnyx |
@@ -54,7 +55,7 @@ también por WhatsApp con el dueño y con sus clientes.
 
 - Node.js 22 (la versión está en `.nvmrc`)
 - Docker y Docker Compose
-- Cuentas y claves de API: Telnyx (voz, telefonía y WhatsApp), Retell, Google Cloud
+- Cuentas y claves de API: Telnyx (voz, telefonía y WhatsApp), Google Cloud
   (Calendar + Places + Login), Microsoft Azure (Outlook), Stripe, Cloudflare R2, Zoho Mail
   (Apple/iCloud no necesita alta de desarrollador: basta una contraseña de aplicación del negocio)
 
@@ -169,7 +170,7 @@ graph TD
     SM[[Secret Manager]]
     R2[(Cloudflare R2<br/>grabaciones, bucket privado)]
     TX[Telnyx<br/>voz · telefonía · WhatsApp]
-    EXT[Retell · Stripe<br/>Google · Microsoft · Zoho]
+    EXT[Stripe · Google<br/>Microsoft · Zoho]
 
     CR_API -->|socket Unix| SQL
     CR_API -->|cerrojos, modo compatibilidad| REDIS
@@ -189,12 +190,13 @@ graph TD
 ├── backend/                # Backend ESM TypeScript
 │   ├── src/
 │   │   ├── server.ts       # Fastify entry point: rutas, webhooks y endpoints internos de jobs
-│   │   ├── plugins/        # auth (JWT), internalAuth (OIDC de Cloud Tasks), firmaRetell y firmaTelnyx;
+│   │   ├── plugins/        # auth (JWT), internalAuth (OIDC de Cloud Tasks) y firmaTelnyx (Ed25519);
 │   │   │                   #   CORS y rate-limit en server.ts
-│   │   ├── modules/        # rutas por dominio: agents, auth, billing, bookings, businesses,
-│   │   │                   #   calendar, calls, demo, gestor, internal, onboarding, phone, places,
-│   │   │                   #   recordings, voiceTools, webhooksRetell, webhooksTelnyx, whatsapp, retellSimulation
-│   │   ├── adapters/       # Retell, Telnyx (voz, WhatsApp), calendarios (Google, Outlook, CalDAV)
+│   │   ├── modules/        # rutas por dominio: agents, auth, billing, bookings, businesses, busqueda,
+│   │   │                   #   calendar, calls, contacto, demo, internal, onboarding, phone, places,
+│   │   │                   #   recordings, webhooksTelnyx, whatsapp; gestor y voiceTools sin rutas
+│   │   │                   #   propias (los usan los webhooks y los scripts)
+│   │   ├── adapters/       # Telnyx (voz y números), WhatsApp, calendarios (Google, Outlook, CalDAV)
 │   │   ├── lib/            # prisma, almacenTemporal, cerrojos, cloudTasks, availability, urls…
 │   │   ├── jobs/           # lógica de los jobs en segundo plano (invocados vía Cloud Tasks/Scheduler)
 │   │   └── config/         # constantes
@@ -256,13 +258,14 @@ graph TD
 |---|---|
 | `/auth/*` | Login, registro (devuelve `pase`), `pase/canjear`, Google Login, contraseña |
 | `/business/me`, `/business/me/whatsapp`, `/business/me/gestor` | Negocio, WhatsApp del dueño, el Gestor en el panel |
+| `/business/me/buscar` | Buscador del panel (⌘K): citas y conversaciones por cliente, teléfono o servicio |
+| `/contacto` | Formulario de contacto de la web pública (correo a `hola@alhabla.ai`) |
 | `/booking-settings/*` | Servicios, profesionales, capacidad |
 | `/calendar/*` | Conexión de calendarios (OAuth y CalDAV) |
 | `/billing/*` | Stripe (checkout, portal, `webhook`) |
 | `/phone/*` | Números de Telnyx |
 | `/agents/*`, `/calls/*`, `/recordings/*` | Recepcionista, llamadas, grabaciones |
 | `/demo/*` | Demo pública de voz y Places |
-| `/webhooks/retell`, `/webhooks/retell/inbound`, `/webhooks/retell/tools/:retellAgentId/:toolName` | Retell (firmados) |
 | `/webhooks/telnyx` | Telnyx: llamadas y **WhatsApp** (mensajes, estados, plantillas), Ed25519 |
 | `/webhooks/telnyx/tools/:toolName` | Tools de la recepcionista (voz y chat) |
 | `/webhooks/telnyx/gestor/:toolName` | Tools del Gestor (negocio por cabecera desde los metadata) |
@@ -284,8 +287,8 @@ Lo que el asistente deje a medias lo completa el Gestor por WhatsApp («empezamo
 ## Seguridad
 
 - JWT firmado con `JWT_SECRET` (obligatorio); sesión en `localStorage` de la app.
-- Webhooks de Retell (`x-retell-signature`), Telnyx (Ed25519, también los de WhatsApp y las
-  tools) y Stripe (`rawBody`) con firma verificada.
+- Webhooks de Telnyx (Ed25519, también los de WhatsApp y las tools, en un único `preHandler`:
+  `plugins/firmaTelnyx.ts`) y Stripe (`rawBody`) con firma verificada.
 - El negocio de cada tool lo fija el backend (cabecera templada desde los metadata de la
   conversación o `businessId` del agente), nunca el modelo.
 - El Gestor nunca ejecuta: propone, y solo el botón del dueño ejecuta (propuestas de 24 h,
@@ -299,6 +302,8 @@ Lo que el asistente deje a medias lo completa el Gestor por WhatsApp («empezamo
 
 - `AGENTS.md` — referencia detallada para agentes de IA y desarrolladores.
 - `PLAN-CANAL-DUENO.md` — el canal de WhatsApp: decisiones, fases y estado.
+- `PLAN-RETIRAR-RETELL.md` — la retirada de Retell y las protecciones de Telnyx que la sustituyen.
+- `PLAN-WHATSAPP-COEXISTENCIA.md` — los mensajes a los clientes desde el WhatsApp Business que el negocio ya usa.
 - `docs/historico/` — planes cerrados o descartados:
   - `docs/historico/PLAN-APP-DOMINIO.md` — el reparto entre la web pública y la app.
   - `docs/historico/PLAN-TELEFONIA-UX.md` — teléfono, desvío y número principal (lo que falta
