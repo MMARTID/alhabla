@@ -375,7 +375,59 @@ describe("buildTelnyxAssistantPayload", () => {
         smart_format: true,
         numerals: true,
       },
+      // Si flux falla: nova-3 (mismo proveedor) y Soniox (otro), con las
+      // mismas palabras clave (PR 7 de PLAN-RETIRAR-RETELL.md).
+      fallback_models: [
+        {
+          model: "deepgram/nova-3",
+          language: "multi",
+          settings: {
+            keyterm: "corte,manicura",
+            smart_format: true,
+            numerals: true,
+          },
+        },
+        {
+          model: "soniox/stt-rt-v5",
+          language: "auto",
+          settings: {
+            context: "corte,manicura",
+            enable_endpoint_detection: true,
+            max_endpoint_delay_ms: 500,
+          },
+        },
+      ],
     });
+  });
+
+  it("con un solo idioma en flux, nova-3 lo repite y el respaldo de Soniox lo lleva de pista", () => {
+    // Hoy flux siempre va en `multi` (un principal Ultra habla los siete);
+    // el caso de un solo idioma se fuerza sobre el perfil resuelto.
+    const payload = buildTelnyxAssistantPayload({
+      ...baseInput,
+      idiomas: {
+        ...idiomas(["de-DE"], "de-DE"),
+        transcripcion: { motor: "flux", idioma: "de" },
+      },
+    });
+
+    expect(payload.transcription?.language).toBe("de");
+    expect(payload.transcription?.fallback_models).toEqual([
+      {
+        model: "deepgram/nova-3",
+        language: "de",
+        settings: { smart_format: true, numerals: true },
+      },
+      {
+        model: "soniox/stt-rt-v5",
+        language: "auto",
+        settings: {
+          language_hints: ["de"],
+          enable_endpoint_detection: true,
+          max_endpoint_delay_ms: 500,
+        },
+      },
+    ]);
   });
 
   it("omite keyterm pero mantiene la config de fin de turno y formato inteligente cuando no hay palabras clave", () => {
@@ -428,6 +480,19 @@ describe("buildTelnyxAssistantPayload", () => {
           enable_endpoint_detection: true,
           max_endpoint_delay_ms: 500,
         },
+        // Si Soniox cae, nova-3 en `multi`: sin la cooficial, pero la
+        // llamada sigue.
+        fallback_models: [
+          {
+            model: "deepgram/nova-3",
+            language: "multi",
+            settings: {
+              keyterm: "corte,Laura",
+              smart_format: true,
+              numerals: true,
+            },
+          },
+        ],
       });
     });
 

@@ -2935,6 +2935,19 @@ olvida al guardar.
     abajo). Contesta entre 1,4 y 2 s en vez de ~0,9 s, también a quien habla castellano, y el
     panel lo avisa.
   - Con catalán, el prompt pide adaptarse al valenciano y al balear.
+- **Transcripción de respaldo** (`transcription.fallback_models`, desde el 18-10, PR 7 de
+  `PLAN-RETIRAR-RETELL.md`): si el modelo en uso falla al empezar o a mitad de llamada, Telnyx
+  pasa al siguiente sin cortar. Con flux: `deepgram/nova-3` en el mismo idioma (mismas
+  `keyterm`, `smart_format` y `numerals`) y después `soniox/stt-rt-v5` en `auto` (con la pista
+  si flux tiene un solo idioma), que cubre una caída entera de Deepgram. Con Soniox:
+  `deepgram/nova-3` en `multi`, que pierde la cooficial pero sigue entendiendo español e
+  inglés. Reglas de Telnyx (documentación de ajustes de transcripción y release note del
+  09-10, y comprobadas contra la API el 18-10): hasta 3, todos de streaming (con `azure/fast`
+  da 400) y distintos; heredan el idioma salvo que lleven el suyo; `null` o `[]` los quitan.
+  Validadas las combinaciones reales (flux con los ocho idiomas y `multi`, Soniox con es+ca y
+  es+eu). No se pudo forzar un fallo de verdad: una `api_key_ref` falsa en Soniox no lo rompe
+  (Telnyx usa su propia clave). El SDK 7.24 no declara el campo:
+  `TranscriptionSettingsInput` en `TelnyxAiAdapter.ts`.
   - **En estudio (no depende de esta PR):** cambiar de voz a mitad de llamada (español → catalán
     con Marta) con `conversation_flow`, para que un principal español atienda también catalán.
 - **El dueño elige la voz escuchándola** en «Cómo atiende»: en Pro y Scale, las recomendadas a

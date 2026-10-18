@@ -463,6 +463,19 @@ disparan, y el código no cambia su camino.
 - Del LLM de respaldo (Kimi-K2.6) hay que averiguar si deja rastro cuando salta, en
   `call.conversation.ended` o en los insights, para contarlo en `salud_llamadas`.
 
+**Resultado (18-10): sale.** Telnyx lo documenta ya (ajustes de transcripción y release note
+del 09-10): hasta 3 respaldos, todos de streaming y distintos, que heredan el idioma salvo que
+lleven el suyo; `null` o `[]` los quitan. Comprobado contra la API con assistants temporales
+(ya borrados): rechaza `fallback_models` con un principal por lotes (`azure/fast`) y acepta
+las combinaciones que usamos, flux con los ocho idiomas y `multi`, y Soniox con es+ca y es+eu.
+- **Con flux:** `deepgram/nova-3` en el mismo idioma y después `soniox/stt-rt-v5` en `auto`.
+  nova-3 es del mismo proveedor; Soniox cubre una caída entera de Deepgram.
+- **Con Soniox:** `deepgram/nova-3` en `multi`. Pierde la cooficial, pero la llamada sigue.
+- **No medido:** el relevo en una llamada real. Una `api_key_ref` falsa en Soniox no lo
+  rompe (la prueba de control transcribió igual) y no hay otra forma limpia de tumbar un modelo
+  de streaming nativo.
+- **Kimi-K2.6:** sin investigar cómo se nota cuando salta; queda para cuando haga falta.
+
 ## 5. Riesgos
 
 | Riesgo | Mitigación |
