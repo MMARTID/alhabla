@@ -2138,7 +2138,7 @@ La separación se apoya por tanto en tres cosas:
    | Número | Tag | Uso |
    |---|---|---|
    | +34930453219 / 236 / 237 / 238 / 289 | `env-dev` | Las 5 cuentas de prueba `test-*@alhabla.local` |
-   | +34930453216 | `env-prod` | Negocio real «Peluqueria Vide» |
+   | +34930453216 | `env-prod`, `prueba-brain-to-train` | Desde el 2026-10-18, cuenta de prueba «Brain to Train» (gimnasio de Sant Celoni, `scripts/crearCuentaPruebaBrainToTrain.ts`); antes «Peluqueria Vide» y luego sin negocio |
    | +34930453218 | `env-prod` | Emisor de WhatsApp gestionado por Telnyx — **no borrar**, no pertenece a ningún negocio de la BD |
    | +34930454394 / 372 / 382 / 375 / 393 | `env-prod`, `whatsapp-sector`, `sector-<tipo>` | Números de WhatsApp de Alhabla (ver § WhatsApp): el …394 es el de clientes «Alhabla Reservas», los otros cuatro en reserva — **no borrar**, no pertenecen a ningún negocio; desvío de voz permanente a +34 692 138 456 |
 
