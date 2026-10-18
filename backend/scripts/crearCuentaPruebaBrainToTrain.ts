@@ -30,6 +30,14 @@
  * producción y sin negocio) es una escritura directa en la Cloud SQL de
  * producción. El script imprime al final el SQL exacto para ejecutarlo a mano.
  *
+ * Mientras tanto (2026-10-18) el número atiende la demo para enseñársela al
+ * gimnasio: un clon del assistant de esta cuenta, `alhabla-demo-brain-to-train`
+ * (`assistant-bf00a21a-b64a-4942-81b2-bf81f16523fe`), con el mismo patrón que
+ * `crearAssistantsDemoAislados.ts` (sin tools salvo colgar, catálogo y horario
+ * en el prompt, sin grabación) y el número en SU app TeXML
+ * (`3073476569801426354`), no en el Call Control App. Antes del SQL hay que
+ * devolver el `connection_id` del número a `3048374727065208187`.
+ *
  * Uso (reanudable: si el alta ya se hizo, pasa la contraseña impresa):
  *   cd backend && npx tsx scripts/crearCuentaPruebaBrainToTrain.ts
  *   PRUEBA_PASSWORD=... npx tsx scripts/crearCuentaPruebaBrainToTrain.ts
