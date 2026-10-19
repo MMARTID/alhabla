@@ -1,7 +1,7 @@
 /**
- * Estado de GET /health. Solo las dependencias críticas (Postgres y Redis)
- * deciden el código: son lo que la revisión necesita para servir, y el
- * workflow de deploy revierte la revisión si /health no da "ok". Las
+ * Estado de GET /health. Solo las dependencias críticas (Postgres) deciden
+ * el código: son lo que la revisión necesita para servir, y el workflow
+ * de deploy revierte la revisión si /health no da "ok". Las
  * informativas (el proveedor de voz, Telnyx) salen en el JSON pero nunca
  * lo cambian: un fallo pasajero de su API durante un deploy revertía una
  * revisión sana (con las migraciones ya aplicadas).

@@ -146,7 +146,6 @@ export async function estadoDelEntorno({
       "http://localhost:3002",
     ],
     ["postgres", "Postgres (BD botbook)", contenedor("alhabla_postgres")],
-    ["redis", "Redis", contenedor("alhabla_redis")],
     [
       "tunel",
       "Túnel dev-api.alhabla.ai",

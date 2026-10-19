@@ -133,7 +133,7 @@ poner_en() {
   elif [ "$antes_schema" != "$(hash_de backend/prisma/schema.prisma)" ]; then
     recrear=(--force-recreate)
   fi
-  compose --profile dev up -d ${recrear[@]+"${recrear[@]}"} postgres redis backend-dev cloudflared
+  compose --profile dev up -d ${recrear[@]+"${recrear[@]}"} postgres backend-dev cloudflared
   registro "Aplicando migraciones a la BD de dev..."
   docker exec alhabla_backend_dev npx prisma migrate deploy >>"$LOGS/entorno.log" 2>&1 \
     || registro "Las migraciones fallaron: mira $LOGS/entorno.log"
@@ -194,7 +194,7 @@ case "$accion" in
       registro "Sin red para actualizar: se arranca lo que ya había"
       rm -f "$PARADO"
       enlazar_secretos
-      compose --profile dev up -d postgres redis backend-dev cloudflared
+      compose --profile dev up -d postgres backend-dev cloudflared
     fi
     if esperar_url "$URL_APP" 80; then
       registro "Listo: $URL_APP"
@@ -232,7 +232,7 @@ case "$accion" in
       launchctl kill SIGTERM "gui/$(id -u)/ai.alhabla.dev.$servicio" >/dev/null 2>&1 || true
     done
     compose --profile dev stop backend-dev cloudflared
-    registro "Entorno de desarrollo parado (Postgres y Redis siguen)"
+    registro "Entorno de desarrollo parado (Postgres sigue)"
     ;;
   *)
     echo "Uso: $0 [arrancar|ver <rama>|estado|parar]" >&2

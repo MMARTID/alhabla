@@ -41,7 +41,7 @@ también por WhatsApp con el dueño y con sus clientes.
 | App (`frontend/`, app.alhabla.ai) | Next.js 16, React 19, Tailwind CSS, TanStack Query |
 | Web pública (`web/`, alhabla.ai) | Next.js 16, React 19, Tailwind CSS, blog en MDX |
 | Base de datos | PostgreSQL 15 + Prisma |
-| Caché | Postgres (`claves_temporales`, `contadores`, `cerrojos`) desde los PR #277 y PR B; Redis 7 (Memorystore) solo como espejo de los cerrojos mientras exista `REDIS_URL` |
+| Caché | Postgres (`claves_temporales`, `contadores`, `cerrojos`) desde los PR #277 y PR B; sin Redis desde el 2026-10-19 |
 | Colas | Cloud Tasks / Cloud Scheduler (jobs HTTP internos, sin BullMQ) |
 | Voz | Telnyx AI Assistants |
 | WhatsApp | Telnyx (WhatsApp Business Platform de Meta) |
@@ -70,7 +70,7 @@ cd web && npm install && cd ..
 cp .env.example .env
 # Editar .env con tus credenciales
 
-# Levantar backend + Postgres + Redis + túnel de Cloudflare (dev)
+# Levantar backend + Postgres + túnel de Cloudflare (dev)
 docker compose --profile dev up -d
 
 # Ejecutar migraciones
@@ -91,7 +91,7 @@ npm run dev              # tsx watch
 npm run build            # tsc
 npm start                # node dist/server.js
 npm run test             # vitest run (unitarios)
-npm run test:integration # contra Postgres/Redis reales (backend/.env.test)
+npm run test:integration # contra el Postgres real (backend/.env.test)
 npm run lint             # eslint
 npm run typecheck        # tsc --noEmit
 npm run prisma:generate
@@ -114,7 +114,7 @@ npm run test && npm run lint && npm run build
 ### Docker
 
 ```bash
-# Desarrollo completo (backend tsx watch, túnel de Cloudflare, postgres, redis)
+# Desarrollo completo (backend tsx watch, túnel de Cloudflare, postgres)
 docker compose --profile dev up
 
 # Producción local (backend compilado, para probar el runtime sin desplegar)
@@ -161,9 +161,8 @@ graph TD
 
     CTS[[Cloud Tasks / Cloud Scheduler<br/>jobs en segundo plano]]
 
-    subgraph VPC["Infraestructura privada (VPC, Direct VPC egress)"]
+    subgraph VPC["Infraestructura privada"]
         SQL[(Cloud SQL<br/>Postgres, también cerrojos,<br/>límites y estado temporal)]
-        REDIS[(Memorystore<br/>Redis, espejo de los cerrojos; en retirada)]
     end
 
     SM[[Secret Manager]]
@@ -172,7 +171,6 @@ graph TD
     EXT[Stripe · Google<br/>Microsoft · Zoho]
 
     CR_API -->|socket Unix| SQL
-    CR_API -->|cerrojos, modo compatibilidad| REDIS
     CR_API -->|encola vía HTTP| CTS
     CTS -->|POST /internal/jobs/*| CR_API
     CR_API -.->|secretos| SM
@@ -200,7 +198,7 @@ graph TD
 │   │   ├── jobs/           # lógica de los jobs en segundo plano (invocados vía Cloud Tasks/Scheduler)
 │   │   └── config/         # constantes
 │   ├── prisma/             # schema y migraciones
-│   ├── tests/              # Vitest (tests/integration/ contra Postgres/Redis reales)
+│   ├── tests/              # Vitest (tests/integration/ contra el Postgres real)
 │   ├── scripts/            # scripts manuales (assistants de Telnyx, prompts, Gestor, WhatsApp, demo)
 │   └── Dockerfile
 ├── frontend/               # la app (app.alhabla.ai): panel, agenda, llamadas, agente, Gestor, ajustes

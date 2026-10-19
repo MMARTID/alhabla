@@ -7,8 +7,8 @@ en el calendario de Google, Outlook o Apple/iCloud del negocio. Desde septiembre
 también por WhatsApp con el dueño (avisos y el Gestor) y con sus clientes.
 
 Backend Fastify 5 + Prisma/PostgreSQL (el estado temporal también: cerrojos, límite de peticiones,
-cachés y claves de un solo uso; Redis solo queda como espejo de los cerrojos mientras exista
-`REDIS_URL`, ver AGENTS.md § Corte de Redis a Postgres). Dos webs Next.js 16 App Router (React 19) con Tailwind 3
+cachés y claves de un solo uso; sin Redis desde el 2026-10-19, ver AGENTS.md § Corte de Redis a
+Postgres). Dos webs Next.js 16 App Router (React 19) con Tailwind 3
 (desde el 2026-09-21, `docs/historico/PLAN-APP-DOMINIO.md`): **la app** en `frontend/` (puerto 3001,
 `app.alhabla.ai`, TanStack Query, sesión JWT en `localStorage`) y **la web pública** en `web/`
 (puerto 3002, `alhabla.ai`: landing, sectores, planes, legal, registro de cuenta y blog en MDX,
@@ -109,7 +109,7 @@ cd backend
 npm run dev            # backend, tsx watch (:3000)
 npm run build          # tsc
 npm run test           # vitest run
-npm run test:integration # contra Postgres/Redis reales (backend/.env.test)
+npm run test:integration # contra el Postgres real (backend/.env.test)
 npm run lint           # eslint src
 npm run typecheck      # tsc --noEmit
 npm run prisma:migrate # migraciones en dev
@@ -118,7 +118,7 @@ npm run prisma:studio  # :5555
 cd frontend && npm run dev   # la app, Next.js :3001
 cd web && npm run dev        # la web pública, Next.js :3002
 
-docker compose --profile dev up   # backend + postgres + redis + cloudflared (desde la raíz)
+docker compose --profile dev up   # backend + postgres + cloudflared (desde la raíz)
 scripts/backend-sim.sh            # backend-sim :3010, destino de los webhooks de Telnyx simulados (también desde un worktree)
 
 scripts/dev/instalar.sh           # una vez en el Mac: entorno de desarrollo fijo al iniciar sesión
@@ -167,7 +167,7 @@ backend/
 │                     #   en línea en dev (ver AGENTS.md § Background Jobs)
 ├── prisma/schema.prisma
 ├── scripts/          # scripts manuales (sincronizar assistants/prompts, demo, simulaciones)
-├── tests/            # Vitest (tests/integration/ aparte, contra Postgres/Redis reales)
+├── tests/            # Vitest (tests/integration/ aparte, contra el Postgres real)
 └── Dockerfile
 frontend/src/{app,components,lib,hooks}/   # la app (app.alhabla.ai)
 web/src/{app,components,lib,hooks}/        # la web pública (alhabla.ai); artículos en web/content/blog/*.mdx

@@ -2,35 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { readFileSync } from "node:fs";
 import Fastify from "fastify";
 
-// Cliente ioredis falso para el Redis de compatibilidad: decide cuándo llega
-// a «ready». El Redis principal y R2 se mockean enteros.
-const { creados, ajustes, FalsoRedis } = await vi.hoisted(async () => {
-  const creados: Array<{
-    url: string;
-    cliente: InstanceType<typeof FalsoRedis>;
-  }> = [];
-  /** Milisegundos hasta «ready» del próximo cliente. */
-  const ajustes = { msHastaListo: 0 };
-  const { EventEmitter: Emisor } = await import("node:events");
-  class FalsoRedis extends Emisor {
-    status = "wait";
-    quit = vi.fn().mockResolvedValue("OK");
-    disconnect = vi.fn();
-    connect = vi.fn(async () => {
-      setTimeout(() => {
-        this.status = "ready";
-        this.emit("ready");
-      }, ajustes.msHastaListo);
-    });
-    constructor(url: string) {
-      super();
-      creados.push({ url, cliente: this });
-    }
-  }
-  return { creados, ajustes, FalsoRedis };
-});
-
-vi.mock("ioredis", () => ({ default: FalsoRedis }));
+// R2 y el almacén de los contadores se mockean enteros.
 vi.mock("../../src/lib/storage.js", () => ({ initStorage: vi.fn() }));
 vi.mock("../../src/lib/almacenTemporal.js", () => ({
   incrementarContadores: vi.fn(),
@@ -40,10 +12,6 @@ import {
   iniciarServiciosExternos,
   registrarLimiteDePeticiones,
 } from "../../src/lib/arranqueDelServidor.js";
-import {
-  cerrarRedisDeCompatibilidad,
-  compatibilidadActiva,
-} from "../../src/lib/redisDeCompatibilidad.js";
 import { reiniciarEstadoDeLimitesParaTests } from "../../src/lib/limitesDePeticiones.js";
 import { initStorage } from "../../src/lib/storage.js";
 import {
@@ -58,8 +26,6 @@ function contestarCon(valor: number, ttlMs: number) {
       new Map(incrementos.map((i) => [i.clave, { valor, ttlMs }]))
   );
 }
-
-const URL_ORIGINAL = process.env.REDIS_URL;
 
 /** El código sin comentarios de bloque ni de línea (los de línea, solo los
  * que ocupan la línea entera o van tras `;`, `{` o `}`: una URL dentro de
@@ -97,52 +63,19 @@ function textoDeServer(): string {
 describe("arranque del servidor", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    creados.length = 0;
-    ajustes.msHastaListo = 0;
     reiniciarEstadoDeLimitesParaTests();
     vi.spyOn(console, "log").mockImplementation(() => {});
     vi.spyOn(console, "error").mockImplementation(() => {});
   });
-  afterEach(async () => {
-    await cerrarRedisDeCompatibilidad();
-    vi.useRealTimers();
+  afterEach(() => {
     vi.restoreAllMocks();
-    if (URL_ORIGINAL === undefined) delete process.env.REDIS_URL;
-    else process.env.REDIS_URL = URL_ORIGINAL;
   });
 
   describe("iniciarServiciosExternos", () => {
-    it("con REDIS_URL deja activo el doble cerrojo y no termina hasta que el Redis de compatibilidad está listo", async () => {
-      vi.useFakeTimers();
-      process.env.REDIS_URL = "redis://redis.interno:6379/0";
-      ajustes.msHastaListo = 200;
-
-      let terminado = false;
-      const promesa = iniciarServiciosExternos().then(() => {
-        terminado = true;
-      });
-      await vi.advanceTimersByTimeAsync(150);
-      // server.ts lo espera antes de `listen`: sin «ready» aún no hay tráfico.
-      expect(terminado).toBe(false);
-      await vi.advanceTimersByTimeAsync(100);
-      await promesa;
-
-      expect(terminado).toBe(true);
-      expect(compatibilidadActiva()).toBe(true);
-      expect(creados.map((c) => c.url)).toEqual([
-        "redis://redis.interno:6379/0",
-      ]);
-      expect(creados[0].cliente.status).toBe("ready");
-      expect(initStorage).toHaveBeenCalledTimes(1);
-    });
-
-    it("sin REDIS_URL los cerrojos van solo por Postgres", async () => {
-      delete process.env.REDIS_URL;
-
+    it("inicia R2", async () => {
       await iniciarServiciosExternos();
 
-      expect(compatibilidadActiva()).toBe(false);
-      expect(creados).toHaveLength(0);
+      expect(initStorage).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -210,16 +143,6 @@ describe("arranque del servidor", () => {
     expect(escuchar).toBeGreaterThan(limitador);
     // Ningún otro registro de @fastify/rate-limit que lo pise.
     expect(servidor).not.toContain("@fastify/rate-limit");
-  });
-
-  // Cerrarlo deja la revisión en «solo Postgres»: una adquisición que
-  // estuviera reintentando se concedería sin la clave de Redis, y una
-  // revisión anterior al PR A podría tener esa misma clave (dos poseedores).
-  // process.exit suelta el socket igualmente.
-  it("el apagado de server.ts no cierra el Redis de compatibilidad de los cerrojos", () => {
-    expect(sinComentarios(textoDeServer())).not.toContain(
-      "cerrarRedisDeCompatibilidad"
-    );
   });
 
   it("la comprobación de server.ts no se deja engañar por una llamada comentada, condicionada o en un bloque", () => {

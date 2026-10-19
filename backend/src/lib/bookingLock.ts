@@ -5,9 +5,7 @@ import {
 } from "./cerrojos.js";
 
 /** Primitiva genérica de lock distribuido. Desde el corte de Redis (PR A)
- * es un envoltorio de lib/cerrojos.ts: un arrendamiento en Postgres (más el
- * mismo cerrojo en Redis mientras la revisión tenga `REDIS_URL`, para
- * excluir a las revisiones viejas). Reintenta con una espera corta contra un
+ * es un envoltorio de lib/cerrojos.ts: un arrendamiento en Postgres. Reintenta con una espera corta contra un
  * PLAZO DE RELOJ real (no un nº fijo de intentos) y devuelve un token propio
  * de esta adquisición —para poder liberar solo el lock propio, nunca el de
  * otro poseedor— o null si no se consiguió dentro del presupuesto.
@@ -85,8 +83,7 @@ export async function releaseLock(key: string, token: string): Promise<void> {
 const BOOKING_LOCK_TTL_MS = 45_000;
 const BOOKING_LOCK_ACQUIRE_BUDGET_MS = 6_000;
 
-// La misma clave que usaban las revisiones anteriores al corte en Redis: en
-// modo compatibilidad las dos se excluyen porque cogen la misma clave.
+// La misma clave que usaban las revisiones anteriores al corte en Redis.
 function getBookingLockKey(businessId: string): string {
   return `booking_lock:${businessId}`;
 }

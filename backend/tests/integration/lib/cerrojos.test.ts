@@ -1,21 +1,13 @@
-import { describe, it, expect, beforeAll, beforeEach, afterAll } from "vitest";
-import Redis from "ioredis";
+import { describe, it, expect, beforeEach } from "vitest";
 import { prisma } from "../../../src/lib/prisma.js";
 import {
   adquirirCerrojo,
   liberarCerrojo,
   type ResultadoDeCerrojo,
 } from "../../../src/lib/cerrojos.js";
-import {
-  cerrarRedisDeCompatibilidad,
-  compatibilidadActiva,
-  conectarRedisDeCompatibilidad,
-} from "../../../src/lib/redisDeCompatibilidad.js";
 import { resetDb } from "../helpers/db.js";
 
-// Cerrojos contra Postgres real, en los dos modos en que puede correr una
-// revisión: «solo Postgres» (sin REDIS_URL, a partir de la fase 2 del corte)
-// y «Postgres + Redis» (modo compatibilidad, mientras exista REDIS_URL).
+// Cerrojos contra Postgres real.
 
 const esperar = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -35,38 +27,9 @@ function tokenDe(resultado: ResultadoDeCerrojo): string {
   return resultado.token;
 }
 
-const modos = [
-  {
-    nombre: "solo Postgres",
-    preparar: () => cerrarRedisDeCompatibilidad(),
-    conRedis: false,
-  },
-  {
-    nombre: "Postgres + Redis (compatibilidad)",
-    preparar: () => conectarRedisDeCompatibilidad(),
-    conRedis: true,
-  },
-];
-
-describe.each(modos)("cerrojos ($nombre)", ({ preparar, conRedis }) => {
-  // Para mirar qué hay en Redis sin pasar por el código probado.
-  let redis: Redis;
-
-  beforeAll(async () => {
-    await preparar();
-    redis = new Redis(process.env.REDIS_URL as string);
-  });
-  afterAll(async () => {
-    await redis.quit();
-    // Se deja el proceso como lo dejó setup.ts: en modo compatibilidad.
-    await conectarRedisDeCompatibilidad();
-  });
+describe("cerrojos (Postgres real)", () => {
   beforeEach(async () => {
     await resetDb();
-  });
-
-  it("está en el modo que dice", () => {
-    expect(compatibilidadActiva()).toBe(conRedis);
   });
 
   it("50 rondas de dos adquisiciones concurrentes de la misma clave: siempre gana exactamente una", async () => {
@@ -84,7 +47,6 @@ describe.each(modos)("cerrojos ($nombre)", ({ preparar, conRedis }) => {
       // El token que quedó en el almacén es el del ganador.
       const token = tokenDe(ganadores[0]);
       expect((await filaDe(clave))?.token).toBe(token);
-      if (conRedis) expect(await redis.get(clave)).toBe(token);
     }
   });
 
@@ -119,21 +81,18 @@ describe.each(modos)("cerrojos ($nombre)", ({ preparar, conRedis }) => {
 
     await liberarCerrojo(clave, viejo);
     expect((await filaDe(clave))?.token).toBe(nuevo);
-    if (conRedis) expect(await redis.get(clave)).toBe(nuevo);
     expect((await adquirirCerrojo(clave, 10_000, 0)).estado).toBe("ocupado");
   });
 
-  it("un token ajeno no libera (compare-and-delete); el propio sí, en los dos almacenes", async () => {
+  it("un token ajeno no libera (compare-and-delete); el propio sí", async () => {
     const clave = "prueba:ajeno";
     const token = tokenDe(await adquirirCerrojo(clave, 10_000, 0));
 
     await liberarCerrojo(clave, "token-de-otro");
     expect((await filaDe(clave))?.token).toBe(token);
-    if (conRedis) expect(await redis.get(clave)).toBe(token);
 
     await liberarCerrojo(clave, token);
     expect(await filaDe(clave)).toBeNull();
-    expect(await redis.get(clave)).toBeNull();
     expect((await adquirirCerrojo(clave, 10_000, 0)).estado).toBe("adquirido");
   });
 });

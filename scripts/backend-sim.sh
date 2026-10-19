@@ -6,7 +6,7 @@
 #   scripts/backend-sim.sh          # levantar
 #   scripts/backend-sim.sh parar    # parar y borrar el contenedor
 #
-# Usa el Postgres y el Redis que ya corren con el perfil dev (proyecto
+# Usa el Postgres que ya corre con el perfil dev (proyecto
 # `asistai`, BD botbook) sin recrearlos, y el .env del checkout principal.
 # Monta el backend/ del checkout desde el que se lanza: si ese worktree se
 # borra, hay que volver a lanzarlo desde otro.

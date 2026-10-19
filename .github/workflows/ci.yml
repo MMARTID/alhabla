@@ -49,7 +49,7 @@ jobs:
     defaults:
       run:
         working-directory: backend
-    # Estos tests corren contra Postgres y Redis DE VERDAD (no mocks): es la
+    # Estos tests corren contra Postgres DE VERDAD (no mocks): es la
     # única capa donde se comprueban el esquema real, las transacciones y la
     # caché de voz. Existían desde hacía tiempo pero no los ejecutaba nadie
     # salvo a mano, así que un fallo de esquema solo aparecía en producción.
@@ -67,15 +67,6 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 12
-      redis:
-        image: redis:7-alpine
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 12
     env:
       # En local estas variables salen de backend/.env.test, que está en
       # .gitignore. `tests/integration/setup.ts` carga ese fichero con dotenv
@@ -83,7 +74,6 @@ jobs:
       # el fichero no exista. El puerto es 5432 y no 5433: el 5433 de local
       # solo evita el choque con el Postgres de Homebrew.
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/alhabla_test
-      REDIS_URL: redis://localhost:6379/1
       # Valores de relleno, no secretos: estos tests no llaman a ningún
       # servicio externo.
       JWT_SECRET: ci-tests-de-integracion-sin-valor-real
