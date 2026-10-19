@@ -1,13 +1,12 @@
 import type { FastifyInstance } from "fastify";
 import rateLimit from "@fastify/rate-limit";
 import { initStorage } from "./storage.js";
-import { conectarRedisDeCompatibilidad } from "./redisDeCompatibilidad.js";
 import { AlmacenDeLimites } from "./limitesDePeticiones.js";
 import { enviosSimulados } from "./enviosSimulados.js";
 
 /**
- * Piezas del arranque de server.ts que deciden cómo se excluyen los cerrojos
- * y cómo se cuenta el límite de peticiones. Viven aquí y no en server.ts
+ * Piezas del arranque de server.ts: los servicios externos y cómo se cuenta
+ * el límite de peticiones. Viven aquí y no en server.ts
  * porque server.ts arranca el servidor al importarlo y ningún test puede
  * cargarlo (tests/lib/arranqueDelServidor.test.ts).
  */
@@ -15,12 +14,6 @@ import { enviosSimulados } from "./enviosSimulados.js";
 /**
  * Servicios externos que se inician ANTES de aceptar tráfico (server.ts lo
  * espera antes de `listen`).
- *
- * Mientras la revisión tenga REDIS_URL, los cerrojos se toman también en
- * Redis para excluir a las revisiones anteriores al corte (que solo conocen
- * Redis). Se espera hasta 3 s a que el cliente esté listo; si no llega, se
- * arranca igual y los cerrojos fallan cerrados hasta que conecte, nunca se
- * quedan en «solo Postgres» (lib/redisDeCompatibilidad.ts).
  */
 export async function iniciarServiciosExternos(): Promise<void> {
   if (enviosSimulados()) {
@@ -33,7 +26,6 @@ export async function iniciarServiciosExternos(): Promise<void> {
     );
   }
   initStorage();
-  await conectarRedisDeCompatibilidad();
 }
 
 /**

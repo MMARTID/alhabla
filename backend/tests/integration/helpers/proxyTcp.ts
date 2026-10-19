@@ -1,9 +1,8 @@
 import net from "node:net";
 
 /**
- * Proxy TCP entre un cliente y el Redis (o el Postgres) real de los tests,
- * para provocar de verdad lo que en producción haría un Memorystore o un
- * Cloud SQL lento o caído:
+ * Proxy TCP entre un cliente y el Postgres real de los tests, para provocar
+ * de verdad lo que en producción haría un Cloud SQL lento o caído:
  * - `retrasar(ms)`: lo que manda el cliente llega al servidor `ms` más tarde
  *   (en orden).
  * - `retrasarRespuestas(ms)`: lo que contesta el servidor llega al cliente
@@ -112,15 +111,4 @@ export function crearProxyTcp(destino: { host: string; port: number }) {
         servidor.close(() => resolve());
       }),
   };
-}
-
-/** `REDIS_URL` que pasa por el proxy, con el mismo índice de base de datos. */
-export function urlAtravesDelProxy(urlReal: string, puerto: number): string {
-  const real = new URL(urlReal);
-  return `redis://127.0.0.1:${puerto}${real.pathname}`;
-}
-
-export function destinoDe(urlReal: string): { host: string; port: number } {
-  const real = new URL(urlReal);
-  return { host: real.hostname, port: Number(real.port || 6379) };
 }

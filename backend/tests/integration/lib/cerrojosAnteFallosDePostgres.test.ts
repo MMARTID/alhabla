@@ -15,13 +15,9 @@ import {
   releaseBookingLock,
   releaseLock,
 } from "../../../src/lib/bookingLock.js";
-import {
-  cerrarRedisDeCompatibilidad,
-  conectarRedisDeCompatibilidad,
-} from "../../../src/lib/redisDeCompatibilidad.js";
 import { resetDb } from "../helpers/db.js";
 
-// Cerrojos en modo «solo Postgres» (el de la fase 2, sin REDIS_URL) contra el
+// Cerrojos contra el
 // Postgres real a través de un proxy TCP: un corte de las conexiones del pool
 // y respuestas que llegan tarde, con `connection_limit=2` como producción.
 
@@ -56,10 +52,9 @@ async function tokensDe(clave: string): Promise<string[]> {
   return filas.map((f) => f.token);
 }
 
-describe("cerrojos ante fallos de Postgres (solo Postgres, Postgres real)", () => {
+describe("cerrojos ante fallos de Postgres (Postgres real)", () => {
   beforeAll(async () => {
     await resetDb();
-    await cerrarRedisDeCompatibilidad();
   });
   afterEach(() => {
     vi.restoreAllMocks();
@@ -70,8 +65,6 @@ describe("cerrojos ante fallos de Postgres (solo Postgres, Postgres real)", () =
     await prisma.$disconnect();
     await directo.$disconnect();
     await proxy.cerrar();
-    // Se deja el proceso como lo dejó setup.ts.
-    await conectarRedisDeCompatibilidad();
   });
 
   it("con Postgres inalcanzable un momento, acquireBookingLock reintenta dentro de su presupuesto y lo consigue", async () => {

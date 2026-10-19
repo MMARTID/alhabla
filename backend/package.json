@@ -44,7 +44,6 @@
     "google-auth-library": "^10.9.0",
     "googleapis": "^173.0.0",
     "ical.js": "^2.2.1",
-    "ioredis": "^5.3.6",
     "jsonwebtoken": "^9.0.3",
     "stripe": "^22.4.0",
     "telnyx": "^7.24.0",

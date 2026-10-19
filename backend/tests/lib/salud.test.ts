@@ -8,19 +8,19 @@ const mal = () => Promise.reject(new Error("caído"));
 describe("comprobarSalud (GET /health)", () => {
   it("con todo bien, sale sano y lista cada dependencia", async () => {
     const resultado = await comprobarSalud({
-      criticas: { postgres: bien, redis: bien },
+      criticas: { postgres: bien },
       informativas: { telnyx: bien },
     });
 
     expect(resultado).toEqual({
       healthy: true,
-      dependencies: { postgres: "ok", redis: "ok", telnyx: "ok" },
+      dependencies: { postgres: "ok", telnyx: "ok" },
     });
   });
 
   it("si cae Telnyx lo dice, pero sigue sano: el deploy no debe revertir por él", async () => {
     const resultado = await comprobarSalud({
-      criticas: { postgres: bien, redis: bien },
+      criticas: { postgres: bien },
       informativas: { telnyx: mal },
     });
 
@@ -28,9 +28,9 @@ describe("comprobarSalud (GET /health)", () => {
     expect(resultado.dependencies).toMatchObject({ telnyx: "unhealthy" });
   });
 
-  it.each(["postgres", "redis"])("si cae %s, no está sano", async (critica) => {
+  it.each(["postgres"])("si cae %s, no está sano", async (critica) => {
     const resultado = await comprobarSalud({
-      criticas: { postgres: bien, redis: bien, [critica]: mal },
+      criticas: { postgres: bien, [critica]: mal },
       informativas: { telnyx: bien },
     });
 
@@ -40,11 +40,11 @@ describe("comprobarSalud (GET /health)", () => {
 
   it("sin claves de proveedores, solo salen las críticas", async () => {
     const resultado = await comprobarSalud({
-      criticas: { postgres: bien, redis: bien },
+      criticas: { postgres: bien },
       informativas: {},
     });
 
-    expect(resultado.dependencies).toEqual({ postgres: "ok", redis: "ok" });
+    expect(resultado.dependencies).toEqual({ postgres: "ok" });
   });
 });
 
@@ -108,16 +108,16 @@ describe("conMemoria (Telnyx en /health)", () => {
     await conCache().catch(() => {});
 
     const resultado = await comprobarSalud({
-      criticas: { postgres: bien, redis: bien },
+      criticas: { postgres: bien },
       informativas: { telnyx: conCache },
     });
     expect(resultado).toEqual({
       healthy: true,
-      dependencies: { postgres: "ok", redis: "ok", telnyx: "unhealthy" },
+      dependencies: { postgres: "ok", telnyx: "unhealthy" },
     });
   });
 
-  it("GET /health pregunta a Telnyx con memoria, y a Postgres y Redis en cada consulta", () => {
+  it("GET /health pregunta a Telnyx con memoria, y a Postgres en cada consulta; Redis ya no cuenta", () => {
     const servidor = readFileSync(
       new URL("../../src/server.ts", import.meta.url),
       "utf8"
@@ -126,5 +126,6 @@ describe("conMemoria (Telnyx en /health)", () => {
     expect(servidor).not.toContain("retellAdapter");
     expect(servidor).not.toMatch(/informativas\.\w+ = \(\) =>/);
     expect(servidor).toContain("postgres: () => prisma.$queryRaw`SELECT 1`");
+    expect(servidor).not.toMatch(/redis/i);
   });
 });

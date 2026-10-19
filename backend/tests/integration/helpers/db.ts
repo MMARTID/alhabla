@@ -1,12 +1,11 @@
 import { prisma } from "../../../src/lib/prisma.js";
-import Redis from "ioredis";
 import { comprobarEntornoDeTest } from "./entornoDeTest.js";
 
 /**
  * Limpia todas las tablas que tocan los tests de integración, en orden
- * seguro para las foreign keys (hijos antes que padres), y vacía el índice
- * de Redis de test (el de los cerrojos en modo compatibilidad). Llamar en un beforeEach para que los tests no dependan
- * del orden ni se contaminen entre sí.
+ * seguro para las foreign keys (hijos antes que padres). Llamar en un
+ * beforeEach para que los tests no dependan del orden ni se contaminen entre
+ * sí.
  */
 export async function resetDb(): Promise<void> {
   // Segunda barrera, por si alguien llama a resetDb sin pasar por setup.ts.
@@ -45,17 +44,4 @@ export async function resetDb(): Promise<void> {
     prisma.user.deleteMany(),
     prisma.business.deleteMany(),
   ]);
-
-  // Con su propio cliente: el de los cerrojos puede estar cerrado (los tests
-  // de «solo Postgres») y sus claves seguirían vivas al volver a abrirlo.
-  await redisParaVaciar()?.flushdb();
-}
-
-let redisDeTest: Redis | null = null;
-
-function redisParaVaciar(): Redis | null {
-  const url = process.env.REDIS_URL;
-  if (!url) return null;
-  redisDeTest ??= new Redis(url, { maxRetriesPerRequest: 1 });
-  return redisDeTest;
 }

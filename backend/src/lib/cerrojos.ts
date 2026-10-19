@@ -1,12 +1,6 @@
 import { randomBytes } from "node:crypto";
 import { prisma } from "./prisma.js";
 import { errorMessage } from "./logUtils.js";
-import {
-  cerrojoEnRedisAntiguo,
-  compatibilidadActiva,
-  redisDeCompatibilidadListo,
-  soltarEnRedisAntiguo,
-} from "./redisDeCompatibilidad.js";
 
 /**
  * Arrendamientos de exclusión mutua en Postgres (tabla `cerrojos`), en lugar
@@ -18,11 +12,6 @@ import {
  * reloj de ninguna instancia. El `INSERT … ON CONFLICT DO UPDATE … WHERE`
  * bloquea la fila y reevalúa el WHERE sobre la versión confirmada, así que
  * con dos adquisiciones a la vez nunca ganan las dos.
- *
- * Mientras la revisión tenga `REDIS_URL` (lib/redisDeCompatibilidad.ts), el
- * cerrojo se toma además en Redis con la misma clave, para excluir a las
- * revisiones viejas que solo conocen Redis. Si Redis no lo confirma, se borra
- * la fila propia y no se concede.
  */
 
 export type ResultadoDeCerrojo =
@@ -178,18 +167,14 @@ async function borrarInciertos(
   }
 }
 
-const SIN_CONEXION = "el Redis de compatibilidad no está conectado";
-const INCIERTO = "el Redis de compatibilidad no confirmó";
-
 /**
  * Intenta coger el cerrojo hasta agotar `presupuestoMs` (plazo de reloj
  * local), con una espera de 300 ms entre intentos. El plazo se comprueba
  * DESPUÉS de cada intento: con presupuesto 0 se hace exactamente uno. Cada
- * intento lleva un token nuevo: un compare-and-delete compensatorio de un
- * intento anterior (que puede salir tarde, al reconectar Redis) nunca puede
- * borrar el cerrojo que coja uno posterior. Si la sentencia de un intento
- * falla sin probar que no se ejecutó (un P1017, por ejemplo), Postgres pudo
- * confirmarla: la fila de ese token se borra antes del siguiente intento y
+ * intento lleva un token nuevo: el borrado de la fila de un intento
+ * anterior nunca puede borrar el cerrojo que coja uno posterior. Si la
+ * sentencia de un intento falla sin probar que no se ejecutó (un P1017, por
+ * ejemplo), Postgres pudo confirmarla: la fila de ese token se borra antes del siguiente intento y
  * antes de rendirse; si no se puede, queda ocupada hasta que caduque, con
  * log.
  *
@@ -198,13 +183,10 @@ const INCIERTO = "el Redis de compatibilidad no confirmó";
  *   de un intento propio incierto que no se pudo borrar).
  * - `error`: la sentencia falló con un error que no es de conexión (en el
  *   acto, sin reintentar), o ningún intento fue concluyente en todo el
- *   presupuesto: sin conexión con Postgres, una respuesta que tardó 12 s o
- *   medio TTL (`llegoTarde`) o, en modo compatibilidad, Redis sin confirmar
- *   (cliente reconectando, plazo vencido). Falla cerrado: quien llama no
- *   entra en la sección crítica. Un corte breve (una conexión del pool que
- *   se cerró, o el Redis de compatibilidad, que reconecta en 200-600 ms)
- *   cabe en el presupuesto de las reservas (6 s) y no llega a fallar, como
- *   no fallaba con la cola offline de las revisiones viejas; con
+ *   presupuesto: sin conexión con Postgres o una respuesta que tardó 12 s o
+ *   medio TTL (`llegoTarde`). Falla cerrado: quien llama no entra en la
+ *   sección crítica. Un corte breve (una conexión del pool que se cerró)
+ *   cabe en el presupuesto de las reservas (6 s) y no llega a fallar; con
  *   presupuesto 0 sí falla en el acto.
  *
  * El presupuesto no acota la espera de un intento: cada uno pide conexión al
@@ -233,38 +215,23 @@ export async function adquirirCerrojo(
     // Por qué el último intento no fue concluyente.
     let inconcluso: string | null = null;
 
-    if (compatibilidadActiva() && !redisDeCompatibilidadListo()) {
-      // Sin cliente listo no se toca Postgres: no se concedería igualmente.
-      inconcluso = SIN_CONEXION;
-    } else {
-      // Antes de reintentar: si no, la fila de un intento incierto que
-      // Postgres sí confirmó dejaría este intento en «ocupado».
-      await borrarInciertos(clave, inciertos);
-      const enPostgres = await intentarEnPostgres(clave, token, ttlMs);
-      if ("filaIncierta" in enPostgres && enPostgres.filaIncierta) {
-        inciertos.push(token);
-      }
-      if (enPostgres.estado === "error") {
-        await borrarInciertos(clave, inciertos);
-        console.error(
-          `[Cerrojo] No se pudo coger ${clave}: ${enPostgres.motivo}`
-        );
-        return { estado: "error", motivo: enPostgres.motivo };
-      }
-      if (enPostgres.estado === "inconcluso") inconcluso = enPostgres.motivo;
-
-      if (enPostgres.estado === "concedido") {
-        if (!compatibilidadActiva()) return { estado: "adquirido", token };
-
-        const enRedis = await cerrojoEnRedisAntiguo(clave, token, ttlMs);
-        if (enRedis === "adquirido") return { estado: "adquirido", token };
-
-        // Redis no lo confirma: la fila propia se borra.
-        await borrarSinLanzar(clave, token);
-        if (enRedis === "sin_conexion") inconcluso = SIN_CONEXION;
-        if (enRedis === "incierto") inconcluso = INCIERTO;
-      }
+    // Antes de reintentar: si no, la fila de un intento incierto que
+    // Postgres sí confirmó dejaría este intento en «ocupado».
+    await borrarInciertos(clave, inciertos);
+    const enPostgres = await intentarEnPostgres(clave, token, ttlMs);
+    if ("filaIncierta" in enPostgres && enPostgres.filaIncierta) {
+      inciertos.push(token);
     }
+    if (enPostgres.estado === "error") {
+      await borrarInciertos(clave, inciertos);
+      console.error(
+        `[Cerrojo] No se pudo coger ${clave}: ${enPostgres.motivo}`
+      );
+      return { estado: "error", motivo: enPostgres.motivo };
+    }
+    if (enPostgres.estado === "concedido")
+      return { estado: "adquirido", token };
+    if (enPostgres.estado === "inconcluso") inconcluso = enPostgres.motivo;
 
     if (Date.now() >= plazo) {
       await borrarInciertos(clave, inciertos);
@@ -289,9 +256,6 @@ export async function liberarCerrojo(
   clave: string,
   token: string
 ): Promise<void> {
-  if (compatibilidadActiva()) {
-    await soltarEnRedisAntiguo(clave, token);
-  }
   try {
     await borrarEnPostgres(clave, token);
   } catch (err) {

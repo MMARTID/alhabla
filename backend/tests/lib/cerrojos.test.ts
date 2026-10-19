@@ -1,29 +1,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { adquirirCerrojo, liberarCerrojo } from "../../src/lib/cerrojos.js";
 import { prisma } from "../../src/lib/prisma.js";
-import {
-  cerrojoEnRedisAntiguo,
-  compatibilidadActiva,
-  redisDeCompatibilidadListo,
-  soltarEnRedisAntiguo,
-} from "../../src/lib/redisDeCompatibilidad.js";
 
 vi.mock("../../src/lib/prisma.js", () => ({
   prisma: { $queryRaw: vi.fn(), $executeRaw: vi.fn() },
 }));
-vi.mock("../../src/lib/redisDeCompatibilidad.js", () => ({
-  compatibilidadActiva: vi.fn(),
-  redisDeCompatibilidadListo: vi.fn(),
-  cerrojoEnRedisAntiguo: vi.fn(),
-  soltarEnRedisAntiguo: vi.fn(),
-}));
 
 const queryRaw = vi.mocked(prisma.$queryRaw);
 const executeRaw = vi.mocked(prisma.$executeRaw);
-const compat = vi.mocked(compatibilidadActiva);
-const listo = vi.mocked(redisDeCompatibilidadListo);
-const enRedis = vi.mocked(cerrojoEnRedisAntiguo);
-const soltar = vi.mocked(soltarEnRedisAntiguo);
 
 /** SQL de una llamada a la plantilla etiquetada ($queryRaw`...`). */
 function sqlDe(llamada: unknown[]): string {
@@ -35,10 +19,9 @@ function sqlDe(llamada: unknown[]): string {
 const libre = (token = "t") => [{ token }];
 const ocupada: never[] = [];
 
-describe("adquirirCerrojo (solo Postgres)", () => {
+describe("adquirirCerrojo", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    compat.mockReturnValue(false);
     executeRaw.mockResolvedValue(1 as never);
   });
   afterEach(() => {
@@ -67,7 +50,6 @@ describe("adquirirCerrojo (solo Postgres)", () => {
       llamada[2]
     );
     expect(llamada[3]).toBe(45_000);
-    expect(enRedis).not.toHaveBeenCalled();
   });
 
   it("reintenta cada 300 ms mientras está ocupado y lo consigue cuando se libera", async () => {
@@ -383,10 +365,9 @@ describe("adquirirCerrojo (solo Postgres)", () => {
   });
 });
 
-describe("liberarCerrojo (solo Postgres)", () => {
+describe("liberarCerrojo", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    compat.mockReturnValue(false);
   });
 
   it("libera con compare-and-delete: borra la clave solo con el token propio", async () => {
@@ -399,7 +380,6 @@ describe("liberarCerrojo (solo Postgres)", () => {
       /DELETE FROM "cerrojos" WHERE "clave" = \? AND "token" = \?/
     );
     expect(llamada.slice(1)).toEqual(["booking_lock:biz_1", "token-abc"]);
-    expect(soltar).not.toHaveBeenCalled();
   });
 
   it("liberar nunca lanza: si la BD falla lo deja en el log (quedará ocupado hasta que caduque)", async () => {
@@ -411,193 +391,5 @@ describe("liberarCerrojo (solo Postgres)", () => {
       expect.stringContaining("quedará ocupado hasta que caduque")
     );
     consola.mockRestore();
-  });
-});
-
-describe("modo compatibilidad (REDIS_URL): el cerrojo se toma también en Redis", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    compat.mockReturnValue(true);
-    listo.mockReturnValue(true);
-    executeRaw.mockResolvedValue(1 as never);
-  });
-  afterEach(() => {
-    vi.useRealTimers();
-  });
-
-  it("adquirido en los dos ⇒ adquirido, con el mismo token en Redis", async () => {
-    queryRaw.mockResolvedValueOnce(libre() as never);
-    enRedis.mockResolvedValueOnce("adquirido");
-
-    const resultado = await adquirirCerrojo("booking_lock:biz_1", 45_000, 0);
-
-    expect(resultado.estado).toBe("adquirido");
-    const token = resultado.estado === "adquirido" ? resultado.token : "";
-    expect(enRedis).toHaveBeenCalledWith("booking_lock:biz_1", token, 45_000);
-    expect(executeRaw).not.toHaveBeenCalled();
-  });
-
-  it("Redis «ocupado» (lo tiene una revisión vieja) ⇒ borra la fila propia y reintenta", async () => {
-    vi.useFakeTimers();
-    queryRaw.mockResolvedValue(libre() as never);
-    enRedis.mockResolvedValueOnce("ocupado").mockResolvedValueOnce("adquirido");
-
-    const promesa = adquirirCerrojo("k", 45_000, 6_000);
-    await vi.advanceTimersByTimeAsync(0);
-    // La fila propia se borra con su token, para no bloquear a nadie.
-    expect(executeRaw).toHaveBeenCalledTimes(1);
-    const token = queryRaw.mock.calls[0][2];
-    expect(executeRaw.mock.calls[0].slice(1)).toEqual(["k", token]);
-    await vi.advanceTimersByTimeAsync(300);
-
-    expect((await promesa).estado).toBe("adquirido");
-    expect(queryRaw).toHaveBeenCalledTimes(2);
-    expect(enRedis).toHaveBeenCalledTimes(2);
-  });
-
-  it("Redis «ocupado» durante todo el presupuesto ⇒ «ocupado», nunca adquirido", async () => {
-    vi.useFakeTimers();
-    queryRaw.mockResolvedValue(libre() as never);
-    enRedis.mockResolvedValue("ocupado");
-
-    const promesa = adquirirCerrojo("k", 45_000, 1_000);
-    await vi.runAllTimersAsync();
-
-    expect(await promesa).toEqual({ estado: "ocupado" });
-    // Cada intento ganado en Postgres se deshace.
-    expect(executeRaw).toHaveBeenCalledTimes(queryRaw.mock.calls.length);
-  });
-
-  it("Redis «incierto» (plazo vencido) ⇒ borra la fila y, al acabar el plazo, «error»", async () => {
-    vi.useFakeTimers();
-    const consola = vi.spyOn(console, "error").mockImplementation(() => {});
-    queryRaw.mockResolvedValue(libre() as never);
-    enRedis.mockResolvedValue("incierto");
-
-    const promesa = adquirirCerrojo("k", 45_000, 600);
-    await vi.runAllTimersAsync();
-    const resultado = await promesa;
-
-    expect(resultado.estado).toBe("error");
-    expect(executeRaw).toHaveBeenCalledTimes(queryRaw.mock.calls.length);
-    expect(consola).toHaveBeenCalledWith(
-      expect.stringContaining("falla cerrado")
-    );
-    consola.mockRestore();
-  });
-
-  it("si el último intento fue «ocupado» tras uno «incierto», acaba en «ocupado»", async () => {
-    vi.useFakeTimers();
-    queryRaw
-      .mockResolvedValueOnce(libre() as never)
-      .mockResolvedValueOnce(ocupada as never);
-    enRedis.mockResolvedValueOnce("incierto");
-
-    const promesa = adquirirCerrojo("k", 45_000, 300);
-    await vi.runAllTimersAsync();
-
-    expect(await promesa).toEqual({ estado: "ocupado" });
-  });
-
-  it("Redis «sin_conexion» (reconectando) ⇒ borra la fila propia y reintenta; si vuelve dentro del presupuesto, adquirido", async () => {
-    vi.useFakeTimers();
-    queryRaw.mockResolvedValue(libre() as never);
-    enRedis
-      .mockResolvedValueOnce("sin_conexion")
-      .mockResolvedValueOnce("adquirido");
-
-    const promesa = adquirirCerrojo("booking_lock:biz_1", 45_000, 6_000);
-    await vi.advanceTimersByTimeAsync(0);
-    expect(executeRaw).toHaveBeenCalledTimes(1);
-    await vi.advanceTimersByTimeAsync(300);
-
-    expect((await promesa).estado).toBe("adquirido");
-    expect(queryRaw).toHaveBeenCalledTimes(2);
-  });
-
-  it("con el cliente de compatibilidad sin conectar no se toca Postgres; si no vuelve en todo el presupuesto, «error» (falla cerrado)", async () => {
-    vi.useFakeTimers();
-    const consola = vi.spyOn(console, "error").mockImplementation(() => {});
-    listo.mockReturnValue(false);
-
-    const promesa = adquirirCerrojo("booking_lock:biz_1", 45_000, 1_000);
-    await vi.runAllTimersAsync();
-
-    expect(await promesa).toEqual({
-      estado: "error",
-      motivo: "el Redis de compatibilidad no está conectado",
-    });
-    expect(queryRaw).not.toHaveBeenCalled();
-    expect(enRedis).not.toHaveBeenCalled();
-    expect(consola).toHaveBeenCalledWith(
-      expect.stringContaining("falla cerrado")
-    );
-    consola.mockRestore();
-  });
-
-  it("con el cliente de compatibilidad reconectando espera 300 ms y lo consigue en cuanto vuelve", async () => {
-    vi.useFakeTimers();
-    listo.mockReturnValueOnce(false).mockReturnValue(true);
-    queryRaw.mockResolvedValue(libre() as never);
-    enRedis.mockResolvedValue("adquirido");
-
-    const promesa = adquirirCerrojo("booking_lock:biz_1", 45_000, 6_000);
-    await vi.advanceTimersByTimeAsync(0);
-    expect(queryRaw).not.toHaveBeenCalled();
-    await vi.advanceTimersByTimeAsync(300);
-
-    expect((await promesa).estado).toBe("adquirido");
-    expect(queryRaw).toHaveBeenCalledTimes(1);
-  });
-
-  it("con presupuesto 0 y Redis sin conectar, «error» en el acto y sin esperar", async () => {
-    vi.useFakeTimers();
-    const consola = vi.spyOn(console, "error").mockImplementation(() => {});
-    listo.mockReturnValue(false);
-
-    const resultado = await adquirirCerrojo("k", 60_000, 0);
-
-    expect(resultado.estado).toBe("error");
-    expect(vi.getTimerCount()).toBe(0);
-    consola.mockRestore();
-  });
-
-  it("cada intento lleva un token nuevo: la compensación de un intento «incierto» no puede borrar el siguiente", async () => {
-    vi.useFakeTimers();
-    vi.spyOn(console, "error").mockImplementation(() => {});
-    queryRaw.mockResolvedValue(libre() as never);
-    enRedis
-      .mockResolvedValueOnce("incierto")
-      .mockResolvedValueOnce("adquirido");
-
-    const promesa = adquirirCerrojo("k", 45_000, 6_000);
-    await vi.advanceTimersByTimeAsync(300);
-    const resultado = await promesa;
-
-    expect(resultado.estado).toBe("adquirido");
-    const [primero, segundo] = enRedis.mock.calls.map((c) => c[1]);
-    expect(primero).not.toBe(segundo);
-    expect(resultado.estado === "adquirido" && resultado.token).toBe(segundo);
-    // La fila del primer intento se borró con su propio token.
-    expect(executeRaw.mock.calls[0].slice(1)).toEqual(["k", primero]);
-    vi.mocked(console.error).mockRestore();
-  });
-
-  it("si Postgres no lo concede, no se pregunta a Redis", async () => {
-    queryRaw.mockResolvedValue(ocupada as never);
-
-    await adquirirCerrojo("k", 45_000, 0);
-
-    expect(enRedis).not.toHaveBeenCalled();
-  });
-
-  it("al liberar borra en los dos almacenes con el mismo token", async () => {
-    await liberarCerrojo("booking_lock:biz_1", "token-abc");
-
-    expect(soltar).toHaveBeenCalledWith("booking_lock:biz_1", "token-abc");
-    expect(executeRaw.mock.calls[0].slice(1)).toEqual([
-      "booking_lock:biz_1",
-      "token-abc",
-    ]);
   });
 });

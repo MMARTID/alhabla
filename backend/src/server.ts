@@ -30,7 +30,6 @@ import { contactoRoutes } from "./modules/contacto/routes.js";
 import { webhooksTelnyxRoutes } from "./modules/webhooksTelnyx/routes.js";
 import { telnyxAdapter } from "./adapters/telnyx/TelnyxAdapter.js";
 import { comprobarSalud, conMemoria } from "./lib/salud.js";
-import { pingDeRedisDeCompatibilidad } from "./lib/redisDeCompatibilidad.js";
 import { comprobarClaveDeCifrado } from "./lib/cifradoDeCredenciales.js";
 import { origenesPermitidos } from "./lib/urls.js";
 import { confianzaEnProxies } from "./lib/proxyDeConfianza.js";
@@ -95,10 +94,7 @@ async function start() {
   try {
     // Initialize external services
     console.log("[Server] Initializing external services...");
-    // R2 y, con REDIS_URL, el Redis de compatibilidad de los cerrojos: se
-    // espera hasta 3 s a que esté listo; si no llega, se arranca igual y
-    // los cerrojos fallan cerrados hasta que conecte
-    // (lib/arranqueDelServidor.ts).
+    // R2 (lib/arranqueDelServidor.ts).
     await iniciarServiciosExternos();
 
     // Register plugins
@@ -185,14 +181,9 @@ async function start() {
       if (process.env.TELNYX_API_KEY) {
         informativas.telnyx = comprobarTelnyx;
       }
-      // Redis solo cuenta mientras haya REDIS_URL, y por el cliente de los
-      // cerrojos (lib/redisDeCompatibilidad.ts): sin él, las reservas fallan
-      // cerradas. Desde la fase 2 del corte deja de salir aquí.
       const criticas: Record<string, () => Promise<unknown>> = {
         postgres: () => prisma.$queryRaw`SELECT 1`,
       };
-      const redis = pingDeRedisDeCompatibilidad();
-      if (redis) criticas.redis = redis;
       const { healthy, dependencies } = await comprobarSalud({
         criticas,
         informativas,
@@ -283,11 +274,6 @@ async function apagar(senal: string) {
   } catch (error) {
     console.error("[Server] Error al cerrar Fastify:", error);
   }
-  // El Redis de compatibilidad de los cerrojos no se cierra: cerrarlo deja
-  // la revisión en «solo Postgres», y una adquisición que aún estuviera
-  // reintentando se concedería sin la clave de Redis (con una revisión
-  // anterior al PR A en marcha, dos poseedores). process.exit suelta su
-  // socket igualmente.
   try {
     await cerrarConexionDelLimitador();
   } catch (error) {
