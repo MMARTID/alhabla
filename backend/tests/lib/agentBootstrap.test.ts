@@ -53,7 +53,7 @@ const mockedBusinessUpdate = vi.mocked(prisma.business.update);
 const mockedTelnyxCreateAssistant = vi.mocked(telnyxAiAdapter.createAssistant);
 const mockedTelnyxListVoices = vi.mocked(telnyxAiAdapter.listVoices);
 
-// Desde el 17-10 no hay Retell (PLAN-RETIRAR-RETELL.md): el alta crea la
+// Desde el 17-10 no hay Retell (docs/historico/PLAN-RETIRAR-RETELL.md): el alta crea la
 // fila Agent y el assistant de Telnyx, siempre.
 describe("createBusinessAgent", () => {
   beforeEach(() => {

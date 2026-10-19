@@ -13,9 +13,8 @@ cachés y claves de un solo uso; Redis solo queda como espejo de los cerrojos mi
 `app.alhabla.ai`, TanStack Query, sesión JWT en `localStorage`) y **la web pública** en `web/`
 (puerto 3002, `alhabla.ai`: landing, sectores, planes, legal, registro de cuenta y blog en MDX,
 sin sesión). El registro crea la cuenta en la web y entra en la app con un pase de un solo uso
-(`POST /auth/pase/canjear`). Voz vía **Telnyx AI Assistants** (el único orquestador: Retell.ai,
-el respaldo que nunca cogió una llamada, se retiró el 2026-10-17, `PLAN-RETIRAR-RETELL.md`);
-telefonía y WhatsApp por Telnyx, pagos Stripe.
+(`POST /auth/pase/canjear`). Voz vía **Telnyx AI Assistants**; telefonía y WhatsApp por Telnyx,
+pagos Stripe.
 
 **Producción** (desde 2026-09-01): backend en Google Cloud Run, **un solo servicio**,
 `alhabla-api` (`https://api.alhabla.ai`, tráfico público). Los jobs en segundo plano (antes

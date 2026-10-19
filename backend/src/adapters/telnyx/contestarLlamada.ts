@@ -4,7 +4,7 @@ import { callLabel, errorMessage } from "../../lib/logUtils.js";
 
 /**
  * Contestar una llamada con el assistant, reintentando lo que se arregla
- * solo (PLAN-RETIRAR-RETELL.md, PR 4). Hasta el 17-10 cualquier fallo del
+ * solo (docs/historico/PLAN-RETIRAR-RETELL.md, PR 4). Hasta el 17-10 cualquier fallo del
  * `answer` dejaba la llamada sonando hasta que el cliente colgaba: la ruta
  * respondía 404 y nadie se enteraba. Lo que sí pasa con Telnyx son 5xx
  * intermitentes de la API v2 (23-09, 2 h, status.telnyx.com), y un 5xx se

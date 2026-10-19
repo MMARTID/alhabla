@@ -64,7 +64,7 @@ describe("cleanupZombieCallsJob", () => {
   });
 });
 
-// PLAN-RETIRAR-RETELL.md, PR 5: lo vigila la alerta de voz por su «[Salud]».
+// docs/historico/PLAN-RETIRAR-RETELL.md, PR 5: lo vigila la alerta de voz por su «[Salud]».
 describe("avisarDeLlamadasSinResultado", () => {
   const ahora = new Date("2026-10-17T12:00:00Z");
 

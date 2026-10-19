@@ -100,7 +100,7 @@ describe("provisionPhoneNumber", () => {
   });
 
   // El número va al Call Control App y queda activo al comprarlo
-  // (PLAN-RETIRAR-RETELL.md).
+  // (docs/historico/PLAN-RETIRAR-RETELL.md).
   it("compra un número en el Call Control App y lo deja activo en Telnyx", async () => {
     mockedBusinessFindUnique.mockResolvedValue({
       id: businessId,

@@ -183,8 +183,8 @@ describe("DetalleDeLlamada", () => {
           callId: "call_1",
           fullText: "texto completo",
           messages: [
-            { role: "user", content: "Hola, quiero reservar" },
-            { role: "assistant", content: "Claro, ¿qué día te viene bien?" },
+            { role: "user", text: "Hola, quiero reservar" },
+            { role: "assistant", text: "Claro, ¿qué día te viene bien?" },
           ],
           createdAt: "2026-09-04T10:00:00Z",
         },

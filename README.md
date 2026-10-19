@@ -8,8 +8,7 @@ también por WhatsApp con el dueño y con sus clientes.
 
 ## Características principales
 
-- **Recepcionista de voz** orquestada por **Telnyx AI Assistants**, el único orquestador desde
-  que Retell.ai se retiró el 2026-10-17 (`PLAN-RETIRAR-RETELL.md`). Multilingüe: castellano por
+- **Recepcionista de voz** orquestada por **Telnyx AI Assistants**. Multilingüe: castellano por
   defecto, la cooficial de la zona (catalán, euskera o gallego) e inglés, francés, alemán,
   italiano, portugués, neerlandés y ruso si el cliente los usa.
 - **Personalización por tipo de negocio**: el prompt incluye instrucciones propias de cada nicho
@@ -302,7 +301,6 @@ Lo que el asistente deje a medias lo completa el Gestor por WhatsApp («empezamo
 
 - `AGENTS.md` — referencia detallada para agentes de IA y desarrolladores.
 - `PLAN-CANAL-DUENO.md` — el canal de WhatsApp: decisiones, fases y estado.
-- `PLAN-RETIRAR-RETELL.md` — la retirada de Retell y las protecciones de Telnyx que la sustituyen.
 - `PLAN-WHATSAPP-COEXISTENCIA.md` — los mensajes a los clientes desde el WhatsApp Business que el negocio ya usa.
 - `docs/historico/` — planes cerrados o descartados:
   - `docs/historico/PLAN-APP-DOMINIO.md` — el reparto entre la web pública y la app.

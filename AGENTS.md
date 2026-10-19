@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-Alhabla is a multi-tenant SaaS platform that provides AI-powered voice receptionists for small businesses in Spain (hair salons, barbershops, physiotherapy clinics, beauty centers, etc.). Each business gets a voice receptionist orchestrated by **Telnyx AI Assistants**, the only voice orchestrator (see § Voice Orchestrator). **Retell.ai**, the backup that never took a call in production, was retired on 2026-10-17 (`PLAN-RETIRAR-RETELL.md`). The agents handle incoming phone calls, answer questions, check business hours, check availability, and book appointments directly into the business's Google, Outlook or Apple/iCloud (CalDAV) calendar. Since September 2026 the platform also talks over WhatsApp (Telnyx as Meta BSP) with business owners (alerts and the Gestor assistant) and with their clients.
+Alhabla is a multi-tenant SaaS platform that provides AI-powered voice receptionists for small businesses in Spain (hair salons, barbershops, physiotherapy clinics, beauty centers, etc.). Each business gets a voice receptionist orchestrated by **Telnyx AI Assistants**, the only voice orchestrator (see § Voice Orchestrator). The agents handle incoming phone calls, answer questions, check business hours, check availability, and book appointments directly into the business's Google, Outlook or Apple/iCloud (CalDAV) calendar. Since September 2026 the platform also talks over WhatsApp (Telnyx as Meta BSP) with business owners (alerts and the Gestor assistant) and with their clients.
 
 The codebase is fully in Spanish — UI copy, comments, variable names, and business logic are written in Spanish. Keep everything in Spanish when modifying code or adding user-facing text.
 
@@ -16,7 +16,7 @@ The codebase is fully in Spanish — UI copy, comments, variable names, and busi
 | **Database** | PostgreSQL 15 + Prisma ORM |
 | **Cache** | Postgres (`claves_temporales`, `contadores`, `cerrojos`) since PR B (2026-10); Redis 7 (Memorystore) only as the compatibility mirror of the locks while `REDIS_URL` exists |
 | **Background jobs** | Cloud Tasks / Cloud Scheduler (HTTP callbacks to `alhabla-api`, no BullMQ) |
-| **Voice AI** | Telnyx AI Assistants (the only orchestrator; Retell.ai retired on 2026-10-17) |
+| **Voice AI** | Telnyx AI Assistants (the only orchestrator) |
 | **Object storage** | Cloudflare R2 (S3-compatible) |
 | **Telephony / WhatsApp** | Telnyx (Spanish numbers, call control, WhatsApp Business Platform) |
 | **Billing** | Stripe (Checkout Sessions, Customer Portal, webhooks) |
@@ -72,12 +72,12 @@ Most modules are a folder containing a `routes.ts` file (and optionally `service
 | `places` | *(none)* | Yes | Google Places autocomplete & details |
 | `onboarding` | *(none)* | Yes | Onboarding state: progress, dismiss, complete, confirm call forwarding |
 | `busqueda` | *(none)* | Yes | Since 2026-10-02: `GET /business/me/buscar?q=` for the panel's ⌘K search — up to 6 bookings (upcoming first, then the last 60 days) and 6 conversations matching client name, phone digits, service name or summary; Gestor rows excluded |
-| `demo` | `/demo` | No | Public landing voice demo, **on Telnyx since 2026-09-22** (before, on Retell, which ran out of credit and the demo 502'd in production). `POST /demo/web-call` accepts `{ niche?, placeId? }` and returns `{ assistantId, niche, maxDurationSeconds }`: the browser then places an unauthenticated WebRTC call to that assistant (`anonymous_login`), so no token or credential ever reaches the bundle. With a `placeId` the backend re-reads the Google Places card and the **detected** niche wins over the landing's — searching your barbershop from the main landing gets you the barbershop demo. Each niche points at an **isolated** demo assistant (`TELNYX_DEMO_<NICHO>_ASSISTANT_ID`), falling back to the generic one. Since 2026-09-24 those are clones of the demo accounts' assistants (`scripts/crearAssistantsDemoAislados.ts`) with **no tools at all** and their own `time_limit_secs` in Telnyx: `anonymous_login` means the assistant id necessarily reaches the browser, so anyone can dial it directly, bypassing this route's rate limit and the browser's cap — pointing that at the real accounts' assistants let an abuser write real bookings into their agendas. The demo accounts' own assistants now have `supports_unauthenticated_web_calls: false`. The route still reasserts that flag once per assistant per process, but only after checking the name starts with `alhabla-demo-`, so a misconfigured env var can never open a real business's assistant. `resolveDemoMaxDurationSeconds()` validates `TELNYX_DEMO_MAX_DURATION_SECONDS` (finite and positive, or 60s) — it is a browser-side cap, Telnyx keeps the account's own `time_limit_secs` |
+| `demo` | `/demo` | No | Public landing voice demo, **on Telnyx since 2026-09-22**. `POST /demo/web-call` accepts `{ niche?, placeId? }` and returns `{ assistantId, niche, maxDurationSeconds }`: the browser then places an unauthenticated WebRTC call to that assistant (`anonymous_login`), so no token or credential ever reaches the bundle. With a `placeId` the backend re-reads the Google Places card and the **detected** niche wins over the landing's — searching your barbershop from the main landing gets you the barbershop demo. Each niche points at an **isolated** demo assistant (`TELNYX_DEMO_<NICHO>_ASSISTANT_ID`), falling back to the generic one. Since 2026-09-24 those are clones of the demo accounts' assistants (`scripts/crearAssistantsDemoAislados.ts`) with **no tools at all** and their own `time_limit_secs` in Telnyx: `anonymous_login` means the assistant id necessarily reaches the browser, so anyone can dial it directly, bypassing this route's rate limit and the browser's cap — pointing that at the real accounts' assistants let an abuser write real bookings into their agendas. The demo accounts' own assistants now have `supports_unauthenticated_web_calls: false`. The route still reasserts that flag once per assistant per process, but only after checking the name starts with `alhabla-demo-`, so a misconfigured env var can never open a real business's assistant. `resolveDemoMaxDurationSeconds()` validates `TELNYX_DEMO_MAX_DURATION_SECONDS` (finite and positive, or 60s) — it is a browser-side cap, Telnyx keeps the account's own `time_limit_secs` |
 | `contacto` | — | No | Formulario «Hablar con nosotros» de la web (`/contacto`, desde 2026-10-16). `POST /contacto` acepta `{ nombre, email, telefono?, negocio, sedes: "1" \| "2-4" \| "5+" \| "franquicia", mensaje?, sitioWeb? }` (Zod, mensajes en español por campo) y encola un correo a `hola@alhabla.ai` desde `support@` (`solicitudDeContactoEmail`; en dev sale en línea y, sin `ZOHO_DEV_ALLOWED_RECIPIENTS`, se queda en el aviso «CORREO NO ENVIADO»). No guarda nada en la BD. 5 envíos cada 10 min por IP. `sitioWeb` es una trampa para bots: relleno, responde `200` y no manda nada. Ni el asunto ni los logs llevan datos personales (solo las sedes) |
 
 | `whatsapp` | *(none)* | Mixed | WhatsApp channel (Telnyx as Meta BSP): owner sign-up and preferences (`/business/me/whatsapp`), inbound messages/status/template events routed from `/webhooks/telnyx`, owner and client chats, waiting list, reminders. |
 | `gestor` | *(no routes.ts)* | Mixed | The owner's assistant ("Gestor", shown as «Tu asistente»): tools at `/webhooks/telnyx/gestor/:toolName` (Ed25519) and the panel thread at `/business/me/gestor` (`panel.ts`). It proposes; only the owner's button executes. |
-| `voiceTools` | *(no routes.ts)* | Webhook signature | Tool execution (`executeVoiceTool`) behind `/webhooks/telnyx/tools/:toolName`, for calls and for the client chat on WhatsApp (`canalDeLaTool`). Until 2026-10-17 Retell's tools (`/webhooks/retell/tools/...`) used it too. |
+| `voiceTools` | *(no routes.ts)* | Webhook signature | Tool execution (`executeVoiceTool`) behind `/webhooks/telnyx/tools/:toolName`, for calls and for the client chat on WhatsApp (`canalDeLaTool`). |
 | `internal` | `/internal` | OIDC | `/internal/jobs/*`, called by Cloud Tasks / Cloud Scheduler (see § Background Jobs). |
 | `webhooksTelnyx` | *(none)* | Ed25519 | Every route Telnyx signs: `/webhooks/telnyx` (Call Control App and WhatsApp events), `/webhooks/telnyx/tools/:toolName` and `/webhooks/telnyx/gestor/:toolName`. The signature is checked once, in the plugin's encapsulated `preHandler` (`plugins/firmaTelnyx.ts`), before any handler runs; a new Telnyx-signed route goes here. The unsigned dev-only `/webhooks/telnyx-harness` stays in `server.ts`. |
 
@@ -86,13 +86,13 @@ Most modules are a folder containing a `routes.ts` file (and optionally `service
 ### Key Libraries (`backend/src/lib/`)
 
 - `prisma.ts` — Prisma Client singleton with `globalThis` hot-reload guard. Since PR A also `conUnaConexion(url, parametros)` (the same URL with `connection_limit=1` plus the given parameters, leaving the rest — `host=/cloudsql/…`, escaped passwords — untouched) and `crearClienteDeUnaConexion(parametros)` (a separate `PrismaClient` with one connection of its own, outside the app pool: the rate limiter's; see § Pool and § Corte de Redis a Postgres).
-- `almacenTemporal.ts` — the temporary store in Postgres that replaced Redis (PR B, 2026-10): `claves_temporales` (key → JSON value with `expiraEn` and an optional `businessId` FK `ON DELETE CASCADE`) with `guardarClave`/`guardarClaveSiNoExiste` (SET NX)/`leerClave`/`consumirClave` (GETDEL)/`borrarClave`, and per-field writes on a JSON object (`guardarCampos`, `fijarCampo`, `fijarCampoSiNoExiste` = HSETNX, `leerCampos`); `contadores` (`incrementarContador`/`leerContador`, fixed window); and `purgarCaducados`. An expired key does not exist for any read. `lib/redis.ts` (the general ioredis client) was deleted in PR B; the only Redis client left is `redisDeCompatibilidad.ts` (locks, see § Corte de Redis a Postgres). Locks and the rate-limit counter moved to Postgres in PR A (`cerrojos.ts`, `limitesDePeticiones.ts`). The Telnyx health streaks of the automatic failover lived in `salud_telnyx` (`saludTelnyx.ts`) until the failover was removed on 2026-10-17; PR 3 of `PLAN-RETIRAR-RETELL.md` dropped the table (migration `20261017200000_retirar_retell_contract`).
+- `almacenTemporal.ts` — the temporary store in Postgres that replaced Redis (PR B, 2026-10): `claves_temporales` (key → JSON value with `expiraEn` and an optional `businessId` FK `ON DELETE CASCADE`) with `guardarClave`/`guardarClaveSiNoExiste` (SET NX)/`leerClave`/`consumirClave` (GETDEL)/`borrarClave`, and per-field writes on a JSON object (`guardarCampos`, `fijarCampo`, `fijarCampoSiNoExiste` = HSETNX, `leerCampos`); `contadores` (`incrementarContador`/`leerContador`, fixed window); and `purgarCaducados`. An expired key does not exist for any read. `lib/redis.ts` (the general ioredis client) was deleted in PR B; the only Redis client left is `redisDeCompatibilidad.ts` (locks, see § Corte de Redis a Postgres). Locks and the rate-limit counter moved to Postgres in PR A (`cerrojos.ts`, `limitesDePeticiones.ts`).
 - `cloudTasks.ts` — Cloud Tasks job dispatch (`enqueueRecordingJob`, `enqueueRetryBookingJob`, `enqueueUsageReportJob`, `enqueueEmailJob`, `enqueueSmsJob`, `enqueueRecordarRecadoJob`, `enqueueWhatsappJob`); inline synchronous fallback outside production. See Background Jobs below.
 - `storage.ts` — R2/S3 client for file uploads (recordings).
 - `stripe.ts` — Stripe SDK client singleton.
 - `telnyx.ts` — Telnyx SDK singleton (single Bearer API key). Active provider for phone number provisioning.
 - `microsoftGraph.ts` — Microsoft Graph OAuth + Calendar API helpers.
-- `agentBootstrap.ts` — Default `Agent` row config (`DEFAULT_AGENT_CONFIG`), per-niche template and display name, safe assistant naming, and `createBusinessAgent` (the `Agent` row plus its Telnyx assistant via `crearAssistantDelNegocio`, `telnyxAgentSync.ts`). Until 2026-10-17 it also created the Retell LLM and agent.
+- `agentBootstrap.ts` — Default `Agent` row config (`DEFAULT_AGENT_CONFIG`), per-niche template and display name, safe assistant naming, and `createBusinessAgent` (the `Agent` row plus its Telnyx assistant via `crearAssistantDelNegocio`, `telnyxAgentSync.ts`).
 - `businessSchedule.ts` — Business hours validation logic with Zod schemas.
 - `availability.ts` — Booking availability check (professionals, capacity, overlapping bookings). Returns available professionals with IDs for explicit selection.
 - `logUtils.ts` — Shared logging helpers (`errorMessage`, `callLabel`).
@@ -495,8 +495,7 @@ negocio de dev. Lo que **no** sale desde `backend-sim` son los WhatsApp, SMS y c
 `ENVIOS_SIMULADOS=1` (`src/lib/enviosSimulados.ts`, comprobado en `WhatsAppAdapter.send`,
 `TelnyxAdapter.sendSms` y `sendZohoMail`) los registra en el log como `ENVÍO SIMULADO` y no los
 manda; en producción se ignora aunque esté puesto. Antes de firmar, `simular_webhook_telnyx`
-comprueba que hay backend escuchando y, si no, dice cómo levantarlo. (Hasta el 17-10 había también
-`simular_webhook_retell`, contra `backend-dev`.) Las consultas leen las columnas `timestamp` sin zona
+comprueba que hay backend escuchando y, si no, dice cómo levantarlo. Las consultas leen las columnas `timestamp` sin zona
 de Prisma como UTC (`mcp/pg.ts`); `pg` las tomaba por hora local y desplazaba todas las horas. Lo de producción y Telnyx enmascara por defecto los
 teléfonos E.164 (deja el prefijo y las 3 últimas cifras; `mostrarTelefonos: true` los enseña): los de
 los clientes salen en logs, conversaciones y tools. Revertir datos de producción sin el panel = escribir
@@ -574,8 +573,8 @@ The schema lives in `backend/prisma/schema.prisma`. Key models:
 
 - `Business` — tenant root; holds Stripe billing state, calendar tokens (encrypted), schedule JSON, agent settings, booking capacity, and optional booking restrictions `minAdvanceBookingMinutes` / `maxAppointmentDurationMinutes` (both nullable = no restriction; stated in the prompt and enforced by `check_availability` and `book_appointment`, see Business Schedule and Agent Configuration).
 - `User` — belongs to a Business; supports password (bcrypt) + Google OAuth login (`googleId`).
-- `Agent` — voice agent config; `telnyxAssistantId` links it to its Telnyx assistant (with `telnyxSyncedAt`/`telnyxSyncError`/`telnyxConfigHash`). Includes voice/LLM/STT provider configs (Retell-era fields still written by `buildAgentPersistencePayload` and `PATCH /agents/:id` and returned by the API; the Telnyx path does not read them), integrations. `retellAgentId`/`retellLlmId` were retired with Retell (2026-10-17) and dropped by migration `20261017200000_retirar_retell_contract` (PR 3 of `PLAN-RETIRAR-RETELL.md`).
-- `Call` — a phone call (Telnyx; older rows may be Retell's, and the WhatsApp chats keep a synthetic `Call` with `voiceProvider = "whatsapp"`). `voiceProvider` defaults to `"telnyx"` since migration `20261017180000_defaults_de_voz_telnyx` (before, `"retell"`; every `create` passes it anyway). Status enum: `INITIATED`, `IN_PROGRESS`, `COMPLETED`, `FAILED`, `TIMED_OUT`. Outcome enum: `RESOLVED`, `FRUSTRATED`, `NO_ANSWER`, `ESCALATED`, `LEAD_CAPTURED` — set from the Telnyx conversation insights (`call.conversation_insights.generated`, see § Voice Orchestrator) and from the receptionist's final report (`informar_al_negocio`, `modules/whatsapp/recados.ts`, which only fills what the insights left empty); until 2026-10-17 Retell's own `post_call_analysis_data` did it for its calls. The other analysis fields: `escalationReason` (enum `CallEscalationReason`) and `toolFailureDetected` (insights and report) and `requestedService` (report only).
+- `Agent` — voice agent config; `telnyxAssistantId` links it to its Telnyx assistant (with `telnyxSyncedAt`/`telnyxSyncError`/`telnyxConfigHash`). Includes voice/LLM/STT provider configs (legacy fields still written by `buildAgentPersistencePayload` and `PATCH /agents/:id` and returned by the API; the Telnyx path does not read them), integrations.
+- `Call` — a phone call (Telnyx; the WhatsApp chats keep a synthetic `Call` with `voiceProvider = "whatsapp"`). `voiceProvider` defaults to `"telnyx"` since migration `20261017180000_defaults_de_voz_telnyx` (every `create` passes it anyway). Status enum: `INITIATED`, `IN_PROGRESS`, `COMPLETED`, `FAILED`, `TIMED_OUT`. Outcome enum: `RESOLVED`, `FRUSTRATED`, `NO_ANSWER`, `ESCALATED`, `LEAD_CAPTURED` — set from the Telnyx conversation insights (`call.conversation_insights.generated`, see § Voice Orchestrator) and from the receptionist's final report (`informar_al_negocio`, `modules/whatsapp/recados.ts`, which only fills what the insights left empty). The other analysis fields: `escalationReason` (enum `CallEscalationReason`) and `toolFailureDetected` (insights and report) and `requestedService` (report only).
 - `Booking` — outcome extracted from a call; stores `professionalId`, `serviceIds` (array — since 2026-09-05 a booking can cover several services, e.g. "corte y mechas") and `durationMinutes` to track who performs the appointment and how long it lasts. `professionalId`/`serviceIds` supplied by the LLM are verified to belong to the business before being trusted (`voiceTools/service.ts`) — they are not enforced at the DB/FK level.
 - `Transcript` / `Recording` — call artifacts. Recording has `storageKey` and `storageUrl` for R2, `providerLegId` (Telnyx `call_leg_id`, to request a fresh download URL once the 10-minute webhook one expires) and `processingFailedAt`/`processingError` (declared unrecoverable; `retry-stuck-recordings` leaves it alone).
 - `Lead` — structured lead data captured during a call. `type: "pending_booking"` rows are created by `voiceTools/service.ts` when `book_appointment` fails, holding the attempted booking payload so it's never lost; `resolvedAt` is set once `jobs/retryFailedBooking.ts` confirms the booking in the background (still `null` if retries are exhausted or the failure needs a manual calendar reconnect).
@@ -1082,7 +1081,7 @@ el `fetch` equivalente. **Nunca desde un route handler**: todo pasa por
   cliente tiene citas en varios (hoy va al de la reserva más reciente), el panel («Tu chat con la
   recepcionista», toggle «chat Beta» en Ajustes) y los tests de integración. El UTC de
   `{{telnyx_current_time}}` afectaba también a las llamadas de voz desde el primer día de Telnyx
-  (issue #122): resuelto el 20-09 traduciendo el patrón de Retell a la variante con zona
+  (issue #122): resuelto el 20-09 traduciendo la variable antigua `{{current_time_<zona IANA>}}` a la variante con zona
   `{{telnyx_current_time_<zona IANA>}}` (`adaptManagedPromptForTelnyx`), verificado por chat en
   dev («cinco y treinta y seis de la tarde» a las 17:36 de Madrid).
 
@@ -1184,8 +1183,7 @@ hablando por el que elige `identificarRemitente`.
   `deleteProfessional`) con la opción nueva `{ sync: false }` y sincroniza UNA vez por lote con
   `syncBookingConfiguration` (ahora exportada) envuelta en `sincronizarCatalogo`: **best-effort
   con log ruidoso**, porque el cambio ya está en la BD y un fallo de la sincronización no puede
-  convertir un «hecho» en un «no he podido» (el reconciliador repara el drift; hasta el 17-10,
-  además, `syncAgentToRetell` lanzaba si la publicación fallaba). El horario va por
+  convertir un «hecho» en un «no he podido» (el reconciliador repara el drift). El horario va por
   `modules/businesses/horario.ts › guardarHorarioDelNegocio` (update → caché de voz →
   Telnyx → tools de calendario, mismos pasos que `PATCH /business/me`; la parte de
   sincronización también best-effort). El PATCH del panel no se toca.
@@ -1228,10 +1226,7 @@ hablando por el que elige `identificarRemitente`.
   repetido se declara ambiguo en vez de «no existe»; `editar_servicio` no deja renombrar a un
   nombre que ya existe; el botón exige además consentimiento vigente y `ownerChatEnabled`;
   tramos ordenados; `Id` admite 80 caracteres; los errores crudos (Prisma, red) no llegan al
-  dueño; **Telnyx se sincronizaba antes que Retell** en `syncBookingConfiguration` y
-  `guardarHorarioDelNegocio` (Retell lanzaba y dejaba a Telnyx sin sincronizar; desde el 17-10
-  solo se sincroniza Telnyx); una respuesta
-  con propuesta de más de 1000 caracteres va como texto + un interactivo aparte con el resumen
+  dueño; una respuesta con propuesta de más de 1000 caracteres va como texto + un interactivo aparte con el resumen
   (Meta limita el cuerpo a 1024); prompt: los parámetros inválidos los corrige el LLM sin
   decírselo al dueño, «empezamos» es la señal de arranque, el número y el calendario no son
   pasos, AYUDA cuenta que se puede pedir por chat. Límite conocido: un móvil dueño de dos
@@ -1363,8 +1358,7 @@ hablando por el que elige `identificarRemitente`.
   pide apuntarlas. `recados.ts › normalizarDudas` las limpia (una por línea si llega una cadena,
   sin vacías ni repetidas, 5 × 200 caracteres) y van a `Call.postCallReport.dudas_sin_respuesta`;
   un segundo informe las añade si el primero no traía ninguna, igual que el recado. Es la única
-  fuente de qué preguntó el cliente: Telnyx no deja resumen (`Call.summary` solo lo tienen las
-  llamadas de Retell, anteriores al 17-10). La «Información del negocio» (`businessDetails`) pasa a su propia sección del prompt,
+  fuente de qué preguntó el cliente: Telnyx no deja resumen. La «Información del negocio» (`businessDetails`) pasa a su propia sección del prompt,
   «## Información del negocio» (antes iba suelta bajo «Referencia temporal»).
 - Gestor, lecturas. `dudas_sin_respuesta({ dias 1-31, 14 por defecto })`
   (`modules/gestor/dudasSinRespuesta.ts`): dudas agrupadas sin distinguir acentos ni signos, las
@@ -1589,9 +1583,6 @@ telnyxPhoneNumberId (unique)   # the PhoneNumber resource id; without it the
 telnyxPhoneNumberPurchasedAt
 ```
 
-`retellPhoneNumber` and `retellPhoneNumberId` (the number imported into Retell over the SIP
-trunk, until 2026-10-17) were dropped by migration `20261017200000_retirar_retell_contract`.
-
 ### `CalendarConnection` (desde 2026-09-18) y campos de calendario en `Business`
 
 ```
@@ -1636,25 +1627,15 @@ escribía las columnas antiguas en espejo; PR #78 retiró el espejo y las column
 (el cliente ya no las selecciona) sin borrarlas de la BD; y, una vez desplegado ese código, la migración
 `20260918100000_drop_legacy_calendar_columns` las borró. Receta reutilizable para cualquier columna que
 haya que quitar: (1) dejar de leerla/escribirla y sacarla del schema, desplegar; (2) `DROP COLUMN` en
-el PR siguiente.
+el PR siguiente. Si en el paso (1) la columna aún tiene que existir en la BD (un default, una
+migración que la toca), se marca con `@ignore` en el schema (`@@ignore` para una tabla entera): el
+cliente de Prisma deja de seleccionarla y la revisión que sigue sirviendo durante el siguiente
+despliegue no se rompe. La migración del paso (2) lleva la etiqueta `migracion-contract` en el PR
+(o `contract-migration: ok` en un commit) para que el job **diff** de CI deje pasar el `DROP`.
 
-### Retired voice-routing fields on `Business`
+### Voice assistant and number of a `Business`
 
-```
-orchestrator, voiceRoutingTarget          (dropped 2026-10-17)
-voiceFailoverActive, voiceFailoverReason, voiceRoutingChangedAt
-retellPhoneNumber, retellPhoneNumberId
-```
-
-Until 2026-10-17 `orchestrator` chose the voice provider of a business (`"retell"` or
-`"telnyx"`), `voiceRoutingTarget` was the effective route of the next call (it could differ
-during a failover) and the `voiceFailover*` fields drove the automatic failover to Retell. **Since
-Retell was retired, every business is Telnyx.** Expand/contract, with the recipe above: PR 2
-(migration `20261017180000_defaults_de_voz_telnyx`) stopped reading and writing them, moved the
-defaults to `"telnyx"` and marked them `@ignore` so the Prisma client no longer selected them;
-once that was deployed, PR 3 (migration `20261017200000_retirar_retell_contract`) dropped the
-columns, `Agent.retellAgentId`/`retellLlmId` and the `salud_telnyx` table without breaking the
-revision that kept serving during its deploy. What replaced them:
+Every business is answered by Telnyx; there is no per-business voice routing.
 
 - **The assistant.** `createBusinessAgent` (`agentBootstrap.ts`) creates the `Agent` row and its
   Telnyx assistant with `crearAssistantDelNegocio` (`telnyxAgentSync.ts`), which never throws and
@@ -1667,8 +1648,7 @@ revision that kept serving during its deploy. What replaced them:
   needed for that.
 - **The number.** `provisionPhoneNumber` always buys it on the Call Control App
   (`TELNYX_CALL_CONTROL_APP_ID`) and sets `phoneNumberStatus: "active"` in the same write as
-  `telnyxPhoneNumber`/`telnyxPhoneNumberId` (see Phone provisioning). «Comprobar desvío» and its
-  day-1 reminder no longer look at `voiceRoutingTarget`.
+  `telnyxPhoneNumber`/`telnyxPhoneNumberId` (see Phone provisioning).
 
 ### Business Type Field on `Business`
 
@@ -1735,10 +1715,7 @@ is now a **Cloud Scheduler** job hitting the same kind of endpoint every
   `/send-weekly-summaries`, `/report-usage`, `/retry-usage-reports`,
   `/attach-usage-prices`, `/suspend-overdue-calls`,
   `/telnyx-reconciler`, `/recordar-desvio-sin-comprobar`, `/recordar-recado`,
-  `/revisar-escalada`, `/recuperar-transcripcion`. (`/telnyx-health-check`, the 2-minute
-  probe of the automatic failover to Retell, was removed on 2026-10-17; its Cloud Scheduler
-  job `telnyx-health-check` is deleted by hand **before** deploying that change, so it does
-  not hit a 404 every 2 minutes.) Gated by
+  `/revisar-escalada`, `/recuperar-transcripcion`. Gated by
   `fastify.verifyCloudTasks` (`backend/src/plugins/internalAuth.ts`), which
   verifies the request carries a Google-signed OIDC token issued to
   `CLOUD_TASKS_INVOKER_SERVICE_ACCOUNT` with the right audience — anyone
@@ -1774,7 +1751,7 @@ is now a **Cloud Scheduler** job hitting the same kind of endpoint every
      `telnyxAiAdapter.listRecordingsByCallLegId(Recording.providerLegId)` and
      downloads again; rows from before this change have no `providerLegId`, so it is
      recovered from the S3 path (`…/<call_leg_id>-<n>.mp3`, `.wav` before issue #280) and persisted. If there is
-     nothing to ask (a call that is not `voiceProvider = "telnyx"`, such as an old Retell one;
+     nothing to ask (a call that is not `voiceProvider = "telnyx"`;
      no leg; Telnyx no longer has it) the row is marked
      `processingFailedAt`/`processingError` and the job throws `PermanentJobError`
      (route answers 200, task leaves the queue). 5xx/network errors still propagate so
@@ -1797,7 +1774,7 @@ is now a **Cloud Scheduler** job hitting the same kind of endpoint every
      **ignored by the API** (returns an empty list — verified against the live account
      2026-09-17). Only `call_leg_id`/`call_session_id` filters work; the adapter no
      longer exposes a by-call-control-id lookup.
-   - **Contestar con reintentos (2026-10-17, `PLAN-RETIRAR-RETELL.md` PR 4).**
+   - **Contestar con reintentos (desde el 2026-10-17).**
      `handleCallInitiated` contesta con `contestarConReintentos` (`adapters/telnyx/contestarLlamada.ts`):
      - Un 5xx, un 429 o un fallo de red se reintentan dos veces, tras 300 y 800 ms.
      - El `answer` tiene su propio timeout de 3 s (`TIEMPO_PARA_CONTESTAR_MS`), así que el peor caso
@@ -1883,14 +1860,12 @@ is now a **Cloud Scheduler** job hitting the same kind of endpoint every
 
 6. **Stuck recording retry** (`backend/src/jobs/retryStuckRecordings.ts`)
    - `Recording` rows are created (with `externalUrl`, `providerLegId`, `storageKey: null`)
-     by `handleCallRecordingSaved` (`adapters/telnyx/webhookHandlers.ts`; for Retell calls,
-     `handleCallEnded` until 2026-10-17) — before `enqueueRecordingJob` is even
+     by `handleCallRecordingSaved` (`adapters/telnyx/webhookHandlers.ts`) — before `enqueueRecordingJob` is even
      called. If that enqueue fails (Cloud Tasks down, IAM misconfigured, etc.),
      the row already exists as a durable marker: this job finds `Recording` rows with
      `storageKey: null` older than 15 minutes and re-enqueues `process-recording` for
      each. Without it, a failed enqueue was permanent — the recording stayed only at
-     the provider (then Retell, with its own `dataStorageRetentionDays` window), with
-     nothing to recover it.
+     the provider, with nothing to recover it.
    - **Cloud Scheduler job `retry-stuck-recordings`** — provisioned in
      `europe-west1` on 2026-09-10, runs every 15 minutes with the same OIDC
      authentication and retry policy as `cleanup-zombie-calls`.
@@ -2019,13 +1994,7 @@ Call outcome classification is **not** a background job — Telnyx classifies ea
 
 ## Voice Orchestrator (Telnyx AI Assistants)
 
-**Telnyx AI Assistants is the only voice orchestrator.** Until 2026-10-17 Retell.ai was kept as a
-hot fallback (its own LLM, agent and tools per business, the number imported over a SIP trunk
-and an automatic failover, `telnyx-health-check`); it never took a call in production and was
-removed in PR 2 of `PLAN-RETIRAR-RETELL.md`; PR 3 dropped its columns (see «Retired
-voice-routing fields on `Business`») and removed `adapters/retell/RetellAdapter.ts` and
-`retell-sdk`, after its account was emptied (§ Deployment Notes, «Cleaning the Retell account»).
-When verifying anything about tools by hand, check the
+**Telnyx AI Assistants is the only voice orchestrator.** When verifying anything about tools by hand, check the
 Telnyx assistant itself (MCP `ver_assistant_telnyx`), not only the DB.
 
 ### Telnyx (`backend/src/adapters/telnyx/TelnyxAiAdapter.ts`, `TelnyxAdapter.ts`)
@@ -2053,8 +2022,7 @@ Telnyx assistant itself (MCP `ver_assistant_telnyx`), not only the DB.
   `{{call_control_id}}`, `CANAL_DE_TOOLS_DE_VOZ`) → `Call.callId` → `executeVoiceTool`
   (`modules/voiceTools/service.ts`; Google, Outlook and Apple/CalDAV). The timeout (20 s) goes at
   the tool level. The legacy `check_business_hours` handler was removed on 2026-09-29: no agent
-  had registered it since 2026-09-09 (a read-only sweep of the then shared Retell account found 0
-  of 232 LLMs with it, and Telnyx assistants never had it), and `check_availability` checks
+  had registered it since 2026-09-09 (Telnyx assistants never had it), and `check_availability` checks
   opening hours and booking restrictions itself. A stale assistant that still called it would hit
   the `default` branch of `executeVoiceTool` (warning log, empty result) and `book_appointment`
   would still validate everything. `check_availability` also accepts an optional
@@ -2064,8 +2032,7 @@ Telnyx assistant itself (MCP `ver_assistant_telnyx`), not only the DB.
   `tool_failure_detected`; ids in `TELNYX_INSIGHT_*_ID`, created by
   `scripts/createTelnyxCallInsights.ts`) arrive as `call.conversation_insights.generated` and
   fill `Call.outcome`, `escalationReason` and `toolFailureDetected`; the final report of
-  `informar_al_negocio` fills what they leave empty, plus `requestedService`. Same categories
-  Retell's `post_call_analysis_data` used, so calls from before and after the cut compare.
+  `informar_al_negocio` fills what they leave empty, plus `requestedService`.
 - **Sync.** `syncAgentToTelnyx(businessId)` (`lib/telnyxAgentSync.ts`) rebuilds the managed
   prompt and the whole payload, pushes it only when its hash changes and **never throws** (the
   state is in `Agent.telnyxSyncError`). Called from `PATCH /business/me`,
@@ -2147,7 +2114,7 @@ La separación se apoya por tanto en tres cosas:
 
 **Lo que dev y producción siguen compartiendo** (auditado el 2026-09-19 comparando por hash cada
 secreto de Secret Manager con el `.env` local, sin imprimir valores): la cuenta de **Telnyx**
-(`TELNYX_API_KEY`; también la de **Retell**, que desde el 17-10 ya no usa ningún entorno), las apps OAuth
+(`TELNYX_API_KEY`), las apps OAuth
 de **Google** y **Microsoft** (`GOOGLE_AUTH_CLIENT_SECRET`, `GOOGLE_CLIENT_SECRET`,
 `MICROSOFT_CLIENT_SECRET`) y **Zoho** (`ZOHO_CLIENT_SECRET`, `ZOHO_REFRESH_TOKEN`).
 `TELNYX_SPAIN_REQUIREMENT_GROUP_ID` también, pero es un identificador regulatorio y compartirlo
@@ -2167,7 +2134,7 @@ movió sus 5 números al Call Control App de producción "de forma permanente", 
 túnel de dev era ngrok y cambiaba de hostname cada dos por tres. Con `dev-api.alhabla.ai` fijo
 eso dejó de hacer falta: los 5 números volvieron al app de dev y las 5 copias se borraron de la
 Cloud SQL de producción (`DELETE FROM businesses`, cascada; 55 llamadas y 17 citas de prueba con
-ellas), junto con sus 5 agentes de Retell, sus 5 LLM y sus 5 assistants de Telnyx. Producción
+ellas), junto con sus 5 assistants de Telnyx. Producción
 queda con tres negocios reales. **Si se vuelve a ejecutar ese script, hay que revertir lo mismo
 otra vez**; lo que no hay que hacer es dejar las copias vivas apropiándose de los números.
 
@@ -2216,8 +2183,6 @@ El mapa de todos los asistentes vive en `backend/src/lib/tiposDeAsistente.ts`
 Only Spain (`PHONE_NUMBER_COUNTRY=ES`) is supported today — searches only `local`-type numbers and requires `TELNYX_SPAIN_REQUIREMENT_GROUP_ID`, a single platform-level regulatory Requirement Group reused across every business. Telnyx doesn't expose a per-number address-requirement flag in search results — regulatory requirements are resolved entirely by the Requirement Group at order time, so there's no address-based filtering step.
 
 **Telnyx number orders are asynchronous** (`status: "pending" | "success" | "failure"`). `provisionPhoneNumber` persists `telnyxNumberOrderId` as soon as the order is created, then polls `getNumberOrder` for a bounded window (5 attempts, 2s apart). If still `"pending"` after that, it returns `status: "pending"` rather than an error — a retry (via the frontend's "Reintentar asignación de número" button, or the `checkout-session/:id/reconcile` fallback) resumes the same order (`telnyxAdapter.getNumberOrder(business.telnyxNumberOrderId)`) instead of placing a duplicate purchase.
-
-Until 2026-10-17 the number was also imported into Retell (`retellAdapter.importPhoneNumber`, over a Telnyx SIP Connection pointing at `sip.retellai.com`, with `RETELL_SIP_*` and `TELNYX_SIP_CONNECTION_ID`), and until PR 1 of `PLAN-RETIRAR-RETELL.md` it only became `"active"` after that import. None of that exists any more; the SIP Connection is deleted in the Telnyx portal in PR 3.
 
 ## Telefonía
 
@@ -2375,8 +2340,7 @@ nuevas: el ajuste vive en `Business.agentSettings.pasarLlamadas`.
   Sin `timeout_secs` (la tool nativa no lo tiene), sin `description` (la genera Telnyx) y
   sin `warm_transfer_acceptance` (la documentación lo limita a llamadas arrancadas con
   `ai_assistant_start`; las nuestras se contestan con `answer` + `assistant`).
-- **Respaldo si la IA falla** (`telephony_settings.fallback_destination`, desde el 18-10,
-  PR 6 de `PLAN-RETIRAR-RETELL.md`): con `activa`, el mismo móvil que la tool `transfer`;
+- **Respaldo si la IA falla** (`telephony_settings.fallback_destination`, desde el 18-10): con `activa`, el mismo móvil que la tool `transfer`;
   sin ella, `null`. Telnyx pasa ahí la llamada cuando la conversación con la IA acaba mal
   (no si el cliente cuelga, si el assistant termina bien, si hay buzón o si ya transfirió).
   Probado en dev el 18-10 con `answer` + `assistant` (nuestro camino) y un `external_llm`
@@ -2407,8 +2371,7 @@ nuevas: el ajuste vive en `Business.agentSettings.pasarLlamadas`.
   en el alta se quedaba sin la tool hasta el reconciliador de las 04:00.
 - **Copia del prompt en `Agent.systemPrompt`** (lo que enseña `/agente`): es el prompt del
   assistant de Telnyx, **con** el bloque cuando la tool está registrada. La escriben
-  `PATCH /business/me` y `syncAgentToTelnyx` (agentes gestionados; hasta el 17-10 también
-  `syncAgentToRetell`). Un prompt **editado a mano**
+  `PATCH /business/me` y `syncAgentToTelnyx` (agentes gestionados). Un prompt **editado a mano**
   (`promptManuallyEdited`) viaja a Telnyx tal cual, pero si la tool se registra y el texto
   no contiene «## Pasar la llamada», `promptManualConSuRegla` le añade el bloque al final:
   nunca la tool sin su regla.
@@ -2586,10 +2549,9 @@ backend/src/lib/voiceConfigCache.ts        # claveDeCacheDeVoz / invalidarCacheD
     absoluta de iCloud (`https://caldav.icloud.com/<id>/calendars/<uuid>/`), `accountEmail` con el Apple ID y
     `credentials` como sobre `aes-256-gcm`. El Apple ID va completo, **con `@`**: sin la arroba iCloud
     responde 401 y la ruta devuelve `400 CALDAV_INVALID_CREDENTIALS`.
-  - **El alta resincronizó bien los dos orquestadores de entonces.** El negocio de pruebas era
-    `orchestrator = "telnyx"` (auto-promoción del rollout) y su assistant de Telnyx quedó con las seis webhook
-    tools + `hangup` (`telnyxSyncedAt` seis segundos después de crear la conexión, sin `telnyxSyncError`); el
-    LLM de Retell, entonces respaldo caliente (retirado el 17-10), con las siete equivalentes. Es la prueba de
+  - **El alta resincronizó bien el assistant.** El assistant de Telnyx del negocio de pruebas quedó con las
+    seis webhook tools + `hangup` (`telnyxSyncedAt` seis segundos después de crear la conexión, sin
+    `telnyxSyncError`). Es la prueba de
     que `seleccionarCalendario` resincroniza tools en todo lo que no es Google **y** de que llega a Telnyx.
   - **Pendiente: la prueba de extremo a extremo por voz** (`check_availability` contra el calendario de Apple
     → `book_appointment` → evento en iCloud). El negocio de pruebas **no tiene número de teléfono
@@ -2706,11 +2668,11 @@ The prompt includes:
 - Booking restrictions, in Spanish, only if set (`minAdvanceBookingMinutes`/`maxAppointmentDurationMinutes` — see Business Type / Booking & Availability)
 - Instructions to NEVER invent data: `get_catalog` for services, professionals and hours; `check_availability` for a concrete slot (it validates opening hours, booking restrictions, capacity and the calendar, and returns the `availabilityToken`); `book_appointment` only after explicit confirmation and with that token (a required parameter). The legacy `check_business_hours` tool no longer exists (removed 2026-09-29)
 - **Bloque «## Lo que ofrece el negocio»** (`TITULO_DEL_BLOQUE_DEL_CATALOGO`, desde el 2026-10-07): lo que hace el negocio solo se sabe por `get_catalog`, también ante preguntas de sí o no («¿hacéis mechas?», «do you do beard trims?») y en cualquier idioma. La tool se llama en ese mismo turno, antes de decir «sí», «no» o «lo miro», y una sola vez por conversación. Un servicio pedido con otro nombre o en otro idioma es el del catálogo, y uno que no está no se confirma. La descripción de la tool dice lo mismo (`buildTelnyxVoiceTools`). Viene de las llamadas de prueba del 05-10: con la regla anterior, metida en «## Conversación» detrás de «no enumeres opciones», la recepcionista contestaba «yes, we do highlights» en un negocio sin servicios. Por chat consultaban 27 de 72 preguntas de sí o no; con el bloque, todas las medidas (288 por chat y 13 llamadas reales). Cuesta una vuelta más del LLM en esa primera respuesta: ~2 s de mediana con flux y ~3,4 s con Soniox, frente a ~0,8 s sin consultar.
-- **Variables from the Retell era**: `{{nombre_negocio}}` and `{{zona_horaria}}` (ours, filled by Retell's dynamic variables), `{{user_number}}` and `{{current_time_<zona IANA>}}` (Retell system variables). Telnyx resolves none of them, so `adaptManagedPromptForTelnyx` (`lib/telnyxAssistantPayload.ts`) translates them when building the payload: the business name and the zone as literal text, `{{telnyx_end_user_target}}` and `{{telnyx_current_time_<zona>}}` (Telnyx system variables). It stays until a prompt PR of its own writes the Telnyx variables directly (`PLAN-RETIRAR-RETELL.md` § 3), because removing it changes the hash of every assistant for a null text change.
+- **Legacy prompt variables**: `{{nombre_negocio}}` and `{{zona_horaria}}` (ours), `{{user_number}}` and `{{current_time_<zona IANA>}}`. Telnyx resolves none of them, so `adaptManagedPromptForTelnyx` (`lib/telnyxAssistantPayload.ts`) translates them when building the payload: the business name and the zone as literal text, `{{telnyx_end_user_target}}` and `{{telnyx_current_time_<zona>}}` (Telnyx system variables). It stays until a prompt PR of its own writes the Telnyx variables directly, because removing it changes the hash of every assistant for a null text change.
 
-Since 2026-09-04 the prompt text itself no longer contains the business's services, professionals or schedule — only the static per-axis instructions above. That data used to be interpolated directly into the string and re-sent to Retell (`updateLlm`) on every services/professionals/schedule edit, and then came per call from Retell's inbound-call webhook (dynamic variables, removed with Retell on 2026-10-17); today the receptionist asks for it with `get_catalog` when it needs it (`formatScheduleForPrompt` writes the schedule in Spanish prose there), so the prompt stays constant-size regardless of how large a business's catalog grows.
+Since 2026-09-04 the prompt text itself no longer contains the business's services, professionals or schedule — only the static per-axis instructions above. The receptionist asks for that data with `get_catalog` when it needs it (`formatScheduleForPrompt` writes the schedule in Spanish prose there), so the prompt stays constant-size regardless of how large a business's catalog grows.
 
-**GDPR note on the fisioterapia niche instruction:** it intentionally asks for the visit reason in general terms and does not solicit medical detail. Health data has a separate legal basis under GDPR Art. 9(2)(h) for the clinic itself as data controller, but no DPA with the voice provider (Retell when this was written, Telnyx now) has been checked to reflect that category explicitly — until one does, don't add a structured field (a Telnyx insight, a field of the final report or a `Booking`/`Lead` column) that captures or labels health data. Free-text mentions volunteered by the caller still land in the transcript like the rest of the conversation, under the same protection as everything else.
+**GDPR note on the fisioterapia niche instruction:** it intentionally asks for the visit reason in general terms and does not solicit medical detail. Health data has a separate legal basis under GDPR Art. 9(2)(h) for the clinic itself as data controller, but no DPA with the voice provider (Telnyx) has been checked to reflect that category explicitly — until one does, don't add a structured field (a Telnyx insight, a field of the final report or a `Booking`/`Lead` column) that captures or labels health data. Free-text mentions volunteered by the caller still land in the transcript like the rest of the conversation, under the same protection as everything else.
 
 **Who calls `buildManagedAgentPrompt()` and pushes the result:** `loadManagedAssistantConfig` in `telnyxAgentSync.ts`, used by `createTelnyxAssistantForAgent` and `syncAgentToTelnyx` (see § Voice Orchestrator, «Sync») — it re-fetches the business's current settings from Postgres, builds the prompt with the languages and the owner transfer of the same resolution, and writes the panel copy (`Agent.systemPrompt`) unless the prompt was edited by hand (`promptManuallyEdited`: that text goes to the assistant as is). `PATCH /business/me` also rebuilds it to save that copy. `agentBootstrap.ts`'s `getAgentTemplateForBusinessType()` calls it once at agent-creation time (with `DEFAULT_AGENT_SETTINGS`, no services yet) so a brand-new agent already has niche instructions instead of the fully generic default text — `createBusinessAgent` then rebuilds it with the business's settings before saving the `Agent` row.
 
@@ -2726,8 +2688,7 @@ generic `fields` array pattern as tone/goal/style/escalation — no registration
 "configure once, tune later" pattern already used for the rest of `AgentSettings`.
 The assistant's voice comes from `lib/idiomas/` (`resolverIdiomas`, below): the chosen voice
 (`AgentSettings.voz`) if it is one of the main language's, otherwise the first of its gender
-(`voiceGender`). Until 2026-10-17 `syncAgentToRetell` also mapped `voiceGender` to a Retell
-`voiceId` (`RETELL_VOICE_ID_BY_GENDER`).
+(`voiceGender`).
 
 #### Idiomas de atención y voz en Telnyx (desde 2026-10-02)
 
@@ -2852,8 +2813,6 @@ listas de idiomas ni decide por su cuenta:
     - El panel lo dice en la vista previa, pero su `languages` va sin la cooficial: se guarda, y
       una cooficial ahí pasaría a ser el principal. Cambiar la dirección resincroniza solo si
       cambia la cooficial.
-  - Hasta el 17-10 había también `ajustesParaRetell`, `idiomaDeRetell` y
-    `usaVozMultilingueEnRetell`: Retell, el respaldo, recibía solo el principal y el español.
 - `panel.ts`: el catálogo del panel (cada principal con su `tipo` —obligatorio, cooficial o
   extranjero—, los `idiomas` que habla con él, la `entradilla` «Habla en N idiomas: …», lo que
   `requiere` del plan para elegirlo —desde el 07-10, `null` en todos—, su `familia`, sus voces con
@@ -2935,8 +2894,7 @@ olvida al guardar.
     abajo). Contesta entre 1,4 y 2 s en vez de ~0,9 s, también a quien habla castellano, y el
     panel lo avisa.
   - Con catalán, el prompt pide adaptarse al valenciano y al balear.
-- **Transcripción de respaldo** (`transcription.fallback_models`, desde el 18-10, PR 7 de
-  `PLAN-RETIRAR-RETELL.md`): si el modelo en uso falla al empezar o a mitad de llamada, Telnyx
+- **Transcripción de respaldo** (`transcription.fallback_models`, desde el 18-10): si el modelo en uso falla al empezar o a mitad de llamada, Telnyx
   pasa al siguiente sin cortar. Con flux: `deepgram/nova-3` en el mismo idioma (mismas
   `keyterm`, `smart_format` y `numerals`) y después `soniox/stt-rt-v5` en `auto` (con la pista
   si flux tiene un solo idioma), que cubre una caída entera de Deepgram. Con Soniox:
@@ -3077,7 +3035,7 @@ The `businessType` field stores the business niche selected during registration.
 
 - Build a readable agent display name (`buildAgentDisplayName`) that includes the niche label, making agents easy to tell apart.
 - Resolve the agent template (`getAgentTemplateForBusinessType`), which builds an initial prompt already including the niche instruction (`NICHE_INSTRUCTIONS`, see Managed Agent Prompt). TTS/LLM/STT settings are still shared across all niches — only prompt content differs today.
-- Rename the agent row (`syncAgentNameWithBusinessType`, cosmetic only) and resync the assistant's prompt (`syncAgentToTelnyx`, from `PATCH /business/me`) when the business type changes, since it changes the niche instruction. Until 2026-10-17 it also renamed the Retell agent and rebuilt its `post_call_analysis_data`.
+- Rename the agent row (`syncAgentNameWithBusinessType`, cosmetic only) and resync the assistant's prompt (`syncAgentToTelnyx`, from `PATCH /business/me`) when the business type changes, since it changes the niche instruction.
 
 Niche landings pass `?niche=<slug>` to `/planes` and on to `/register`, so the type can be pre-selected. If the user comes from the generic flow, the type is inferred from the `types` array returned by Google Places API (`backend/src/modules/places/service.ts`) using the keywords defined in `BUSINESS_TYPE_PLACE_KEYWORDS` (both in `backend/src/lib/businessType.ts` and `frontend/src/lib/business-type.ts`). Each niche has exactly 2 keywords; if any place type contains at least one of them, that niche is assigned. The mapping is ordered from most specific to most generic:
 
@@ -3323,7 +3281,7 @@ Separate suite (`npm run test:integration`, config `backend/vitest.integration.c
 - **JWT_SECRET** is mandatory — the server refuses to start without it.
 - CORS is restricted to the exact `APP_URL`, `WEB_URL` and `EXTRA_ALLOWED_ORIGIN` origins (`lib/urls.ts › origenesPermitidos`).
 - Rate limiting is active globally (100 req/min per IP, counted in Postgres since PR A) and raised for the Telnyx webhooks (300 req/min). `/auth/register` and the other credential routes use 5/min, `/login` 10/min; Places endpoints use 20/min. Internal job routes (`/internal/jobs/*`) are exempt.
-- Telnyx webhook signatures (Ed25519, `telnyx-signature-ed25519` with a timestamp window) are verified once, in the encapsulated `preHandler` of `plugins/firmaTelnyx.ts`, for every route of `modules/webhooksTelnyx/routes.ts`: Call Control and WhatsApp events, the voice tools and the Gestor tools. Retell's `x-retell-signature` check (`plugins/firmaRetell.ts`) went with its routes on 2026-10-17.
+- Telnyx webhook signatures (Ed25519, `telnyx-signature-ed25519` with a timestamp window) are verified once, in the encapsulated `preHandler` of `plugins/firmaTelnyx.ts`, for every route of `modules/webhooksTelnyx/routes.ts`: Call Control and WhatsApp events, the voice tools and the Gestor tools.
 - Stripe webhook signatures are verified in the route handler before calling `handleStripeEvent` (route uses `rawBody: true`).
 - Raw body parsing is enabled only on the signed webhook routes (Telnyx and Stripe) to avoid memory overhead on regular routes.
 - Business-scoped queries must always filter by `request.user.businessId`. Do not accept a `businessId` from the body for reads/writes.
@@ -3482,8 +3440,7 @@ fusionar o descartar una rama, quita su fila de esta tabla.
     `lib/gestorPayload.ts`/`lib/gestorSync.ts` (`lib/idiomas/` and the rest were added on
     2026-10-07, after a change only in `idiomas/resolver.ts`, PR #262, came out as "nada que
     propagar") — the job forces the `telnyx-reconciler` Cloud Scheduler job
-    instead of waiting for its daily 04:00 pass (until 2026-10-17 it also warned that the Retell
-    fallback had to be synced by hand). It never fails the deploy: if the
+    instead of waiting for its daily 04:00 pass. It never fails the deploy: if the
     trigger is refused (the CI service account needs `roles/cloudscheduler.jobRunner`), the
     daily pass will reconcile anyway. This exists because a deploy changes the code that *runs*
     tools but not the prompt and tool URLs **baked into each assistant at the provider** — on
@@ -3546,7 +3503,7 @@ fusionar o descartar una rama, quita su fila de esta tabla.
     referenced them: `GOOGLE_CLIENT_SECRET` (which Vercel itself flagged `readable-secret`),
     `GOOGLE_CLIENT_ID`, `GOOGLE_REDIRECT_URI` and `FRONTEND_URL`. Those belong to the backend and
     live in Secret Manager. The three `NEXT_PUBLIC_VAPI_DEMO_*` entries are unused too (the
-    landing demo ran on Retell then; on Telnyx since 2026-09-22) but were left alone.
+    landing demo is on Telnyx) but were left alone.
 - **Auth: Workload Identity Federation, no stored keys.** A dedicated service account
   (`github-actions-ci@project-84381467-a606-4b71-a6e.iam.gserviceaccount.com`, least-privilege —
   deliberately *not* the default Compute Engine SA that Cloud Run/Cloud Build use for everything
@@ -3563,7 +3520,7 @@ fusionar o descartar una rama, quita su fila de esta tabla.
 - The `backend/Dockerfile` has 5 stages: `base`, `deps`, `builder`, `runtime`, `development`.
 - Production image runs `node dist/server.js` (compiled output).
 - Development image runs `npx tsx watch backend/src/server.ts` over a volume-mounted source tree.
-- Health check endpoint at `GET /health` probes Postgres on every request and, while the revision has `REDIS_URL`, Redis through the locks' compatibility client (`pingDeRedisDeCompatibilidad`, since PR B; before, the general client `lib/redis.ts`, now deleted) — they alone decide `200`/`503` (and the deploy's automatic rollback). Without `REDIS_URL` (phase 2 of the cut) Redis is not listed. Telnyx (`balance.retrieve`), when `TELNYX_API_KEY` is set, is informational only (`lib/salud.ts`, `comprobarSalud`) and is asked **at most once a minute per instance** (`conMemoria`, since 2026-10-11, issue #281): a success is kept 60 s and a failure 15 s, and concurrent requests share one probe. Before that every uptime-check probe (every 60 s from 6 regions, ~8,600 a day) opened fresh TLS connections to the voice providers (then Telnyx and Retell; Retell's probe, `agent.list`, went with it on 2026-10-17) — ~30 MB/day of internet egress and ~17,000 useless provider API calls a day.
+- Health check endpoint at `GET /health` probes Postgres on every request and, while the revision has `REDIS_URL`, Redis through the locks' compatibility client (`pingDeRedisDeCompatibilidad`, since PR B; before, the general client `lib/redis.ts`, now deleted) — they alone decide `200`/`503` (and the deploy's automatic rollback). Without `REDIS_URL` (phase 2 of the cut) Redis is not listed. Telnyx (`balance.retrieve`), when `TELNYX_API_KEY` is set, is informational only (`lib/salud.ts`, `comprobarSalud`) and is asked **at most once a minute per instance** (`conMemoria`, since 2026-10-11, issue #281): a success is kept 60 s and a failure 15 s, and concurrent requests share one probe. Before that every uptime-check probe (every 60 s from 6 regions, ~8,600 a day) opened fresh TLS connections to the voice providers — ~30 MB/day of internet egress and ~17,000 useless provider API calls a day.
 
 ### Local development (Docker Compose)
 
@@ -3607,8 +3564,7 @@ Plan del corte (decidido por el dueño el 2026-10-10, con 72 h de vigilancia ent
 
 Desde el PR B nada usa ya el cliente general de Redis (`lib/redis.ts`, borrado): todo el estado temporal vive en Postgres (`lib/almacenTemporal.ts`) y Redis solo queda como espejo de los cerrojos mientras haya `REDIS_URL` (fases 2 a 4 del plan, arriba).
 
-- **Qué se movió, con las mismas claves:** a `claves_temporales` (texto o JSON, caducidad en ms; con `businessId` cuando la clave es de un negocio, para que se borre con él): el pase de un solo uso (`auth:pase:*`, 60 s), el token de restablecer contraseña (`auth:password-reset:*`, 1 h), los `state` y sesiones de Google/Facebook (`auth:google|facebook:state|session:*`) y del calendario (`calendar_oauth_state:*`, 10 min), el draft del token de disponibilidad (`availability_draft:*`), la caché de voz (`voice_config:<biz>`, 1 h; se conserva, con su invalidación de siempre en `lib/voiceConfigCache.ts`), el aviso único de reserva pendiente (`pending_booking_alert:<biz>`, SET NX de 1 h), el intento fallido (`intento_reserva_fallido:*`), las patas sin `Call` (`telnyx:pata_sin_call:*`), la elección de negocio del cliente de WhatsApp (`wa:cliente:negocio:*`, 6 h), el turno y la propuesta del Gestor (`gestor:turno|propuesta:<biz>`, 180 s) y la comprobación del desvío (`desvio:check:*`, un objeto de campos con escritura por campo; ver § Comprobar desvío). A `contadores`: el tope de avisos de cita pendiente por hora, los turnos del día de los chats de cliente y dueño y el límite de 3 comprobaciones de desvío por hora. Las rachas del health-check de Telnyx iban a la fila única de `salud_telnyx` (`lib/saludTelnyx.ts`), hasta que el failover se retiró el 17-10 (la tabla sigue en la BD con `@@ignore` hasta la PR 3 de `PLAN-RETIRAR-RETELL.md`).
-- **Rachas de Telnyx, una lectura por tick** (hasta el 17-10): cada lectura del health-check llevaba su tick (`X-CloudScheduler-ScheduleTime`) y una sola sentencia solo la contaba si era posterior a la última contada; con Redis, dos entregas de la misma lectura degradada sumaban dos (INCR) y bastaban para mover todo el tráfico a Retell.
+- **Qué se movió, con las mismas claves:** a `claves_temporales` (texto o JSON, caducidad en ms; con `businessId` cuando la clave es de un negocio, para que se borre con él): el pase de un solo uso (`auth:pase:*`, 60 s), el token de restablecer contraseña (`auth:password-reset:*`, 1 h), los `state` y sesiones de Google/Facebook (`auth:google|facebook:state|session:*`) y del calendario (`calendar_oauth_state:*`, 10 min), el draft del token de disponibilidad (`availability_draft:*`), la caché de voz (`voice_config:<biz>`, 1 h; se conserva, con su invalidación de siempre en `lib/voiceConfigCache.ts`), el aviso único de reserva pendiente (`pending_booking_alert:<biz>`, SET NX de 1 h), el intento fallido (`intento_reserva_fallido:*`), las patas sin `Call` (`telnyx:pata_sin_call:*`), la elección de negocio del cliente de WhatsApp (`wa:cliente:negocio:*`, 6 h), el turno y la propuesta del Gestor (`gestor:turno|propuesta:<biz>`, 180 s) y la comprobación del desvío (`desvio:check:*`, un objeto de campos con escritura por campo; ver § Comprobar desvío). A `contadores`: el tope de avisos de cita pendiente por hora, los turnos del día de los chats de cliente y dueño y el límite de 3 comprobaciones de desvío por hora. Las rachas del health-check de Telnyx iban a la fila única de `salud_telnyx` (`lib/saludTelnyx.ts`), hasta que el failover se retiró el 17-10.
 - **Cerrojo de reserva con detalle (D1):** `book_appointment` usa `adquirirCerrojoDeReserva` (`lib/bookingLock.ts`) y separa `ocupado` (otra reserva del negocio la tiene: `BOOKING_LOCK_TIMEOUT`, «Hay otra reserva de este negocio en curso…») de `error` (el almacén no respondió: `BOOKING_LOCK_ERROR`, «Ahora mismo no puedo dejar la cita confirmada en la agenda…», con el motivo en el log); en los dos casos guarda la cita pendiente y encola el reintento. El aviso al dueño (`motivoDeFallo` en `whatsapp/avisosNegocio.ts`) y el panel (`motivoDeCitaPendiente` en `frontend/src/lib/llamadas.ts`) dicen «otra reserva estaba entrando a la vez» / «un fallo técnico momentáneo»; antes el aviso buscaba `BOOKING_LOCK` y, con el código real, decía «tu calendario no respondió».
 - **Lo que se pierde al desplegar:** el estado temporal que estaba en Redis no se copia. Lo que esté a medias en ese momento se rehace solo o se pide otra vez: un enlace de restablecer contraseña de la última hora o un `state` de OAuth de los últimos 10 min dan «no válido» (se pide otro), un pase de registro de los últimos 60 s da «El pase ha caducado» y hay que iniciar sesión, un draft de disponibilidad de los últimos 5 min hace que la recepcionista vuelva a mirar el hueco, la caché de voz se relee de la BD, los topes por hora y los turnos del día de los chats empiezan de cero, el aviso de reserva pendiente puede salir una vez más en esa hora, la elección de negocio del cliente de WhatsApp se vuelve a preguntar y las rachas de Telnyx empiezan de cero. Por eso se despliega en una ventana tranquila, como el PR A.
 
@@ -3627,7 +3583,7 @@ Notification channels, not in code.
 | **Cloud Tasks · cola que no baja** | `cloudtasks.googleapis.com/queue/depth`, any queue, 5-min mean **> 200 for 15 min** | Queues drain in seconds at current traffic; a queue that grows is a task failing in a loop. Same incident peaked at ~9,000. |
 | **alhabla-api · /health caído** | Uptime check `alhabla-api-health-tJzyQ7cVqx8` (HTTPS `api.alhabla.ai/health` every minute from 6 regions, must contain `"status":"ok"`) failing from **more than one region for 60 s** | One region failing is usually the checker; two is us. |
 | **alhabla-api · cerrojos de citas con errores** | Log match (added 2026-10-12, PR A vigilance): stderr `[Cerrojo]` or `[Compat Redis]`, or `[Purga] No se pudo purgar`, from `alhabla-api`; at most one email per 30 min, auto-close after 30 min | Every `[Cerrojo]` line is an error: a booking, change or cancellation that did not happen (the lock fails closed, never double-books). `[Compat Redis]` errors mean the compatibility Redis is down or slow, which makes every lock fail closed. Kept after the 72 h of PR A vigilance. |
-| **alhabla-api · llamadas de voz con fallos** | Log match (added 2026-10-17, `PLAN-RETIRAR-RETELL.md` PR 5): `textPayload` with `[Telnyx] No se pudo contestar`, `[Telnyx] Error procesando inicio de`, `[Telnyx] No se pudo procesar el evento`, `[Telnyx] Error procesando call.`, `sin assistant Telnyx operativo o suspendido` or `[Salud] ` from `alhabla-api`; at most one email per 30 min, auto-close after 30 min | A voice failure was invisible until then: `/webhooks/telnyx` answers **404, not 5xx**, when `handleCallInitiated` fails, so the 5xx policy never sees it. `[Salud]` comes from `avisarDeLlamadasSinResultado` (`jobs/cleanupZombieCalls.ts`, every 15 min): Telnyx calls that ended 10–25 min ago with cost ≠ 0 and no `outcome` (the conversation insights never arrived), each reported once. A suspended business also logs `sin assistant…`: legitimate after a missed payment. |
+| **alhabla-api · llamadas de voz con fallos** | Log match (added 2026-10-17): `textPayload` with `[Telnyx] No se pudo contestar`, `[Telnyx] Error procesando inicio de`, `[Telnyx] No se pudo procesar el evento`, `[Telnyx] Error procesando call.`, `sin assistant Telnyx operativo o suspendido` or `[Salud] ` from `alhabla-api`; at most one email per 30 min, auto-close after 30 min | A voice failure was invisible until then: `/webhooks/telnyx` answers **404, not 5xx**, when `handleCallInitiated` fails, so the 5xx policy never sees it. `[Salud]` comes from `avisarDeLlamadasSinResultado` (`jobs/cleanupZombieCalls.ts`, every 15 min): Telnyx calls that ended 10–25 min ago with cost ≠ 0 and no `outcome` (the conversation insights never arrived), each reported once. A suspended business also logs `sin assistant…`: legitimate after a missed payment. |
 | **alhabla-api · WhatsApp rechazado por Meta** | Log match (added 2026-10-17, PR 5): `textPayload:"[WhatsApp] Meta rechazó"`; at most one email per hour, auto-close after 1 h | A deferred `statuses[].failed` on a message to a client (`aplicarEfectosDeEntrega`): a confirmation, reminder or notice that never arrived. 1 in 175 sends up to 2026-10-17. |
 | **alhabla-api · límite de peticiones solo en local** | Log match (added 2026-10-11, PR A): `textPayload:"no se abre otra hasta"` from `alhabla-api`; at most one email per hour, auto-close after 30 min | Fires when an instance has 2 limiter connections discarded by a timeout in 15 min and stops opening new ones: up to 15 min counting the rate limit locally with Postgres healthy, which `/health` does not see (§ Corte de Redis a Postgres, «Conexión desechada y tope»). |
 
@@ -3695,20 +3651,6 @@ URLs are baked into each assistant at the provider.
 - Between the deploy and the resync an agent may have a new prompt with an old schema or
   vice versa: handlers treat a missing `professionalConfirmed` as false and nothing in the
   booking path depends on the new field to complete a plain reservation.
-- Until 2026-10-17 the Retell fallback had to be synced by hand against production
-  (`scripts/syncManagedAgentPrompts.ts`, deleted with it).
-
-### Cleaning the Retell account
-
-Done on 2026-10-17, with the user's permission, before PR 3 removed the adapter: a throwaway
-script over `RetellAdapter` deleted the 6 imported numbers, 13 agents and 13 LLMs (225 LLM
-versions) of the account shared by dev and production; nothing was left. In Telnyx, the FQDN
-connection «Alhabla» (`3036588299167729519`, the SIP trunk to Retell, `TELNYX_SIP_CONNECTION_ID`)
-was deleted after moving its last number, `+34930453216` (tagged `sin-negocio`, no business in
-any environment), to the production Call Control App. The Cloud Run variables and the Secret
-Manager secrets of Retell and Vapi (`RETELL_API_KEY`, `RETELL_SIP_TRUNK_AUTH_PASSWORD`,
-`VAPI_API_KEY`, `VAPI_WEBHOOK_SECRET`) are gone too. Closing the Retell account itself and
-revoking its key is the user's decision.
 
 ### Re-syncing webhook URLs
 

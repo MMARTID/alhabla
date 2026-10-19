@@ -195,7 +195,7 @@ export async function provisionPhoneNumber(businessId: string): Promise<{
       order = await telnyxAdapter.getNumberOrder(business.telnyxNumberOrderId);
     } else {
       // El número va al Call Control App de Telnyx, que contesta todas las
-      // llamadas (PLAN-RETIRAR-RETELL.md).
+      // llamadas (docs/historico/PLAN-RETIRAR-RETELL.md).
       const connectionId = process.env.TELNYX_CALL_CONTROL_APP_ID;
       if (!connectionId) {
         throw new Error(

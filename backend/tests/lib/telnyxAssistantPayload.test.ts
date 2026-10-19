@@ -376,7 +376,7 @@ describe("buildTelnyxAssistantPayload", () => {
         numerals: true,
       },
       // Si flux falla: nova-3 (mismo proveedor) y Soniox (otro), con las
-      // mismas palabras clave (PR 7 de PLAN-RETIRAR-RETELL.md).
+      // mismas palabras clave (PR 7 de docs/historico/PLAN-RETIRAR-RETELL.md).
       fallback_models: [
         {
           model: "deepgram/nova-3",

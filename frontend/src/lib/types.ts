@@ -11,7 +11,7 @@ export type CallSentiment = "POSITIVE" | "NEUTRAL" | "NEGATIVE";
 
 /**
  * Motivo por el que una llamada acabó escalada o sin completar la reserva,
- * clasificado por el análisis post-llamada de Retell.
+ * clasificado al terminar la llamada.
  */
 export type CallEscalationReason =
   | "CLIENTE_LO_PIDIO"
@@ -542,8 +542,7 @@ export type Agent = {
 
 export type TranscriptMessage = {
   role?: string;
-  content?: string; // Retell
-  text?: string; // Telnyx
+  text?: string;
   timestamp?: string;
   createdAt?: string;
   sentAt?: string;
@@ -652,7 +651,7 @@ export type Call = {
   requestedService: string | null;
   durationSecs: number | null;
   costCents: number | null;
-  /** "telnyx" | "retell" para llamadas; "whatsapp" para chats con la recepcionista. */
+  /** "telnyx" para llamadas; "whatsapp" para chats con la recepcionista. */
   voiceProvider: string;
   /** El cliente pidió en la llamada que no se grabara: no hay audio, solo
    * la transcripción. */

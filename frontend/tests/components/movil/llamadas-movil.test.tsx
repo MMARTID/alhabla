@@ -212,8 +212,8 @@ describe("HojaLlamada", () => {
           fullText: "",
           createdAt: "2026-10-01T15:05:34Z",
           messages: [
-            { role: "assistant", content: "Peluquería Aurora, ¿en qué puedo ayudarte?" },
-            { role: "user", content: "¿Hacéis microblading?" },
+            { role: "assistant", text: "Peluquería Aurora, ¿en qué puedo ayudarte?" },
+            { role: "user", text: "¿Hacéis microblading?" },
           ],
         },
       })
