@@ -72,7 +72,7 @@ const VENTANA_DEL_BARRIDO_MS = 15 * 60 * 1000;
  * resultado del panel y el cobro por resultado dependen de ellos. Las de
  * coste 0 colgaron antes de que contestara el assistant y no cuentan. Deja
  * un `console.error` con «[Salud]», que vigila la alerta «llamadas de voz con
- * fallos» (AGENTS.md § Alertas; PLAN-RETIRAR-RETELL.md, PR 5). Nunca lanza:
+ * fallos» (AGENTS.md § Alertas; docs/historico/PLAN-RETIRAR-RETELL.md, PR 5). Nunca lanza:
  * es un aviso, y el barrido de zombis ya ha hecho su trabajo.
  */
 export async function avisarDeLlamadasSinResultado(

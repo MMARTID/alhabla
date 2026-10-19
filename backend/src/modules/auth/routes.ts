@@ -351,7 +351,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
       }
 
       // Ya no decide nada (elegía el orquestador de voz, y desde el 17-10
-      // solo hay Telnyx: PLAN-RETIRAR-RETELL.md), pero el registro de la web
+      // solo hay Telnyx: docs/historico/PLAN-RETIRAR-RETELL.md), pero el registro de la web
       // lo sigue mandando: se valida para no cambiar el contrato.
       if (typeof isEuropeanUnion !== "boolean") {
         return reply

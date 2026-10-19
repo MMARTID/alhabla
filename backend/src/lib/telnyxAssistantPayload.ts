@@ -519,7 +519,7 @@ function transcripcionDeSoniox(
     ...ajustesDeSoniox(pistas, boostedKeywords),
     // Si Soniox cae, nova-3 (Deepgram) en `multi`: pierde el catalán, el
     // euskera o el gallego, pero la llamada sigue entendiendo español e
-    // inglés en vez de quedarse sorda (PLAN-RETIRAR-RETELL.md, PR 7).
+    // inglés en vez de quedarse sorda (docs/historico/PLAN-RETIRAR-RETELL.md, PR 7).
     fallback_models: [respaldoDeNova3("multi", boostedKeywords)],
   };
 }
@@ -837,7 +837,7 @@ export function buildTelnyxAssistantPayload(
           model: "deepgram/flux",
           language: transcripcion.idioma,
           // Respaldo si flux falla al empezar o a mitad de llamada
-          // (PLAN-RETIRAR-RETELL.md, PR 7; validado contra la API el 18-10
+          // (docs/historico/PLAN-RETIRAR-RETELL.md, PR 7; validado contra la API el 18-10
           // con los ocho idiomas de flux y `multi`): nova-3, del mismo
           // proveedor, y después Soniox, que cubre una caída entera de
           // Deepgram. Telnyx exige que todos sean de streaming.
@@ -947,7 +947,7 @@ export function buildTelnyxAssistantPayload(
       // fallos seguidos del LLM, unos 40 s de silencio), Telnyx pasa la
       // llamada a este número en vez de dejar al cliente sin nadie. Solo
       // cuando el dueño acepta que le pasen llamadas (regla (a) de
-      // PLAN-RETIRAR-RETELL.md, PR 6): el mismo destino que la tool
+      // docs/historico/PLAN-RETIRAR-RETELL.md, PR 6): el mismo destino que la tool
       // `transfer`, y la pata sale, como la de la tool, con el número de
       // Alhabla. No salta si el cliente cuelga, si el assistant termina bien
       // o si ya transfirió. Siempre se manda: Telnyx mezcla

@@ -297,7 +297,7 @@ export async function createTelnyxAssistantForAgent(args: {
 /**
  * Crea el assistant Telnyx de un agente y apunta en el negocio si es
  * elegible. Hasta el 17-10 además lo promocionaba a Telnyx-primary
- * (`orchestrator`); desde que no hay Retell (PLAN-RETIRAR-RETELL.md) todo
+ * (`orchestrator`); desde que no hay Retell (docs/historico/PLAN-RETIRAR-RETELL.md) todo
  * negocio es de Telnyx y su número va siempre al Call Control App
  * (phone/service.ts).
  *

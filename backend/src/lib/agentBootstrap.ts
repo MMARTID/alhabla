@@ -17,7 +17,7 @@ import { listaDeEsperaDisponible } from "../modules/whatsapp/service.js";
  * Alta del agente de un negocio: la fila `Agent` (con el prompt gestionado
  * de partida) y su assistant de Telnyx, que atiende todas las llamadas.
  * Hasta el 17-10 creaba también un agente de Retell como respaldo, que nunca
- * llegó a coger una llamada (PLAN-RETIRAR-RETELL.md).
+ * llegó a coger una llamada (docs/historico/PLAN-RETIRAR-RETELL.md).
  */
 
 export type AgentTemplateConfig = {

@@ -3,7 +3,7 @@
  * ver TelnyxAiAdapter.createAssistantTest) con el caso de reserva de
  * extremo a extremo de cada nicho — uno por cada uno de los 5 negocios de
  * desarrollo. Nació como el equivalente de las simulaciones de Retell,
- * retiradas el 17-10 (PLAN-RETIRAR-RETELL.md).
+ * retiradas el 17-10 (docs/historico/PLAN-RETIRAR-RETELL.md).
  *
  * Idempotente: si ya existe un test con el mismo `name` en el test_suite
  * "alhabla-dev-simulaciones", se omite en vez de duplicarlo.

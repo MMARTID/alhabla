@@ -358,7 +358,7 @@ function Dato({ termino, valor, numerico = false }: { termino: string; valor: st
 export function Transcripcion({ call, timeZone }: { call: Call; timeZone: string }) {
   const mensajes = call.transcript ? parseTranscriptMessages(call.transcript.messages) : null;
   const visibles = (mensajes ?? []).filter((mensaje) => {
-    const texto = mensaje.content ?? mensaje.text ?? "";
+    const texto = mensaje.text ?? "";
     return mensaje.role !== "tool" && texto.trim().length > 0;
   });
 
@@ -385,7 +385,7 @@ export function Transcripcion({ call, timeZone }: { call: Call; timeZone: string
                   <span className="mb-0.5 block text-[11px] font-bold uppercase tracking-[0.12em] opacity-75">
                     {cliente ? "Cliente" : "Agente"}
                   </span>
-                  {mensaje.content ?? mensaje.text}
+                  {mensaje.text}
                 </div>
               </div>
             );

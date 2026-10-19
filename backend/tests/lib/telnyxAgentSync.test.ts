@@ -542,7 +542,7 @@ describe("createTelnyxAssistantForAgent", () => {
   });
 });
 
-// Desde el 17-10 no hay promoción a Telnyx-primary (PLAN-RETIRAR-RETELL.md):
+// Desde el 17-10 no hay promoción a Telnyx-primary (docs/historico/PLAN-RETIRAR-RETELL.md):
 // todo negocio es de Telnyx; solo se crea el assistant y se apunta la
 // elegibilidad.
 describe("crearAssistantDelNegocio", () => {

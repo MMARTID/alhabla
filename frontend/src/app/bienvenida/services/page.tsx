@@ -107,15 +107,10 @@ export default function RegisterBusinessServicesPage() {
       const servicesToCreate = allTemplates.filter(
         (service) => selected.has(service.name) && !existingNames.has(service.name),
       );
-      // Uno por uno, NO en paralelo: cada servicio creado dispara una
-      // sincronización completa del agente de Retell (borrador -> publicar)
-      // para el mismo agente, y dos de esas sincronizaciones a la vez para
-      // el mismo agente compiten entre sí — Retell responde "Cannot update
-      // published LLM" cuando una publica justo entre que la otra lee el
-      // borrador y lo actualiza. Antes casi nunca se disparaba (la
-      // selección venía premarcada y "configurar después" evitaba crear
-      // varios de golpe); con la selección mínima de 4 pasó a ser el
-      // camino normal, y encontrado 2026-09-14 probando el onboarding real.
+      // Uno por uno, NO en paralelo: cada servicio creado vuelve a
+      // sincronizar la recepcionista entera, y varias sincronizaciones del
+      // mismo assistant a la vez se pisarían entre sí. Con la selección
+      // mínima de 4 servicios es el camino normal del alta.
       let anyFailed = false;
       for (const service of servicesToCreate) {
         try {

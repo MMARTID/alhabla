@@ -415,7 +415,7 @@ describe("handleCallInitiated", () => {
     errorLog.mockRestore();
   });
 
-  // Decisión del usuario del 17-10 (PLAN-RETIRAR-RETELL.md, PR 4): si
+  // Decisión del usuario del 17-10 (docs/historico/PLAN-RETIRAR-RETELL.md, PR 4): si
   // Telnyx no deja contestar ni reintentando, se cuelga para que el cliente
   // note el corte y vuelva a llamar; antes la llamada sonaba sin fin.
   describe("cuando Telnyx no deja contestar", () => {

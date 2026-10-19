@@ -484,7 +484,7 @@ export async function handleCallInitiated(
       });
     } catch (error) {
       if (!(error instanceof NoSePudoContestar)) throw error;
-      // Decisión del usuario del 17-10 (PLAN-RETIRAR-RETELL.md): si no se
+      // Decisión del usuario del 17-10 (docs/historico/PLAN-RETIRAR-RETELL.md): si no se
       // puede contestar, se cuelga, para que el cliente note el corte y
       // vuelva a llamar en vez de oír tonos hasta cansarse. Salvo que un
       // intento agotara el tiempo y Telnyx pudiera ejecutarlo: entonces la

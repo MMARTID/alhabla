@@ -192,7 +192,7 @@ export function outcomeTone(outcome: CallOutcome | null): "success" | "warning" 
   return "neutral";
 }
 
-/** Etiqueta en español del tono/sentimiento del cliente detectado por Retell.
+/** Etiqueta en español del tono/sentimiento del cliente en la llamada.
  * Eje distinto al resultado (outcome): esto es cómo se sintió, no qué pasó. */
 export function sentimentLabel(sentiment: CallSentiment | null) {
   const labels: Record<CallSentiment, string> = {
