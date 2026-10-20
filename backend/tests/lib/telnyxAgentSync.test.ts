@@ -140,6 +140,59 @@ describe("createTelnyxAssistantForAgent", () => {
     expect(mockedListaDeEspera).toHaveBeenCalledTimes(2);
   });
 
+  // En Inicio el recordatorio por WhatsApp no sale (recordatorios_cita es
+  // de Pro y Scale): la recepcionista no lo ofrece.
+  it("ofrece el recordatorio por WhatsApp solo si el plan lo manda", async () => {
+    mockedCreateAssistant.mockResolvedValue({
+      id: "assistant_1",
+      name: "alhabla-biz1-agent1",
+      instructions: "i",
+    });
+
+    mockedBusinessFindUnique.mockResolvedValue({
+      ...BASE_BUSINESS,
+      plan: "pro",
+      stripePriceId: null,
+    } as any);
+    await createTelnyxAssistantForAgent({ agentId: "agent1", businessId: "biz1" });
+    expect(mockedCreateAssistant.mock.calls[0][0].instructions).toContain(
+      "le envías la confirmación y un recordatorio por WhatsApp"
+    );
+
+    mockedBusinessFindUnique.mockResolvedValue({
+      ...BASE_BUSINESS,
+      plan: "basic",
+      stripePriceId: null,
+    } as any);
+    await createTelnyxAssistantForAgent({ agentId: "agent1", businessId: "biz1" });
+    const enInicio = mockedCreateAssistant.mock.calls[1][0].instructions;
+    expect(enInicio).toContain("le envías la confirmación por WhatsApp");
+    expect(enInicio).not.toContain("un recordatorio por WhatsApp");
+    expect(mockedBusinessFindUnique).toHaveBeenCalledWith(
+      expect.objectContaining({
+        select: expect.objectContaining({ plan: true, stripePriceId: true }),
+      })
+    );
+  });
+
+  it("lleva la regla de «Dar precios» del negocio al prompt", async () => {
+    mockedCreateAssistant.mockResolvedValue({
+      id: "assistant_1",
+      name: "alhabla-biz1-agent1",
+      instructions: "i",
+    });
+    mockedBusinessFindUnique.mockResolvedValue({
+      ...BASE_BUSINESS,
+      agentSettings: { ...DEFAULT_AGENT_SETTINGS, darPrecios: "nunca" },
+    } as any);
+
+    await createTelnyxAssistantForAgent({ agentId: "agent1", businessId: "biz1" });
+
+    const instrucciones = mockedCreateAssistant.mock.calls[0][0].instructions;
+    expect(instrucciones).toContain("## Precios");
+    expect(instrucciones).toContain("No des precios");
+  });
+
   it("crea el assistant y persiste su id cuando el negocio es elegible", async () => {
     mockedBusinessFindUnique.mockResolvedValue(BASE_BUSINESS as any);
     mockedCreateAssistant.mockResolvedValue({

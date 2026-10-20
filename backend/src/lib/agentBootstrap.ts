@@ -12,6 +12,7 @@ import {
 import { componerSaludo } from "./idiomas/catalogo.js";
 import { crearAssistantDelNegocio } from "./telnyxAgentSync.js";
 import { listaDeEsperaDisponible } from "../modules/whatsapp/service.js";
+import { recordatorioIncluido } from "./planFeatures.js";
 
 /**
  * Alta del agente de un negocio: la fila `Agent` (con el prompt gestionado
@@ -175,6 +176,8 @@ export async function createBusinessAgent(args: {
       minAdvanceBookingMinutes: true,
       maxAppointmentDurationMinutes: true,
       hideOwnerNumberFromClients: true,
+      plan: true,
+      stripePriceId: true,
     },
   });
 
@@ -202,6 +205,7 @@ export async function createBusinessAgent(args: {
       minAdvanceBookingMinutes: business?.minAdvanceBookingMinutes,
       maxAppointmentDurationMinutes: business?.maxAppointmentDurationMinutes,
       listaDeEspera,
+      recordatorioPorWhatsapp: recordatorioIncluido(business ?? {}),
       ocultarNumeroDelNegocio: business?.hideOwnerNumberFromClients,
     }),
   };

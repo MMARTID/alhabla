@@ -85,6 +85,17 @@ export function planAllows(planId: PlanId, feature: PlanFeature): boolean {
   return PLAN_FEATURES[planId].features.includes(feature);
 }
 
+/** ¿Manda el plan del negocio el recordatorio por WhatsApp antes de la
+ * cita? Lo mira la recepcionista para ofrecerlo (buildManagedAgentPrompt);
+ * quien lo manda de verdad es programarMensajesAlCliente, con la misma
+ * feature. */
+export function recordatorioIncluido(business: {
+  stripePriceId?: string | null;
+  plan?: string | null;
+}): boolean {
+  return planAllows(resolvePlanId(business), "recordatorios_cita");
+}
+
 /** Cómo llama la web a cada plan (`name` en web/src/lib/plans.ts). */
 const NOMBRES_DE_PLAN: Record<PlanId, string> = {
   inicio: "Inicio",

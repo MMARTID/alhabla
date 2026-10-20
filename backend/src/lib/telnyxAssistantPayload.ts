@@ -195,7 +195,7 @@ export function buildTelnyxVoiceTools(
     {
       name: "get_catalog",
       description:
-        "Única fuente de lo que ofrece el negocio: los servicios activos con sus IDs y duraciones, los profesionales y el horario. Llámala antes de confirmar o negar un servicio, un profesional o el horario, también ante una pregunta de sí o no, y antes de comprobar o reservar si necesitas un ID o una duración.",
+        "Única fuente de lo que ofrece el negocio: los servicios activos con sus IDs, duraciones y precios (si el negocio los da; en precios, cuándo decirlos), los profesionales y el horario. Llámala antes de confirmar o negar un servicio, un profesional o el horario, también ante una pregunta de sí o no, antes de decir un precio y antes de comprobar o reservar si necesitas un ID o una duración.",
       properties: {},
     },
     {
