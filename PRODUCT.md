@@ -50,13 +50,18 @@ Lo que un producto vecino no podría copiar honestamente:
 
 - **Reserva verificada, no conversación simpática.** El agente tiene prohibido inventar datos: el
   prompt le obliga a consultar `get_catalog` y a comprobar el hueco con `check_availability`
-  (horario, capacidad y calendario), que devuelve el `availabilityToken` sin el que
-  `book_appointment` no reserva. La agenda real del negocio es la fuente de verdad, no una
-  promesa que luego hay que repasar a mano.
+  (horario, capacidad, ausencias y calendario), y `book_appointment` vuelve a comprobarlo bajo un
+  cerrojo por negocio, así que dos llamadas por el mismo hueco dejan una sola cita. Ojo: el
+  `availabilityToken` solo lo exige el esquema de la tool, no el servidor. Si el calendario no
+  responde, la cita queda pendiente, el dueño recibe un WhatsApp con botones («La apunté yo»,
+  «Reintentar», «Reconectar») y se reintenta cada 6 h durante 48 h: nunca se reserva a ciegas. La
+  agenda real del negocio es la fuente de verdad, no una promesa que luego hay que repasar a mano.
 - **Vertical, no constructor genérico de agentes.** Cinco nichos españoles concretos con
-  plantillas de servicios, copy, preguntas frecuentes y textos de onboarding propios
-  (`web/src/lib/business-type.ts`, `web/src/lib/niche-landings.ts`). Una peluquería y una
-  clínica de fisioterapia no leen ni configuran lo mismo.
+  plantillas de servicios, instrucciones por sector y textos de onboarding propios
+  (`backend/src/lib/businessType.ts`, `web/src/lib/niche-landings.ts`). Una peluquería y una
+  clínica de fisioterapia no leen ni configuran lo mismo. La web tiene además página para
+  pestañas y cejas, spa y masajes y peluquería canina, que en el backend son «otros» (servicios
+  genéricos en el alta).
 - **Reparto por especialidad, no cola ciega.** Cada profesional tiene un nivel por servicio
   (especialista / lo hace / no sugerir). El agente recomienda al especialista una vez y reserva
   igualmente si el cliente insiste; nunca dice que alguien «no se le da bien».
@@ -65,8 +70,12 @@ Lo que un producto vecino no podría copiar honestamente:
   profesional, o añade/mueve/cancela una cita — hablando con Alhabla por WhatsApp, sin entrar al
   panel. El Gestor propone la acción y solo la ejecuta tras un «Confirmar» explícito — nunca de
   forma autónoma. (Reabrir un día ya cerrado todavía exige el panel web, no WhatsApp.) Está en
-  todos los planes. A 20-10-2026 no consta nada parecido en la web de HeyDiga ni en la de fonio
-  (las tablas de `/comparativa` lo dicen así, con fecha).
+  todos los planes. **No es exclusivo:** a 20-10-2026 no consta en HeyDiga ni en fonio, pero mims
+  (mims.studio, Barcelona, desde 79 €) publica un asistente por WhatsApp para el dueño, con texto
+  y audios, que mueve citas, cambia precios y horarios y cierra días; no publica que pida
+  confirmación antes ni que resuelva ausencias. Recepio (recepio.ai) cambia horario y precios a
+  través de su equipo humano. Lo que diferencia al Gestor es el «Confirmar» en cada cambio, que
+  vaya en el plan de entrada y la ausencia de punta a punta (abajo).
 - **«Mañana falta Marta»: la ausencia se resuelve entera por WhatsApp, avisos incluidos.** El
   dueño escribe que alguien del equipo no viene y el Gestor encadena tres pasos, cada uno con su
   «Confirmar» (`backend/src/modules/gestor/accionesAgenda.ts`):
@@ -81,8 +90,11 @@ Lo que un producto vecino no podría copiar honestamente:
      cancelación por WhatsApp. Nada sale al cliente sin ese sí, y no se escribe a quien pidió no
      recibir mensajes.
 
-  Ningún competidor revisado publica algo así (ver arriba). Es el ejemplo que mejor explica el
-  Gestor en una demo o en la web, porque es un problema que el dueño tiene cada semana.
+  Ningún competidor revisado el 20-10-2026 publica la cadena entera (HeyDiga, fonio, Habla,
+  Primer Tono, mims, Recepio, OfiVoice, Fulminatia, Arsys, safina.ai, y la IA de Treatwell, Fresha,
+  Booksy y Koibox); lo más cercano es Recepio, que reasigna y avisa al equipo, no al cliente, en
+  su plan de 249 €. Es el ejemplo que mejor explica el Gestor en una demo o en la web, porque es
+  un problema que el dueño tiene cada semana.
 - **Voz diseñada para no sonar a robot, no solo "voz de IA".** El dueño elige la voz
   escuchándola. En Pro y Scale, entre todas: en español, las 29 voces Ultra de Telnyx con acento
   de España, cada una con una descripción de cómo suena y las de atención al cliente a la vista;
@@ -144,9 +156,11 @@ Lo que un producto vecino no podría copiar honestamente:
 - Idioma principal y voz del agente, seleccionables desde `/agente`. El dueño solo elige el
   idioma principal (desde el 05-10-2026): en él saluda y de él salen la voz y los idiomas que
   habla, sin casillas. Con español o uno extranjero (inglés, francés, alemán, italiano, portugués
-  o neerlandés, para negocios de clientela extranjera) habla esos siete; con catalán, euskera o
-  gallego, también esa lengua (ocho). Después del saludo sigue en el idioma de quien llama, y el
-  panel lo dice: «Habla en 7 idiomas: … Saluda en español y sigue en el idioma de quien llama.»
+  o neerlandés, para negocios de clientela extranjera) habla ocho: esos siete y el ruso (desde el
+  14-10-2026; el ruso no puede ser principal); con catalán, euskera o gallego, también esa lengua
+  (nueve). La cooficial también se activa sola por el código postal (Cataluña y Baleares,
+  Euskadi, Galicia). Después del saludo sigue en el idioma de quien llama, y el panel lo dice:
+  «Habla en 8 idiomas: … Saluda en español y sigue en el idioma de quien llama.»
   Con una lengua cooficial de principal atienden Marta o Sergio y contesta entre 1,4 y 2 segundos
   en vez de ~0,9 (medido con llamadas reales, también con clientes que hablan castellano), y el
   panel lo avisa. El idioma principal, catalán, euskera y gallego incluidos, se elige en todos los
@@ -219,8 +233,10 @@ Lo que un producto vecino no podría copiar honestamente:
   visual concreto vive fuera de este archivo.
 - **Voz del agente telefónico:** cálida y eficiente, con matiz emocional automático
   (`expressive_mode`) y detección de turno de palabra en Deepgram Flux para interrupciones
-  naturales — no una voz robótica que espera silencio. Mensaje inicial por defecto: «Hola, soy la
-  recepcionista virtual. ¿En qué te ayudo?».
+  naturales — no una voz robótica que espera silencio. Saludo (lo compone el backend,
+  `lib/idiomas/catalogo.ts`, en 11 idiomas): «{negocio}, te atiende su asistente de inteligencia
+  artificial. ¿En qué te ayudo?» — el aviso de IA del art. 50 del Reglamento de IA no se puede
+  quitar.
 
 ## Evidence on Hand
 

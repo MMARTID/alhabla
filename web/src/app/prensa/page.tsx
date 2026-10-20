@@ -50,7 +50,7 @@ export default function PrensaPage() {
             <p className="text-sm font-semibold text-morado-tinta">En una frase</p>
             <p className="mt-2 text-base leading-7 text-tinta">
               Alhabla es una recepcionista de inteligencia artificial que contesta el teléfono de peluquerías, barberías,
-              centros de estética y clínicas de fisioterapia cuando el equipo no puede, reserva en su agenda y confirma la
+              salones de uñas, centros de estética, fisioterapia y otros negocios con cita previa cuando el equipo no puede, reserva en su agenda y confirma la
               cita por WhatsApp.
             </p>
           </div>
@@ -61,8 +61,8 @@ export default function PrensaPage() {
               las manos ocupadas. El negocio conserva su número de teléfono y desvía a Alhabla las llamadas que no puede
               coger. La recepcionista avisa de que es una inteligencia artificial, consulta la agenda real en Google
               Calendar, Outlook o iCloud, reserva con el profesional adecuado y envía la confirmación por WhatsApp. Atiende
-              en castellano, catalán, euskera, gallego y ocho idiomas más, y el dueño cambia su agenda escribiéndole por
-              WhatsApp. Cuesta desde {desde} € al mes más IVA, sin permanencia.
+              en castellano y siete idiomas más, y en catalán, euskera o gallego según dónde esté el negocio; y el dueño
+              cambia su agenda escribiendo por WhatsApp a su Gestor. Cuesta desde {desde} € al mes más IVA, sin permanencia.
             </p>
           </div>
         </div>
@@ -77,7 +77,7 @@ export default function PrensaPage() {
             ["Origen", "Sant Celoni (Barcelona), 2026"],
             ["Titular", "Miguel Martín Delgado (autónomo)"],
             ["Sectores", "Peluquerías, barberías, salones de uñas, centros de estética, fisioterapia, pestañas y cejas, spa y masajes, peluquería canina"],
-            ["Idiomas", "Castellano, catalán, euskera, gallego, inglés, francés, alemán, italiano, portugués, neerlandés y ruso"],
+            ["Idiomas", "Castellano, inglés, francés, alemán, italiano, portugués, neerlandés y ruso; y la lengua cooficial de la zona del negocio (catalán, euskera o gallego)"],
             ["Calendarios", "Google Calendar, Outlook y Calendario de Apple (iCloud)"],
             ["Precio", `Desde ${desde} € + IVA al mes; ${TRIAL_DAYS} días de prueba; sin permanencia`],
             ["Web", "alhabla.ai"],

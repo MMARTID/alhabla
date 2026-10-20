@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { paginasDeLaSeccion } from "@/lib/paginas";
 import { plans } from "@/lib/plans";
 import {
   absoluteUrl,
@@ -76,17 +77,76 @@ export type TeamRouting = {
 export type OwnerAssistantExample = { title: string; description: string };
 
 /**
- * Guion del mockup de conversación de WhatsApp: el caso de la ausencia de
- * un profesional, turno a turno tal como ocurre de verdad (propuesta con
- * botones, confirmación). Un solo caso dramatizado, no los tres — los otros
- * dos quedan en `examples`.
+ * Un mensaje del mockup de WhatsApp con el Gestor. Con `botones`, el primero
+ * es el que pulsa el dueño en el ejemplo; `hecho` pinta el resultado de una
+ * acción ya ejecutada.
  */
-export type OwnerAssistantChat = {
-  ownerMessage: string;
-  proposal: string;
-  buttons: [string, string];
-  confirmation: string;
-};
+export type MensajeDelChat =
+  | { de: "dueno"; texto: string }
+  | { de: "gestor"; texto: string; botones?: [string, string]; hecho?: boolean };
+
+/**
+ * Guion del mockup de conversación de WhatsApp: el caso de la ausencia de
+ * un profesional, turno a turno tal como ocurre de verdad (2026-10-20,
+ * contrastado con modules/gestor/accionesAgenda.ts y whatsapp/router.ts):
+ * cada acción es una propuesta con «Confirmar», una a la vez; el «Hecho:»
+ * lo escribe el sistema; tras mover la cita, el sistema pregunta si avisa
+ * al cliente. Un solo caso dramatizado — los otros dos quedan en `examples`.
+ */
+export type OwnerAssistantChat = { mensajes: MensajeDelChat[] };
+
+/**
+ * La ausencia de punta a punta con los textos reales del backend:
+ * `marcar_ausencia` → «Hecho: … dime si las movemos o las cancelamos» → el
+ * dueño dice a quién → `mover_cita` → «¿Le aviso…?» (`avisar_cliente`).
+ */
+function chatDeAusencia(c: {
+  /** Lo que escribe el dueño, p. ej. «Marta está de baja hoy». */
+  aviso: string;
+  profesional: string;
+  /** «hoy», «mañana»… */
+  cuando: string;
+  /** A quién se pasa la cita, como lo diría el dueño. */
+  respuesta: string;
+  /** «las mechas de Rosa», con artículo. */
+  cita: string;
+  hora: string;
+  otra: string;
+  cliente: string;
+}): OwnerAssistantChat {
+  const cita = c.cita.charAt(0).toUpperCase() + c.cita.slice(1);
+  return {
+    mensajes: [
+      { de: "dueno", texto: c.aviso },
+      {
+        de: "gestor",
+        texto: `¿Confirmas? Marcar a ${c.profesional} como ausente ${c.cuando}: la recepcionista no le reservará nada. Ojo: ya tiene 1 cita ahí, que no se mueve sola.`,
+        botones: ["Confirmar", "Cancelar"],
+      },
+      {
+        de: "gestor",
+        texto: `Hecho: ${c.profesional} no está ${c.cuando}. Tiene 1 cita en ese tramo: dime si las movemos o las cancelamos.`,
+        hecho: true,
+      },
+      { de: "dueno", texto: c.respuesta },
+      {
+        de: "gestor",
+        texto: `¿Confirmas? Mover ${c.cita} ${c.cuando} a las ${c.hora} con ${c.otra}.`,
+        botones: ["Confirmar", "Cancelar"],
+      },
+      {
+        de: "gestor",
+        texto: `Hecho: ${cita} pasa a las ${c.hora} con ${c.otra}. El calendario ya está al día.`,
+        hecho: true,
+      },
+      {
+        de: "gestor",
+        texto: `¿Le aviso a ${c.cliente} por WhatsApp de la nueva hora?`,
+        botones: ["Sí, avísale", "Le llamo yo"],
+      },
+    ],
+  };
+}
 
 export type OwnerAssistant = {
   badge: string;
@@ -336,16 +396,20 @@ export const nicheLandings: Record<NicheSlug, NicheLandingContent> = {
       title: "Y cuando algo cambia en el salón, se lo dices por WhatsApp.",
       description: "Tu línea directa con Alhabla es el Gestor: le escribes como a una compañera de mostrador y te deja el cambio preparado en la agenda. Sirve para lo que pasa entre clienta y clienta: una baja, la cita que te piden mientras cobras, una tarifa nueva.",
       examples: [
-        { title: "Si una estilista no viene", description: "«Marta está de baja hoy» y deja de darle citas nuevas; si tenía mechas o color reservados, te propone a quién pasarlos y tú lo apruebas con un botón." },
+        { title: "Si una estilista no viene", description: "«Marta está de baja hoy»: en cuanto confirmas, deja de darle citas nuevas y te dice cuántas tenía. Le dices a quién pasar las mechas o el color, confirmas el cambio y te pregunta si avisa a la clienta por WhatsApp." },
         { title: "La cita que te piden en caja", description: "Mientras cobras, la clienta quiere hora para dentro de un mes: «apunta a Rosa el jueves 14 a las 5, mechas». El Gestor comprueba que el hueco existe y, si le das su móvil, puede mandarle a Rosa la confirmación por WhatsApp." },
         { title: "Una tarifa o un horario nuevo", description: "«El alisado pasa a 120 €» o «los martes abrimos a las 10»: cambia en tu catálogo y en tu horario, y la recepcionista lo dice así desde la siguiente llamada." },
       ],
-      chat: {
-        ownerMessage: "Marta está de baja hoy",
-        proposal: "Entendido, dejo de ofrecer hueco con Marta. Tenía mechas a las 11:00 — ¿se las muevo a Laura?",
-        buttons: ["Sí, muévelas", "Ya lo hago yo"],
-        confirmation: "Hecho ✓ Las mechas de las 11:00 ya están con Laura.",
-      },
+      chat: chatDeAusencia({
+        aviso: "Marta está de baja hoy",
+        profesional: "Marta",
+        cuando: "hoy",
+        respuesta: "Las mechas de las 11, pásaselas a Laura",
+        cita: "las mechas de Rosa",
+        hora: "11:00",
+        otra: "Laura",
+        cliente: "Rosa",
+      }),
       closing: "Hasta que no pulsas «Confirmar», tu agenda sigue tal cual.",
     },
     ciudades: {
@@ -385,7 +449,7 @@ export const nicheLandings: Record<NicheSlug, NicheLandingContent> = {
       { question: "Trabajo con Booksy o Treatwell, ¿lo puedo seguir usando?", answer: "Alhabla no se conecta con esos programas. Lo que hace es mirar el calendario que conectes antes de ofrecer una hora: si tu programa copia sus citas en ese calendario de Google, Outlook o iCloud, esas horas no se ofrecen por teléfono." },
       { question: "¿Puede reservar a madre e hija a la vez?", answer: "Cada llamada termina en una sola cita, aunque esa cita lleve varios servicios. Para dos personas, la segunda cita se pide en otra llamada o la apuntas tú escribiendo al Gestor por WhatsApp." },
       { question: "¿Le dice el precio a la clienta?", answer: "Si el servicio tiene precio en tu catálogo, sí. Si tus precios dependen del largo o del producto, puedes dejar el servicio sin precio y escribir en la información del negocio cómo lo calculáis, para que lo explique sin dar una cifra cerrada." },
-      { question: "¿Y si llaman en catalán o en inglés?", answer: "El inglés y otros seis idiomas extranjeros van en cualquier plan, y la recepcionista cambia de idioma si la clienta lo hace. El catalán se activa solo si el salón está en Cataluña o Baleares; igual el euskera en Euskadi y el gallego en Galicia." },
+      { question: "¿Y si llaman en catalán o en inglés?", answer: "El inglés y otros seis idiomas extranjeros van en cualquier plan, y la recepcionista cambia de idioma si la clienta lo hace. El catalán se activa sin que configures nada si el salón está en Cataluña o Baleares (por el código postal de su dirección), y en cualquier sitio puedes elegirlo como idioma principal; igual el euskera en Euskadi y el gallego en Galicia." },
       { question: "¿Graba las llamadas de mis clientas?", answer: "Únicamente si la clienta acepta: se lo pregunta durante la llamada y, a quien ya aceptó, se lo recuerda al descolgar. Si dice que no, solo queda la transcripción, que puedes leer en el panel." },
     ],
     closingTitle: "Que la próxima clienta reserve aunque tengas las manos en un tinte.",
@@ -535,16 +599,20 @@ export const nicheLandings: Record<NicheSlug, NicheLandingContent> = {
       title: "Y cuando algo cambia en el centro, se lo dices por WhatsApp.",
       description: "Lo que cambia en un centro casi nunca puede esperar a que acabe la última cabina. Al Gestor se lo escribes por WhatsApp en cuanto lo sabes y prepara el cambio en tu agenda real; tú solo apruebas.",
       examples: [
-        { title: "Si una esteticista falta", description: "«Sara no puede venir hoy» y deja de recibir citas; si tenía un facial o una sesión de bono, te propone a quién pasarla y lo confirmas con un botón." },
+        { title: "Si una esteticista falta", description: "«Sara no puede venir hoy»: al confirmar, deja de recibir citas y el Gestor te dice qué tenía. Le pasas el facial o la sesión de bono a otra compañera con un «Confirmar» y te pregunta si avisa a la clienta." },
         { title: "Mover una sesión y avisar", description: "«Pasa la presoterapia de Beatriz al viernes a la misma hora»: el Gestor comprueba el hueco y, cuando confirmas, te pregunta si avisa a Beatriz por WhatsApp." },
         { title: "Enseñarle algo a la recepcionista", description: "«Dile que los bonos se pagan en el centro, no por teléfono»: lo añade a lo que sabe del centro y lo cuenta en las llamadas, en vez de improvisar." },
       ],
-      chat: {
-        ownerMessage: "Sara no puede venir hoy",
-        proposal: "Entendido, hoy no ofrezco hueco con Sara. Tenía un facial con peeling a las 12:00 — ¿se lo paso a Elena?",
-        buttons: ["Sí, pásalo", "Ya lo hago yo"],
-        confirmation: "Hecho ✓ El facial de las 12:00 ya está con Elena.",
-      },
+      chat: chatDeAusencia({
+        aviso: "Sara no puede venir hoy",
+        profesional: "Sara",
+        cuando: "hoy",
+        respuesta: "El facial de las 12, a Elena",
+        cita: "el facial con peeling de Inés",
+        hora: "12:00",
+        otra: "Elena",
+        cliente: "Inés",
+      }),
       closing: "Ningún cambio llega a la agenda sin tu «Confirmar».",
     },
     ciudades: {
@@ -736,16 +804,20 @@ export const nicheLandings: Record<NicheSlug, NicheLandingContent> = {
       title: "Y cuando algo cambia en el salón, se lo dices por WhatsApp.",
       description: "Con las manos en una uña no se abre un panel; dos líneas de WhatsApp en la pausa, sí. Al Gestor le cuentas lo que ha cambiado en el salón y te lo deja preparado: solo falta tu visto bueno.",
       examples: [
-        { title: "Si una técnica no viene", description: "«Laura tiene hoy el día libre» y deja de recibir citas; si tenía manicuras puestas, te propone a quién moverlas y lo apruebas con un botón." },
+        { title: "Si una técnica no viene", description: "«Laura tiene hoy el día libre»: al confirmar, deja de recibir citas y te dice cuántas manicuras tenía. Le dices a quién pasarlas, confirmas cada cambio y te pregunta si avisa a cada clienta por WhatsApp." },
         { title: "Lo que la recepcionista no supo contestar", description: "«¿Qué te han preguntado hoy que no supieras?» y te resume las dudas; si le contestas «sí, hacemos press-on», te propone enseñárselo para la próxima llamada." },
         { title: "Un servicio nuevo en la carta", description: "«Añade retirada de acrílico, 20 minutos, 10 €» y queda en tu catálogo; desde la siguiente llamada la recepcionista la ofrece y la reserva con su tiempo." },
       ],
-      chat: {
-        ownerMessage: "Laura tiene hoy el día libre",
-        proposal: "Entendido, hoy no ofrezco hueco con Laura. Tenía una semipermanente a las 11:00 — ¿se la paso a Noa?",
-        buttons: ["Sí, pásala", "Ya lo hago yo"],
-        confirmation: "Hecho ✓ La semipermanente de las 11:00 ya está con Noa.",
-      },
+      chat: chatDeAusencia({
+        aviso: "Laura tiene hoy el día libre",
+        profesional: "Laura",
+        cuando: "hoy",
+        respuesta: "La semipermanente de las 11, que la haga Noa",
+        cita: "la semipermanente de Carla",
+        hora: "11:00",
+        otra: "Noa",
+        cliente: "Carla",
+      }),
       closing: "Tu agenda no se mueve hasta que tocas «Confirmar».",
     },
     ciudades: {
@@ -934,16 +1006,20 @@ export const nicheLandings: Record<NicheSlug, NicheLandingContent> = {
       title: "Y cuando algo cambia en la barbería, se lo dices por WhatsApp.",
       description: "Entre corte y corte no hay tiempo para abrir un panel. Con el Gestor escribes por WhatsApp lo que ha cambiado, como se lo dirías a un compañero, y te devuelve el cambio preparado para que lo apruebes.",
       examples: [
-        { title: "Si falta un barbero", description: "«Hoy Luis no viene» y deja de recibir citas nuevas; si tenía cortes agendados, te dice a qué otro barbero pasarlos y lo apruebas con un botón." },
-        { title: "¿Qué huecos me quedan?", description: "«¿Qué tengo libre mañana por la tarde?» y te contesta con los huecos reales; si un cliente te lo pide en la silla, «apunta a Javier mañana a las 6, corte y barba» y queda listo para confirmar." },
+        { title: "Si falta un barbero", description: "«Hoy Luis no viene»: al confirmar, deja de recibir citas nuevas y te dice cuántos cortes tenía. Le dices a qué barbero pasar cada uno, confirmas el cambio y te pregunta si avisa al cliente por WhatsApp." },
+        { title: "¿Tengo hueco?", description: "«¿Hay hueco mañana a las 6 para un corte y barba?» y te lo dice mirando tu agenda real o te da la hora libre más cercana; si el cliente te lo pide en la silla, «apúntale a Javier» y queda listo para confirmar." },
         { title: "Un precio o un cierre nuevo", description: "«El corte y barba pasa a 22 €» o «el lunes festivo cerramos»: cambia en tu catálogo o queda cerrado en la agenda, y la recepcionista deja de ofrecer esa hora." },
       ],
-      chat: {
-        ownerMessage: "Hoy Luis no viene, está malo",
-        proposal: "Entendido, hoy no doy hueco con Luis. Tenía un corte y barba a las 12:00 — ¿se lo paso a Dani?",
-        buttons: ["Sí, pásalo", "Ya lo hago yo"],
-        confirmation: "Hecho ✓ El corte y barba de las 12:00 ya está con Dani.",
-      },
+      chat: chatDeAusencia({
+        aviso: "Hoy Luis no viene, está malo",
+        profesional: "Luis",
+        cuando: "hoy",
+        respuesta: "El de las 12, pásaselo a Dani",
+        cita: "el corte y barba de Javier",
+        hora: "12:00",
+        otra: "Dani",
+        cliente: "Javier",
+      }),
       closing: "Lo que escribes no toca la agenda hasta que tú pulsas «Confirmar».",
     },
     ciudades: {
@@ -1142,16 +1218,20 @@ export const nicheLandings: Record<NicheSlug, NicheLandingContent> = {
       title: "Y cuando algo cambia en la consulta, se lo dices por WhatsApp.",
       description: "Entre paciente y paciente tienes dos minutos, no veinte. Al Gestor le escribes por WhatsApp lo que ha cambiado en la consulta y te devuelve el cambio listo; tú decides si se aplica.",
       examples: [
-        { title: "Si un fisioterapeuta falta", description: "«Pablo está de baja hoy» y deja de recibir pacientes nuevos; si tenía sesiones, te propone a quién pasarlas y tú decides con un botón." },
+        { title: "Si un fisioterapeuta falta", description: "«Pablo está de baja hoy»: al confirmar, deja de recibir pacientes nuevos y te dice qué sesiones tenía. Decides a quién pasarlas, confirmas cada cambio y te pregunta si avisa al paciente por WhatsApp." },
         { title: "Una mañana fuera", description: "«Irene no está el jueves de 9 a 12, tiene formación»: queda marcada esa ausencia y no se le reserva nada en ese tramo." },
         { title: "¿Cómo va la semana?", description: "«¿Cuántas llamadas y citas llevamos estos días?» y te lo resume; y si un tipo de sesión cambia, «el seguimiento pasa a 50 minutos» y queda así en el catálogo." },
       ],
-      chat: {
-        ownerMessage: "Pablo está de baja hoy",
-        proposal: "Entendido, dejo de ofrecer hueco con Pablo. Tenía una sesión de seguimiento a las 11:00 — ¿se la paso a Irene?",
-        buttons: ["Sí, pásala", "Ya lo hago yo"],
-        confirmation: "Hecho ✓ La sesión de las 11:00 ya está con Irene.",
-      },
+      chat: chatDeAusencia({
+        aviso: "Pablo está de baja hoy",
+        profesional: "Pablo",
+        cuando: "hoy",
+        respuesta: "La sesión de las 11, que la lleve Irene",
+        cita: "la sesión de seguimiento de Andrés",
+        hora: "11:00",
+        otra: "Irene",
+        cliente: "Andrés",
+      }),
       closing: "Lo que propone el Gestor espera a tu «Confirmar»; antes, no cambia nada.",
     },
     ciudades: {
@@ -1306,7 +1386,12 @@ export function getNicheStructuredData(content: NicheLandingContent) {
   };
 }
 
-export const nicheLinks = (Object.values(nicheLandings) as NicheLandingContent[]).map(({ slug, name }) => ({ href: `/${slug}`, label: name }));
+/**
+ * Los enlaces a TODAS las páginas de sector (menús, el Gestor, la
+ * calculadora), del registro de páginas: las cinco de aquí y las que se
+ * hicieron después con su propia página (pestañas, spa, peluquería canina).
+ */
+export const nicheLinks = paginasDeLaSeccion("sectores").map(({ ruta, nombre }) => ({ href: ruta, label: nombre }));
 
 /**
  * El Gestor para la landing genérica: «un profesional», sin oficio. Las
@@ -1321,7 +1406,7 @@ export const generalOwnerAssistant: OwnerAssistant = {
   examples: [
     {
       title: "Si un profesional falta",
-      description: "«Ana está de baja hoy» y deja de recibir citas nuevas para ella; si ya tenía alguna agendada, te propone a quién moverla y tú confirmas con un botón.",
+      description: "«Ana está de baja hoy»: al confirmar, deja de recibir citas nuevas y te dice cuántas tenía. Le dices a quién pasar cada una, confirmas el cambio y te pregunta si avisa al cliente por WhatsApp.",
     },
     {
       title: "Si cierras antes o un día entero",
@@ -1332,11 +1417,15 @@ export const generalOwnerAssistant: OwnerAssistant = {
       description: "«el servicio pasa a 30€» o «los lunes abrimos a las 10» — se actualiza en tu catálogo y tu horario al momento.",
     },
   ],
-  chat: {
-    ownerMessage: "Ana está de baja hoy",
-    proposal: "Entendido, dejo de ofrecer hueco con Ana. Tenía una cita a las 11:00 — ¿se la muevo a Marcos, que tiene hueco esa hora?",
-    buttons: ["Sí, muévela", "Ya lo hago yo"],
-    confirmation: "Hecho ✓ La cita de las 11:00 ya está con Marcos.",
-  },
+  chat: chatDeAusencia({
+    aviso: "Ana está de baja hoy",
+    profesional: "Ana",
+    cuando: "hoy",
+    respuesta: "La de las 11, pásasela a Marcos",
+    cita: "la cita de Carmen",
+    hora: "11:00",
+    otra: "Marcos",
+    cliente: "Carmen",
+  }),
   closing: "Nunca cambia nada sin que pulses «Confirmar».",
 };

@@ -33,7 +33,7 @@ import {
 
 const titulo = "Recepcionista de IA que atiende en catalán";
 const descripcion =
-  "En Cataluña y Baleares, tu recepcionista de IA entiende y contesta en catalán desde la primera llamada. También euskera, gallego y ocho idiomas más.";
+  "En Cataluña y Baleares, tu recepcionista de IA entiende y contesta en catalán desde la primera llamada. Y en castellano y siete idiomas más, en cualquier plan.";
 const ruta = "/recepcionista-ia-en-catalan";
 
 export const metadata: Metadata = {

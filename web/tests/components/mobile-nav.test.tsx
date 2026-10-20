@@ -75,7 +75,7 @@ describe("MobileNav", () => {
     expect(screen.getByRole("link", { name: /Empezar/ })).toHaveAttribute("href", "/planes");
   });
 
-  it("incluye los cinco sectores como enlaces reales, no anclas", async () => {
+  it("incluye los ocho sectores como enlaces reales, no anclas", async () => {
     const user = userEvent.setup();
     render(<MobileNav />);
     await user.click(screen.getByRole("button", { name: "Abrir menú" }));
@@ -86,7 +86,10 @@ describe("MobileNav", () => {
       ["Barberías", "/barberia"],
       ["Salones de uñas", "/salon-de-unas"],
       ["Centros de estética", "/centro-de-estetica"],
-      ["Clínicas y consultas de fisioterapia", "/fisioterapia"],
+      ["Fisioterapia", "/fisioterapia"],
+      ["Pestañas y cejas", "/pestanas-y-cejas"],
+      ["Spa y masajes", "/spa-y-masajes"],
+      ["Peluquería canina", "/peluqueria-canina"],
     ]) {
       expect(within(menu).getByRole("link", { name: label })).toHaveAttribute("href", href);
     }

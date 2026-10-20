@@ -130,6 +130,7 @@ export default function IcloudPage() {
             "Cada cita se guarda con la hora exacta en tiempo universal, así que se ve a su hora en el iPhone, el Mac o cualquier otro dispositivo, también al cambiar al horario de verano.",
             "Si reintenta una reserva por un corte de red, no la duplica: reconoce la que ya creó.",
             "Si el cliente cancela, borra solo esa cita. Nunca toca eventos que no haya creado ella.",
+            "Si mueves o cancelas una cita con el Gestor por WhatsApp o desde el panel, el evento cambia también en iCloud. Y si al borrarlo no está donde lo dejó, lo busca por su identificador para que no quede una cita fantasma en tu iPhone.",
           ]}
         />
       </Seccion>

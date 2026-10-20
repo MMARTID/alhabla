@@ -27,7 +27,13 @@ const FILAS: Fila[] = [
   { concepto: "Reparto por especialidad", valores: [true, true, true] },
   { concepto: "Confirmación de la cita por WhatsApp", valores: [true, true, true] },
   { concepto: "El Gestor por WhatsApp para el dueño", valores: [true, true, true] },
-  { concepto: "Castellano, catalán, euskera, gallego y 7 idiomas más", valores: [true, true, true] },
+  { concepto: "Si falta alguien: recolocar sus citas y avisar a cada cliente", valores: [true, true, true] },
+  { concepto: "Avisos al dueño por WhatsApp, con botones para resolverlos", valores: [true, true, true] },
+  { concepto: "Lista de espera por WhatsApp", valores: [true, true, true] },
+  { concepto: "Da el precio de tu catálogo (tú eliges cuándo)", valores: [true, true, true] },
+  { concepto: "Aviso de IA en la primera frase y grabación solo con permiso", valores: [true, true, true] },
+  { concepto: "«Comprobar desvío» con una llamada real", valores: [true, true, true] },
+  { concepto: "Castellano y 7 idiomas más, y el catalán, euskera o gallego de tu zona", valores: [true, true, true] },
   { concepto: "Recordatorios de cita por WhatsApp", valores: [false, true, true] },
   { concepto: "Resumen semanal por email", valores: [false, true, true] },
   { concepto: "Elegir entre todas las voces", valores: [false, true, true] },
@@ -62,11 +68,11 @@ export const PREGUNTAS_DE_FACTURACION = [
   },
   {
     question: "¿Hay permanencia o penalización por cancelar?",
-    answer: "No. Pagas mes a mes y cancelas cuando quieras desde el panel. No hay cuota de alta.",
+    answer: "No. Pagas mes a mes y cancelas cuando quieras desde Facturación, en el panel. No hay cuota de alta.",
   },
   {
     question: "¿Puedo cambiar de plan?",
-    answer: "Sí, cuando quieras desde el panel. Si das de alta más profesionales de los que permite tu plan, el panel te avisa para que subas al siguiente.",
+    answer: "Sí, cuando quieras: desde Facturación, en el panel, entras al portal de pago, y si lo prefieres nos escribes y lo cambiamos nosotros. Si das de alta más profesionales de los que permite tu plan, el panel te avisa para que subas al siguiente.",
   },
   {
     question: "¿Qué es el precio de fundador?",

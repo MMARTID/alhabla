@@ -243,7 +243,7 @@ export default function PestanasYCejasPage() {
               icono: MessageCircle,
               titulo: "«Tengo que cambiar la de mañana»",
               texto:
-                "Si llama desde el móvil con el que reservó y aceptó los mensajes, encuentra su cita y la cambia o la anula. El hueco que deja puede ir a quien esperaba.",
+                "Si llama desde el móvil con el que reservó, encuentra su cita y la cambia o la anula. El hueco que deja puede ir a quien esperaba.",
             },
           ]}
         />

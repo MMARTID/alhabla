@@ -53,7 +53,7 @@ export default function IntegracionesPage() {
         {
           question: "¿Qué pasa si se desconecta el calendario?",
           answer:
-            "Si tu proveedor deja de aceptar el permiso (por ejemplo, porque cambiaste la contraseña), el panel te pide reconectar. Mientras tanto la recepcionista no da horas que no puede comprobar: prefiere no reservar a reservar a ciegas.",
+            "Si tu proveedor deja de aceptar el permiso (por ejemplo, porque cambiaste la contraseña), te avisamos por WhatsApp y el panel te pide reconectar. Mientras tanto la recepcionista no da horas que no puede comprobar: prefiere no reservar a reservar a ciegas.",
         },
         {
           question: "¿Hace falta un técnico para conectarlo?",

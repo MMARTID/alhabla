@@ -119,7 +119,7 @@ export function SectorDataSection({
                         tiene que quedar claro antes de leer la frase, no
                         después. */}
                     <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#52525b]">
-                      Dato de terceros sobre el sector
+                      En prensa, sobre el sector · no es cliente de Alhabla
                     </p>
                     <blockquote className="mt-2 text-sm font-medium italic leading-6 text-[#27272a]">
                       &ldquo;{quote.text}&rdquo;

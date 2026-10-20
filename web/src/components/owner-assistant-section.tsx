@@ -119,7 +119,7 @@ export function OwnerAssistantSection({
           <Reveal delay={0.1} y={16}>
             <OwnerAssistantChatMockup data={data.chat} accent={a} />
             <p className="mt-3 px-1 text-xs leading-5 text-[#a1a1aa]">
-              {data.examples[0].title}: ejemplo de una conversación real por WhatsApp.
+              {data.examples[0].title}: ejemplo con los mensajes que escribe el Gestor; los nombres son inventados.
             </p>
           </Reveal>
         </div>
