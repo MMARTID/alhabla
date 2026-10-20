@@ -137,6 +137,7 @@ describe("registro", () => {
       "fijar_horario",
       "marcar_ausencia",
       "mover_cita",
+      "quitar_ausencia",
       "resolver_pendiente",
       "retirar_profesional",
       "retirar_servicio",

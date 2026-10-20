@@ -1,6 +1,7 @@
 import axios from "axios";
 import type {
   AgentSettings,
+  AusenciaDelEquipo,
   AgendaResponse,
   CatalogoDeIdiomas,
   VistaPreviaDeIdiomas,
@@ -411,6 +412,20 @@ export async function getCalendarList() {
 export async function selectCalendar(calendarId: string) {
   const { data } = await api.post<Business>("/calendar/select", { calendarId });
   return data;
+}
+
+/** Ausencias del equipo que se solapan con [desde, hasta) (instantes ISO,
+ * como mucho 120 días). */
+export async function getAusencias(desde: string, hasta: string) {
+  const { data } = await api.get<{ ausencias: AusenciaDelEquipo[] }>("/booking-settings/absences", {
+    params: { desde, hasta },
+  });
+  return data.ausencias;
+}
+
+/** Quita una ausencia: la recepcionista vuelve a ofrecer ese tramo. */
+export async function quitarAusencia(id: string) {
+  await api.delete(`/booking-settings/absences/${id}`);
 }
 
 export async function getBookingSettings() {

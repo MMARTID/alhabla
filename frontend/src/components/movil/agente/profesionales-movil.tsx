@@ -10,8 +10,14 @@ import {
   updateBookingProfessional,
 } from "@/lib/api";
 import { getPlanLimitInfo, planLimitUpgradeMessage } from "@/lib/plan-limit";
-import type { BookingProfessional } from "@/lib/types";
+import type { AusenciaDelEquipo, BookingProfessional, Business } from "@/lib/types";
 import { AvisoFlotante, useAviso } from "@/components/aviso-flotante";
+import {
+  AusenciasDeLaPersona,
+  DialogoQuitarAusencia,
+  useAusencias,
+  useQuitarAusencia,
+} from "@/components/ausencias";
 import {
   describeServiceLevels,
   ProfessionalServiceLevels,
@@ -29,13 +35,26 @@ type Borrador = { id: string | null; nombre: string; activo: boolean; niveles: S
  * Profesionales: la lista del equipo y una hoja por persona con su nivel en
  * cada servicio (especialista, lo hace, no sugerir), como en escritorio.
  */
-export function ProfesionalesMovil() {
+export function ProfesionalesMovil({ business }: { business: Business }) {
+  const timeZone = business.timezone || "Europe/Madrid";
   const queryClient = useQueryClient();
   const { aviso, avisar, cerrar } = useAviso();
   const ajustes = useQuery({ queryKey: ["booking-settings"], queryFn: getBookingSettings });
   const profesionales = ajustes.data?.professionals ?? [];
   const servicios = ajustes.data?.services ?? [];
   const [borrador, setBorrador] = useState<Borrador | null>(null);
+
+  // Ausencias por venir (las marca el Gestor): se ven y se quitan aquí. El
+  // instante se redondea a la hora para que la clave de la consulta no cambie
+  // en cada render.
+  const [desdeAusencias] = useState(() => new Date(Math.floor(Date.now() / 3_600_000) * 3_600_000));
+  const ausencias = useAusencias(
+    desdeAusencias.toISOString(),
+    new Date(desdeAusencias.getTime() + 110 * 24 * 60 * 60 * 1000).toISOString()
+  );
+  const ausenciasDe = (professionalId: string) => (ausencias.data ?? []).filter((a) => a.professionalId === professionalId);
+  const [ausenciaAQuitar, setAusenciaAQuitar] = useState<AusenciaDelEquipo | null>(null);
+  const quitarAusencia = useQuitarAusencia(avisar, () => setAusenciaAQuitar(null));
 
   const abrir = (profesional: BookingProfessional | null) =>
     setBorrador(
@@ -87,6 +106,11 @@ export function ProfesionalesMovil() {
                 </span>
                 <ChevronRight className="h-[18px] w-[18px] shrink-0 text-tenue" aria-hidden="true" />
               </button>
+              {ausenciasDe(profesional.id).length > 0 ? (
+                <div className="px-4 pb-3">
+                  <AusenciasDeLaPersona ausencias={ausenciasDe(profesional.id)} timeZone={timeZone} onQuitar={setAusenciaAQuitar} />
+                </div>
+              ) : null}
             </li>
           ))}
         </ul>
@@ -111,6 +135,13 @@ export function ProfesionalesMovil() {
           avisar(mensaje);
         }}
         onError={(mensaje) => avisar(mensaje, "error")}
+      />
+      <DialogoQuitarAusencia
+        ausencia={ausenciaAQuitar}
+        timeZone={timeZone}
+        quitando={quitarAusencia.isPending}
+        onCerrar={() => setAusenciaAQuitar(null)}
+        onConfirmar={(ausencia) => quitarAusencia.mutate(ausencia)}
       />
       {aviso ? <AvisoFlotante aviso={aviso} onClose={cerrar} /> : null}
     </PantallaDeAjuste>
