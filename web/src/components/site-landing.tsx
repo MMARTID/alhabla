@@ -9,6 +9,7 @@ import { SectorCiudadesIdiomas } from "@/components/sector-ciudades-idiomas";
 import { EnTuNegocioScroll } from "@/components/en-tu-negocio";
 import { LlamadaScroll } from "@/components/llamada-scroll";
 import { TeamRoutingSection } from "@/components/team-routing-section";
+import { GuiaDelSector } from "@/components/sector/guia-sector";
 import { OwnerAssistantSection } from "@/components/owner-assistant-section";
 import { WhatsAppBenefitsTable } from "@/components/whatsapp-benefits-table";
 import { RevenueLossCalculator } from "@/components/revenue-loss-calculator";
@@ -65,7 +66,7 @@ export function SiteLanding({ content }: { content?: NicheLandingContent }) {
         vacías — la cifra del sector en cada gran ciudad — y lo que sí cambia
         según dónde esté el negocio: la lengua cooficial que se activa sola.
       */}
-      <SectorCiudadesIdiomas nicho={content.slug} accent={content.accent} />
+      <SectorCiudadesIdiomas nicho={content.slug} accent={content.accent} textos={content.ciudades} />
 
       {/*
         Sin fondo propio a partir de aquí (salvo los bloques negros reales,
@@ -85,15 +86,23 @@ export function SiteLanding({ content }: { content?: NicheLandingContent }) {
       <TeamRoutingSection data={content.teamRouting} accent={content.accent} />
 
       {/*
-        El Gestor justo después del reparto por especialidad: el visitante
-        acaba de ver que la agenda ya reparte solo por profesional, y ahora
-        ve que además puede hablarle por WhatsApp cuando algo cambia (una
-        baja, un cierre) — la continuación natural de "la agenda es lista",
-        no un bloque suelto.
+        La guía del oficio justo después del reparto (2026-10-20): el
+        visitante acaba de ver las tres reglas del reparto y la guía las baja
+        a su sector — las llamadas típicas, los servicios con sus tiempos y
+        quién suele hacerlos, cuándo llaman y los errores al empezar. Es el
+        contenido que solo tiene esta landing; sin él, las cinco compartían
+        más de la mitad del texto y Google solo indexaba una.
+      */}
+      <GuiaDelSector guia={content.guia} />
+
+      {/*
+        El Gestor después del reparto y de la guía: el visitante ya ha visto
+        que la agenda reparte sola por profesional, y ahora ve que además
+        puede hablarle por WhatsApp cuando algo cambia (una baja, un cierre).
       */}
       <OwnerAssistantSection data={content.ownerAssistant} accent={content.accent} masInfoHref="/agenda-por-whatsapp" />
 
-      <WhatsAppBenefitsTable accent={content.accent} />
+      <WhatsAppBenefitsTable accent={content.accent} titulo={content.whatsappClientes.titulo} filas={content.whatsappClientes.filas} />
 
       <section className="py-16 sm:py-20 lg:py-24">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -155,7 +164,7 @@ export function SiteLanding({ content }: { content?: NicheLandingContent }) {
 
       <section id="precios" className="scroll-m-20 mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-20 lg:px-8">
         <Reveal className="max-w-2xl">
-          <h2 className="text-3xl font-black tracking-tight text-[#0a0a0a] sm:text-4xl">Planes claros, sin permanencia.</h2>
+          <h2 className="text-3xl font-black tracking-tight text-[#0a0a0a] sm:text-4xl">{content.planesTitulo}</h2>
           <p className="mt-4 flex flex-wrap items-center gap-2 text-base font-semibold leading-7 text-[#27272a]">
             <Check className="h-5 w-5 shrink-0" style={{ color: content?.accent?.strong ?? "#8b5cf6" }} aria-hidden="true" />
             {TRIAL_REASSURANCE}
@@ -194,14 +203,14 @@ export function SiteLanding({ content }: { content?: NicheLandingContent }) {
                   <PrecioDePlan plan={plan} />
                 </div>
                 <p className="mt-3 text-sm font-semibold text-[#27272a]">
-                  {formatIncludedMinutes(plan.minutes)} minutos incluidos
+                  Incluye {formatIncludedMinutes(plan.minutes)} minutos de llamadas al mes
                 </p>
                 <p className="mt-2 text-sm leading-7 text-[#52525b]">{plan.summary}</p>
                 <Link
                   href={`${plansHref}${plansHref.includes("?") ? "&" : "?"}plan=${plan.id}`}
                   className={plan.featured ? "btn-primary mt-6" : "btn-secondary mt-6"}
                 >
-                  Elegir {plan.name}
+                  Empezar con {plan.name}
                 </Link>
               </article>
             </Reveal>
@@ -212,7 +221,7 @@ export function SiteLanding({ content }: { content?: NicheLandingContent }) {
       <section id="preguntas" className="scroll-m-20 border-y border-[#e5e5e5] py-16 sm:py-20">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <Reveal>
-            <h2 className="text-3xl font-black tracking-tight text-[#0a0a0a] sm:text-4xl">Resuelve tus dudas antes de empezar.</h2>
+            <h2 className="text-3xl font-black tracking-tight text-[#0a0a0a] sm:text-4xl">{content.faqsTitulo}</h2>
           </Reveal>
 
           <div className="mt-8 grid items-start gap-3 sm:grid-cols-2">

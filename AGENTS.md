@@ -3361,7 +3361,9 @@ The landing lives in `web/`; the backend (demo) and the app (redirect) need a sm
 3. **Pages:** copy an existing niche folder — `web/src/app/<niche>/page.tsx` (`SiteLanding` +
    JSON-LD) and `opengraph-image.tsx` (`imagenOg`) — and add the sector photo `web/public/heroes/<niche>.jpg`,
    used by the OG image and the home accordion.
-4. **Lists nothing type-checks:** `NICHOS` in `web/src/app/sitemap.ts`; `SECTORES` in
+4. **Lists nothing type-checks:** its entry in `PAGINAS` (`web/src/lib/paginas.ts`, the single
+   registry the sitemap, `/llms.txt` and the tests read; `tests/lib/paginas.test.ts` fails if a
+   `page.tsx` is missing from it); `SECTORES` in
    `components/main-landing.tsx` (home accordion) and `components/site-footer.tsx`; the blog CTA
    targets (`DESTINOS` in `components/blog/bloques.tsx` and `lib/keystatic/bloques.tsx`) and
    article sectors (`SECTORES` in `web/keystatic.config.tsx`). Optionally a plural alias in
@@ -3397,6 +3399,42 @@ Al abrir el Issue correspondiente, añade su número en la columna "Issue". Al
 fusionar o descartar una rama, quita su fila de esta tabla.
 
 ## Deployment Notes
+
+### Páginas de valor de la web y auditoría de parecido (desde 2026-10-20)
+
+Por qué: Google indexó 2 de las 30 páginas sector × ciudad (se parecían más de un 50 %) y las cinco
+landings de sector compartían el 55–58 % del texto de `<main>`. Desde el 2026-10-20:
+
+- **Registro único** `web/src/lib/paginas.ts` (`PAGINAS`): ruta, nombre, resumen, sección, prioridad,
+  `actualizado` (fecha real de la última revisión de fondo, va al `lastmod`; sin ella no se publica) y
+  `foto` (catálogo `web/src/lib/fotos.ts`, Unsplash con licencia libre y crédito). De ahí leen
+  `app/sitemap.ts` (con sitemap de imágenes), `app/llms.txt/route.ts`, los índices de sección
+  (`paginasBajo("/integraciones")`…) y `tests/lib/paginas.test.ts`, que falla si una ruta del registro no
+  tiene `page.tsx` o si un `page.tsx` indexable no está en el registro.
+- **Plantilla** `web/src/components/pagina-guia.tsx` (`PaginaGuia` + bloques `Seccion`, `Texto`,
+  `Tarjetas`, `Pasos`, `Tabla`, `Conversacion`, `Nota`, `Fuentes`, `IndiceDePaginas`): migas, cabecera con
+  la foto del registro, FAQ, relacionadas, cierre y JSON-LD (WebPage/Article + BreadcrumbList +
+  FAQPage). La plantilla no lleva texto de relleno: el cuerpo es de cada página. Metadata con
+  `metadataDePagina` (`lib/seo.ts`) y un `opengraph-image.tsx` por página.
+- **Familias**: `/integraciones/*`, `/desvio-de-llamadas/*` (datos de la ayuda oficial de cada
+  operador, con fuentes), `/comparativa/*` (con nombre solo HeyDiga y fonio; datos publicados y
+  fechados por el art. 10 de la Ley 3/1991; lo que no publican se escribe «no consta en su web»),
+  `/herramientas/*`, `/guias/ley-y-recepcionista-de-ia`, `/recepcionista-ia-en-{catalan,euskera,gallego}`,
+  `/glosario` (una página con anclas y `DefinedTermSet`, no una por término), `/sobre-alhabla`,
+  `/prensa`, `/novedades` (añadir cada mes) y los sectores sin datos de salud `/pestanas-y-cejas`,
+  `/spa-y-masajes`, `/peluqueria-canina` (podología y osteopatía quedan fuera: datos de salud, RGPD art. 9).
+- **Auditoría de parecido**: `npm run seo:similitud` (`web/scripts/auditar-similitud.mjs`) lee el HTML
+  prerenderizado de `.next/server/app` tras el build (o, con `BASE_URL=https://alhabla.ai`, producción) y
+  mide, para cada par de páginas del sitemap, qué parte del texto de `<main>` de la más corta aparece en
+  la otra (secuencias de 5 palabras). Falla con 0,50 (`UMBRAL=0.4` para ser más estricto). Corre en el
+  job «Web — lint, test, build» del CI.
+- **Vistas previas de Vercel**: los proyectos `alhabla-web` y `alhabla-frontend` tienen como «Ignored Build
+  Step» `git diff --quiet HEAD^ HEAD -- .`: solo construyen si el ÚLTIMO commit toca su carpeta. Si lo último
+  que se sube a una rama es un merge de `main` que no toca `web/`, la vista previa sale «Canceled by Ignored
+  Build Step» aunque la PR cambie la web (PR #335). Para tener vista previa, que el último commit toque `web/`.
+- **IndexNow**: `npm run seo:indexnow` (o `-- /ruta /otra`) avisa a Bing/Yandex de las URLs del sitemap
+  de producción con la clave de `web/public/36dd951327300353ad396b40d72dbd75.txt`. Google no usa
+  IndexNow: para Google, Search Console.
 
 ### Automated CI/CD (GitHub Actions) — added 2026-09-04
 

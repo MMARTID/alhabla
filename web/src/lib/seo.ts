@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { plans } from "@/lib/plans";
 
 export const siteName = "Alhabla";
@@ -50,6 +51,35 @@ export const ogImageAlt = "Alhabla — Recepción telefónica para negocios con 
 export function ogImages(path = "/", alt = ogImageAlt) {
   const base = path === "/" ? "" : path.replace(/\/$/, "");
   return [{ url: absoluteUrl(`${base}/opengraph-image`), width: 1200, height: 630, alt }];
+}
+
+/**
+ * Metadata de una página de valor (lib/paginas.ts): título, descripción,
+ * canónica propia y OG/Twitter con la imagen de su `opengraph-image.tsx`.
+ * El `title` lleva la plantilla «… | Alhabla» del layout raíz.
+ */
+export function metadataDePagina({ ruta, titulo, descripcion }: { ruta: string; titulo: string; descripcion: string }): Metadata {
+  const tituloCompleto = `${titulo} | ${siteName}`;
+  return {
+    title: titulo,
+    description: descripcion,
+    alternates: { canonical: absoluteUrl(ruta) },
+    openGraph: {
+      type: "website",
+      locale: "es_ES",
+      url: absoluteUrl(ruta),
+      siteName,
+      title: tituloCompleto,
+      description: descripcion,
+      images: ogImages(ruta, tituloCompleto),
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: tituloCompleto,
+      description: descripcion,
+      images: ogImages(ruta, tituloCompleto),
+    },
+  };
 }
 
 /** Identificadores estables del grafo: los nichos y el blog los referencian

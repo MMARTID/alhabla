@@ -16,6 +16,24 @@ const SECTORES = [
   { href: "/centro-de-estetica", label: "Centros de estética" },
   { href: "/salon-de-unas", label: "Salones de uñas" },
   { href: "/fisioterapia", label: "Fisioterapia" },
+  { href: "/pestanas-y-cejas", label: "Pestañas y cejas" },
+  { href: "/spa-y-masajes", label: "Spa y masajes" },
+  { href: "/peluqueria-canina", label: "Peluquería canina" },
+] as const;
+
+/** Los índices de cada sección de guías (lib/paginas.ts): desde ellos se
+ * llega a cada página hija en un clic, así que el pie enlaza a todo el
+ * sitio sin ser una lista de 60 enlaces. */
+const RECURSOS = [
+  { href: "/integraciones", label: "Integraciones" },
+  { href: "/desvio-de-llamadas", label: "Desvío de llamadas" },
+  { href: "/herramientas", label: "Herramientas gratis" },
+  { href: "/comparativa", label: "Comparativas" },
+  { href: "/guias/ley-y-recepcionista-de-ia", label: "La ley y la IA" },
+  { href: "/glosario", label: "Glosario" },
+  { href: "/novedades", label: "Novedades" },
+  { href: "/sobre-alhabla", label: "Sobre Alhabla" },
+  { href: "/prensa", label: "Prensa" },
 ] as const;
 
 const enlace = "inline-flex h-11 items-center transition hover:text-white";
@@ -50,6 +68,16 @@ export function SiteFooter() {
             </Link>
           </nav>
         </div>
+        <nav
+          aria-label="Guías y recursos"
+          className="flex flex-wrap items-center gap-x-4 border-t border-white/10 pt-4 text-sm font-medium"
+        >
+          {RECURSOS.map((recurso) => (
+            <Link key={recurso.href} href={recurso.href} className={enlace}>
+              {recurso.label}
+            </Link>
+          ))}
+        </nav>
         <div className="flex flex-col gap-4 border-t border-white/10 pt-5 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center gap-3">
             <BrandMark className="h-8 w-8 shrink-0" />

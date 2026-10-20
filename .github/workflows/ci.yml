@@ -271,3 +271,7 @@ jobs:
           NEXT_PUBLIC_API_BASE_URL: https://api.alhabla.ai
           NEXT_PUBLIC_SITE_URL: https://alhabla.ai
           NEXT_PUBLIC_APP_URL: https://app.alhabla.ai
+      # Ningún par de páginas del sitemap puede compartir la mitad del texto
+      # principal: Google agrupa las casi iguales y solo indexa una (las 30
+      # páginas sector × ciudad, 2026-10-20). Lee el HTML del build anterior.
+      - run: npm run seo:similitud

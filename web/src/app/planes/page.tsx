@@ -7,7 +7,8 @@ import { PlansHeadline } from "@/components/plans-headline";
 import { BackLink } from "@/components/back-link";
 import { BotonWhatsappEquipo } from "@/components/boton-whatsapp-equipo";
 import { SiteFooter } from "@/components/site-footer";
-import { absoluteUrl, buildBreadcrumbStructuredData, ogImages, siteName, websiteId } from "@/lib/seo";
+import { datosDePrecios, PlanesDetalle, PREGUNTAS_DE_FACTURACION } from "@/components/planes-detalle";
+import { absoluteUrl, buildBreadcrumbStructuredData, buildFaqPageStructuredData, ogImages, siteName, websiteId } from "@/lib/seo";
 import { formatIncludedMinutes, plans, starterPlan, TRIAL_DAYS } from "@/lib/plans";
 
 // Título con la palabra clave y el precio de entrada, que es lo que busca
@@ -55,6 +56,8 @@ const planesStructuredData = {
       inLanguage: "es-ES",
       isPartOf: { "@id": websiteId() },
     },
+    datosDePrecios(),
+    buildFaqPageStructuredData(PREGUNTAS_DE_FACTURACION),
   ],
 };
 
@@ -83,6 +86,9 @@ export default function PlansPage() {
               <PlansHeadline />
               <p className="mt-5 text-lg leading-8 text-[#52525b]">
                 Elige el plan que encaja hoy y déjanos la recepción: disponibilidad real, tono impecable y operativa lista para crecer.
+              </p>
+              <p className="mt-3 text-sm text-muted">
+                Precios sin IVA. Debajo tienes qué incluye cada plan, cuántos minutos necesitas y cómo se factura.
               </p>
             </div>
 
@@ -121,6 +127,8 @@ export default function PlansPage() {
                 </article>
               ))}
             </div>
+
+            <PlanesDetalle />
           </div>
         </section>
       </div>

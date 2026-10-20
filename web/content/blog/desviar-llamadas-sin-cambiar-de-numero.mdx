@@ -2,6 +2,7 @@
 titulo: "Desviar llamadas sin cambiar de número: cómo funciona"
 resumen: "Con un código en tu móvil o tu fijo, las llamadas que no puedes coger pasan a tu recepcionista. Tu número sigue siendo el mismo. Así se activa."
 fecha: "2026-09-26"
+actualizado: "2026-10-20"
 autor: "Miguel Martín Delgado"
 sector: ""
 imagen: "https://images.unsplash.com/photo-1512428559087-560fa5ceab42?auto=format&fit=crop&w=1600&q=80"
@@ -24,25 +25,27 @@ Así, Alhabla no sustituye a tu teléfono: se queda con las llamadas que antes s
 
 ## Cómo se activa en un móvil
 
-Los códigos son del estándar GSM, así que valen igual en Movistar, Vodafone, Orange, Yoigo y MásMóvil (los detalles y el coste de cada uno, en [desvío de llamadas si no contesta](/blog/desvio-de-llamadas-si-no-contesta)). Se marcan como si fueran una llamada normal, poniendo tu número de Alhabla donde pone `número`:
+Los códigos son del estándar GSM: [Movistar](/desvio-de-llamadas/movistar), [Vodafone](/desvio-de-llamadas/vodafone), [Orange](/desvio-de-llamadas/orange), [O2](/desvio-de-llamadas/o2) y [Digi](/desvio-de-llamadas/digi) los publican tal cual para el móvil. [Yoigo](/desvio-de-llamadas/yoigo) y [MásMóvil](/desvio-de-llamadas/masmovil) solo publican el de todas las llamadas (`*21*número#`), aunque Yoigo usa los condicionales para su propio contestador. Los detalles y el coste de cada uno, en [desvío de llamadas si no contesta](/blog/desvio-de-llamadas-si-no-contesta) y en la [guía de desvío por operador](/desvio-de-llamadas). Se marcan como si fueran una llamada normal, poniendo tu número de Alhabla donde pone `número`:
 
 - **Cuando no contestas** (el recomendado): `**61*número#`. Para quitarlo, `##61#`.
-- **Cuando estás comunicando**: `**67*número#`, para no perder al cliente que llama mientras hablas con otro. Para quitarlo, `##67#`.
+- **Cuando estás comunicando** o rechazas la llamada: `**67*número#`, para no perder al cliente que llama mientras hablas con otro. Para quitarlo, `##67#`. Si tienes la llamada en espera activada, no «comunicas»: la segunda llamada suena en espera y, si no la coges, se aplica el desvío cuando no contestas.
 - **Cuando estás sin cobertura o apagado**: `**62*número#`. Para quitarlo, `##62#`.
 - **Todas las llamadas**: `**21*número#`. Tu teléfono deja de sonar y todo va a la recepcionista. Para quitarlo, `##21#`.
 
-Si algún día quieres dejarlo todo como estaba, `##002#` anula de una vez todos los desvíos del móvil.
+Si algún día quieres quitarlo, marca `##61#` (y `##67#` o `##62#` si los pusiste). No uses `##002#`: anula de una vez todos los desvíos del móvil, también los que mandan llamadas al buzón de voz. El buzón se vuelve a activar aparte, con el método de tu operador (en Movistar, llamando al 22500; en Vodafone, con `*147#`).
 
 <Aviso tipo="consejo" titulo="No hace falta memorizarlo">Al dar de alta tu negocio, el panel te enseña el código ya escrito con tu número de Alhabla y te guía según tu operador. Después puedes hacer una llamada de prueba para comprobar que la recepcionista contesta.</Aviso>
 
 ## Y si el teléfono del local es un fijo
 
-En un fijo los códigos son los mismos, pero sin los dos asteriscos del principio, y se marcan desde el propio aparato después del tono:
+En la mayoría de fijos los códigos son los mismos, pero con un solo asterisco al principio, y se marcan desde el propio aparato después del tono:
 
 - **Cuando no contestas**: `*61*número#`. Para quitarlo, `#61#`.
 - **Todas las llamadas**: `*21*número#`. Para quitarlo, `#21#`.
 
-<Aviso tipo="importante" titulo="Ojo con el contestador del fijo">Si tu fijo tiene contestador automático, desactívalo (en Movistar, marcando `#10#`). Si no, el contestador saltará antes que el desvío y se quedará él las llamadas.</Aviso>
+Hay excepciones. En Orange con cobertura directa son `*23número` y `*231*`; en el fijo de Vodafone se marca `*61*número` sin almohadilla final y se quita con `##61#`; [Jazztel](/desvio-de-llamadas/jazztel) lo activa con `*61`, el número y `#`, y lo quita con `#61`, sin almohadilla final; y las centralitas Big Pyme usan otra familia de códigos. En Movistar, además, el desvío del fijo hay que contratarlo (4 € al mes por cada tipo), y Digi no tiene desvío «si comunica» en el fijo.
+
+<Aviso tipo="importante" titulo="Ojo con el contestador del fijo">Si tu fijo tiene contestador automático, desactívalo (en Movistar, marcando `#9998` y después `#10#`; en Vodafone, `*110*`; en Jazztel, `#10` y `#11`). Si no, el contestador saltará antes que el desvío y se quedará él las llamadas.</Aviso>
 
 ## Qué pasa después del desvío
 
@@ -54,6 +57,6 @@ Mientras tanto, tú no has soltado lo que tenías entre manos. Lo explicamos con
 
 ## Preguntas frecuentes
 
-<Faq preguntas={[{ pregunta: "¿Mis clientes tienen que llamar a otro número?", respuesta: "No. Siguen marcando el de siempre. El desvío ocurre dentro de tu línea y ellos no lo notan." }, { pregunta: "¿Cuántos tonos suena antes de desviar?", respuesta: "Depende de tu operador. Con el desvío «cuando no contestas» la llamada salta tras unos tonos, así que te da tiempo a cogerla si puedes." }, { pregunta: "¿Puedo quitar el desvío cuando quiera?", respuesta: "Sí. Cada desvío tiene su código para quitarlo, y en un móvil ##002# los anula todos a la vez. No hay permanencia." }, { pregunta: "¿Me cobra algo mi operador por desviar?", respuesta: "Algunas tarifas cobran las llamadas desviadas como una llamada saliente. Revisa las condiciones de la tuya o pregunta a tu operador antes de activarlo." }]} />
+<Faq preguntas={[{ pregunta: "¿Mis clientes tienen que llamar a otro número?", respuesta: "No. Siguen marcando el de siempre. El desvío ocurre dentro de tu línea y ellos no lo notan." }, { pregunta: "¿Cuántos tonos suena antes de desviar?", respuesta: "Depende de tu operador. Con el desvío «cuando no contestas» la llamada salta tras unos tonos, así que te da tiempo a cogerla si puedes." }, { pregunta: "¿Puedo quitar el desvío cuando quiera?", respuesta: "Sí. Cada desvío tiene su código para quitarlo: ##61# el de cuando no contestas. Mejor eso que ##002#, que en un móvil los anula todos a la vez, también los que mandan llamadas al buzón de voz. No hay permanencia." }, { pregunta: "¿Me cobra algo mi operador por desviar?", respuesta: "Activarlo suele ser gratis, pero en todos los operadores el tramo desviado es una llamada que sale de tu línea: lo que cambia es si tu tarifa la incluye. Y hay cuotas que conviene conocer: el fijo de Movistar cobra 4 € al mes por cada tipo de desvío, y el de Vodafone, 0,182 € por llamada desviada más 0,242 € el minuto, IVA incluido." }]} />
 
 <Cta titulo="Que ninguna llamada se quede sin respuesta" texto="7 días de prueba, sin permanencia y con tu número de siempre." destino="planes" />
