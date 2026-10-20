@@ -1296,6 +1296,14 @@ hablando por el que elige `identificarRemitente`.
   (recortadas: «todo el día»). `marcar_ausencia`: días enteros si no hay horas, hasta 62
   días, sin solapes con otra ausencia de la misma persona, y avisa de las citas ya reservadas
   en el tramo («no se mueven solas»; el prompt ofrece moverlas o cancelarlas una a una).
+  **`quitar_ausencia`** (Gestor) deshace una: por `ausencia` (id; `listar_agenda` lo devuelve como
+  `ausenciaId`) o por `profesional` (+ `fecha` si tiene varias; con varias sin fecha devuelve los ids
+  para preguntar al dueño); al proponer se normaliza a `{ ausencia: id }` y el borrado va con
+  `{ id, businessId }`. El panel hace lo mismo con `GET /booking-settings/absences?desde&hasta` y
+  `DELETE /booking-settings/absences/:id` (lógica en `modules/bookings/ausencias.ts`): la agenda de
+  escritorio (vista Día) las pinta por columna con «Quitar», y Agente › Profesionales (escritorio y
+  móvil) las lista por persona. No hay caché de voz que invalidar: `checkAvailability` y `get_catalog`
+  leen la tabla en cada llamada. Crear sigue siendo solo del Gestor.
 - **Bloqueos no son tabla**: `bloquear_franja` escribe una excepción del horario con horario
   especial (`restarTramo` quita `[desde, hasta)` de los tramos del día; si no queda nada,
   `closed`), lo que `checkBusinessHours`, `get_catalog`, el panel (`business-hours-editor`) y

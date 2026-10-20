@@ -3,7 +3,7 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AgenteEscritorio } from "@/components/escritorio/agente/agente-escritorio";
-import { getBookingSettings, updateBookingProfessional, updateBookingService } from "@/lib/api";
+import { getAusencias, getBookingSettings, quitarAusencia, updateBookingProfessional, updateBookingService } from "@/lib/api";
 import type { BookingSettings, Business } from "@/lib/types";
 
 const replace = vi.fn();
@@ -15,6 +15,8 @@ vi.mock("next/navigation", () => ({
 }));
 vi.mock("@/lib/api", () => ({
   getBookingSettings: vi.fn(),
+  getAusencias: vi.fn(),
+  quitarAusencia: vi.fn(),
   updateBookingService: vi.fn(),
   updateBookingProfessional: vi.fn(),
   createBookingService: vi.fn(),
@@ -73,6 +75,8 @@ beforeEach(() => {
   vi.mocked(getBookingSettings).mockResolvedValue(AJUSTES);
   vi.mocked(updateBookingService).mockResolvedValue({} as never);
   vi.mocked(updateBookingProfessional).mockResolvedValue({} as never);
+  vi.mocked(getAusencias).mockResolvedValue([]);
+  vi.mocked(quitarAusencia).mockResolvedValue(undefined);
 });
 
 describe("AgenteEscritorio", () => {
@@ -134,5 +138,31 @@ describe("AgenteEscritorio", () => {
     const profesionales = await within(indice).findByRole("button", { name: /Profesionales\s*·\s*1/ });
     expect(profesionales).toHaveAttribute("aria-current", "page");
     expect(within(indice).getByRole("button", { name: /Información\s*\(sin rellenar\)/ })).toBeInTheDocument();
+  });
+
+  it("en Profesionales enseña las ausencias por venir de cada persona y deja quitarlas", async () => {
+    busqueda = "ajuste=profesionales";
+    vi.mocked(getAusencias).mockResolvedValue([
+      {
+        id: "aus_1",
+        professionalId: "p_lucia",
+        professionalName: "Lucía",
+        startsAt: "2026-11-08T23:00:00.000Z",
+        endsAt: "2026-11-10T23:00:00.000Z",
+        reason: "baja",
+        createdVia: "owner_chat",
+      },
+    ]);
+    const user = userEvent.setup();
+    pintar();
+
+    expect(await screen.findByText("Ausente del 9 al 10 de noviembre")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Quitar la ausencia de Lucía (del 9 al 10 de noviembre)" }));
+    vi.mocked(getAusencias).mockResolvedValue([]);
+    await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Quitar ausencia" }));
+
+    expect(quitarAusencia).toHaveBeenCalledWith("aus_1");
+    expect(await screen.findByText(/Ausencia de Lucía quitada/)).toBeInTheDocument();
+    expect(screen.queryByText("Ausente del 9 al 10 de noviembre")).not.toBeInTheDocument();
   });
 });
