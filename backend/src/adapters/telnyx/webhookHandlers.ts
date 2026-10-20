@@ -388,6 +388,8 @@ export async function handleCallInitiated(
         phone: true,
         telnyxPhoneNumber: true,
         ownerWhatsappNumber: true,
+        // Lo que decide si el pago corta el servicio (selectTelnyxInboundAgent).
+        subscriptionStatus: true,
         callsSuspendedAt: true,
         paymentFailureSuspensionAt: true,
         agents: {
@@ -416,7 +418,7 @@ export async function handleCallInitiated(
     const agent = selectTelnyxInboundAgent(business);
     if (!agent) {
       console.warn(
-        `[Telnyx] Negocio ${business.id} sin assistant Telnyx operativo o suspendido — se cuelga la llamada`
+        `[Telnyx] Negocio ${business.id} sin assistant Telnyx operativo o con el servicio cortado por el pago (suscripción ${business.subscriptionStatus ?? "sin Stripe"}) — se cuelga la llamada`
       );
       await telnyxAiAdapter.hangupCall(call_control_id).catch(() => {});
       return { success: false };

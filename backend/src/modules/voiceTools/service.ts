@@ -278,6 +278,10 @@ type BusinessVoiceConfig = FilaDeConexionDeCalendario & {
   agentSettings?: unknown;
 };
 
+/** Lo que oye el cliente cuando el pago del negocio corta las reservas. */
+const MENSAJE_SERVICIO_SUSPENDIDO =
+  "No puedo agendar la cita en este momento. Por favor, contacta con el negocio directamente.";
+
 async function loadBusinessConfig(
   businessId: string
 ): Promise<BusinessVoiceConfig | null> {
@@ -439,6 +443,24 @@ async function executeCheckAvailability(
       typeof params?.durationMinutes === "number" ? params.durationMinutes : 0;
     if (!isValidAppointmentDuration(durationMinutes)) {
       return invalidDurationResult();
+    }
+
+    // Si el pago corta el servicio, book_appointment va a rechazar la cita
+    // (SUBSCRIPTION_INACTIVE): no se ofrece una hora que no se va a poder
+    // reservar. Normalmente la llamada ni se contesta (selectTelnyxInboundAgent),
+    // pero la suscripción puede cancelarse con la llamada en curso.
+    if (servicioSuspendidoPorPago(business)) {
+      console.warn(
+        `[VoiceTools] ${callLabel} check_availability sin ofrecer horas: suscripción en estado ${business.subscriptionStatus} o servicio suspendido por impago`
+      );
+      return {
+        success: true,
+        result: {
+          available: false,
+          code: "SUBSCRIPTION_INACTIVE",
+          message: MENSAJE_SERVICIO_SUSPENDIDO,
+        },
+      };
     }
 
     // Antelación mínima, duración máxima y horizonte de 120 días: las mismas
@@ -1675,8 +1697,7 @@ async function executeBookAppointment(
       result: {
         success: false,
         code: "SUBSCRIPTION_INACTIVE",
-        message:
-          "No puedo agendar la cita en este momento. Por favor, contacta con el negocio directamente.",
+        message: MENSAJE_SERVICIO_SUSPENDIDO,
       },
     };
   }

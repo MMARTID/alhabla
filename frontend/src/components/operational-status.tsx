@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { getOnboardingState, getPhoneNumberInfo } from "@/lib/api";
 import { formatPhone } from "@/lib/format";
+import { suscripcionSinCobro } from "@/lib/suscripcion";
 import type { Business, PhoneNumberInfo } from "@/lib/types";
 
 /**
@@ -72,9 +73,11 @@ export function buildOperationalStatus({
 
   const agent: OperationalStatusItem = business.callsSuspendedAt
     ? { key: "agent", label: "Recepcionista", icon: Bot, value: "Suspendida por impago", tone: "error", action: { label: "Regularizar el pago", href: "/ajustes/facturacion" } }
-    : !business.active || !agentActive
-      ? { key: "agent", label: "Recepcionista", icon: Bot, value: "Inactiva", tone: "warning", action: { label: "Revisar agente", href: "/agente?section=agent-settings" } }
-      : { key: "agent", label: "Recepcionista", icon: Bot, value: "Atendiendo llamadas", tone: "ok" };
+    : suscripcionSinCobro(business.subscriptionStatus)
+      ? { key: "agent", label: "Recepcionista", icon: Bot, value: "No contesta: sin plan activo", tone: "error", action: { label: "Elegir plan", href: "/ajustes/facturacion" } }
+      : !business.active || !agentActive
+        ? { key: "agent", label: "Recepcionista", icon: Bot, value: "Inactiva", tone: "warning", action: { label: "Revisar agente", href: "/agente?section=agent-settings" } }
+        : { key: "agent", label: "Recepcionista", icon: Bot, value: "Atendiendo llamadas", tone: "ok" };
 
   const phoneItem: OperationalStatusItem = phone?.status === "active" && phone.phoneNumber
     ? { key: "phone", label: "Tu número", icon: Smartphone, value: formatPhone(phone.phoneNumber) ?? phone.phoneNumber, tone: "ok" }
