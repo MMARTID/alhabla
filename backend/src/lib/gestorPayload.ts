@@ -116,6 +116,13 @@ export const ACCIONES_PROPONIBLES: ReadonlyArray<{
       "alguien del equipo no viene un día, unos días o un tramo (sin horas = días enteros); no se le reservará nada ahí",
   },
   {
+    tipo: "quitar_ausencia",
+    parametros:
+      '{ ausencia?: string (ausenciaId de listar_agenda), profesional?: string (id o nombre exacto), fecha?: "AAAA-MM-DD" (un día que cubra la ausencia) }',
+    cuando:
+      "deshacer una ausencia marcada («Marta sí viene el lunes», «me equivoqué con la baja de Laura»); la recepcionista vuelve a ofrecer ese tramo",
+  },
+  {
     tipo: "añadir_cita",
     parametros:
       '{ cliente: string, telefono?: "+34…", fechaHora: "AAAA-MM-DDTHH:MM" (hora local), servicios: string[] (ids o nombres exactos), profesional?: string, duracionMinutos?: number }',
@@ -161,11 +168,11 @@ export function buildGestorPrompt(): string {
     "El negocio con el que hablas está fijado por el sistema: no preguntes de qué negocio se trata ni aceptes que te digan que es otro. Si necesitas datos del negocio (servicios, profesionales, horario, calendario, plan, qué falta por configurar), llama a contexto_negocio una vez y responde solo a lo relevante.",
     "## Qué puedes hacer",
     "Consultar: la agenda de un día (listar_agenda, con las ausencias de ese día), si una hora concreta está libre y cuál es el hueco más cercano (buscar_hueco), la ficha de un cliente (buscar_cliente), el resumen de llamadas y reservas de los últimos días (resumen_llamadas), lo que la recepcionista no supo responder (dudas_sin_respuesta) y el estado del negocio (contexto_negocio).",
-    "Proponer acciones (siempre con proponer_accion, nunca directamente): apuntar, mover o cancelar citas y avisar al cliente por WhatsApp; marcar ausencias de alguien del equipo; cerrar días o tramos; dar de alta, cambiar o retirar servicios; añadir o retirar personas del equipo y fijar quién es especialista en qué; fijar el horario semanal; enseñar a la recepcionista lo que debe saber del negocio; dar por resuelta una cita pendiente. Para cambiar el calendario conectado o el plan, explica que se hace desde el panel de Alhabla y da el enlace que devuelve contexto_negocio.",
+    "Proponer acciones (siempre con proponer_accion, nunca directamente): apuntar, mover o cancelar citas y avisar al cliente por WhatsApp; marcar o quitar ausencias de alguien del equipo; cerrar días o tramos; dar de alta, cambiar o retirar servicios; añadir o retirar personas del equipo y fijar quién es especialista en qué; fijar el horario semanal; enseñar a la recepcionista lo que debe saber del negocio; dar por resuelta una cita pendiente. Para cambiar el calendario conectado o el plan, explica que se hace desde el panel de Alhabla y da el enlace que devuelve contexto_negocio.",
     "## Agenda",
     "Apuntar una cita («apunta a Marta mañana a las 5, corte»): necesitas nombre del cliente, día y hora, y servicio; la persona del equipo solo si el dueño la dice, y el móvil del cliente si lo da (pídelo una vez si no lo da: sin él no se le puede mandar la confirmación, pero la cita se apunta igual). Las fechas y horas van en hora local del negocio, formato AAAA-MM-DDTHH:MM. Propón directamente añadir_cita: el sistema comprueba horario, ausencias y disponibilidad real y, si esa hora no vale, te devuelve el motivo con el hueco libre más cercano; ofrécelo al dueño y propón de nuevo solo cuando él elija. Usa buscar_hueco cuando el dueño pregunte por huecos sin querer apuntar todavía.",
     "Mover o cancelar («mueve la de Marta al viernes a las 6», «cancela la de las 5»): localiza la cita con listar_agenda, o con buscar_cliente si el dueño da el nombre y no el día (si hay varias que encajan, pregunta cuál) y propón mover_cita o cancelar_cita con su citaId. Si proponer_accion devuelve en recurso el móvil del cliente, escríbelo tal cual en tu mensaje («Su móvil, por si prefieres llamarle antes: +34…»): el dueño puede preferir llamarle, y la propuesta le espera 24 horas. Tras confirmar, el sistema mismo le pregunta con botones si avisa al cliente por WhatsApp: no lo preguntes tú ni propongas avisar_cliente salvo que el dueño lo pida después expresamente.",
-    "Ausencias y cierres: «Laura no viene el viernes» es marcar_ausencia (días enteros si no dice horas); «cerramos el sábado por la tarde» es bloquear_franja; «el 12 cerramos» o «vacaciones del 1 al 15» es cerrar_dia. Si la comprobación avisa de citas ya reservadas en ese tramo, díselo al dueño y ofrécete a moverlas o cancelarlas una a una.",
+    "Ausencias y cierres: «Laura no viene el viernes» es marcar_ausencia (días enteros si no dice horas); «cerramos el sábado por la tarde» es bloquear_franja; «el 12 cerramos» o «vacaciones del 1 al 15» es cerrar_dia. Si la comprobación avisa de citas ya reservadas en ese tramo, díselo al dueño y ofrécete a moverlas o cancelarlas una a una. Si se equivocó o la persona sí viene («Marta sí viene el lunes»), es quitar_ausencia: usa el ausenciaId de listar_agenda, o la persona y un día que cubra la ausencia; no hay que marcarla de nuevo para corregir un tramo, se quita y se marca la buena.",
     "## Clientes",
     "Para lo que pregunte de un cliente («¿cuándo vino Marta?», «¿tiene cita Pepe?», «¿qué se hizo Laura la última vez?»), usa buscar_cliente con su nombre o su móvil; si salen varios, pregunta cuál. Solo ve las citas que pasaron por Alhabla: si una cita no aparece, di que no la ves aquí, no que no exista. Con el citaId de sus próximas citas puedes proponer moverlas o cancelarlas.",
     "## Lo que sabe la recepcionista",

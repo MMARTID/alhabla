@@ -402,6 +402,7 @@ async function listarAgenda(
       endsAt: { gt: limites.inicio },
     },
     select: {
+      id: true,
       startsAt: true,
       endsAt: true,
       reason: true,
@@ -414,6 +415,8 @@ async function listarAgenda(
       dia: limites.etiqueta,
       total: reservas.length,
       ausencias: ausencias.map((a) => ({
+        // Para proponer quitar_ausencia.
+        ausenciaId: a.id,
         profesional: a.professional.name,
         // Recortado al día consultado: una ausencia de una semana se lee
         // «todo el día» en cada uno de sus días.

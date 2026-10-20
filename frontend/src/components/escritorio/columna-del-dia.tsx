@@ -45,6 +45,7 @@ export function ColumnaDelDia({
   alto = ALTO_DE_HORA,
   compacta = false,
   cerradoTodoElDia = false,
+  ausencias,
   arrastrable,
 }: {
   citas: AgendaBooking[];
@@ -60,6 +61,8 @@ export function ColumnaDelDia({
   /** En la semana: una línea por bloque, sin precio. */
   compacta?: boolean;
   cerradoTodoElDia?: boolean;
+  /** Tramos del día (en minutos) en que esta persona no está. */
+  ausencias?: Array<{ desde: number; hasta: number }>;
   /** Arrastrar una cita para moverla (solo la semana de la Agenda). */
   arrastrable?: {
     onEmpezar: (cita: AgendaBooking, evento: React.PointerEvent<HTMLButtonElement>) => void;
@@ -99,6 +102,21 @@ export function ColumnaDelDia({
           />
         ))
       )}
+      {(ausencias ?? []).map((tramo) => {
+        const desde = Math.max(tramo.desde, rango.desde);
+        const hasta = Math.min(tramo.hasta, rango.hasta);
+        if (hasta <= desde) return null;
+        return (
+          <div
+            key={`${tramo.desde}-${tramo.hasta}`}
+            className="pointer-events-none absolute inset-x-0 border-y border-lavado-borde bg-[repeating-linear-gradient(135deg,rgb(var(--lavado))_0,rgb(var(--lavado))_7px,rgb(var(--lavado-2))_7px,rgb(var(--lavado-2))_14px)]"
+            style={{ top: aPx(desde), height: aPx(hasta) - aPx(desde) }}
+            aria-hidden="true"
+          >
+            <span className="absolute left-2 top-1.5 text-xs font-semibold text-morado-tinta">Ausente</span>
+          </div>
+        );
+      })}
       {colocadas.map(({ item: cita, inicio, fin, carril, carriles }) => {
         const pasada = finDeCita(cita) <= ahora;
         const elegida = seleccionada === cita.id;
