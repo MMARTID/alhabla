@@ -224,6 +224,7 @@ graph TD
 | `/peluqueria`, `/barberia`, `/centro-de-estetica`, `/salon-de-unas`, `/fisioterapia` | Landings por sector |
 | `/planes` | Planes y calculadora de ROI |
 | `/recepcionista-ia-en-catalan` | Atención en catalán, euskera y gallego |
+| `/agenda-por-whatsapp` | El Gestor: el dueño gestiona la agenda por WhatsApp |
 | `/blog`, `/blog/[slug]`, `/blog/rss.xml` | Artículos (MDX en `web/content/blog`) |
 | `/keystatic`, `/vista-previa/[slug]` | Editor del blog (Keystatic) y vista previa de un borrador |
 | `/legal/aviso-legal`, `/legal/privacidad` | Legales |

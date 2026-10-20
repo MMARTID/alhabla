@@ -150,6 +150,7 @@ each file.
 | `/` | Generic conversion landing |
 | `/barberia`, `/peluqueria`, `/fisioterapia`, `/centro-de-estetica`, `/salon-de-unas` | Niche SEO landings (the old `/<niche>/<city>` pages 301 here since 2026-10-20) |
 | `/recepcionista-ia-en-catalan` | Catalan / Basque / Galician attention (cooficial language by postal code) |
+| `/agenda-por-whatsapp` | The Gestor: the owner manages the agenda over WhatsApp (not `/gestor`, which redirects to the app) |
 | `/planes` | Pricing page with ROI-aware headline |
 | `/register` | Account creation (email or Google); jumps to the app with a one-time pass |
 | `/blog`, `/blog/[slug]`, `/blog/rss.xml` | MDX blog (`web/content/blog`) |
