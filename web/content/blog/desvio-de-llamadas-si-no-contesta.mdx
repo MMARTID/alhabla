@@ -1,0 +1,111 @@
+---
+titulo: "Desvío de llamadas si no contesta: códigos por operador"
+resumen: "En el móvil se marca **61*número#. Los códigos de Movistar, Vodafone, Orange, Digi y O2 en móvil y fijo, en iPhone y Android, y lo que cuesta."
+fecha: "2026-10-20"
+autor: "Miguel Martín Delgado"
+sector: ""
+imagen: "https://images.pexels.com/photos/7580908/pexels-photo-7580908.jpeg?auto=compress&cs=tinysrgb&w=1600"
+imagenAlt: "Mano marcando en el teclado de un teléfono fijo de oficina, sobre una mesa de madera con un teclado y un ratón al fondo"
+idioma: "es"
+borrador: false
+---
+
+Para desviar las llamadas que no contestas desde un móvil, marca `**61*`, el número al que quieres mandarlas y `#`, y pulsa llamar: por ejemplo, `**61*600000000#`. Para comprobar que ha quedado activo, marca `*#61#`; para quitarlo, `##61#`. Es un código del estándar GSM: Movistar, Vodafone, Digi y O2 lo publican tal cual para sus móviles, y Orange con los segundos de espera añadidos.
+
+En el fijo cambia: casi todos usan `*61*número#` y `#61#` para quitarlo, pero Vodafone y Orange tienen sus variantes y Movistar lo cobra aparte. Abajo están los códigos de cada operador, sacados de sus páginas de ayuda en octubre de 2026, y cómo hacerlo desde el iPhone o un Android.
+
+## Los códigos de desvío en el móvil
+
+Se marcan en el teclado de la app Teléfono, como una llamada, desde el móvil que quieres desviar. Pon el número de destino donde dice `número`:
+
+- **Si no contestas**: `**61*número#`. Comprobar: `*#61#`. Quitar: `##61#`.
+- **Si estás comunicando** o rechazas la llamada: `**67*número#`. Comprobar: `*#67#`. Quitar: `##67#`.
+- **Si está apagado o sin cobertura**: `**62*número#`. Comprobar: `*#62#`. Quitar: `##62#`.
+- **Todas las llamadas**, y el móvil deja de sonar: `**21*número#`. Comprobar: `*#21#`. Quitar: `##21#`.
+- **Quitar todos los desvíos a la vez**: `##002#`, que también borra el desvío al buzón de voz (lo publican Vodafone, Orange y Digi).
+
+### Cuántos segundos suena antes de desviar
+
+El estándar que siguen los operadores ([3GPP TS 22.030](https://www.etsi.org/deliver/etsi_ts/122000_122099/122030/19.00.00_60/ts_122030v190000p.pdf), anexo B) permite añadir al final cuántos segundos suena el teléfono antes de desviar, de 5 a 30: `**61*número**20#` desvía a los 20 segundos. Solo Orange lo explica en su ayuda, con un margen de 5 a 20 segundos en múltiplos de 5. Los demás no lo mencionan: puedes probarlo y comprobar con `*#61#` que el desvío ha quedado activo.
+
+## Desvío si no contesta por operador
+
+<div style={{ overflowX: "auto" }}>
+<table style={{ minWidth: "560px" }}>
+<thead>
+<tr><th>Operador</th><th>Móvil: activar</th><th>Móvil: quitar</th><th>Fijo: activar</th><th>Fijo: quitar</th></tr>
+</thead>
+<tbody>
+<tr><td>Movistar</td><td>`**61*número#`</td><td>`##61#`</td><td>`*61*número#` (servicio de 4 €/mes)</td><td>`#61#`</td></tr>
+<tr><td>Vodafone</td><td>`**61*número#`</td><td>`##61#`</td><td>`*61*número` y tecla de llamada</td><td>`##61#`</td></tr>
+<tr><td>Orange</td><td>`**61*número**segundos#`</td><td>`##61#`</td><td>`*61*número#` (cobertura indirecta) o `*23número` (directa)</td><td>`#61#` o `*231*`</td></tr>
+<tr><td>Digi</td><td>`**61*número#`</td><td>`##61#`</td><td>`*61*número#`</td><td>`#61#`</td></tr>
+<tr><td>O2</td><td>`**61*número#`</td><td>`##61#`</td><td>`*61*número#`</td><td>`#61#`</td></tr>
+</tbody>
+</table>
+</div>
+
+En el fijo se descuelga antes de marcar y se cuelga al oír el tono de confirmación. Lo que cambia de un operador a otro es el precio y algún detalle.
+
+### Movistar
+
+**Móvil.** También se gestiona desde tu área privada de Mi Movistar. Activarlo cuesta 0 €, pero cada desvío cuenta como una llamada de tu línea al destino: entra en tu tarifa si tiene llamadas ilimitadas o bono de minutos; en prepago necesitas saldo. Fuente: [servicios de móvil de Movistar](https://www.movistar.es/mas-servicios/servicios-de-movil).
+
+**Fijo.** El desvío se contrata: **4 € al mes por cada tipo** (si no contestas, si comunicas e inmediato), y las llamadas desviadas se pagan al precio de llamadas de tu línea. Salta a los 15 segundos sin contestar, y no hay desvío por apagado. Fuentes: [servicios de fijo de Movistar](https://www.movistar.es/mas-servicios/servicios-de-fijo) y el [blog de Movistar](https://www.movistar.es/blog/mi-movistar/desviar-llamadas-movistar/).
+
+### Vodafone
+
+**Móvil.** En Mi Vodafone está en Mis productos › Móvil, fibra y TV › tu línea › Mi tarifa › Ajustes de línea › Opciones de llamada › Desvíos de llamada. Activarlo es gratis, pero el tramo desde tu número hasta el destino lo pagas tú: 0,182 € de establecimiento de llamada (IVA incluido) más el precio por minuto. Fuente: [ayuda de Vodafone para el móvil](https://ayudacliente.vodafone.es/particulares/movil/opciones-de-llamada-y-voz/como-desviar-llamadas-en-tu-movil/).
+
+**Fijo.** Su guía dice marcar `*61*`, el número y la tecla de llamada, sin almohadilla final, y quitarlo con `##61#`. Desde el fijo se puede desviar a cualquier fijo o móvil de Vodafone o a un móvil de otro operador. Cada llamada desviada cuesta 0,182 € de establecimiento y 0,242 € el minuto, IVA incluido. Fuente: [ayuda de Vodafone para el fijo](https://ayudacliente.vodafone.es/particulares/internet-y-fijo/fijo/como-desviar-llamadas-en-tu-fijo/).
+
+### Orange
+
+**Móvil.** Orange publica el código con los segundos: `**61*número**15#` desvía a los 15 segundos, y valen 5, 10, 15 o 20. Se comprueba con `*#61#`, se quita con `##61#` y también se configura en Mi Orange › Productos › Llamadas nacionales. Activarlo es gratis, pero la llamada desde tu móvil al destino la pagas tú. Fuente: [ayuda de Orange para el móvil](https://ayuda.orange.es/particulares/mi-orange/activar-servicios/777-desvia-las-llamadas-que-recibes-en-tu-movil-a-otro-numero).
+
+**Fijo.** Depende de si tu línea tiene cobertura directa de Orange o indirecta. Con directa, `*23` seguido del número, sin asterisco final, y `*231*` para quitarlo; con indirecta, `*61*número#` y `#61#`. Esa página no dice cómo saber cuál tienes ni si cobra: pregúntalo a Orange. Fuente: [ayuda de Orange para el fijo](https://ayuda.orange.es/particulares/internet-y-wi-fi/servicios/2055-desvia-las-llamadas-de-tu-telefono-fijo-de-orange-a-otro-fijo-o-a-un-movil).
+
+### Digi
+
+**Móvil.** Los códigos de arriba, con su comprobación, y `##002#` para quitar todos, incluido el del buzón. La llamada desviada se cobra según tu tarifa. Es incompatible con el aviso de llamada perdida y con el desvío de todas las llamadas al buzón.
+
+**Fijo.** `*61*número#` y la tecla de llamada; `#61#` para quitarlo y `#002#` para quitar todos. Para el fijo, Digi solo publica este desvío y el de todas las llamadas (`*21*número#`), y no indica precio. Fuente: [servicios adicionales de Digi](https://www.digimobil.es/servicios-adicionales).
+
+### O2
+
+**Móvil.** Los códigos de arriba, con su comprobación; en la app Mi O2 se ve en Configura tu línea › Desvío de llamadas. Si desvías a un fijo o móvil nacional, entra en tu tarifa. O2 avisa de que, con un teléfono con VoLTE, los códigos pueden no funcionar: entonces se hace desde los ajustes del teléfono. Con MultiSIM solo se pueden desviar todas las llamadas. Fuente: [ayuda de O2 para el móvil](https://o2online.es/ayuda/desvio-llamadas-movil/).
+
+**Fijo.** Descuelga, marca `*61*número#`, espera el tono continuo de confirmación y cuelga; `#61#` para quitarlo. O2 dice que es gratuito y que solo desvía a fijos y móviles nacionales. Fuente: [ayuda de O2 para el fijo](https://o2online.es/ayuda/desvio-de-llamadas-desde-el-fijo/).
+
+## Cómo desviar llamadas de fijo a móvil
+
+Con los códigos de la tabla, desde el propio fijo. En Movistar, contrata antes el servicio.
+
+<Pasos pasos={[{ titulo: "Descuelga el fijo", texto: "El de la línea que quieres desviar. Espera el tono de marcar." }, { titulo: "Marca el código con el número del móvil", texto: "Si no contestas: *61*, las 9 cifras del móvil y #. Para que todo vaya al móvil sin que suene el fijo, *21* en lugar de *61*. En Vodafone y Orange, usa sus variantes." }, { titulo: "Cuelga y pruébalo", texto: "Llama al fijo desde otro teléfono y no lo cojas: si salta al móvil, está bien puesto." }]} />
+
+## Desvío de llamadas en el iPhone y en Android
+
+**iPhone.** En Ajustes › Apps › Teléfono › Desvío de llamadas activas la opción y pones el número en «Desviar a». Pero ese menú desvía todas las llamadas: el iPhone deja de sonar. No hay opción para desviar solo si no contestas, y Apple remite al operador para los desvíos por línea ocupada o sin servicio. Así que abre la app Teléfono, ve al teclado, marca `**61*número#` y pulsa llamar. Fuente: [soporte de Apple](https://support.apple.com/es-es/guide/iphone/iph7405291c4/ios).
+
+**Android.** En un Samsung Galaxy: app Teléfono › Más (tres puntos) › Ajustes › Servicios adicionales › Desvío de llamadas › tu SIM › Desviar si no respondes; escribe el número y pulsa Habilitar. Samsung avisa de que los pasos cambian según el modelo ([ayuda de Samsung](https://www.samsung.com/es/support/mobile-devices/como-usar-el-desvio-de-llamadas-en-tu-smartphone-galaxy/)). En otras marcas el menú cambia de sitio: O2 explica el de Huawei y el de Xiaomi en su [guía para VoLTE](https://o2online.es/ayuda/desvio-llamadas-volte/). Si no lo encuentras, marca el código desde el teclado.
+
+## Errores típicos al activar el desvío
+
+- **El buzón de voz se queda la llamada.** En el móvil, el buzón es un desvío más: en la [comunidad de Movistar](https://comunidad.movistar.es/discussions/ayuda_tecnica_movil/desv%C3%ADos-de-llamadas-condicionales-qu%C3%A9-tipos-hay-y-c%C3%B3mo-gestionarlos/3466908) explican que sus líneas traen al buzón, por defecto, los desvíos por no contestar, comunicando y apagado. Con `**61*número#` cambias el primero; si quieres que tampoco vayan al buzón las llamadas cuando comunicas o estás sin cobertura, activa también `**67*` y `**62*` con el mismo número.
+- **Borrarlo sin querer.** `##002#` quita todos los desvíos, también el nuevo. Si quieres limpiar los antiguos, márcalo antes de activar el tuyo.
+- **El contestador del fijo contesta antes.** Si tu fijo tiene el contestador de la operadora (en Movistar se quita con `#10#`) o el aparato tiene uno, puede descolgar antes de que salte el desvío. Desactívalo.
+- **Usar el desvío incondicional.** `**21*`, como el menú de Ajustes del iPhone, desvía todas las llamadas y tu teléfono no vuelve a sonar. Si quieres seguir cogiendo las que puedas, el tuyo es el 61.
+- **Escribir mal el número.** Las 9 cifras seguidas, sin espacios ni guiones, como en el ejemplo de Vodafone: `**61*600000000#`. Solo se puede desviar a fijos y móviles españoles, no a números internacionales, cortos ni de tarificación especial.
+- **Que el código dé error.** Prueba desde los ajustes del teléfono o el área de cliente de tu operador; O2 avisa de que con VoLTE los códigos pueden fallar.
+
+## Desviar a una recepcionista de IA sin cambiar de número
+
+Todo esto sirve para mandar las llamadas que no coges a otro móvil, pero también a una recepcionista de IA. El desvío «si no contestas» es justo el que encaja: tu teléfono suena como siempre y solo las llamadas que no puedes coger pasan a ella. No cambias de número ni tienes que avisar a tus clientes; lo contamos en [cómo desviar llamadas sin cambiar de número](/blog/desviar-llamadas-sin-cambiar-de-numero).
+
+Con Alhabla desvías al número que te damos, y la recepcionista contesta con el nombre de tu negocio, consulta tu horario y tu calendario de Google, Outlook o iCloud, reserva la cita y se la confirma al cliente por WhatsApp. Tienes los precios en [planes](/planes).
+
+## Preguntas frecuentes
+
+<Faq preguntas={[{ pregunta: "¿Cuánto tarda en saltar el desvío si no contesto?", respuesta: "Depende del operador. En el fijo de Movistar, 15 segundos. En el móvil de Orange lo eliges tú, entre 5 y 20 segundos. El estándar GSM admite de 5 a 30, pero Movistar, Vodafone, Digi y O2 no publican cómo cambiarlo." }, { pregunta: "¿Cómo sé si tengo un desvío activado en el móvil?", respuesta: "Marca *#61# (si no contestas), *#67# (comunicando), *#62# (apagado) o *#21# (todas) y pulsa llamar. En el iPhone, el desvío de todas las llamadas muestra además un icono en la barra de estado." }, { pregunta: "¿Se desvían también los SMS?", respuesta: "No. Orange y Digi lo dicen expresamente: solo se desvían las llamadas." }, { pregunta: "¿Me cobran las llamadas desviadas?", respuesta: "Activarlo en el móvil es gratis en Movistar, Vodafone y Orange. El tramo desviado cuenta como una llamada tuya: Movistar, O2 y Digi lo cargan a tu tarifa, Orange dice que lo pagas tú y Vodafone cobra 0,182 € de establecimiento más el minuto. En el fijo, Movistar cobra 4 € al mes por cada tipo de desvío y Vodafone 0,182 € por llamada más 0,242 € el minuto." }]} />
+
+<Cta titulo="Que las llamadas que no coges no se pierdan" texto="Desvía a tu recepcionista de IA con el código de tu operador y sigue con tu número de siempre." destino="planes" />

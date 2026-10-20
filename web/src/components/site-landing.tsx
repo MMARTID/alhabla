@@ -91,7 +91,7 @@ export function SiteLanding({ content }: { content?: NicheLandingContent }) {
         baja, un cierre) — la continuación natural de "la agenda es lista",
         no un bloque suelto.
       */}
-      <OwnerAssistantSection data={content.ownerAssistant} accent={content.accent} />
+      <OwnerAssistantSection data={content.ownerAssistant} accent={content.accent} masInfoHref="/agenda-por-whatsapp" />
 
       <WhatsAppBenefitsTable accent={content.accent} />
 

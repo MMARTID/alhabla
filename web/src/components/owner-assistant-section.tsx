@@ -1,4 +1,5 @@
-import { CalendarOff, Check, MessageCircleMore, UserX } from "lucide-react";
+import Link from "next/link";
+import { ArrowRight, CalendarOff, Check, MessageCircleMore, UserX } from "lucide-react";
 import type { NicheAccent, OwnerAssistant } from "@/lib/niche-landings";
 import { OwnerAssistantChatMockup } from "@/components/owner-assistant-chat";
 import { Reveal } from "@/components/scroll-reveal";
@@ -35,9 +36,13 @@ const EXAMPLE_ICONS = [UserX, CalendarOff, MessageCircleMore] as const;
 export function OwnerAssistantSection({
   data,
   accent,
+  masInfoHref,
 }: {
   data: OwnerAssistant;
   accent?: NicheAccent;
+  /** Enlace a la página del Gestor (/agenda-por-whatsapp). Solo lo pasan
+   * las páginas de sector: la portada tiene el diseño cerrado. */
+  masInfoHref?: string;
 }) {
   const a = accent ?? FALLBACK_ACCENT;
   const badgeInk = a.deep;
@@ -99,6 +104,15 @@ export function OwnerAssistantSection({
 
             <Reveal delay={0.2} y={10}>
               <p className="mt-5 text-sm leading-6 text-[#52525b]">{data.closing}</p>
+              {masInfoHref ? (
+                <Link
+                  href={masInfoHref}
+                  className="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-[#0a0a0a] underline-offset-4 hover:underline"
+                >
+                  Todo lo que puedes pedirle a tu Gestor
+                  <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                </Link>
+              ) : null}
             </Reveal>
           </Reveal>
 
