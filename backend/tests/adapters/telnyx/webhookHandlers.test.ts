@@ -550,6 +550,28 @@ describe("handleCallInitiated", () => {
     expect(mockedAnswerCallWithAssistant).not.toHaveBeenCalled();
   });
 
+  it("cuelga la llamada si la suscripción está cancelada, como con el impago vencido", async () => {
+    mockedBusinessFindUnique.mockResolvedValue({
+      id: "biz1",
+      subscriptionStatus: "CANCELED",
+      callsSuspendedAt: null,
+      paymentFailureSuspensionAt: null,
+      agents: [{ id: "agent1", telnyxAssistantId: "assistant_1" }],
+    } as any);
+
+    const result = await handleCallInitiated(basePayload);
+
+    expect(result).toEqual({ success: false });
+    expect(mockedHangupCall).toHaveBeenCalledWith("call_ctrl_1");
+    expect(mockedCallUpsert).not.toHaveBeenCalled();
+    expect(mockedAnswerCallWithAssistant).not.toHaveBeenCalled();
+    expect(mockedBusinessFindUnique).toHaveBeenCalledWith(
+      expect.objectContaining({
+        select: expect.objectContaining({ subscriptionStatus: true }),
+      })
+    );
+  });
+
   it("cuelga la llamada si el negocio no tiene ningún assistant Telnyx operativo", async () => {
     mockedBusinessFindUnique.mockResolvedValue({
       id: "biz1",
