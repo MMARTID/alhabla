@@ -435,6 +435,12 @@ export function motivoDeFallo(failureCode: string | null | undefined): string {
     case "BOOKING_LOCK_ERROR":
       return "tuvimos un fallo técnico momentáneo";
     default:
+      // voiceTools escribe el código del proveedor
+      // (`GOOGLE_CALENDAR_RECONNECT_REQUIRED`, codigoDeReconexion): antes
+      // caía aquí y el aviso decía «no respondió» siendo una reconexión.
+      if (failureCode && /_CALENDAR_RECONNECT_REQUIRED$/i.test(failureCode)) {
+        return "la conexión con tu calendario estaba caducada";
+      }
       return "tu calendario no respondió";
   }
 }
@@ -703,6 +709,95 @@ export async function avisarCitaRecuperada(input: {
     // lo refleja); `resolverPlantilla` devuelve null para una clave que no
     // existe y se cae al respaldo, que aquí no hay.
     plantilla: { key: "cita_recuperada_negocio", params: {} },
+  });
+}
+
+/**
+ * Una cita pendiente que el reintento ya no puede hacer (jobs/
+ * retryFailedBooking.ts): el lead queda cerrado y el dueño tiene que llamar
+ * al cliente, al que se le prometió una confirmación. Antes se cerraba en
+ * silencio. Sin plantilla propia (la de cita pendiente lleva botones que
+ * aquí no valen): fuera de la ventana, el email del llamante.
+ */
+export async function avisarReservaPerdida(input: {
+  businessId: string;
+  businessName: string;
+  timezone: string;
+  leadId: string;
+  clientName: string;
+  clientPhone: string | null;
+  startDateTime: Date;
+  /** Por qué ya no cabe, en palabras del dueño: «ese hueco se ha ocupado». */
+  motivo: string;
+  email?: () => Promise<void>;
+}): Promise<ResultadoAviso> {
+  return enviarAvisoAlNegocio({
+    businessId: input.businessId,
+    tipo: "cita_pendiente",
+    recursoId: `${input.leadId}:perdida`,
+    texto: mensajes.avisoReservaPerdida({
+      negocio: nombreParaWhatsapp({ name: input.businessName }),
+      cliente: input.clientName,
+      telefono: input.clientPhone,
+      cita: formatearCitaCorta(input.startDateTime, input.timezone),
+      motivo: input.motivo,
+    }),
+    botones: [
+      {
+        id: idDeBoton("cita_pendiente", `${input.leadId}:perdida`, "vale"),
+        title: "Vale",
+      },
+    ],
+    plantilla: { key: "reserva_perdida_negocio", params: {} },
+    email: input.email,
+  });
+}
+
+/**
+ * Se agotaron los reintentos con el calendario desconectado: la cita sigue
+ * pendiente (en el panel, «Citas que se quedaron sin reservar»), pero ya no
+ * se reintenta sola. Los botones llevan el id del lead tal cual, así que
+ * «La apunté yo» y «Reintentar» funcionan igual que en el aviso de cita
+ * pendiente; la idempotencia, con su propio sufijo.
+ */
+export async function avisarReintentosAgotados(input: {
+  businessId: string;
+  businessName: string;
+  timezone: string;
+  leadId: string;
+  clientName: string;
+  clientPhone: string | null;
+  startDateTime: Date;
+  email?: () => Promise<void>;
+}): Promise<ResultadoAviso> {
+  return enviarAvisoAlNegocio({
+    businessId: input.businessId,
+    tipo: "cita_pendiente",
+    recursoId: `${input.leadId}:agotada`,
+    texto: mensajes.avisoReintentosAgotados({
+      negocio: nombreParaWhatsapp({ name: input.businessName }),
+      cliente: input.clientName,
+      telefono: input.clientPhone,
+      cita: formatearCitaCorta(input.startDateTime, input.timezone),
+    }),
+    botones: [
+      {
+        id: idDeBoton("cita_pendiente", input.leadId, "apuntada"),
+        title: "La apunté yo",
+      },
+      {
+        id: idDeBoton("cita_pendiente", input.leadId, "reintentar"),
+        title: "Reintentar",
+      },
+      {
+        id: idDeBoton("cita_pendiente", input.leadId, "reconectar"),
+        title: "Reconectar",
+      },
+    ],
+    // Sin plantilla: la de cita pendiente devolvería el id con el sufijo y
+    // sus botones no encontrarían el lead. Fuera de la ventana, el email.
+    plantilla: { key: "reintentos_agotados_negocio", params: {} },
+    email: input.email,
   });
 }
 

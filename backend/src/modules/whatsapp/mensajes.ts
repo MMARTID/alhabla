@@ -437,6 +437,44 @@ export function avisoCitaRecuperada(input: {
   return `${input.negocio}: la cita de ${input.cliente}, ${input.cita}, ya está en tu calendario.`;
 }
 
+/**
+ * Una cita pendiente que el reintento ya no puede hacer (el hueco se ocupó,
+ * la hora quedó fuera de horario o de plazo): el lead se cierra, y al
+ * cliente se le dijo «he tomado nota para confirmártela».
+ */
+export function avisoReservaPerdida(input: {
+  negocio: string;
+  cliente: string;
+  telefono: string | null;
+  cita: string;
+  motivo: string;
+}): string {
+  const llamar = input.telefono
+    ? `Llámale al ${input.telefono} para darle otra hora.`
+    : "No dejó teléfono: si vuelve a llamar, la recepcionista le dará otra hora.";
+  return [
+    `${input.negocio}: no he podido dejar la cita de ${input.cliente}, ${input.cita}, en tu calendario porque ${input.motivo}, así que ya no lo intento más.`,
+    `La recepcionista le dijo que se la confirmaríais. ${llamar}`,
+  ].join("\n");
+}
+
+/**
+ * Dos días con el calendario desconectado: la cita sigue pendiente, pero ya
+ * no se reintenta sola. Los botones son los del aviso de cita pendiente.
+ */
+export function avisoReintentosAgotados(input: {
+  negocio: string;
+  cliente: string;
+  telefono: string | null;
+  cita: string;
+}): string {
+  const telefono = input.telefono ? ` Su teléfono: ${input.telefono}.` : "";
+  return [
+    `${input.negocio}: llevo dos días sin poder dejar la cita de ${input.cliente}, ${input.cita}, en tu calendario porque sigue desconectado, y ya no lo intento más sola.`,
+    `Reconéctalo y pulsa «Reintentar», o apúntala tú y pulsa «La apunté yo».${telefono}`,
+  ].join("\n");
+}
+
 /** Botón «La apunté yo». */
 export function citaApuntada(input: { cliente: string }): string {
   return `Perfecto, doy por apuntada la cita de ${input.cliente}. No volveré a intentar meterla en el calendario.`;
