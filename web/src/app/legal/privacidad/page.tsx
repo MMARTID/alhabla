@@ -6,7 +6,7 @@ import { absoluteUrl, ogImages, siteName } from "@/lib/seo";
 export const metadata: Metadata = {
   title: "Política de privacidad",
   description:
-    "Qué datos trata Alhabla, con qué finalidad, quién los procesa y cómo ejercer tus derechos, incluidas las llamadas que atiende la recepcionista virtual.",
+    "Qué datos trata Alhabla, con qué finalidad, quién los procesa y cómo ejercer tus derechos, incluidas las llamadas que atiende la recepcionista de IA.",
   alternates: {
     canonical: absoluteUrl("/legal/privacidad"),
   },
@@ -132,7 +132,7 @@ export default function PrivacidadPage() {
       <LegalSection title="Las llamadas que atiende tu recepcionista">
         <p>
           Esto es importante y conviene que lo sepas antes de contratar, porque afecta a las personas que llaman a tu
-          negocio: las llamadas que atiende tu recepcionista virtual{" "}
+          negocio: las llamadas que atiende tu recepcionista de IA{" "}
           <strong className="font-semibold text-[#0a0a0a]">se transcriben y se clasifican</strong> para que puedas
           consultarlas en tu panel, saber qué pidió cada cliente y comprobar que la cita se registró bien, y{" "}
           <strong className="font-semibold text-[#0a0a0a]">solo se graban si quien llama da permiso</strong>.

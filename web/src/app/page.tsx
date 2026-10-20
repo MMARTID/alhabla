@@ -4,21 +4,21 @@ import { HOME_QUICK_FAQS } from "@/lib/home-faqs";
 import { absoluteUrl, buildFaqPageStructuredData, defaultDescription, landingStructuredData, ogImages, seoKeywords, siteName } from "@/lib/seo";
 
 export const metadata: Metadata = {
-  title: { absolute: "Asistente telefónico con IA para reservas 24/7 | Alhabla" },
+  title: { absolute: "Alhabla: recepcionista de IA que contesta y reserva citas" },
   description: defaultDescription,
   keywords: [
     ...seoKeywords,
-    "asistente telefónico para peluquerías",
-    "recepcionista virtual para centros de estética",
-    "asistente telefónico para salones de uñas",
-    "recepcionista virtual para barberías",
-    "asistente telefónico para fisioterapia",
+    "recepcionista de IA para peluquerías",
+    "IA para centros de estética",
+    "recepcionista de IA para salones de uñas",
+    "IA para barberías",
+    "recepcionista de IA para fisioterapia",
   ],
   alternates: {
     canonical: absoluteUrl("/"),
   },
   openGraph: {
-    title: "Asistente telefónico con IA para reservas 24/7 | Alhabla",
+    title: "Alhabla: recepcionista de IA que contesta y reserva citas",
     description: defaultDescription,
     url: absoluteUrl("/"),
     siteName,
@@ -28,7 +28,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Asistente telefónico con IA para reservas 24/7 | Alhabla",
+    title: "Alhabla: recepcionista de IA que contesta y reserva citas",
     description: defaultDescription,
     images: ogImages(),
   },

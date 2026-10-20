@@ -148,7 +148,8 @@ each file.
 | Route | Purpose |
 |-------|---------|
 | `/` | Generic conversion landing |
-| `/barberia`, `/peluqueria`, `/fisioterapia`, `/centro-de-estetica`, `/salon-de-unas` (+ `/[ciudad]`) | Niche SEO landings, also per city |
+| `/barberia`, `/peluqueria`, `/fisioterapia`, `/centro-de-estetica`, `/salon-de-unas` | Niche SEO landings (the old `/<niche>/<city>` pages 301 here since 2026-10-20) |
+| `/recepcionista-ia-en-catalan` | Catalan / Basque / Galician attention (cooficial language by postal code) |
 | `/planes` | Pricing page with ROI-aware headline |
 | `/register` | Account creation (email or Google); jumps to the app with a one-time pass |
 | `/blog`, `/blog/[slug]`, `/blog/rss.xml` | MDX blog (`web/content/blog`) |
@@ -198,8 +199,9 @@ each page's image explicitly from its `openGraph`/`twitter` metadata.
   real Gestor actions — `marcar_ausencia` + `mover_cita` + `avisar_cliente`, `cerrar_dia`,
   `editar_servicio`. The laptop helpers shared by both scenes live in
   `web/src/lib/portatil-3d.ts`; on phones only the iPhone is shown), `EnMarchaSection`,
-  the sector accordion, plans and FAQ. The per-city pages (`/<niche>/[ciudad]`) use
-  `CityNicheLanding`.
+  the sector accordion, plans and FAQ. Niche pages add `SectorCiudadesIdiomas` (figures per big
+  city from `lib/sector-ciudades.ts` + languages) right after `SectorDataSection`; the 30
+  `/<niche>/[ciudad]` pages were merged into them on 2026-10-20 (301 in `next.config.mjs`).
 - `SectorDataSection` — Third-party figures about the niche, each rendered with its source
   (`Citation`: «Dato de terceros», publisher, link). Every published figure needs an external
   cited source (see Evidence rules).
@@ -333,8 +335,9 @@ the content: each project keeps what it needs.
   sector) and `describeRegisterError`.
 - `niche-landings.ts` — The SEO copy of each niche: hero, benefits, FAQ, cited `sectorData`,
   `teamRouting`, `ownerAssistant`, metadata and JSON-LD, plus `generalOwnerAssistant` for the
-  generic landing (it has no team-routing block since the six-block home page, `9d4abef`). Accents in `niche-accents.ts`, per-city pages in
-  `city-landings.ts`, home FAQ in `home-faqs.ts`.
+  generic landing (it has no team-routing block since the six-block home page, `9d4abef`). Accents in `niche-accents.ts`, per-city figures in
+  `sector-ciudades.ts`, home FAQ in `home-faqs.ts`. SEO wording rule (owner, 2026-10-20): titles and
+  H1 say «recepcionista de IA» / «IA para…», never «recepcionista virtual».
 - `roi-context.ts` — ROI calculation, plan value contrast and the calculator → `/planes` hand-off
   (`activateRoiContext` / `getActiveRoiContext`).
 - `seo.ts` — Site metadata, structured data (JSON-LD), absolute URL builder, OG image list.
@@ -3343,12 +3346,11 @@ The landing lives in `web/`; the backend (demo) and the app (redirect) need a sm
    calculator's links read `nicheLinks`, derived from `nicheLandings`, so they need nothing.
 2. **Maps TypeScript enforces:** with the slug in `NicheSlug`, `npx tsc --noEmit` flags the other
    `Record<NicheSlug, …>` that need an entry: `COMO_FUNCIONA_EJEMPLOS`
-   (`components/site-landing.tsx`), `SINGULAR_POR_NICHO` and `COPY_POR_NICHO`
-   (`components/city-niche-landing.tsx`) and `CITY_NICHE_STATS` (`lib/city-landings.ts`, one
+   (`components/site-landing.tsx`), `SINGULAR_POR_NICHO` and `ENTRADA_POR_NICHO`
+   (`components/sector-ciudades-idiomas.tsx`) and `CITY_NICHE_STATS` (`lib/sector-ciudades.ts`, one
    sourced figure per city).
 3. **Pages:** copy an existing niche folder — `web/src/app/<niche>/page.tsx` (`SiteLanding` +
-   JSON-LD), `[ciudad]/page.tsx` (`CityNicheLanding`; the sitemap lists every niche × city) and
-   `opengraph-image.tsx` (`imagenOg`) — and add the sector photo `web/public/heroes/<niche>.jpg`,
+   JSON-LD) and `opengraph-image.tsx` (`imagenOg`) — and add the sector photo `web/public/heroes/<niche>.jpg`,
    used by the OG image and the home accordion.
 4. **Lists nothing type-checks:** `NICHOS` in `web/src/app/sitemap.ts`; `SECTORES` in
    `components/main-landing.tsx` (home accordion) and `components/site-footer.tsx`; the blog CTA

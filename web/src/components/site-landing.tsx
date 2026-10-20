@@ -5,6 +5,7 @@ import { LandingHero } from "@/components/landing-hero";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { SectorDataSection } from "@/components/sector-data-section";
+import { SectorCiudadesIdiomas } from "@/components/sector-ciudades-idiomas";
 import { EnTuNegocioScroll } from "@/components/en-tu-negocio";
 import { LlamadaScroll } from "@/components/llamada-scroll";
 import { TeamRoutingSection } from "@/components/team-routing-section";
@@ -57,6 +58,14 @@ export function SiteLanding({ content }: { content?: NicheLandingContent }) {
       </div>
 
       {content.sectorData ? <SectorDataSection data={content.sectorData} accent={content.accent} /> : null}
+
+      {/*
+        Ciudades e idiomas justo después de los datos del sector (2026-10-20):
+        recoge lo que antes repartían 30 páginas `/[sector]/[ciudad]` casi
+        vacías — la cifra del sector en cada gran ciudad — y lo que sí cambia
+        según dónde esté el negocio: la lengua cooficial que se activa sola.
+      */}
+      <SectorCiudadesIdiomas nicho={content.slug} accent={content.accent} />
 
       {/*
         Sin fondo propio a partir de aquí (salvo los bloques negros reales,

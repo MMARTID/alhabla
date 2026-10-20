@@ -1,30 +1,32 @@
-import type { Metadata } from "next";
-import { nicheLandings, type NicheSlug } from "@/lib/niche-landings";
-import { absoluteUrl, ogImages, organizationId, siteName, websiteId } from "@/lib/seo";
+import type { NicheSlug } from "@/lib/niche-landings";
 
 /**
- * Páginas de nicho + ciudad (`/[nicho]/[ciudad]`, 2026-09-25): el dato real
- * que las hace defendibles frente al riesgo de "contenido fino" (páginas que
- * solo cambian el nombre de la ciudad). Dos fuentes, según lo que el INE
- * puede o no distinguir:
+ * Cifras de cada sector en las seis grandes ciudades, para la sección
+ * «En tu ciudad y en tu idioma» de las páginas de sector
+ * (components/sector-ciudades-idiomas.tsx).
+ *
+ * Hasta el 2026-10-20 alimentaban 30 páginas `/[sector]/[ciudad]` que solo
+ * cambiaban el nombre de la ciudad y esta cifra: Google indexó 2 de 30 y el
+ * autocompletado no mostraba búsquedas por ciudad, así que se fusionaron en
+ * la página de su sector (redirección 301 en next.config.mjs) y la cifra
+ * vive aquí. Dos fuentes, según lo que el INE puede o no distinguir:
  *
  * - **Peluquería, barbería, salón de uñas y centro de estética**: el INE
  *   clasifica por CNAE y ahí peluquería y barbería comparten código (96.21),
  *   igual que salón de uñas y estética (96.22) — no da un número por nicho.
- *   Se usa en su lugar `places:searchText` (mismo endpoint que
+ *   Se usó `places:searchText` (mismo endpoint que
  *   `backend/src/modules/places`) con una rejilla de puntos por ciudad para
  *   superar el tope de 60 resultados de una sola consulta, deduplicando por
- *   `place.id`. Sigue sin ser un censo, así que la cifra final se redondea
- *   hacia abajo y se presenta siempre como cota mínima («más de N»).
+ *   `place.id`. No es un censo, así que la cifra se redondea hacia abajo y
+ *   se presenta siempre como cota mínima («más de N»).
  * - **Fisioterapia**: SÍ tiene fuente oficial limpia — el INE publica cada
  *   año fisioterapeutas colegiados por provincia («Estadística de
  *   Profesionales Sanitarios Colegiados», tabla 75049,
  *   https://www.ine.es/jaxi/Tabla.htm?tpx=75049). Cifra exacta, no cota.
  *
- * Refrescar cada 6-12 meses basta (la densidad de negocios por sector no
- * cambia rápido): repetir la consulta de Places y actualizar
- * `CITY_DATA_FECHA`; para fisioterapia, comprobar si el INE publicó tabla
- * nueva (se actualiza una vez al año, hacia mayo).
+ * Refrescar cada 6-12 meses basta: repetir la consulta de Places y
+ * actualizar `CITY_DATA_FECHA`; para fisioterapia, comprobar si el INE
+ * publicó tabla nueva (hacia mayo).
  */
 
 export type CitySlug = "madrid" | "barcelona" | "valencia" | "sevilla" | "zaragoza" | "malaga";
@@ -32,7 +34,6 @@ export type CitySlug = "madrid" | "barcelona" | "valencia" | "sevilla" | "zarago
 export type CityInfo = {
   slug: CitySlug;
   name: string;
-  /** Para el schema `Service.areaServed` (`City` → `containedInPlace`). */
   region: string;
 };
 
@@ -115,75 +116,3 @@ export const CITY_NICHE_STATS: Record<CitySlug, Record<NicheSlug, CityNicheStat>
     fisioterapia: { cifra: 2055, unidad: "fisioterapeutas colegiados en la provincia de Málaga", ...INE_COLEGIADOS },
   },
 };
-
-export function getCityNicheMetadata(nicho: NicheSlug, ciudad: CitySlug): Metadata {
-  const content = nicheLandings[nicho];
-  const city = CITIES[ciudad];
-  const url = absoluteUrl(`/${nicho}/${ciudad}`);
-  const title = `${content.name} en ${city.name}: asistente telefónico con IA | ${siteName}`;
-  const description = `Asistente telefónico con IA para ${content.name.toLowerCase()} en ${city.name}: atiende llamadas y reserva citas 24/7 con tu número de siempre.`;
-
-  return {
-    title: { absolute: title },
-    description,
-    alternates: { canonical: url },
-    category: "business software",
-    robots: {
-      index: true,
-      follow: true,
-      googleBot: { index: true, follow: true, "max-image-preview": "large", "max-snippet": -1, "max-video-preview": -1 },
-    },
-    openGraph: {
-      title,
-      description,
-      url,
-      siteName,
-      locale: "es_ES",
-      type: "website",
-      images: ogImages(`/${nicho}`, title),
-    },
-    twitter: { card: "summary_large_image", title, description, images: ogImages(`/${nicho}`, title) },
-    other: { "geo.region": "ES", "geo.placename": city.name, language: "es" },
-  };
-}
-
-export function getCityNicheStructuredData(nicho: NicheSlug, ciudad: CitySlug) {
-  const content = nicheLandings[nicho];
-  const city = CITIES[ciudad];
-  const url = absoluteUrl(`/${nicho}/${ciudad}`);
-  const nicheUrl = absoluteUrl(`/${nicho}`);
-
-  return {
-    "@context": "https://schema.org",
-    "@graph": [
-      {
-        "@type": "WebPage",
-        "@id": `${url}#webpage`,
-        name: `${content.name} en ${city.name} | ${siteName}`,
-        url,
-        inLanguage: "es-ES",
-        isPartOf: { "@id": websiteId() },
-        about: { "@id": `${url}#service` },
-      },
-      {
-        "@type": "Service",
-        "@id": `${url}#service`,
-        name: `${content.primaryKeyword} en ${city.name}`,
-        serviceType: "Recepción telefónica con inteligencia artificial y gestión de citas",
-        provider: { "@id": organizationId() },
-        areaServed: { "@type": "City", name: city.name, containedInPlace: { "@type": "AdministrativeArea", name: city.region } },
-        audience: { "@type": "BusinessAudience", audienceType: content.name },
-        url,
-        offers: { "@type": "AggregateOffer", lowPrice: "69", highPrice: "299", priceCurrency: "EUR", offerCount: "3", url: absoluteUrl("/planes") },
-      },
-      {
-        "@type": "BreadcrumbList",
-        itemListElement: [
-          { "@type": "ListItem", position: 1, name: "Inicio", item: absoluteUrl("/") },
-          { "@type": "ListItem", position: 2, name: content.name, item: nicheUrl },
-          { "@type": "ListItem", position: 3, name: city.name, item: url },
-        ],
-      },
-    ],
-  };
-}

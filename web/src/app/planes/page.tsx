@@ -8,11 +8,14 @@ import { BackLink } from "@/components/back-link";
 import { BotonWhatsappEquipo } from "@/components/boton-whatsapp-equipo";
 import { SiteFooter } from "@/components/site-footer";
 import { absoluteUrl, buildBreadcrumbStructuredData, ogImages, siteName, websiteId } from "@/lib/seo";
+import { formatIncludedMinutes, plans, starterPlan, TRIAL_DAYS } from "@/lib/plans";
 
-// Título con la palabra clave: «Planes y precios» a secas no dice de qué.
-const planesTitle = "Planes y precios del asistente telefónico con IA";
-const planesDescription =
-  "Planes de Alhabla desde 59 € + IVA al mes: recepcionista telefónica con IA que atiende 24/7 y reserva citas en tu calendario. 7 días de prueba, sin permanencia.";
+// Título con la palabra clave y el precio de entrada, que es lo que busca
+// quien llega por «recepcionista ia precio»: «Planes y precios» a secas no
+// dice de qué. El precio sale de lib/plans.ts para que no se quede viejo
+// (Bing llegó a enseñar «desde 79 €» meses después del cambio).
+const planesTitle = `Precios de la recepcionista de IA, desde ${starterPlan.price} €`;
+const planesDescription = `Desde ${starterPlan.price} € + IVA al mes con ${plans.map((plan) => formatIncludedMinutes(plan.minutes)).join(", ").replace(/, ([^,]*)$/, " o $1")} minutos incluidos: tu recepcionista de IA contesta y reserva citas. ${TRIAL_DAYS} días de prueba, sin permanencia.`;
 
 // Canónica propia: sin ella, esta página heredaba la canónica global del
 // root layout (la home) y Google la trataba como duplicada.

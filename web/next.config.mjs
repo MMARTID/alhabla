@@ -71,6 +71,16 @@ const nextConfig = {
       { source: "/centros-de-estetica", destination: "/centro-de-estetica", permanent: true },
       { source: "/salones-de-unas", destination: "/salon-de-unas", permanent: true },
       { source: "/fisioterapeutas", destination: "/fisioterapia", permanent: true },
+      // Las 30 páginas sector × ciudad se fusionaron en la de su sector el
+      // 2026-10-20 (sin búsquedas por ciudad; Google indexó 2 de 30): sus
+      // cifras viven ahora en la sección de ciudades de cada sector
+      // (lib/sector-ciudades.ts). El 301 conserva lo que Google ya indexó.
+      {
+        source:
+          "/:nicho(peluqueria|barberia|centro-de-estetica|salon-de-unas|fisioterapia)/:ciudad(madrid|barcelona|valencia|sevilla|zaragoza|malaga)",
+        destination: "/:nicho",
+        permanent: true,
+      },
       // El asistente del negocio tras el registro se mudó a la app.
       { source: "/register/business", destination: `${appUrl}/bienvenida`, permanent: true },
       { source: "/register/business/:path*", destination: `${appUrl}/bienvenida/:path*`, permanent: true },

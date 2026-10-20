@@ -172,7 +172,7 @@ export default function AvisoLegalPage() {
         <p>
           Esta cláusula regula un tratamiento distinto del anterior: no tus datos como titular de la cuenta, sino los
           datos personales de las personas que llaman a tu negocio o le escriben por WhatsApp (nombre, teléfono y el
-          contenido de la conversación) que tu recepcionista virtual trata en tu nombre. En esa relación, tu negocio es
+          contenido de la conversación) que tu recepcionista de IA trata en tu nombre. En esa relación, tu negocio es
           el <strong className={negrita}>responsable del tratamiento</strong> y Alhabla actúa como{" "}
           <strong className={negrita}>encargado del tratamiento</strong>, conforme al artículo 28 del RGPD. Aceptar
           estas condiciones al contratar el servicio constituye el contrato de encargo de tratamiento exigido por ese
