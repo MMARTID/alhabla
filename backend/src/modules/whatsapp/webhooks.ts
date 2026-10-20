@@ -8,6 +8,7 @@ import { resolverNegocioDelCliente } from "./tenantDelCliente.js";
 import {
   actualizarEstadoEnvio,
   audienciaDelNumero,
+  avisarCambioDeCategoria,
   avisarCambioDeListaDeEspera,
   incorporarPlantillasNuevas,
   type EstadoEntrega,
@@ -182,6 +183,16 @@ export const TemplateStatusEventSchema = z.object({
         status: z.string().optional(),
         reason: z.string().optional(),
         quality_rating: z.string().optional(),
+        // Cambio de categoría (`template_category_update` de Meta). Nunca ha
+        // llegado a producción: los nombres son los de Meta, sin verificar
+        // cómo los reenvía Telnyx.
+        category: z.string().optional(),
+        new_category: z.string().optional(),
+        previous_category: z.string().optional(),
+        correct_category: z.string().optional(),
+        message_template_id: z.union([z.string(), z.number()]).optional(),
+        message_template_name: z.string().optional(),
+        message_template_language: z.string().optional(),
       })
       .passthrough(),
   }),
@@ -767,11 +778,39 @@ function mapEstadoTelnyx(
   }
 }
 
+type PayloadDePlantilla = z.infer<
+  typeof TemplateStatusEventSchema
+>["data"]["payload"];
+
+/**
+ * A qué fila de `WhatsappTemplate` se refiere un evento: por el id de
+ * Telnyx, por nombre + idioma (los de Telnyx o los de Meta) o por el id de
+ * Meta. `null` si no trae ninguno.
+ */
+function dondeEstaLaPlantilla(
+  payload: PayloadDePlantilla
+): Prisma.WhatsappTemplateWhereInput | null {
+  if (payload.template_id) {
+    return { telnyxTemplateId: payload.template_id };
+  }
+  const nombre = payload.template_name ?? payload.message_template_name;
+  const idioma = payload.language ?? payload.message_template_language;
+  if (nombre && idioma) {
+    return { name: nombre, language: idioma };
+  }
+  if (payload.message_template_id !== undefined) {
+    return { metaTemplateId: String(payload.message_template_id) };
+  }
+  return null;
+}
+
 /**
  * `whatsapp.template.approved` / `.rejected` / `.disabled` / `.paused`… —
  * el estado nuevo va en `payload.status`; si falta, se deduce del nombre del
- * evento. Una plantilla que no está en la tabla se ignora con aviso (la
- * sincroniza el script).
+ * evento. Si el evento es de categoría (su nombre la menciona), solo cambia
+ * la categoría: antes se habría guardado como estado y la plantilla habría
+ * dejado de contar como aprobada. Una plantilla que no está en la tabla se
+ * da de alta desde el WABA.
  */
 export async function handleTemplateStatusEvent(
   payload: unknown
@@ -784,6 +823,16 @@ export async function handleTemplateStatusEvent(
     return { success: false };
   }
   const { data } = parsed.data;
+  const where = dondeEstaLaPlantilla(data.payload);
+  if (!where) {
+    console.warn(
+      `[WhatsApp] ${data.event_type} sin template_id ni nombre+idioma; se ignora`
+    );
+    return { success: true };
+  }
+  if (data.event_type.toLowerCase().includes("categor")) {
+    return cambiarCategoriaDePlantilla(data.event_type, data.payload, where);
+  }
   const status = (
     data.payload.status ??
     data.event_type.split(".").pop() ??
@@ -792,32 +841,25 @@ export async function handleTemplateStatusEvent(
   if (!status) {
     return { success: true };
   }
-  const where = data.payload.template_id
-    ? { telnyxTemplateId: data.payload.template_id }
-    : data.payload.template_name && data.payload.language
-      ? {
-          name_language: {
-            name: data.payload.template_name,
-            language: data.payload.language,
-          },
-        }
-      : null;
-  if (!where) {
-    console.warn(
-      `[WhatsApp] ${data.event_type} sin template_id ni nombre+idioma; se ignora`
-    );
-    return { success: true };
-  }
   // Para saber si `hueco_libre` cruza APPROVED (el gate del prompt de la
-  // lista de espera) hace falta el estado anterior.
+  // lista de espera) hace falta el estado anterior; la categoría, para
+  // avisar si Meta la cambió al aprobarla.
   const anterior = await prisma.whatsappTemplate.findFirst({
     where,
-    select: { key: true, status: true },
+    select: {
+      key: true,
+      name: true,
+      language: true,
+      status: true,
+      category: true,
+    },
   });
+  const categoria = data.payload.category?.toUpperCase();
   const updated = await prisma.whatsappTemplate.updateMany({
     where,
     data: {
       status,
+      category: categoria,
       rejectionReason: data.payload.reason ?? undefined,
       qualityRating: data.payload.quality_rating ?? undefined,
       lastSyncedAt: new Date(),
@@ -836,7 +878,55 @@ export async function handleTemplateStatusEvent(
     );
     if (anterior) {
       avisarCambioDeListaDeEspera(anterior.key, anterior.status, status);
+      if (categoria) {
+        avisarCambioDeCategoria(
+          `${anterior.name}/${anterior.language}`,
+          anterior.category,
+          categoria
+        );
+      }
     }
   }
+  return { success: true };
+}
+
+/**
+ * Evento de categoría (`template_category_update` de Meta): guarda la nueva
+ * y avisa del cambio. No toca `lastSyncedAt`, que marca cuándo se supo el
+ * estado. Un aviso de Meta de que la cambiará más adelante
+ * (`correct_category` sin `new_category`) solo se deja en el log.
+ */
+async function cambiarCategoriaDePlantilla(
+  tipoDeEvento: string,
+  payload: PayloadDePlantilla,
+  where: Prisma.WhatsappTemplateWhereInput
+): Promise<{ success: boolean }> {
+  const nueva = (payload.new_category ?? payload.category)?.toUpperCase();
+  if (!nueva) {
+    console.warn(
+      `[WhatsApp] ${tipoDeEvento} sin categoría nueva (${JSON.stringify(where)}${payload.correct_category ? `, Meta anuncia ${payload.correct_category}` : ""}); no se toca la fila`
+    );
+    return { success: true };
+  }
+  const anterior = await prisma.whatsappTemplate.findFirst({
+    where,
+    select: { name: true, language: true, category: true },
+  });
+  const updated = await prisma.whatsappTemplate.updateMany({
+    where,
+    data: { category: nueva },
+  });
+  if (updated.count === 0) {
+    const creadas = await incorporarPlantillasNuevas();
+    console.warn(
+      `[WhatsApp] ${tipoDeEvento} para una plantilla que no estaba en WhatsappTemplate (${JSON.stringify(where)}); incorporadas desde el WABA: ${creadas}`
+    );
+    return { success: true };
+  }
+  avisarCambioDeCategoria(
+    anterior ? `${anterior.name}/${anterior.language}` : JSON.stringify(where),
+    anterior?.category ?? payload.previous_category,
+    nueva
+  );
   return { success: true };
 }

@@ -13,6 +13,7 @@ import {
   claimVoiceWebhookEvent,
   completeVoiceWebhookEvent,
 } from "../../../src/lib/voiceWebhookIdempotency.js";
+import { handleTemplateStatusEvent } from "../../../src/modules/whatsapp/webhooks.js";
 
 // La firma se verifica DE VERDAD (TelnyxAiAdapter real, Ed25519 real): solo
 // se sustituyen los handlers que hay detrás, para saber si llegaron a
@@ -269,6 +270,43 @@ describe("webhooks de Telnyx: la firma se comprueba en todas las rutas", () => {
     expect(respuesta.statusCode).toBe(200);
     expect(mockedClaim).toHaveBeenCalledWith("telnyx", "evt_1", "call.hangup");
     expect(mockedHandleCallHangup).toHaveBeenCalledWith(JSON.parse(CUERPO));
+  });
+
+  it("los eventos de plantilla van a handleTemplateStatusEvent, también el de categoría con el nombre de Meta", async () => {
+    vi.mocked(handleTemplateStatusEvent).mockResolvedValue({ success: true });
+    for (const tipo of [
+      "whatsapp.template.approved",
+      "whatsapp.template.category_update",
+      "whatsapp.template_category_update",
+    ]) {
+      mockedExtractEnvelope.mockReturnValue({
+        id: `evt_${tipo}`,
+        eventType: tipo,
+      } as never);
+      const cuerpo = JSON.stringify({
+        data: { id: `evt_${tipo}`, event_type: tipo, payload: {} },
+      });
+      const marcaDeTiempo = ahora();
+      const respuesta = await app.inject({
+        method: "POST",
+        url: "/webhooks/telnyx",
+        headers: {
+          "content-type": "application/json",
+          "telnyx-timestamp": marcaDeTiempo,
+          "telnyx-signature-ed25519": firmar(
+            claves.privateKey,
+            marcaDeTiempo,
+            cuerpo
+          ),
+        },
+        payload: cuerpo,
+      });
+      expect(respuesta.statusCode, tipo).toBe(200);
+      expect(handleTemplateStatusEvent).toHaveBeenLastCalledWith(
+        JSON.parse(cuerpo)
+      );
+    }
+    expect(handleTemplateStatusEvent).toHaveBeenCalledTimes(3);
   });
 
   it("con firma válida ejecuta la tool de voz con la llamada de la cabecera", async () => {

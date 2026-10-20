@@ -13,6 +13,7 @@ import {
 import {
   actualizarEstadoEnvio,
   audienciaDelNumero,
+  avisarCambioDeCategoria,
   avisarCambioDeListaDeEspera,
   incorporarPlantillasNuevas,
 } from "../../../src/modules/whatsapp/service.js";
@@ -46,6 +47,7 @@ vi.mock("../../../src/lib/prisma.js", () => ({
 vi.mock("../../../src/modules/whatsapp/service.js", () => ({
   actualizarEstadoEnvio: vi.fn(),
   audienciaDelNumero: vi.fn(),
+  avisarCambioDeCategoria: vi.fn(),
   avisarCambioDeListaDeEspera: vi.fn(),
   incorporarPlantillasNuevas: vi.fn().mockResolvedValue(0),
 }));
@@ -993,5 +995,132 @@ describe("handleTemplateStatusEvent", () => {
       expect.stringContaining("incorporadas desde el WABA: 1")
     );
     warnSpy.mockRestore();
+  });
+
+  it("un evento de categoría solo cambia la categoría (ni estado ni lastSyncedAt) y avisa del cambio", async () => {
+    mockedTemplateFindFirst.mockResolvedValue({
+      name: "hueco_libre",
+      language: "es",
+      category: "UTILITY",
+    } as never);
+
+    await handleTemplateStatusEvent({
+      data: {
+        id: "evt-9",
+        event_type: "whatsapp.template.category_update",
+        payload: {
+          message_template_id: 1234567890,
+          message_template_name: "hueco_libre",
+          message_template_language: "es",
+          previous_category: "UTILITY",
+          new_category: "MARKETING",
+        },
+      },
+    });
+
+    expect(mockedTemplateUpdateMany).toHaveBeenCalledWith({
+      where: { name: "hueco_libre", language: "es" },
+      data: { category: "MARKETING" },
+    });
+    expect(avisarCambioDeCategoria).toHaveBeenCalledWith(
+      "hueco_libre/es",
+      "UTILITY",
+      "MARKETING"
+    );
+    expect(avisarCambioDeListaDeEspera).not.toHaveBeenCalled();
+
+    // Solo con el id de Meta, y sin la fila: la categoría anterior sale del
+    // payload.
+    mockedTemplateFindFirst.mockResolvedValue(null);
+    await handleTemplateStatusEvent({
+      data: {
+        id: "evt-10",
+        event_type: "whatsapp.template_category_update",
+        payload: {
+          message_template_id: "987",
+          previous_category: "UTILITY",
+          new_category: "marketing",
+        },
+      },
+    });
+    expect(mockedTemplateUpdateMany).toHaveBeenLastCalledWith({
+      where: { metaTemplateId: "987" },
+      data: { category: "MARKETING" },
+    });
+    expect(avisarCambioDeCategoria).toHaveBeenLastCalledWith(
+      JSON.stringify({ metaTemplateId: "987" }),
+      "UTILITY",
+      "MARKETING"
+    );
+  });
+
+  it("un aviso de categoría sin la nueva (Meta anuncia un cambio futuro) no toca la fila y lo deja en el log", async () => {
+    const warnSpy = vi
+      .spyOn(console, "warn")
+      .mockImplementation(() => undefined);
+
+    await handleTemplateStatusEvent({
+      data: {
+        id: "evt-11",
+        event_type: "whatsapp.template.category_update",
+        payload: { template_id: "tpl-c", correct_category: "MARKETING" },
+      },
+    });
+
+    expect(mockedTemplateUpdateMany).not.toHaveBeenCalled();
+    expect(avisarCambioDeCategoria).not.toHaveBeenCalled();
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining("Meta anuncia MARKETING")
+    );
+    warnSpy.mockRestore();
+  });
+
+  it("un evento de estado que trae la categoría la guarda también y avisa si cambió", async () => {
+    mockedTemplateFindFirst.mockResolvedValue({
+      key: "cierre_del_dia",
+      name: "cierre_del_dia",
+      language: "es",
+      status: "PENDING",
+      category: "UTILITY",
+    } as never);
+
+    await handleTemplateStatusEvent({
+      data: {
+        id: "evt-12",
+        event_type: "whatsapp.template.approved",
+        payload: {
+          template_id: "tpl-cierre",
+          status: "APPROVED",
+          category: "MARKETING",
+        },
+      },
+    });
+
+    expect(mockedTemplateUpdateMany).toHaveBeenCalledWith({
+      where: { telnyxTemplateId: "tpl-cierre" },
+      data: expect.objectContaining({
+        status: "APPROVED",
+        category: "MARKETING",
+      }),
+    });
+    expect(avisarCambioDeCategoria).toHaveBeenCalledWith(
+      "cierre_del_dia/es",
+      "UTILITY",
+      "MARKETING"
+    );
+
+    // Sin categoría en el payload no se toca la de la fila.
+    await handleTemplateStatusEvent({
+      data: {
+        id: "evt-13",
+        event_type: "whatsapp.template.approved",
+        payload: { template_id: "tpl-cierre", status: "APPROVED" },
+      },
+    });
+    expect(mockedTemplateUpdateMany).toHaveBeenLastCalledWith({
+      where: { telnyxTemplateId: "tpl-cierre" },
+      data: expect.objectContaining({ category: undefined }),
+    });
+    expect(avisarCambioDeCategoria).toHaveBeenCalledTimes(1);
   });
 });
