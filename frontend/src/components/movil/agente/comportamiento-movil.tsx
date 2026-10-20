@@ -21,7 +21,7 @@ import { DEFAULT_AGENT_SETTINGS } from "@/lib/agent-settings";
 import { BarraGuardar, Insignia } from "@/components/movil/piezas";
 import { PantallaDeAjuste } from "@/components/movil/agente/pantalla-de-ajuste";
 
-type CampoDeOpciones = "tone" | "primaryGoal" | "responseStyle" | "escalation";
+type CampoDeOpciones = "tone" | "primaryGoal" | "responseStyle" | "escalation" | "darPrecios";
 
 const CAMPOS: Array<{ clave: CampoDeOpciones; titulo: string; texto: string; opciones: Array<[string, string, string]> }> = [
   {
@@ -60,6 +60,16 @@ const CAMPOS: Array<{ clave: CampoDeOpciones; titulo: string; texto: string; opc
     opciones: [
       ["take_message", "Tomar un recado", "Nombre, teléfono y motivo"],
       ["request_callback", "Solicitar devolución", "Pedir datos para llamar después"],
+    ],
+  },
+  {
+    clave: "darPrecios",
+    titulo: "Dar precios",
+    texto: "Usa el precio de cada servicio de tu catálogo. Si un servicio no tiene precio, no se lo inventa.",
+    opciones: [
+      ["siempre", "Siempre", "Lo dice al ofrecer o confirmar un servicio"],
+      ["si_preguntan", "Si se lo preguntan", "Solo cuando el cliente pregunta cuánto cuesta"],
+      ["nunca", "Nunca", "Dice que el precio lo confirma el negocio"],
     ],
   },
 ];

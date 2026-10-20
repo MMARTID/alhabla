@@ -60,9 +60,16 @@ export type AgentSettings = {
   /** «Cuándo pasarme llamadas» (fase 4 del plan de telefonía). Sin valor,
    * el backend aplica el de por defecto (ver lib/pasar-llamadas.ts). */
   pasarLlamadas?: ModoDePasarLlamadas;
+  /** «Dar precios»: si la recepcionista dice el precio de cada servicio del
+   * catálogo. Opcional porque un backend anterior no lo devuelve; sin
+   * valor, «si se lo preguntan» (DEFAULT_AGENT_SETTINGS). */
+  darPrecios?: ModoDeDarPrecios;
 };
 
 export type ModoDePasarLlamadas = "nunca" | "si_lo_pide" | "siempre";
+
+/** Los de MODOS_DE_DAR_PRECIOS en backend/src/lib/managedAgentPrompt.ts. */
+export type ModoDeDarPrecios = "siempre" | "si_preguntan" | "nunca";
 
 /** Código BCP-47 de un idioma de atención («es-ES», «ca-ES»…). Los define
  * el catálogo del backend (backend/src/lib/idiomas/catalogo.ts); el panel
