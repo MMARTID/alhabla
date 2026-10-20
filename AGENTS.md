@@ -3428,6 +3428,10 @@ landings de sector compartían el 55–58 % del texto de `<main>`. Desde el 2026
   mide, para cada par de páginas del sitemap, qué parte del texto de `<main>` de la más corta aparece en
   la otra (secuencias de 5 palabras). Falla con 0,50 (`UMBRAL=0.4` para ser más estricto). Corre en el
   job «Web — lint, test, build» del CI.
+- **Vistas previas de Vercel**: los proyectos `alhabla-web` y `alhabla-frontend` tienen como «Ignored Build
+  Step» `git diff --quiet HEAD^ HEAD -- .`: solo construyen si el ÚLTIMO commit toca su carpeta. Si lo último
+  que se sube a una rama es un merge de `main` que no toca `web/`, la vista previa sale «Canceled by Ignored
+  Build Step» aunque la PR cambie la web (PR #335). Para tener vista previa, que el último commit toque `web/`.
 - **IndexNow**: `npm run seo:indexnow` (o `-- /ruta /otra`) avisa a Bing/Yandex de las URLs del sitemap
   de producción con la clave de `web/public/36dd951327300353ad396b40d72dbd75.txt`. Google no usa
   IndexNow: para Google, Search Console.

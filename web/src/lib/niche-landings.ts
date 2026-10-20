@@ -600,7 +600,7 @@ export const nicheLandings: Record<NicheSlug, NicheLandingContent> = {
       quotes: [
         { text: "Cruzando dedos, así es como muchas profesionales entran en cabina para atender a sus clientes. Deseando que no suene el teléfono", source: "Estetical — Facebook" },
       ],
-      painPoint: "Cuando estás con un cliente en cabina, no puedes atender el teléfono. Los picos de llamadas (10:00–13:00 y sábados) coinciden exactamente con las horas de máxima ocupación.",
+      painPoint: "Cuando estás con un cliente en cabina, no puedes atender el teléfono. Y las llamadas no esperan a que termines: suelen llegar justo en las horas en que la agenda está más llena.",
     },
   },
   "salon-de-unas": {
