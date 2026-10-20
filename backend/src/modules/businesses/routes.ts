@@ -32,6 +32,7 @@ import {
 import {
   planAllows,
   planesQueIncluyen,
+  recordatorioIncluido,
   resolvePlanId,
 } from "../../lib/planFeatures.js";
 import { isBusinessType } from "../../lib/businessType.js";
@@ -625,6 +626,8 @@ export async function businessesRoutes(fastify: FastifyInstance) {
               telnyxPhoneNumber: true,
               ownerWhatsappNumber: true,
               ownerPhoneIsCustomerLine: true,
+              plan: true,
+              stripePriceId: true,
             },
           });
           const settings = data.agentSettings ?? currentBusiness?.agentSettings;
@@ -648,6 +651,9 @@ export async function businessesRoutes(fastify: FastifyInstance) {
             }).idiomas,
             timezone: data.timezone ?? currentBusiness?.timezone,
             listaDeEspera: await listaDeEsperaDisponible(),
+            recordatorioPorWhatsapp: recordatorioIncluido(
+              currentBusiness ?? {}
+            ),
             ocultarNumeroDelNegocio:
               data.hideOwnerNumberFromClients ??
               currentBusiness?.hideOwnerNumberFromClients ??

@@ -6,6 +6,11 @@ import {
   leerClave,
 } from "../../lib/almacenTemporal.js";
 import { nombreParaElCliente } from "../../lib/nombreProfesional.js";
+import { precioParaDecir } from "../../lib/precio.js";
+import {
+  modoDeDarPrecios,
+  type ModoDeDarPrecios,
+} from "../../lib/managedAgentPrompt.js";
 import { esNombreDeClienteValido } from "../../lib/nombreDelCliente.js";
 import { guardarIdiomaDelCliente } from "../../lib/idiomaDelCliente.js";
 import {
@@ -266,6 +271,10 @@ type BusinessVoiceConfig = FilaDeConexionDeCalendario & {
   // faltar en entradas de caché anteriores a estas columnas.
   callsSuspendedAt?: Date | string | null;
   paymentFailureSuspensionAt?: Date | string | null;
+  // De aquí sale «Dar precios» (modoDeDarPrecios), que decide si get_catalog
+  // lleva el precio. Puede faltar en entradas de caché anteriores: sin él,
+  // el de por defecto. PATCH /business/me invalida la caché al cambiarlo.
+  agentSettings?: unknown;
 };
 
 async function loadBusinessConfig(
@@ -288,6 +297,7 @@ async function loadBusinessConfig(
       subscriptionStatus: true,
       callsSuspendedAt: true,
       paymentFailureSuspensionAt: true,
+      agentSettings: true,
     },
   });
 }
@@ -766,16 +776,52 @@ function describirAusencia(startsAt: Date, endsAt: Date, timezone: string): stri
   return `desde el ${dia.format(startsAt)} a las ${horaMin.format(startsAt)} hasta el ${dia.format(endsAt)} a las ${horaMin.format(endsAt)}`;
 }
 
+/** La regla de «Dar precios» en la respuesta de get_catalog: la misma que
+ * «## Precios» del prompt (seccionesDelPrompt.ts), para que valga aunque el
+ * prompt del assistant aún no esté al día (cambio de ajuste o deploy). */
+const REGLA_DE_PRECIOS: Record<ModoDeDarPrecios, string> = {
+  siempre:
+    "Di el precio de cada servicio la primera vez que lo ofrezcas o lo confirmes. Vale el de aquí aunque la información del negocio diga otro. Si un servicio está «sin precio», no lo inventes: dile que ese precio se lo confirma el negocio.",
+  si_preguntan:
+    "Di el precio de un servicio solo si el cliente pregunta cuánto cuesta. Vale el de aquí aunque la información del negocio diga otro. Si un servicio está «sin precio», no lo inventes: dile que ese precio se lo confirma el negocio.",
+  nunca:
+    "Este negocio no da precios: si preguntan cuánto cuesta algo, dile que ese precio se lo confirma el negocio.",
+};
+
+/** «[id] Corte (30 min, 18 €)»: con «Nunca», sin el precio, que así no
+ * llega a la llamada. */
+function lineaDelServicio(
+  service: {
+    id: string;
+    name: string;
+    durationMinutes: number;
+    priceCents: number | null;
+  },
+  darPrecios: ModoDeDarPrecios
+): string {
+  const precio =
+    darPrecios === "nunca"
+      ? ""
+      : `, ${precioParaDecir(service.priceCents) ?? "sin precio"}`;
+  return `[${service.id}] ${service.name} (${service.durationMinutes} min${precio})`;
+}
+
 async function executeGetCatalog(
   business: BusinessVoiceConfig,
   callLabel: string
 ): Promise<ResultadoDeTool> {
   try {
     const ahora = new Date();
+    const darPrecios = modoDeDarPrecios(business.agentSettings);
     const [services, professionals, ausencias] = await Promise.all([
       prisma.service.findMany({
         where: { businessId: business.id, active: true, deletedAt: null },
-        select: { id: true, name: true, durationMinutes: true },
+        select: {
+          id: true,
+          name: true,
+          durationMinutes: true,
+          priceCents: true,
+        },
         orderBy: { name: "asc" },
         take: MAX_CATALOG_ITEMS,
       }),
@@ -808,8 +854,11 @@ async function executeGetCatalog(
       success: true,
       result: {
         services: services.length
-          ? services.map((service) => `[${service.id}] ${service.name} (${service.durationMinutes} min)`).join("\n")
+          ? services
+              .map((service) => lineaDelServicio(service, darPrecios))
+              .join("\n")
           : "No hay servicios configurados.",
+        precios: REGLA_DE_PRECIOS[darPrecios],
         professionals: professionals.length
           ? professionals
               .map((professional) => {

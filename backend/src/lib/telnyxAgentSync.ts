@@ -19,6 +19,7 @@ import { resolverIdiomas, saludoDelNegocio } from "./idiomas/resolver.js";
 import { cooficialDeLaZona } from "./idiomas/zona.js";
 import { listaDeEsperaDisponible } from "../modules/whatsapp/service.js";
 import { resolverTransferenciaAlDueno } from "./transferenciaAlDueno.js";
+import { recordatorioIncluido } from "./planFeatures.js";
 import type { CreateTelnyxAssistantInput } from "../adapters/telnyx/TelnyxAiAdapter.js";
 
 /** Hash del payload enviado a Telnyx: si no cambia, la sincronización no
@@ -56,6 +57,9 @@ async function loadManagedAssistantConfig(
       telnyxPhoneNumber: true,
       ownerWhatsappNumber: true,
       ownerPhoneIsCustomerLine: true,
+      // El recordatorio por WhatsApp solo se ofrece si el plan lo manda.
+      plan: true,
+      stripePriceId: true,
     },
   });
   if (!business) return null;
@@ -85,6 +89,7 @@ async function loadManagedAssistantConfig(
     minAdvanceBookingMinutes: business.minAdvanceBookingMinutes,
     maxAppointmentDurationMinutes: business.maxAppointmentDurationMinutes,
     listaDeEspera: await listaDeEsperaDisponible(),
+    recordatorioPorWhatsapp: recordatorioIncluido(business),
     ocultarNumeroDelNegocio: business.hideOwnerNumberFromClients,
     transferenciaAlDueno,
     idiomas: idiomas.idiomas,

@@ -28,6 +28,14 @@ export {
   TITULO_DEL_BLOQUE_DEL_CATALOGO,
 } from "./seccionesDelPrompt.js";
 
+/** «Dar precios»: siempre, si se lo preguntan o nunca. */
+export const MODOS_DE_DAR_PRECIOS = [
+  "siempre",
+  "si_preguntan",
+  "nunca",
+] as const;
+export type ModoDeDarPrecios = (typeof MODOS_DE_DAR_PRECIOS)[number];
+
 /** Los campos de AgentSettings por separado: parseAgentSettings los lee
  * uno a uno para que un valor inválido no se lleve por delante el resto. */
 const CAMPOS_DE_AJUSTES = {
@@ -62,6 +70,11 @@ const CAMPOS_DE_AJUSTES = {
   // opcional a propósito, sin .default(): así pasar a «Alhabla como
   // principal» activa la transferencia sin tener que reescribir el ajuste.
   pasarLlamadas: z.enum(MODOS_DE_TRANSFERENCIA).optional(),
+  // «Dar precios» (decisión del dueño del producto del 2026-10-20): si la
+  // recepcionista dice el precio de cada servicio del catálogo al ofrecerlo,
+  // solo si se lo preguntan o nunca. Con .default(), como voiceGender: los
+  // negocios anteriores al ajuste lo tienen en «si se lo preguntan».
+  darPrecios: z.enum(MODOS_DE_DAR_PRECIOS).default("si_preguntan"),
 };
 
 export const AgentSettingsSchema = z
@@ -107,6 +120,7 @@ export const DEFAULT_AGENT_SETTINGS: AgentSettings = {
   voiceGender: "femenina",
   languages: idiomasQueHabla("es-ES"),
   voiceLanguage: "es-ES",
+  darPrecios: "si_preguntan",
 };
 
 /**
@@ -169,9 +183,26 @@ export function parseAgentSettings(value: unknown): AgentSettings {
     ),
     languages,
     voiceLanguage,
+    darPrecios: campo(
+      z.enum(MODOS_DE_DAR_PRECIOS),
+      bruto.darPrecios,
+      porDefecto.darPrecios
+    ),
     ...(pasarLlamadas ? { pasarLlamadas } : {}),
     ...(voz ? { voz } : {}),
   });
+}
+
+/** «Dar precios» de unos agentSettings guardados, sin leer el resto: el de
+ * por defecto («si se lo preguntan») si falta o no vale, como en
+ * parseAgentSettings. Lo usan get_catalog y el Gestor. */
+export function modoDeDarPrecios(value: unknown): ModoDeDarPrecios {
+  const bruto =
+    value && typeof value === "object"
+      ? (value as Record<string, unknown>).darPrecios
+      : undefined;
+  const leido = z.enum(MODOS_DE_DAR_PRECIOS).safeParse(bruto);
+  return leido.success ? leido.data : DEFAULT_AGENT_SETTINGS.darPrecios;
 }
 
 /** Zona válida o Madrid. La hora actual del agente depende de esto, así que
@@ -201,6 +232,11 @@ export function buildManagedAgentPrompt(input: {
    * recepcionista no promete avisos ni usa notify_when_available. Lo
    * calcula `listaDeEsperaDisponible()` (modules/whatsapp/service.ts). */
   listaDeEspera?: boolean;
+  /** ¿Manda el plan el recordatorio por WhatsApp antes de la cita
+   * (`recordatorios_cita`, ver programarMensajesAlCliente)? `true` por
+   * defecto: el prompt de siempre. Con `false` la recepcionista ofrece solo
+   * la confirmación. Lo calcula `recordatorioIncluido()`. */
+  recordatorioPorWhatsapp?: boolean;
   /** Privacidad (docs/historico/PLAN-TELEFONIA-UX.md § 3, caso C): con `true`
    * la
    * recepcionista nunca dice el número del negocio al cliente; toma recado
@@ -232,6 +268,7 @@ export function buildManagedAgentPrompt(input: {
     minAdvanceBookingMinutes: input.minAdvanceBookingMinutes,
     maxAppointmentDurationMinutes: input.maxAppointmentDurationMinutes,
     listaDeEspera: input.listaDeEspera !== false,
+    recordatorioPorWhatsapp: input.recordatorioPorWhatsapp !== false,
     ocultarNumero: input.ocultarNumeroDelNegocio === true,
     transferenciaAlDueno: input.transferenciaAlDueno,
   });

@@ -419,7 +419,7 @@ exports[`payloads de asistentes (instantáneas) > assistant de la recepcionista,
           "required": undefined,
           "type": "object",
         },
-        "description": "Única fuente de lo que ofrece el negocio: los servicios activos con sus IDs y duraciones, los profesionales y el horario. Llámala antes de confirmar o negar un servicio, un profesional o el horario, también ante una pregunta de sí o no, y antes de comprobar o reservar si necesitas un ID o una duración.",
+        "description": "Única fuente de lo que ofrece el negocio: los servicios activos con sus IDs, duraciones y precios (si el negocio los da; en precios, cuándo decirlos), los profesionales y el horario. Llámala antes de confirmar o negar un servicio, un profesional o el horario, también ante una pregunta de sí o no, antes de decir un precio y antes de comprobar o reservar si necesitas un ID o una duración.",
         "headers": [
           {
             "name": "X-Alhabla-Call-Control-Id",
@@ -948,6 +948,8 @@ La recepcionista responde con el catálogo, el equipo, el horario y la informaci
 
 Servicios, precios, duraciones, equipo, horario, cierres y ausencias no van en la información del negocio: tienen sus propias acciones, y la recepcionista reserva con ellos, no con un texto.
 
+Cuándo da la recepcionista los precios del catálogo lo dice recepcionistaDaPrecios en contexto_negocio: siempre, si se lo preguntan o nunca. Si el dueño pregunta por ello o quiere cambiarlo, explícale que se cambia desde el panel, en Cómo atiende (enlaces.comoAtiende); tú no puedes cambiarlo.
+
 Si el dueño pregunta qué no supo responder la recepcionista o qué preguntan los clientes, usa dudas_sin_respuesta: resume las dudas, las más repetidas primero, y ofrécete a enseñarle la respuesta de las que el dueño sepa, una propuesta cada vez. Las llamadas que quedaron sin resolver por un fallo técnico o por ser fuera de horario no se arreglan enseñándole nada: cuéntalas sin más.
 
 ## Poner en marcha la recepcionista
@@ -989,7 +991,7 @@ Si te escriben en catalán, gallego, euskera o inglés, responde en ese idioma; 
           "required": undefined,
           "type": "object",
         },
-        "description": "Estado del negocio del dueño con el que hablas: nombre, sector, zona horaria, teléfono, servicios activos con duración y precio (con sus ids), profesionales con sus especialidades (con sus ids), horario, la información del negocio que usa la recepcionista (informacion), calendario conectado, plan, qué falta por configurar (faltaPorConfigurar), enlaces al panel (enlaces.panel, enlaces.calendario para conectar el calendario), más las citas pendientes de resolver y los recados sin atender. Úsala una vez cuando necesites cualquiera de esos datos y otra vez después de una acción confirmada si necesitas los ids nuevos.",
+        "description": "Estado del negocio del dueño con el que hablas: nombre, sector, zona horaria, teléfono, servicios activos con duración y precio (con sus ids), profesionales con sus especialidades (con sus ids), horario, la información del negocio que usa la recepcionista (informacion), calendario conectado, plan, si la recepcionista da los precios (recepcionistaDaPrecios), qué falta por configurar (faltaPorConfigurar), enlaces al panel (enlaces.panel, enlaces.calendario para conectar el calendario, enlaces.comoAtiende), más las citas pendientes de resolver y los recados sin atender. Úsala una vez cuando necesites cualquiera de esos datos y otra vez después de una acción confirmada si necesitas los ids nuevos.",
         "headers": [
           {
             "name": "X-Alhabla-Business",
@@ -1224,15 +1226,15 @@ Si te escriben en catalán, gallego, euskera o inglés, responde en ese idioma; 
 
 exports[`payloads de asistentes (instantáneas) > el JSON enviado es idéntico byte a byte (hash) 1`] = `
 {
-  "gestor": "d42493dfb458dbe1ef8fa7fab6dbf284ec727a79d37293a97bff584963af6abf",
-  "recepcionista": "0c1cc6e97fd45d69627bc9dc2729c04a4409412ca6074949074458b8ff37e322",
+  "gestor": "5978f0e9a88c5de66f3c7031677c7beedcd30ab8ec818923479106957152522b",
+  "recepcionista": "d46b39517ef62dbf3bb875d18d8a611513e70b11a1e87498c79739967cc2caf5",
 }
 `;
 
 exports[`payloads de asistentes (instantáneas) > tools de voz de la recepcionista 1`] = `
 [
   {
-    "description": "Única fuente de lo que ofrece el negocio: los servicios activos con sus IDs y duraciones, los profesionales y el horario. Llámala antes de confirmar o negar un servicio, un profesional o el horario, también ante una pregunta de sí o no, y antes de comprobar o reservar si necesitas un ID o una duración.",
+    "description": "Única fuente de lo que ofrece el negocio: los servicios activos con sus IDs, duraciones y precios (si el negocio los da; en precios, cuándo decirlos), los profesionales y el horario. Llámala antes de confirmar o negar un servicio, un profesional o el horario, también ante una pregunta de sí o no, antes de decir un precio y antes de comprobar o reservar si necesitas un ID o una duración.",
     "headers": [
       {
         "name": "X-Alhabla-Call-Control-Id",
@@ -1533,7 +1535,7 @@ exports[`payloads de asistentes (instantáneas) > tools de voz de la recepcionis
 exports[`payloads de asistentes (instantáneas) > tools del Gestor 1`] = `
 [
   {
-    "description": "Estado del negocio del dueño con el que hablas: nombre, sector, zona horaria, teléfono, servicios activos con duración y precio (con sus ids), profesionales con sus especialidades (con sus ids), horario, la información del negocio que usa la recepcionista (informacion), calendario conectado, plan, qué falta por configurar (faltaPorConfigurar), enlaces al panel (enlaces.panel, enlaces.calendario para conectar el calendario), más las citas pendientes de resolver y los recados sin atender. Úsala una vez cuando necesites cualquiera de esos datos y otra vez después de una acción confirmada si necesitas los ids nuevos.",
+    "description": "Estado del negocio del dueño con el que hablas: nombre, sector, zona horaria, teléfono, servicios activos con duración y precio (con sus ids), profesionales con sus especialidades (con sus ids), horario, la información del negocio que usa la recepcionista (informacion), calendario conectado, plan, si la recepcionista da los precios (recepcionistaDaPrecios), qué falta por configurar (faltaPorConfigurar), enlaces al panel (enlaces.panel, enlaces.calendario para conectar el calendario, enlaces.comoAtiende), más las citas pendientes de resolver y los recados sin atender. Úsala una vez cuando necesites cualquiera de esos datos y otra vez después de una acción confirmada si necesitas los ids nuevos.",
     "headers": [
       {
         "name": "X-Alhabla-Business",
