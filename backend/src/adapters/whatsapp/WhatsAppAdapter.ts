@@ -132,7 +132,12 @@ export interface WhatsAppTemplateSummary {
   metaTemplateId: string | null;
   name: string;
   language: string;
-  category: string;
+  /**
+   * La que Meta aprobó, que puede no ser la pedida (pidió UTILITY y la dejó
+   * en MARKETING). `null` si Telnyx no la trae: mejor no tocar la fila que
+   * inventarse una.
+   */
+  category: string | null;
   status: string;
   qualityRating: string | null;
   rejectionReason: string | null;
@@ -531,7 +536,7 @@ export class WhatsAppAdapter {
           metaTemplateId: asString(raw.template_id),
           name: item.name,
           language: item.language ?? "es",
-          category: item.category ?? "UTILITY",
+          category: item.category ?? null,
           status: item.status ?? "UNKNOWN",
           qualityRating: asString(raw.quality_rating),
           rejectionReason:

@@ -173,11 +173,13 @@ export function reiniciarEnfriamientoDePlantillas(): void {
 }
 
 /**
- * Red de seguridad para el estado de una plantilla: si su fila lleva más de
- * 24 h sin sincronizar (o nunca), se consulta el WABA y se actualiza. Cubre
- * el caso de que el evento `whatsapp.template.*` no llegue, o llegue con
- * otro nombre (no verificado en la fase 0). Nunca lanza, y tras un fallo
- * espera 15 min antes de volver a llamar al WABA.
+ * Red de seguridad para el estado y la categoría de una plantilla: si su fila
+ * lleva más de 24 h sin sincronizar (o nunca), se consulta el WABA y se
+ * actualiza. Cubre el caso de que el evento `whatsapp.template.*` no llegue,
+ * o llegue con otro nombre (no verificado en la fase 0); el de categoría
+ * (`template_category_update` en Meta) no ha llegado nunca a producción
+ * aunque Meta reclasificó plantillas. Nunca lanza, y tras un fallo espera
+ * 15 min antes de volver a llamar al WABA.
  */
 export async function refrescarPlantilla(key: string): Promise<void> {
   const wabaId = process.env.WHATSAPP_WABA_ID;
@@ -221,6 +223,7 @@ export async function refrescarPlantilla(key: string): Promise<void> {
       where: { id: row.id },
       data: {
         status: remota.status,
+        category: remota.category ?? undefined,
         qualityRating: remota.qualityRating ?? undefined,
         rejectionReason: remota.rejectionReason ?? undefined,
         lastSyncedAt: new Date(),
@@ -232,6 +235,13 @@ export async function refrescarPlantilla(key: string): Promise<void> {
       );
       avisarCambioDeListaDeEspera(key, row.status, remota.status);
     }
+    if (remota.category) {
+      avisarCambioDeCategoria(
+        `${key} (${row.name}/${row.language})`,
+        row.category,
+        remota.category
+      );
+    }
   } catch (error) {
     ultimoRefrescoFallido.set(key, Date.now());
     console.error(
@@ -241,9 +251,35 @@ export async function refrescarPlantilla(key: string): Promise<void> {
 }
 
 /**
- * Barrido diario (telnyxReconciler): refresca en serie todas las filas con
- * `key`. Cada una respeta su propio enfriamiento (24 h / 15 min), así que
- * cuesta como mucho un puñado de llamadas al WABA al día. Nunca lanza.
+ * Deja en el log que Meta cambió la categoría de una plantilla; si no cambió,
+ * no hace nada. Ningún envío depende de la categoría, pero el precio por
+ * mensaje sí: de UTILITY a MARKETING cada envío cuesta más (y Meta puede
+ * limitar su entrega), así que ese salto va como aviso.
+ */
+export function avisarCambioDeCategoria(
+  plantilla: string,
+  categoriaAnterior: string | null | undefined,
+  categoriaNueva: string
+): void {
+  if (!categoriaAnterior || categoriaAnterior === categoriaNueva) {
+    return;
+  }
+  if (categoriaNueva === "MARKETING") {
+    console.warn(
+      `[WhatsApp] Meta pasó la plantilla ${plantilla} de ${categoriaAnterior} a MARKETING: cada envío cuesta más y Meta puede limitar su entrega`
+    );
+    return;
+  }
+  console.log(
+    `[WhatsApp] Categoría de la plantilla ${plantilla}: ${categoriaAnterior} → ${categoriaNueva}`
+  );
+}
+
+/**
+ * Barrido diario (telnyxReconciler): refresca en serie el estado y la
+ * categoría de todas las filas con `key`. Cada una respeta su propio
+ * enfriamiento (24 h / 15 min), así que cuesta como mucho un puñado de
+ * llamadas al WABA al día. Nunca lanza.
  */
 export async function refrescarPlantillasConClave(): Promise<void> {
   let filas: Array<{ key: string | null }>;
@@ -306,7 +342,7 @@ export async function incorporarPlantillasNuevas(): Promise<number> {
             language: t.language,
             telnyxTemplateId: t.telnyxTemplateId,
             metaTemplateId: t.metaTemplateId,
-            category: t.category,
+            category: t.category ?? "UTILITY",
             status: t.status,
             qualityRating: t.qualityRating,
             rejectionReason: t.rejectionReason,

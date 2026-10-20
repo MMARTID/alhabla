@@ -721,6 +721,14 @@ el `fetch` equivalente. **Nunca desde un route handler**: todo pasa por
 - El nombre real del evento `whatsapp.template.*` no está verificado (fase 0): el `default:`
   del switch de `/webhooks/telnyx` avisa con `warn` de cualquier `whatsapp.*`/`message.*` sin
   handler, y el GET refresca la plantilla cada 24 h por `listTemplates`.
+- **Categoría de las plantillas** (desde el 20-10): Meta puede aprobar como MARKETING una que se
+  pidió UTILITY (le pasó a `bienvenida_negocio`, `cierre_del_dia` y `hueco_libre`), y eso sube el
+  coste por mensaje. `refrescarPlantilla` (y el barrido diario) copian `category` de
+  `listTemplates`; `avisarCambioDeCategoria` lo loguea con `[WhatsApp]` (`warn` si pasa a
+  MARKETING). El evento `template_category_update` está suscrito pero nunca ha llegado a
+  producción: si Telnyx lo reenvía con un nombre que empiece por `whatsapp.template` y mencione
+  «categor», `handleTemplateStatusEvent` solo cambia la categoría (antes la habría guardado como
+  estado). Ningún envío depende de la categoría.
 - Panel (PR 2b): `frontend/src/components/whatsapp-dueno.tsx` (Ajustes › Teléfono › Tu móvil,
   antes «Ajustes › WhatsApp»: estado,
   móvil, «Guardar y activar», «Reenviar activación», «Quitar el móvil», enlace `wa.me` con

@@ -111,7 +111,10 @@ export async function webhooksTelnyxRoutes(fastify: FastifyInstance) {
           result = await handleMessageStatusEvent(payload);
           break;
         default:
-          if (envelope.eventType.startsWith("whatsapp.template.")) {
+          // `whatsapp.template` a secas: también entra
+          // `whatsapp.template_category_update` si Telnyx lo nombra como
+          // Meta (nombre sin verificar).
+          if (envelope.eventType.startsWith("whatsapp.template")) {
             result = await handleTemplateStatusEvent(payload);
             break;
           }

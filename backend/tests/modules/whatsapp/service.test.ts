@@ -4,6 +4,7 @@ import { whatsappAdapter } from "../../../src/adapters/whatsapp/WhatsAppAdapter.
 import {
   actualizarEstadoEnvio,
   audienciaDelNumero,
+  avisarCambioDeCategoria,
   enviarBotones,
   enviarContacto,
   enviarPlantilla,
@@ -605,6 +606,110 @@ describe("refrescarPlantilla", () => {
     logSpy.mockRestore();
   });
 
+  it("si Meta pasó la plantilla de UTILITY a MARKETING, guarda la categoría y lo avisa con warn", async () => {
+    mockedTemplateFindUnique.mockResolvedValue({
+      ...fila,
+      status: "APPROVED",
+      category: "UTILITY",
+    } as never);
+    mockedListTemplates.mockResolvedValue([
+      {
+        telnyxTemplateId: "tpl-b",
+        metaTemplateId: null,
+        name: "bienvenida_negocio",
+        language: "es",
+        category: "MARKETING",
+        status: "APPROVED",
+        qualityRating: null,
+        rejectionReason: null,
+        components: null,
+      },
+    ]);
+    const warnSpy = vi
+      .spyOn(console, "warn")
+      .mockImplementation(() => undefined);
+
+    await refrescarPlantilla("bienvenida_negocio");
+
+    expect(mockedTemplateUpdate).toHaveBeenCalledWith({
+      where: { id: "wt_1" },
+      data: expect.objectContaining({
+        status: "APPROVED",
+        category: "MARKETING",
+      }),
+    });
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining(
+        "bienvenida_negocio (bienvenida_negocio/es) de UTILITY a MARKETING"
+      )
+    );
+    warnSpy.mockRestore();
+  });
+
+  it("sin categoría en el WABA no toca la de la fila, y si no cambia no avisa", async () => {
+    mockedTemplateFindUnique.mockResolvedValue({
+      ...fila,
+      status: "APPROVED",
+      category: "MARKETING",
+    } as never);
+    const remota = {
+      telnyxTemplateId: "tpl-b",
+      metaTemplateId: null,
+      name: "bienvenida_negocio",
+      language: "es",
+      category: null as string | null,
+      status: "APPROVED",
+      qualityRating: null,
+      rejectionReason: null,
+      components: null,
+    };
+    mockedListTemplates.mockResolvedValue([remota]);
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    const warnSpy = vi
+      .spyOn(console, "warn")
+      .mockImplementation(() => undefined);
+
+    await refrescarPlantilla("bienvenida_negocio");
+    expect(mockedTemplateUpdate).toHaveBeenLastCalledWith({
+      where: { id: "wt_1" },
+      data: expect.objectContaining({ category: undefined }),
+    });
+
+    reiniciarEnfriamientoDePlantillas();
+    mockedListTemplates.mockResolvedValue([
+      { ...remota, category: "MARKETING" },
+    ]);
+    await refrescarPlantilla("bienvenida_negocio");
+    expect(mockedTemplateUpdate).toHaveBeenLastCalledWith({
+      where: { id: "wt_1" },
+      data: expect.objectContaining({ category: "MARKETING" }),
+    });
+
+    expect(logSpy).not.toHaveBeenCalled();
+    expect(warnSpy).not.toHaveBeenCalled();
+    logSpy.mockRestore();
+    warnSpy.mockRestore();
+  });
+
+  it("avisarCambioDeCategoria: a MARKETING con warn, el resto con log, y sin categoría anterior o sin cambio, nada", () => {
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    const warnSpy = vi
+      .spyOn(console, "warn")
+      .mockImplementation(() => undefined);
+
+    avisarCambioDeCategoria("hueco_libre/es", "MARKETING", "UTILITY");
+    expect(logSpy).toHaveBeenCalledWith(
+      "[WhatsApp] Categoría de la plantilla hueco_libre/es: MARKETING → UTILITY"
+    );
+    avisarCambioDeCategoria("hueco_libre/es", null, "MARKETING");
+    avisarCambioDeCategoria("hueco_libre/es", "UTILITY", "UTILITY");
+    expect(logSpy).toHaveBeenCalledTimes(1);
+    expect(warnSpy).not.toHaveBeenCalled();
+
+    logSpy.mockRestore();
+    warnSpy.mockRestore();
+  });
+
   it("si el adaptador falla, lo deja en el log y no relanza; sin WHATSAPP_WABA_ID no consulta", async () => {
     mockedTemplateFindUnique.mockResolvedValue(fila as never);
     mockedListTemplates.mockRejectedValue(new Error("timeout"));
@@ -708,6 +813,23 @@ describe("incorporarPlantillasNuevas", () => {
         telnyxTemplateId: "tpl-v3-es",
         key: "confirmacion_cita_v3",
         status: "APPROVED",
+      }),
+    });
+  });
+
+  it("si Telnyx no trae la categoría, la fila nueva nace como UTILITY", async () => {
+    mockedListTemplates.mockResolvedValue([
+      { ...remota("tpl-sin-cat", "plantilla_nueva"), category: null },
+    ] as never);
+    mockedTemplateFindMany.mockResolvedValue([] as never);
+    const create = vi.mocked(prisma.whatsappTemplate.create);
+    create.mockResolvedValue({} as never);
+
+    expect(await incorporarPlantillasNuevas()).toBe(1);
+    expect(create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        telnyxTemplateId: "tpl-sin-cat",
+        category: "UTILITY",
       }),
     });
   });
