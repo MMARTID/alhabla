@@ -8,6 +8,7 @@ import { useBusiness } from "@/components/providers";
 import { useMinutesWarning } from "@/hooks/use-aviso-de-minutos";
 import { useEsMovil } from "@/hooks/use-es-movil";
 import { clearAuthTokens } from "@/lib/billing-navigation";
+import { suscripcionSinCobro } from "@/lib/suscripcion";
 import {
   ContenidoDelEstado,
   textoDelEstado,
@@ -125,7 +126,7 @@ export function BarraLateral({
   const tono = TONOS[tonoDelEstado(estado)];
   const textoEstado = textoDelEstado(estado);
   const hayProblemaDePago =
-    business?.callsSuspendedAt || business?.subscriptionStatus === "PAST_DUE" || business?.subscriptionStatus === "UNPAID";
+    business?.callsSuspendedAt || business?.subscriptionStatus === "PAST_DUE" || suscripcionSinCobro(business?.subscriptionStatus);
 
   return (
     <aside

@@ -2027,8 +2027,9 @@ Telnyx assistant itself (MCP `ver_assistant_telnyx`), not only the DB.
   (`modules/webhooksTelnyx/routes.ts`; Ed25519 checked once in `plugins/firmaTelnyx.ts`;
   deduplicated in `voice_webhook_events`). `call.initiated` → `handleCallInitiated`
   (`adapters/telnyx/webhookHandlers.ts`) picks the agent with `selectTelnyxInboundAgent`
-  (`modules/phone/telnyxInbound.ts`: no answer with an overdue payment or without an operational
-  assistant) and answers with `answer` + the assistant, with that call's greeting and prompt
+  (`modules/phone/telnyxInbound.ts`: hangs up when `servicioSuspendidoPorPago` says payment cuts the
+  service — subscription CANCELED/UNPAID/INCOMPLETE_EXPIRED or the grace of a failed payment over,
+  the same rule as bookings, the Gestor and the chats — or without an operational assistant) and answers with `answer` + the assistant, with that call's greeting and prompt
   variables (see «Aviso de IA, saludo por cliente y grabación con permiso» in § Background Jobs).
   The other call events: `call.answered`, `call.hangup`, `call.conversation.ended` (transcript),
   `call.recording.saved`, `call.conversation_insights.generated` and `call.cost`.
