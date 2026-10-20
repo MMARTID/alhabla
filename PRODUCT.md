@@ -64,7 +64,25 @@ Lo que un producto vecino no podría copiar honestamente:
   cambia un precio, fija el horario semanal, cierra un día, da de alta o de baja a un
   profesional, o añade/mueve/cancela una cita — hablando con Alhabla por WhatsApp, sin entrar al
   panel. El Gestor propone la acción y solo la ejecuta tras un «Confirmar» explícito — nunca de
-  forma autónoma. (Reabrir un día ya cerrado todavía exige el panel web, no WhatsApp.)
+  forma autónoma. (Reabrir un día ya cerrado todavía exige el panel web, no WhatsApp.) Está en
+  todos los planes. A 20-10-2026 no consta nada parecido en la web de HeyDiga ni en la de fonio
+  (las tablas de `/comparativa` lo dicen así, con fecha).
+- **«Mañana falta Marta»: la ausencia se resuelve entera por WhatsApp, avisos incluidos.** El
+  dueño escribe que alguien del equipo no viene y el Gestor encadena tres pasos, cada uno con su
+  «Confirmar» (`backend/src/modules/gestor/accionesAgenda.ts`):
+  1. `marcar_ausencia` bloquea a esa persona en ese tramo (hasta 62 días), la recepcionista deja
+     de reservarle ahí, y el Gestor cuenta cuántas citas tenía: «Tiene 3 citas en ese tramo: dime
+     si las movemos o las cancelamos».
+  2. `mover_cita` pasa cada cita a otra hora o a otro profesional (con `buscar_hueco` para
+     encontrar dónde cabe), comprobando la disponibilidad y actualizando el calendario conectado;
+     o `cancelar_cita` si no hay sitio.
+  3. Tras cada «Hecho», el Gestor pregunta «¿Le aviso a Lucía por WhatsApp de la nueva hora?» con
+     dos botones, «Sí, avísale» o «Le llamo yo», y `avisar_cliente` le manda el cambio o la
+     cancelación por WhatsApp. Nada sale al cliente sin ese sí, y no se escribe a quien pidió no
+     recibir mensajes.
+
+  Ningún competidor revisado publica algo así (ver arriba). Es el ejemplo que mejor explica el
+  Gestor en una demo o en la web, porque es un problema que el dueño tiene cada semana.
 - **Voz diseñada para no sonar a robot, no solo "voz de IA".** El dueño elige la voz
   escuchándola. En Pro y Scale, entre todas: en español, las 29 voces Ultra de Telnyx con acento
   de España, cada una con una descripción de cómo suena y las de atención al cliente a la vista;
@@ -76,9 +94,26 @@ Lo que un producto vecino no podría copiar honestamente:
   palabra corre en Deepgram Flux (Soniox con catalán, euskera o gallego, ajustado con llamadas
   reales), pensado para interrumpir y ser interrumpido de forma natural en vez de esperar un
   silencio largo.
-- **Proveedor primario con respaldo real, no una promesa sin implementar.** Telnyx orquesta hoy
-  tanto las llamadas reales como la demo pública; Retell.ai, con certificación RGPD, queda
-  sincronizado como respaldo en caliente ante una caída.
+- **Un solo proveedor de voz, con respaldo dentro de la llamada.** Telnyx orquesta las llamadas
+  reales y la demo pública; Retell se retiró el 17-10-2026 (no llegó a coger ninguna llamada).
+  Si el assistant falla, la llamada pasa al teléfono del negocio cuando el dueño tiene activada
+  la transferencia, y la transcripción tiene modelos de respaldo.
+- **Coste por minuto que deja competir con los grandes en precio.** Lo que paga Alhabla a Telnyx
+  (facturación del 03-10-2026, en dólares como factura Telnyx): el assistant 0,05 $ por minuto
+  empezado, con el modelo, la transcripción y la voz Ultra dentro; la telefonía ~0,002 $/min; la
+  grabación ~0,002 $/min, y solo si el cliente la permite. Unos **0,054 $ por minuto facturado**;
+  con catalán, euskera o gallego la voz suma de 0,002 a 0,014 $/min. Ojo con el redondeo: Telnyx
+  cobra cada llamada por minuto empezado y Alhabla descuenta del plan la suma de segundos. Con las
+  llamadas de producción de los últimos 60 días (52, todas de prueba, de 70 s de media) se pagaron
+  94 minutos por 60,6 hablados, así que el minuto real salió a ~0,08 $. Con llamadas más largas
+  baja hacia 0,054. En cifras redondas, **unos 0,06 $ por minuto**, sin contar el número, los
+  WhatsApp, Stripe ni la infraestructura.
+
+  El minuto incluido más barato de Alhabla (Scale, 269 € / 1.500 min ≈ 0,18 €) sigue por encima
+  del doble del peor caso medido. Eso da margen para igualar a fonio, que es el más barato
+  revisado (0,12 € por minuto incluido en Solo, 0,10 € en Team; minuto extra a 0,15 €), y a
+  HeyDiga (de 0,25 € en Lite a 0,19 € en Pro), si la venta lo pide. El precio de hoy no está
+  atado al coste: es una decisión comercial (ver «Operating Context»).
 
 ## Operating Context
 
@@ -127,10 +162,15 @@ Lo que un producto vecino no podría copiar honestamente:
   reconexión cuando el refresh token o la contraseña de aplicación caduca.
 - Reparto de citas por especialidad: cada profesional tiene un nivel por servicio (especialista /
   lo hace / no sugerir) que el agente usa para recomendar una vez, sin descartar al resto.
-- El Gestor: el dueño administra precios, horario semanal, cierres, altas/bajas de profesionales
-  y reservas (añadir, mover, cancelar) por WhatsApp, con un patrón de proponer y confirmar —
-  nunca ejecuta sin que el dueño pulse «Confirmar». Reabrir un día ya cerrado no está aún en
-  WhatsApp (requiere el panel).
+- El Gestor: el dueño administra por WhatsApp servicios y precios (crear, cambiar, retirar),
+  horario semanal, cierres de un día, tramos bloqueados, altas/bajas de profesionales y su
+  especialidad, ausencias de una persona del equipo, la información del negocio que usa la
+  recepcionista y las reservas (añadir, mover, cancelar), y avisa al cliente del cambio por
+  WhatsApp. También responde preguntas: la agenda, el resumen de llamadas, dónde hay hueco, quién
+  es un cliente y qué preguntaron que la recepcionista no supo contestar. Patrón de proponer y
+  confirmar: nunca ejecuta sin que el dueño pulse «Confirmar». En todos los planes; se para solo
+  si el pago está suspendido. Reabrir un día ya cerrado no está aún en WhatsApp (requiere el
+  panel).
 - Confirmación y recordatorio de cita por WhatsApp al cliente final, y lista de espera cuando no
   hay hueco disponible.
 - Número de teléfono principal del negocio configurable desde ajustes.
