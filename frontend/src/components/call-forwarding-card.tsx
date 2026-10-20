@@ -25,97 +25,24 @@ import {
   updateMyBusiness,
 } from "@/lib/api";
 import { apiErrorCode } from "@/lib/api-errors";
+import {
+  OPERADORES,
+  RUTA_GUIA_DE_DESVIO,
+  esOperador,
+  guiaDeDesvio,
+  type CodigoDeDesvio,
+  type GrupoDeCodigos,
+  type GuiaDeDesvio,
+  type OperadorId,
+} from "@/lib/desvio-por-operador";
 import { formatPhone } from "@/lib/format";
+import { webUrl } from "@/lib/web-url";
 import type {
   CustomerLineType,
   ForwardingCheckErrorCode,
   ForwardingCheckFailureReason,
   OnboardingForwarding,
 } from "@/lib/types";
-
-export type CodigoDeDesvio = {
-  id: string;
-  titulo: string;
-  descripcion: string;
-  activar: (numero: string) => string;
-  desactivar: string;
-  recomendado: boolean;
-};
-
-/**
- * Códigos MMI del estándar GSM (3GPP TS 22.030): son los mismos en Movistar,
- * Vodafone, Orange, Yoigo y MásMóvil, no dependen de la operadora. Se marcan
- * en el teléfono como una llamada normal.
- *
- * El primero es el que corresponde a la promesa del producto — «solo las
- * llamadas que no contestas» — así que va primero y es el recomendado.
- */
-export const CODIGOS_MOVIL: CodigoDeDesvio[] = [
-  {
-    id: "no-contesta",
-    titulo: "Cuando no contestas",
-    descripcion: "Suena en tu teléfono; si no lo coges, atiende tu recepcionista. Es el recomendado.",
-    activar: (numero: string) => `**61*${numero}#`,
-    desactivar: "##61#",
-    recomendado: true,
-  },
-  {
-    id: "comunicando",
-    titulo: "Cuando estás comunicando",
-    descripcion: "Para no perder al cliente que llama mientras hablas con otro.",
-    activar: (numero: string) => `**67*${numero}#`,
-    desactivar: "##67#",
-    recomendado: false,
-  },
-  {
-    id: "apagado",
-    titulo: "Cuando estás sin cobertura o apagado",
-    descripcion: "Cubre las horas en las que tienes el teléfono apagado o sin línea.",
-    activar: (numero: string) => `**62*${numero}#`,
-    desactivar: "##62#",
-    recomendado: false,
-  },
-  {
-    id: "todas",
-    titulo: "Todas las llamadas",
-    descripcion: "Tu teléfono no suena: todas van directas a la recepcionista.",
-    activar: (numero: string) => `**21*${numero}#`,
-    desactivar: "##21#",
-    recomendado: false,
-  },
-];
-
-/**
- * Anula de una vez todos los desvíos de un móvil (3GPP TS 22.030, mismo
- * estándar que los códigos de arriba). Se ofrece cuando el móvil del dueño
- * va a ser el destino de la transferencia y no puede quedarse desviado.
- */
-export const CODIGO_ANULAR_DESVIOS_MOVIL = "##002#";
-
-/**
- * En un fijo los códigos son los mismos pero sin el `**` inicial
- * (docs/historico/PLAN-TELEFONIA-UX.md § 2): se marcan desde el propio
- * aparato tras el tono. Solo
- * los dos que tienen sentido en un local: «si no contestas» y «todas».
- */
-export const CODIGOS_FIJO: CodigoDeDesvio[] = [
-  {
-    id: "fijo-no-contesta",
-    titulo: "Cuando no contestas",
-    descripcion: "Suena en el local; si nadie lo coge, atiende tu recepcionista. Es el recomendado.",
-    activar: (numero: string) => `*61*${numero}#`,
-    desactivar: "#61#",
-    recomendado: true,
-  },
-  {
-    id: "fijo-todas",
-    titulo: "Todas las llamadas",
-    descripcion: "El fijo no suena: todas van directas a la recepcionista.",
-    activar: (numero: string) => `*21*${numero}#`,
-    desactivar: "#21#",
-    recomendado: false,
-  },
-];
 
 /**
  * «Comprobar desvío» (docs/historico/PLAN-TELEFONIA-UX.md § 4): el panel
@@ -218,6 +145,7 @@ export function CallForwardingCard({
 }: CallForwardingCardProps) {
   const queryClient = useQueryClient();
   const [copiado, setCopiado] = useState<string | null>(null);
+  const [operador, setOperador] = useState<OperadorId | null>(null);
   const tipoDeLinea = customerLineType ?? null;
 
   const confirmMutation = useMutation({
@@ -271,8 +199,6 @@ export function CallForwardingCard({
   const esMovil =
     tipoDeLinea === "movil_trabajo" || tipoDeLinea === "movil_personal";
   const esFijo = tipoDeLinea === "fijo";
-  const recomendado = CODIGOS_MOVIL[0];
-  const otrosCodigos = CODIGOS_MOVIL.slice(1);
 
   return (
     <section
@@ -326,24 +252,21 @@ export function CallForwardingCard({
         <PreguntaTipoDeLinea customerLine={forwarding.customerLine} />
       ) : null}
 
+      <SelectorDeOperador
+        id="desvio-operador"
+        value={operador}
+        onChange={setOperador}
+      />
+
       {esFijo ? (
         <>
           <h3 className="mt-5 text-sm font-semibold text-tinta">Desde el fijo del local</h3>
-          <p className="mt-1 text-sm leading-6 text-muted">
-            Descuelga el teléfono del local y marca el código tras el tono, como si fuera una llamada.
-            Es el mismo en todas las compañías.
-          </p>
-          <ul className="mt-3 space-y-2">
-            {CODIGOS_FIJO.map((codigo) => (
-              <li key={codigo.id}>
-                <CodigoFila codigo={codigo} numero={numero} copiado={copiado} onCopiar={copiar} />
-              </li>
-            ))}
-          </ul>
-          <NotaDeLinea>
-            Si tu fijo tiene contestador, desactívalo o se quedará él las llamadas. En Movistar se
-            quita marcando <span className="font-mono text-tinta-2">#10#</span>.
-          </NotaDeLinea>
+          <GuiaDeCodigos
+            guia={guiaDeDesvio("fijo", operador)}
+            numero={numero}
+            copiado={copiado}
+            onCopiar={copiar}
+          />
         </>
       ) : null}
 
@@ -352,56 +275,30 @@ export function CallForwardingCard({
           <h3 className="mt-5 text-sm font-semibold text-tinta">
             {esMovil ? "Desde tu móvil" : "Desde un móvil"}
           </h3>
-          <p className="mt-1 text-sm leading-6 text-muted">
-            Marca el código en tu teléfono como si fuera una llamada normal. Funciona igual en Movistar,
-            Vodafone, Orange, Yoigo y MásMóvil.
-          </p>
-
-          {/* Solo el recomendado a la vista: elegir entre cuatro modos de desvío
-              es una decisión que este usuario no tiene por qué tomar para empezar. */}
-          <div className="mt-3">
-            <CodigoFila
-              codigo={recomendado}
-              numero={numero}
-              copiado={copiado}
-              onCopiar={copiar}
-            />
-          </div>
-
-          <details className="group mt-2">
-            <summary className="inline-flex min-h-11 cursor-pointer list-none items-center gap-1.5 rounded-[10px] px-1 text-sm font-semibold text-morado-tinta underline-offset-2 transition duration-200 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-morado [&::-webkit-details-marker]:hidden">
-              Otras formas de desviar
-              <ChevronDown className="h-4 w-4 transition duration-200 group-open:rotate-180" aria-hidden="true" />
-            </summary>
-            <ul className="mt-2 space-y-2">
-              {otrosCodigos.map((codigo) => (
-                <li key={codigo.id}>
-                  <CodigoFila codigo={codigo} numero={numero} copiado={copiado} onCopiar={copiar} />
-                </li>
-              ))}
-            </ul>
-          </details>
-
           {/* También sin tipo confirmado: si la línea resulta ser un móvil,
               conviene saber que el buzón de voz deja de saltar. */}
-          <NotaDeLinea>
-            Este desvío sustituye al buzón de voz: las llamadas que no cojas irán a tu recepcionista
-            en vez de al contestador.
-          </NotaDeLinea>
+          <GuiaDeCodigos
+            guia={guiaDeDesvio("movil", operador)}
+            numero={numero}
+            copiado={copiado}
+            onCopiar={copiar}
+          />
         </>
       ) : null}
 
       {tipoDeLinea === null ? (
         <>
           <h3 className="mt-5 text-sm font-semibold text-tinta">Desde un fijo</h3>
-          <p className="mt-1 max-w-2xl text-sm leading-6 text-muted">
-            Descuelga y marca <span className="font-mono text-tinta-2">*61*{numero}#</span> tras el
-            tono para desviar las llamadas que no contestas, o{" "}
-            <span className="font-mono text-tinta-2">*21*{numero}#</span> para desviarlas todas. Si el
-            fijo tiene contestador, desactívalo o se quedará él las llamadas.
-          </p>
+          <GuiaDeCodigos
+            guia={guiaDeDesvio("fijo", operador)}
+            numero={numero}
+            copiado={copiado}
+            onCopiar={copiar}
+          />
         </>
       ) : null}
+
+      <EnlaceAGuiaDeDesvio />
 
       <ComprobarDesvio customerLine={forwarding.customerLine} />
 
@@ -436,9 +333,190 @@ export function CallForwardingCard({
 /** Aviso corto bajo los códigos (contestador, buzón de voz). */
 export function NotaDeLinea({ children }: { children: ReactNode }) {
   return (
-    <p className="mt-3 flex items-start gap-2 rounded-2xl border border-aviso-borde bg-aviso-fondo px-4 py-3 text-sm leading-6 text-aviso">
+    <div className="mt-3 flex items-start gap-2 rounded-2xl border border-aviso-borde bg-aviso-fondo px-4 py-3 text-sm leading-6 text-aviso">
       <TriangleAlert className="mt-1 h-4 w-4 shrink-0 text-aviso-icono" aria-hidden="true" />
-      <span>{children}</span>
+      <div className="min-w-0">{children}</div>
+    </div>
+  );
+}
+
+/**
+ * Los códigos de marcar que aparecen dentro de un texto (`*21*`, `#10#`,
+ * `#9998`), en monoespaciada como en las filas de códigos.
+ */
+export function conCodigos(texto: string): ReactNode[] {
+  return texto.split(/([*#][*#\d]*\d[*#\d]*)/).map((trozo, indice) =>
+    indice % 2 === 1 ? (
+      <span key={indice} className="whitespace-nowrap font-mono text-tinta-2">
+        {trozo}
+      </span>
+    ) : (
+      trozo
+    )
+  );
+}
+
+/**
+ * Con qué compañía está la línea: cambia los códigos (sobre todo en el fijo)
+ * y los avisos. Sin elegir, los más habituales. No se guarda: solo sirve
+ * para esta guía.
+ */
+export function SelectorDeOperador({
+  id,
+  value,
+  onChange,
+}: {
+  id: string;
+  value: OperadorId | null;
+  onChange: (operador: OperadorId | null) => void;
+}) {
+  return (
+    <div className="mt-4">
+      <label htmlFor={id} className="block text-sm font-semibold text-tinta">
+        ¿Con qué compañía tienes esta línea?
+      </label>
+      <p id={`${id}-hint`} className="mt-0.5 text-xs leading-5 text-muted">
+        Los códigos y lo que cobra cada una no son iguales.
+      </p>
+      <select
+        id={id}
+        value={value ?? ""}
+        onChange={(event) =>
+          onChange(esOperador(event.target.value) ? event.target.value : null)
+        }
+        aria-describedby={`${id}-hint`}
+        className="field mt-2 w-full sm:max-w-xs"
+      >
+        <option value="">Otra o no lo sé</option>
+        {OPERADORES.map((operador) => (
+          <option key={operador.id} value={operador.id}>
+            {operador.nombre}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
+/**
+ * Cómo marcar, los códigos y los avisos de una compañía. En el panel solo
+ * el recomendado queda a la vista (elegir entre varios modos de desvío es
+ * una decisión que no hace falta tomar para empezar); en Ajustes, dentro de
+ * su propio desplegable, van todos.
+ */
+export function GuiaDeCodigos({
+  guia,
+  numero,
+  copiado,
+  onCopiar,
+  plegarOtros = true,
+}: {
+  guia: GuiaDeDesvio;
+  numero: string;
+  copiado: string | null;
+  onCopiar: (valor: string, id: string) => void;
+  plegarOtros?: boolean;
+}) {
+  return (
+    <>
+      <p className="mt-1 text-sm leading-6 text-muted">{conCodigos(guia.comoMarcar)}</p>
+      {guia.grupos.map((grupo) => (
+        <GrupoDeCodigosFilas
+          key={grupo.codigos[0]?.id}
+          grupo={grupo}
+          numero={numero}
+          copiado={copiado}
+          onCopiar={onCopiar}
+          plegarOtros={plegarOtros}
+        />
+      ))}
+      {guia.avisos.length === 1 ? (
+        <NotaDeLinea>{conCodigos(guia.avisos[0])}</NotaDeLinea>
+      ) : guia.avisos.length > 1 ? (
+        <NotaDeLinea>
+          <ul className="space-y-2">
+            {guia.avisos.map((aviso) => (
+              <li key={aviso}>{conCodigos(aviso)}</li>
+            ))}
+          </ul>
+        </NotaDeLinea>
+      ) : null}
+    </>
+  );
+}
+
+function GrupoDeCodigosFilas({
+  grupo,
+  numero,
+  copiado,
+  onCopiar,
+  plegarOtros,
+}: {
+  grupo: GrupoDeCodigos;
+  numero: string;
+  copiado: string | null;
+  onCopiar: (valor: string, id: string) => void;
+  plegarOtros: boolean;
+}) {
+  const [recomendado, ...otros] = grupo.codigos;
+  const titulo = grupo.titulo ? (
+    <h4 className="mt-4 text-sm font-semibold text-tinta-2">{grupo.titulo}</h4>
+  ) : null;
+
+  if (!plegarOtros) {
+    return (
+      <>
+        {titulo}
+        <ul className="mt-2 space-y-2">
+          {grupo.codigos.map((codigo) => (
+            <li key={codigo.id}>
+              <CodigoFila codigo={codigo} numero={numero} copiado={copiado} onCopiar={onCopiar} />
+            </li>
+          ))}
+        </ul>
+      </>
+    );
+  }
+
+  return (
+    <>
+      {titulo}
+      <div className="mt-3">
+        <CodigoFila codigo={recomendado} numero={numero} copiado={copiado} onCopiar={onCopiar} />
+      </div>
+      {otros.length > 0 ? (
+        <details className="group mt-2">
+          <summary className="inline-flex min-h-11 cursor-pointer list-none items-center gap-1.5 rounded-[10px] px-1 text-sm font-semibold text-morado-tinta underline-offset-2 transition duration-200 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-morado [&::-webkit-details-marker]:hidden">
+            Otras formas de desviar
+            <ChevronDown className="h-4 w-4 transition duration-200 group-open:rotate-180" aria-hidden="true" />
+          </summary>
+          <ul className="mt-2 space-y-2">
+            {otros.map((codigo) => (
+              <li key={codigo.id}>
+                <CodigoFila codigo={codigo} numero={numero} copiado={copiado} onCopiar={onCopiar} />
+              </li>
+            ))}
+          </ul>
+        </details>
+      ) : null}
+    </>
+  );
+}
+
+/** La guía pública, con el paso a paso y las fuentes de cada compañía. */
+export function EnlaceAGuiaDeDesvio() {
+  return (
+    <p className="mt-3 text-sm leading-6 text-muted">
+      Paso a paso y con la ayuda oficial de cada compañía:{" "}
+      <a
+        href={webUrl(RUTA_GUIA_DE_DESVIO)}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="font-semibold text-morado-tinta underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-morado"
+      >
+        guía del desvío de llamadas
+      </a>
+      .
     </p>
   );
 }

@@ -17,11 +17,11 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import {
-  CODIGOS_FIJO,
-  CODIGOS_MOVIL,
-  CodigoFila,
   ComprobarDesvio,
+  EnlaceAGuiaDeDesvio,
+  GuiaDeCodigos,
   NotaDeLinea,
+  SelectorDeOperador,
 } from "@/components/call-forwarding-card";
 import { DEFAULT_AGENT_SETTINGS } from "@/lib/agent-settings";
 import {
@@ -41,6 +41,11 @@ import {
   updateMyBusiness,
 } from "@/lib/api";
 import { describeApiError } from "@/lib/api-errors";
+import {
+  guiaDeDesvio,
+  type LineaDeDesvio,
+  type OperadorId,
+} from "@/lib/desvio-por-operador";
 import { formatDate, formatPhone } from "@/lib/format";
 import {
   modoDePasarLlamadas,
@@ -258,6 +263,7 @@ function LineaDeClientes({
   const [tipo, setTipo] = useState<CustomerLineType | null>(tipoActual);
   const [feedback, setFeedback] = useState<Feedback>(null);
   const [copiado, setCopiado] = useState<string | null>(null);
+  const [operador, setOperador] = useState<OperadorId | null>(null);
 
   // Si el negocio cambia desde fuera (otra pestaña, «Usar como número
   // principal» más abajo), el formulario se pone al día con lo guardado.
@@ -366,11 +372,11 @@ function LineaDeClientes({
     }
   };
 
-  const codigos =
+  const lineaDeDesvio: LineaDeDesvio | null =
     tipoActual === "fijo"
-      ? CODIGOS_FIJO
+      ? "fijo"
       : tipoActual && ES_MOVIL[tipoActual]
-        ? CODIGOS_MOVIL
+        ? "movil"
         : null;
 
   // Con Alhabla como principal, el número que se está dando a los clientes
@@ -523,7 +529,7 @@ function LineaDeClientes({
           )}
 
           {numeroDeAlhabla && numeroDeAlhablaActivo ? (
-            codigos ? (
+            lineaDeDesvio ? (
               <details className="group mt-3">
                 <summary className="inline-flex min-h-11 cursor-pointer list-none items-center gap-1.5 rounded-[10px] px-1 text-sm font-semibold text-morado-tinta underline-offset-2 transition duration-200 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-morado [&::-webkit-details-marker]:hidden">
                   Códigos para activar o quitar el desvío
@@ -532,35 +538,21 @@ function LineaDeClientes({
                     aria-hidden="true"
                   />
                 </summary>
-                <p className="mt-1 text-sm leading-6 text-muted">
-                  {tipoActual === "fijo"
-                    ? "Descuelga el fijo y marca el código tras el tono, como si fuera una llamada. Es el mismo en todas las compañías."
-                    : "Marca el código en el móvil como si fuera una llamada normal. Funciona igual en todas las compañías."}
-                </p>
-                <ul className="mt-2 space-y-2">
-                  {codigos.map((codigo) => (
-                    <li key={codigo.id}>
-                      <CodigoFila
-                        codigo={codigo}
-                        numero={numeroDeAlhabla}
-                        copiado={copiado}
-                        onCopiar={copiar}
-                      />
-                    </li>
-                  ))}
-                </ul>
-                {tipoActual === "fijo" ? (
-                  <NotaDeLinea>
-                    Si tu fijo tiene contestador, desactívalo o se quedará él
-                    las llamadas. En Movistar se quita marcando{" "}
-                    <span className="font-mono text-tinta-2">#10#</span>.
-                  </NotaDeLinea>
-                ) : (
-                  <NotaDeLinea>
-                    Este desvío sustituye al buzón de voz: las llamadas que no
-                    cojas irán a tu recepcionista en vez de al contestador.
-                  </NotaDeLinea>
-                )}
+                <SelectorDeOperador
+                  id="ajustes-desvio-operador"
+                  value={operador}
+                  onChange={setOperador}
+                />
+                <div className="mt-3">
+                  <GuiaDeCodigos
+                    guia={guiaDeDesvio(lineaDeDesvio, operador)}
+                    numero={numeroDeAlhabla}
+                    copiado={copiado}
+                    onCopiar={copiar}
+                    plegarOtros={false}
+                  />
+                </div>
+                <EnlaceAGuiaDeDesvio />
               </details>
             ) : (
               <p className="mt-3 text-xs leading-5 text-muted">

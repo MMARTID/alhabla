@@ -21,17 +21,19 @@ import {
 import { DEFAULT_AGENT_SETTINGS } from "@/lib/agent-settings";
 import { AppPageHeader, AppPageSkeleton } from "@/components/app-page-header";
 import { SectionErrorState } from "@/components/section-card";
-import {
-  CODIGO_ANULAR_DESVIOS_MOVIL,
-  CODIGOS_FIJO,
-  CODIGOS_MOVIL,
-  CodigoFila,
-} from "@/components/call-forwarding-card";
+import { CodigoFila } from "@/components/call-forwarding-card";
 import { PasarLlamadas } from "@/components/pasar-llamadas";
 import { useBusiness } from "@/components/providers";
 import { getPhoneNumberInfo, updateMyBusiness } from "@/lib/api";
 import { describeApiError } from "@/lib/api-errors";
+import {
+  CODIGO_ANULAR_DESVIOS_MOVIL,
+  CODIGOS_FIJO,
+  CODIGOS_MOVIL,
+  RUTA_GUIA_DE_DESVIO,
+} from "@/lib/desvio-por-operador";
 import { formatPhone } from "@/lib/format";
+import { webUrl } from "@/lib/web-url";
 import {
   lineaAntiguaEsElMovilDelDueno,
   modoDePasarLlamadasPorDefecto,
@@ -356,8 +358,9 @@ export default function NumeroPrincipalPage() {
               {CODIGO_ANULAR_DESVIOS_MOVIL}
             </button>
             <p className="mt-2 text-xs leading-5 text-muted">
-              Marca el código en tu móvil como si fuera una llamada. También
-              puedes anularlos uno a uno:{" "}
+              Marca el código en tu móvil como si fuera una llamada. Si
+              prefieres quitar solo los desvíos a Alhabla y no tocar los del
+              buzón, anúlalos uno a uno:{" "}
               {CODIGOS_MOVIL.map((codigo, indice) => (
                 <span key={codigo.id}>
                   {indice > 0 ? ", " : ""}
@@ -396,6 +399,23 @@ export default function NumeroPrincipalPage() {
               copiado={copiado}
               onCopiar={copiar}
             />
+          ) : null}
+          {codigoTodas && tipoAntiguo === "fijo" ? (
+            <p className="text-xs leading-5 text-muted">
+              Es el código más habitual en los fijos. En Vodafone va sin # al
+              final, en Orange con cobertura directa y en Jazztel el número va
+              pegado al código, y en Movistar el desvío del fijo hay que
+              contratarlo antes. Lo tienes en la{" "}
+              <a
+                href={webUrl(RUTA_GUIA_DE_DESVIO)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-semibold text-morado-tinta underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-morado"
+              >
+                guía del desvío de llamadas
+              </a>
+              .
+            </p>
           ) : null}
         </Panel>
       ) : null}

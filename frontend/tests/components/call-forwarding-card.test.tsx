@@ -5,6 +5,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -17,6 +18,7 @@ import {
   TEXTO_POR_MOTIVO,
   TEXTO_POR_MOTIVO_EN_AJUSTES,
 } from "@/components/call-forwarding-card";
+import { AVISO_IPHONE } from "@/lib/desvio-por-operador";
 import {
   confirmForwarding,
   getForwardingCheck,
@@ -115,15 +117,22 @@ describe("CallForwardingCard · códigos según el tipo de línea", () => {
     vi.clearAllMocks();
   });
 
-  it("con un fijo enseña *61* y *21* sin el doble asterisco, con la nota del contestador", () => {
+  it("con un fijo enseña *61*, *67* y *21* sin el doble asterisco y con las 9 cifras, con la nota del contestador", () => {
     renderCard(forwarding(), "fijo");
 
-    expect(screen.getByText("*61*+34930453218#")).toBeInTheDocument();
-    expect(screen.getByText("*21*+34930453218#")).toBeInTheDocument();
+    // Un sobremesa no suele marcar «+»: el número va como lo ponen las
+    // compañías en sus ejemplos.
+    expect(screen.getByText("*61*930453218#")).toBeInTheDocument();
+    expect(screen.getByText("Otras formas de desviar")).toBeInTheDocument();
+    expect(screen.getByText("*67*930453218#")).toBeInTheDocument();
+    expect(screen.getByText("*21*930453218#")).toBeInTheDocument();
     expect(screen.queryByText(/\*\*61\*/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/\+34930453218#/)).not.toBeInTheDocument();
+    // Sin compañía elegida no dice que valga en todas.
+    expect(screen.queryByText(/todas las compañías/)).not.toBeInTheDocument();
     expect(
-      screen.queryByText("Otras formas de desviar")
-    ).not.toBeInTheDocument();
+      screen.getByText(/en Vodafone, Orange y Jazztel cambia/)
+    ).toBeInTheDocument();
     expect(screen.getByText("Recomendado")).toBeInTheDocument();
     expect(
       screen.getByText(/Si tu fijo tiene contestador, desactívalo/)
@@ -152,8 +161,13 @@ describe("CallForwardingCard · códigos según el tipo de línea", () => {
       expect(
         screen.getByText(/Este desvío sustituye al buzón de voz/)
       ).toBeInTheDocument();
+      // iPhone: Ajustes solo desvía todas, y «Silenciar» / el Buzón de voz
+      // en vivo se pueden quedar a los clientes nuevos.
+      expect(screen.getByText(AVISO_IPHONE)).toBeInTheDocument();
+      // Ya no promete que los códigos valgan igual en Yoigo y MásMóvil.
+      expect(screen.queryByText(/Funciona igual en/)).not.toBeInTheDocument();
       expect(screen.queryByText("Desde un fijo")).not.toBeInTheDocument();
-      expect(screen.queryByText("*61*+34930453218#")).not.toBeInTheDocument();
+      expect(screen.queryByText("*61*930453218#")).not.toBeInTheDocument();
       expect(
         screen.queryByText("¿De qué tipo es esta línea?")
       ).not.toBeInTheDocument();
@@ -269,6 +283,183 @@ describe("CallForwardingCard · códigos según el tipo de línea", () => {
       screen.queryByText("¿De qué tipo es esta línea?")
     ).not.toBeInTheDocument();
     expect(screen.getByText("**61*+34930453218#")).toBeInTheDocument();
+  });
+});
+
+describe("CallForwardingCard · según la compañía", () => {
+  const NACIONAL = "930453218";
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  async function elegirCompania(
+    user: ReturnType<typeof userEvent.setup>,
+    compania: string
+  ) {
+    await user.selectOptions(
+      screen.getByLabelText("¿Con qué compañía tienes esta línea?"),
+      compania
+    );
+  }
+
+  it("sin elegir, «Otra o no lo sé» y los códigos más habituales, con el enlace a la guía pública", () => {
+    renderCard(forwarding(), "movil_trabajo");
+
+    const selector = screen.getByLabelText(
+      "¿Con qué compañía tienes esta línea?"
+    );
+    expect(selector).toHaveValue("");
+    expect(
+      within(selector)
+        .getAllByRole("option")
+        .map((opcion) => opcion.textContent)
+    ).toEqual([
+      "Otra o no lo sé",
+      "Movistar",
+      "Vodafone",
+      "Orange o Amena",
+      "Yoigo",
+      "MásMóvil",
+      "O2",
+      "Jazztel",
+      "Digi",
+      "Pepephone",
+      "Lowi",
+      "Simyo",
+      "Euskaltel",
+      "R (Galicia)",
+      "Telecable",
+      "Finetwork",
+      "Avatel",
+    ]);
+    expect(screen.getByText("**61*+34930453218#")).toBeInTheDocument();
+    const guia = screen.getByRole("link", {
+      name: "guía del desvío de llamadas",
+    });
+    expect(guia).toHaveAttribute(
+      "href",
+      expect.stringMatching(/\/desvio-de-llamadas$/)
+    );
+    expect(guia).toHaveAttribute("target", "_blank");
+  });
+
+  it.each([
+    ["yoigo", "Yoigo"],
+    ["masmovil", "MásMóvil"],
+  ])(
+    "en el móvil de %s avisa de que solo publica el de todas y da el *21* que publica",
+    async (compania, nombre) => {
+      const user = userEvent.setup();
+      renderCard(forwarding(), "movil_personal");
+
+      await elegirCompania(user, compania);
+
+      expect(
+        screen.getByText(
+          new RegExp(`${nombre} solo publica el código de todas las llamadas`)
+        )
+      ).toBeInTheDocument();
+      expect(screen.getByText("**61*+34930453218#")).toBeInTheDocument();
+      expect(screen.getByText("*21*+34930453218#")).toBeInTheDocument();
+      expect(screen.queryByText("**21*+34930453218#")).not.toBeInTheDocument();
+    }
+  );
+
+  it("en el móvil de Pepephone no hay códigos: explica dónde se pone en Mi Pepephone", async () => {
+    const user = userEvent.setup();
+    renderCard(forwarding(), "movil_trabajo");
+
+    await elegirCompania(user, "pepephone");
+
+    expect(screen.getByText(/Ajustes de la línea/)).toBeInTheDocument();
+    expect(screen.queryByText("**61*+34930453218#")).not.toBeInTheDocument();
+    expect(screen.queryByText("Recomendado")).not.toBeInTheDocument();
+    expect(screen.getByText(AVISO_IPHONE)).toBeInTheDocument();
+  });
+
+  it("en el fijo de Movistar avisa de que hay que contratarlo: 4 €/mes cada tipo", async () => {
+    const user = userEvent.setup();
+    renderCard(forwarding(), "fijo");
+
+    await elegirCompania(user, "movistar");
+
+    expect(screen.getByText(`*61*${NACIONAL}#`)).toBeInTheDocument();
+    expect(screen.getByText(/cuesta 4 €\/mes cada tipo/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Pack de servicios básicos .* solo trae el de todas/)
+    ).toBeInTheDocument();
+  });
+
+  it("en el fijo de Vodafone los códigos van sin # final, se quitan con ##61# y avisa de los destinos", async () => {
+    const user = userEvent.setup();
+    renderCard(forwarding(), "fijo");
+
+    await elegirCompania(user, "vodafone");
+
+    expect(screen.getByText(`*61*${NACIONAL}`)).toBeInTheDocument();
+    expect(screen.getByText(`*21*${NACIONAL}`)).toBeInTheDocument();
+    expect(screen.queryByText(`*61*${NACIONAL}#`)).not.toBeInTheDocument();
+    expect(screen.getAllByText("##61#").length).toBeGreaterThan(0);
+    expect(
+      screen.getByText(/solo desvía a fijos y móviles de Vodafone/)
+    ).toBeInTheDocument();
+  });
+
+  it("en el fijo de Orange da los dos juegos, según la cobertura sea directa o indirecta", async () => {
+    const user = userEvent.setup();
+    renderCard(forwarding(), "fijo");
+
+    await elegirCompania(user, "orange");
+
+    expect(screen.getByText("Cobertura directa de Orange")).toBeInTheDocument();
+    expect(screen.getByText(`*23${NACIONAL}`)).toBeInTheDocument();
+    expect(screen.getByText("*231*")).toBeInTheDocument();
+    expect(
+      screen.getByText(/Cobertura indirecta \(con microfiltro/)
+    ).toBeInTheDocument();
+    expect(screen.getByText(`*61*${NACIONAL}#`)).toBeInTheDocument();
+    expect(screen.getAllByText("Recomendado")).toHaveLength(2);
+  });
+
+  it("en el fijo de Jazztel el número va pegado al código y se quita sin # final", async () => {
+    const user = userEvent.setup();
+    renderCard(forwarding(), "fijo");
+
+    await elegirCompania(user, "jazztel");
+
+    expect(screen.getByText(`*61${NACIONAL}#`)).toBeInTheDocument();
+    expect(screen.getByText("#61")).toBeInTheDocument();
+    expect(screen.queryByText(`*61*${NACIONAL}#`)).not.toBeInTheDocument();
+  });
+
+  it("en el fijo de Digi no ofrece «cuando estás comunicando» y lo dice", async () => {
+    const user = userEvent.setup();
+    renderCard(forwarding(), "fijo");
+
+    await elegirCompania(user, "digi");
+
+    expect(screen.getByText(`*61*${NACIONAL}#`)).toBeInTheDocument();
+    expect(screen.getByText(`*21*${NACIONAL}#`)).toBeInTheDocument();
+    expect(screen.queryByText(`*67*${NACIONAL}#`)).not.toBeInTheDocument();
+    expect(
+      screen.getByText(
+        /El fijo de Digi no tiene desvío «cuando estás comunicando»/
+      )
+    ).toBeInTheDocument();
+  });
+
+  it("volver a «Otra o no lo sé» devuelve los códigos más habituales", async () => {
+    const user = userEvent.setup();
+    renderCard(forwarding(), "fijo");
+
+    await elegirCompania(user, "vodafone");
+    await elegirCompania(user, "");
+
+    expect(screen.getByText(`*61*${NACIONAL}#`)).toBeInTheDocument();
+    expect(
+      screen.queryByText(/solo desvía a fijos y móviles de Vodafone/)
+    ).not.toBeInTheDocument();
   });
 });
 
