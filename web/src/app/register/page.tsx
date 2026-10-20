@@ -197,9 +197,6 @@ export default function RegisterPage() {
                   </label>
                 ))}
               </div>
-              <p className="mt-1 text-xs text-muted">
-                Lo usamos para preparar tu asistente conforme a la RGPD desde el primer día.
-              </p>
             </fieldset>
             <label className="flex min-h-11 items-start gap-3 py-1.5 text-sm text-tinta-2">
               <input

@@ -252,8 +252,9 @@ export default function DesvioO2Page() {
               O2 avisa de que con MultiSIM solo se puede desviar todo. Para una
               recepcionista de IA eso significa que tu móvil dejaría de sonar y
               todas las llamadas irían a ella. Si eso es lo que quieres, mejor
-              publicar el número de Alhabla como principal y que te pase al
-              móvil las llamadas que elijas con «Cuándo pasarme llamadas». Si
+              publicar el número de Alhabla como principal y elegir en «Cuándo
+              pasarme llamadas» si te pasa al móvil a quien pida hablar contigo.
+              Si
               no, la limitación viene del MultiSIM, no de Alhabla.
             </p>
           </Texto>

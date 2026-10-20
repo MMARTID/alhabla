@@ -13,8 +13,12 @@ import { metadataDePagina } from "@/lib/seo";
  *
  * Lo que dice de la recepcionista de IA, ajustado a los hechos del
  * producto: avisa de que es una IA, mira la agenda real antes de ofrecer,
- * reserva con quien piden por su nombre, confirma por WhatsApp, y la
- * grabación de audio es solo con permiso del cliente.
+ * reserva con quien piden por su nombre, resume la cita antes de reservarla
+ * y pregunta si manda la confirmación por WhatsApp (backend/src/lib/
+ * seccionesDelPrompt.ts, «## Reserva»), saluda por su nombre a quien ya
+ * reservó y le ofrece repetir (lib/idiomas/catalogo.ts), el precio sale del
+ * catálogo según «Cómo atiende», y la grabación de audio es solo con
+ * permiso del cliente (la pregunta, de modules/voiceTools/service.ts).
  */
 const ruta = "/herramientas/guion-para-atender-el-telefono";
 const titulo = "Guion para atender el teléfono del salón";
@@ -141,7 +145,7 @@ export default function GuionParaAtenderElTelefonoPage() {
         {
           question: "¿La recepcionista de IA sigue este mismo guion?",
           answer:
-            "Sigue la misma lógica: saluda con el nombre del negocio avisando de que es una inteligencia artificial, pregunta servicio y profesional, mira la agenda real, ofrece horas libres, toma nombre y teléfono y confirma por WhatsApp. Lo que no tiene es la memoria de quien conoce a la clienta desde hace años.",
+            "Sigue la misma lógica: saluda con el nombre del negocio avisando de que es una inteligencia artificial, pregunta qué servicio quiere, mira la agenda real y ofrece una hora libre. Antes de reservar repite servicio, día, hora y nombre, y pregunta si le manda la confirmación por WhatsApp; el teléfono lo toma del número desde el que llaman. A quien ya reservó con ese número le saluda por su nombre y le ofrece repetir lo de la última vez. Lo que no sabe es lo que no está apuntado en ninguna parte.",
         },
       ]}
       relacionadas={[
@@ -248,31 +252,39 @@ export default function GuionParaAtenderElTelefonoPage() {
             etiqueta="Ejemplo de llamada atendida por la recepcionista de IA"
             turnos={[
               { quien: "recepcionista", texto: "Peluquería Nerea, te atiende su asistente de inteligencia artificial. ¿En qué te ayudo?" },
-              { quien: "cliente", texto: "Hola, quería hora para cortarme el pelo, si puede ser con Marta." },
-              { quien: "recepcionista", texto: "Claro, miro la agenda de Marta. Mientras tanto: ¿te parece bien que se grabe la llamada para que el negocio pueda escucharla?" },
+              { quien: "cliente", texto: "Hola, quería hora para cortarme el pelo con Marta. ¿El viernes a las diez puede ser?" },
+              { quien: "recepcionista", texto: "Mientras lo compruebo, ¿te parece bien que grabe tus llamadas para que Peluquería Nerea pueda revisarlas?" },
               { quien: "cliente", texto: "Sí, vale." },
-              { quien: "recepcionista", texto: "Gracias. Con Marta tengo el jueves a las cinco o el viernes a las diez y media. ¿Cuál te viene mejor?" },
-              { quien: "cliente", texto: "El viernes." },
-              { quien: "recepcionista", texto: "Perfecto. ¿A nombre de quién la pongo?" },
+              { quien: "recepcionista", texto: "Gracias. A las diez Marta está ocupada, pero tiene libre a las diez y media. ¿Te viene bien?" },
+              { quien: "cliente", texto: "Sí, perfecto." },
+              { quien: "recepcionista", texto: "¿A nombre de quién la pongo?" },
               { quien: "cliente", texto: "Laura Gómez." },
-              { quien: "recepcionista", texto: "Hecho, Laura: viernes a las diez y media, corte con Marta. Te llega ahora la confirmación por WhatsApp." },
+              { quien: "recepcionista", texto: "Te lo resumo: corte con Marta el viernes a las diez y media, a nombre de Laura Gómez. ¿Te la reservo y te mando la confirmación por WhatsApp a este número?" },
+              { quien: "cliente", texto: "Sí, gracias." },
+              { quien: "recepcionista", texto: "Hecho, Laura. Ahora te llega un WhatsApp de Alhabla con la confirmación de la cita." },
             ]}
           />
           <Texto>
             <p>
               Avisa al empezar de que es una inteligencia artificial y dice el nombre de tu negocio. Antes de ofrecer una
-              hora mira tu agenda real y tu horario, y si piden a alguien por su nombre, reserva con esa persona. Al
-              terminar, el cliente recibe la cita por WhatsApp.
+              hora mira tu agenda real y tu horario, y si piden a alguien por su nombre, reserva con esa persona. Antes de
+              reservar repite servicio, día, hora y nombre, y pregunta si manda la confirmación por WhatsApp: si el
+              cliente dice que sí, le llega en ese momento.
             </p>
             <p>
-              Los precios y las duraciones son los que configuras en cada servicio. Lo que se habló queda en la
-              transcripción de la llamada. La grabación de audio, solo si el cliente acepta cuando se lo pregunta; si
-              dice que no, queda solo la transcripción.
+              Si quien llama ya reservó antes desde ese número, le saluda por su nombre y le pregunta si quiere repetir el
+              servicio de la última vez. Si dice que sí, no le vuelve a pedir ni el servicio ni el nombre.
             </p>
             <p>
-              Lo que no tiene es lo que da conocer a alguien desde hace años: no sabe qué es «lo de siempre» de tu
-              clienta, así que lo pregunta. Por eso funciona mejor como el que coge lo que tú no puedes coger, no como
-              sustituto del mostrador. Cómo llegan esas llamadas, en la{" "}
+              El precio que da es el que tenga cada servicio en tu catálogo, y tú eliges en «Cómo atiende» si lo dice
+              siempre, solo si se lo preguntan (es lo que viene marcado) o nunca. Si un servicio no tiene precio, no se lo
+              inventa. Lo que se habló queda en la transcripción de la llamada. La grabación de audio, solo si el cliente
+              acepta cuando se lo pregunta, una sola vez; si dice que no, queda solo la transcripción.
+            </p>
+            <p>
+              Lo que no sabe es lo que no está apuntado en ninguna parte: cómo le gusta el flequillo a tu clienta o lo que
+              te contó la última vez. Por eso funciona mejor como el que coge lo que tú no puedes coger, no como sustituto
+              del mostrador. Cómo llegan esas llamadas, en la{" "}
               <Link href="/desvio-de-llamadas">guía de desvío por operador</Link>.
             </p>
           </Texto>

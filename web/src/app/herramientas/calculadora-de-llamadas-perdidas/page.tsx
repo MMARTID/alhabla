@@ -240,8 +240,8 @@ export default function CalculadoraDeLlamadasPerdidasPage() {
         <Texto>
           <p>
             Con el desvío condicional, las llamadas que tú no coges pasan a una recepcionista de IA que mira tu agenda,
-            ofrece una hora libre y deja la cita apuntada con su confirmación por WhatsApp. Por eso la calculadora cuenta
-            solo las perdidas: las que coges tú siguen siendo tuyas. Cómo se activa en cada operador está en la{" "}
+            ofrece una hora libre y deja la cita apuntada, con la confirmación por WhatsApp si el cliente la quiere. Por
+            eso la calculadora cuenta solo las perdidas: las que coges tú siguen siendo tuyas. Cómo se activa en cada operador está en la{" "}
             <Link href="/desvio-de-llamadas">guía de desvío de llamadas</Link>, y los minutos de cada plan, en{" "}
             <Link href="/planes">planes y precios</Link>.
           </p>

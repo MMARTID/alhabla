@@ -30,7 +30,7 @@ export default function AvisoLegalPage() {
     <LegalPage
       title="Aviso legal"
       description="Quién está detrás de Alhabla, en qué condiciones puedes usarlo, qué implica contratar una suscripción y cómo tratamos por tu cuenta los datos de tus clientes."
-      updatedAt="2026-10-16"
+      updatedAt="2026-10-20"
       indice
     >
       <LegalSection id="titularidad" title="Titularidad del sitio">
@@ -69,8 +69,9 @@ export default function AvisoLegalPage() {
           cambias precios, horarios o citas y que siempre te propone el cambio antes de aplicarlo.
         </p>
         <p>
-          El servicio se presta como suscripción mensual. Tú mantienes tu número de teléfono habitual y las llamadas
-          llegan a Alhabla mediante un desvío que activas desde tu propio terminal.
+          El servicio se presta como suscripción mensual. Puedes mantener tu número de teléfono habitual y hacer que
+          las llamadas lleguen a Alhabla mediante un desvío que activas desde tu propia línea, o dar a tus clientes el
+          número de Alhabla como número principal de tu negocio.
         </p>
       </LegalSection>
 
@@ -112,7 +113,7 @@ export default function AvisoLegalPage() {
         </p>
         <p>
           No hay compromiso de permanencia: puedes cambiar de plan o cancelar cuando quieras desde el portal de
-          facturación de tu cuenta.
+          facturación de Stripe, al que entras desde la aplicación.
         </p>
       </LegalSection>
 
@@ -180,9 +181,9 @@ export default function AvisoLegalPage() {
         </p>
         <p>
           <strong className={negrita}>Objeto, naturaleza y duración.</strong> Alhabla trata datos por tu cuenta para
-          prestarte el servicio contratado: atender llamadas y mensajes de WhatsApp, grabar y transcribir las llamadas,
-          consultar tu disponibilidad y reservar citas en tu calendario. El tratamiento dura mientras tu suscripción
-          esté activa y, tras la baja, durante el plazo de conservación indicado en la{" "}
+          prestarte el servicio contratado: atender llamadas y mensajes de WhatsApp, transcribir las llamadas y
+          grabarlas cuando quien llama da permiso, consultar tu disponibilidad y reservar citas en tu calendario. El
+          tratamiento dura mientras tengas la cuenta, con los plazos de conservación indicados en la{" "}
           <Link href="/legal/privacidad" className={enlace}>
             política de privacidad
           </Link>
@@ -201,8 +202,8 @@ export default function AvisoLegalPage() {
           deber de confidencialidad.
         </p>
         <p>
-          <strong className={negrita}>Medidas de seguridad.</strong> Las grabaciones y transcripciones se almacenan
-          cifradas y solo son accesibles desde tu cuenta, conforme al artículo 32 del RGPD.
+          <strong className={negrita}>Medidas de seguridad.</strong> En Alhabla, las grabaciones y transcripciones se
+          almacenan cifradas y solo son accesibles desde tu cuenta, conforme al artículo 32 del RGPD.
         </p>
         <p>
           <strong className={negrita}>Subencargados.</strong> Autorizas con carácter general que Alhabla recurra a los
@@ -217,9 +218,15 @@ export default function AvisoLegalPage() {
           seguridad de estos datos, te lo notificaremos sin dilación indebida.
         </p>
         <p>
-          <strong className={negrita}>Al finalizar la prestación.</strong> Cuando canceles la suscripción, a tu
-          elección eliminamos o te devolvemos las grabaciones y transcripciones asociadas a tu negocio, salvo que
-          debamos conservarlas por obligación legal.
+          <strong className={negrita}>Al finalizar la prestación.</strong> Cuando eliminas tu cuenta desde el panel,
+          borramos los datos de tus clientes asociados a tu negocio, con sus grabaciones y transcripciones, salvo los
+          que debamos conservar por obligación legal. Si antes prefieres que te enviemos una copia de las que aún
+          conservemos, pídenosla por correo a{" "}
+          <a href="mailto:privacidad@alhabla.ai" className={enlace}>
+            privacidad@alhabla.ai
+          </a>
+          . Cancelar la suscripción no borra nada por sí solo: los datos siguen en tu cuenta hasta que la elimines o
+          nos pidas que la borremos.
         </p>
       </LegalSection>
 

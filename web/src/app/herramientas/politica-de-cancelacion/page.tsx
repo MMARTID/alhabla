@@ -3,6 +3,7 @@ import { CalendarX, Clock, HandCoins, Hourglass, UserX } from "lucide-react";
 import { GeneradorPoliticaCancelacion } from "@/components/herramientas/generador-politica-cancelacion";
 import { EJEMPLOS_DE_POLITICA, POLITICA_POR_DEFECTO, type Politica } from "@/components/herramientas/politica-de-cancelacion";
 import { Fuentes, ListaCheck, Nota, PaginaGuia, Seccion, Tabla, Tarjetas, Texto } from "@/components/pagina-guia";
+import { plans } from "@/lib/plans";
 import { absoluteUrl, metadataDePagina } from "@/lib/seo";
 
 /**
@@ -28,6 +29,14 @@ export const metadata = metadataDePagina({
   titulo: "Política de cancelación: generador gratis para salones",
   descripcion,
 });
+
+// Los planes con recordatorio por WhatsApp, por su nombre en lib/plans.ts,
+// como en plantillas-recordatorio-de-cita: el primero que los nombra y los
+// siguientes, que dicen «Todo lo de …».
+const primeroConRecordatorio = plans.findIndex((plan) => plan.features.some((f) => f.startsWith("Recordatorios")));
+const nombresConRecordatorio = (primeroConRecordatorio >= 0 ? plans.slice(primeroConRecordatorio) : [])
+  .map((plan) => plan.name)
+  .join(" y ");
 
 function describirSenal(v: Politica) {
   if (v.senal === "no") return "Sin señal";
@@ -239,9 +248,11 @@ export default function PoliticaDeCancelacionPage() {
           <p>
             Si tus llamadas las atiende Alhabla, pega el texto para la web en <strong>Información para responder</strong>,
             en el panel: la recepcionista la usa para contestar cuando alguien pregunta qué pasa si no puede venir. Tus
-            clientes pueden anular o cambiar la cita respondiendo al WhatsApp de confirmación, y el hueco que dejan queda
-            libre para la <Link href="/blog/lista-de-espera-huecos-libres">lista de espera</Link>. Con los recordatorios de
-            los planes que los incluyen, el aviso llega 24 horas antes, con margen para anular a tiempo.
+            clientes pueden cambiar o anular su cita llamando desde el mismo número con el que reservaron o escribiendo
+            por WhatsApp a la recepcionista, y el hueco que dejan queda libre para la{" "}
+            <Link href="/blog/lista-de-espera-huecos-libres">lista de espera</Link>. En los planes{" "}
+            {nombresConRecordatorio}, además, el recordatorio llega 24 horas antes (si la cita se reservó con más
+            margen) con botones para confirmar, cancelar o cambiar, a tiempo de dar el hueco a otra persona.
           </p>
           <p>
             Lo que Alhabla no hace: no cobra señales, no lleva la cuenta de las ausencias de cada cliente y no bloquea a
