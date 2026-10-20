@@ -2458,6 +2458,67 @@ describe("executeVoiceTool book_appointment — estado de la suscripción (halla
       expect(mockedBookAppointment).toHaveBeenCalled();
     }
   );
+
+  // Antes check_availability ofrecía la hora y el cliente la confirmaba
+  // para que luego book_appointment la rechazara.
+  function comprobarDisponibilidad() {
+    return executeVoiceTool({
+      businessId: "business_123",
+      toolName: "check_availability",
+      callId: "call_123",
+      params: {
+        startDateTime: "2026-12-01T11:00:00+01:00",
+        durationMinutes: 30,
+      },
+    });
+  }
+
+  it.each(["CANCELED", "UNPAID", "INCOMPLETE_EXPIRED"])(
+    "check_availability no ofrece horas si la suscripción está en %s",
+    async (subscriptionStatus) => {
+      mockedBusinessFindUnique.mockResolvedValue(
+        buildBusiness({ subscriptionStatus }) as any
+      );
+
+      const result = await comprobarDisponibilidad();
+
+      expect(result.result.available).toBe(false);
+      expect(result.result.code).toBe("SUBSCRIPTION_INACTIVE");
+      expect(result.result.availabilityToken).toBeUndefined();
+      expect(mockedCheckAvailability).not.toHaveBeenCalled();
+      expect(mockedGetBusyIntervals).not.toHaveBeenCalled();
+    }
+  );
+
+  it("check_availability no ofrece horas cuando la gracia del impago ya venció", async () => {
+    mockedBusinessFindUnique.mockResolvedValue(
+      buildBusiness({
+        subscriptionStatus: "PAST_DUE",
+        paymentFailureSuspensionAt: new Date(Date.now() - 60 * 1000),
+        callsSuspendedAt: null,
+      }) as any
+    );
+
+    const result = await comprobarDisponibilidad();
+
+    expect(result.result.code).toBe("SUBSCRIPTION_INACTIVE");
+    expect(mockedCheckAvailability).not.toHaveBeenCalled();
+  });
+
+  it("check_availability sigue ofreciendo horas con PAST_DUE durante la gracia", async () => {
+    mockedBusinessFindUnique.mockResolvedValue(
+      buildBusiness({
+        subscriptionStatus: "PAST_DUE",
+        paymentFailureSuspensionAt: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
+        callsSuspendedAt: null,
+      }) as any
+    );
+
+    const result = await comprobarDisponibilidad();
+
+    expect(result.result.code).not.toBe("SUBSCRIPTION_INACTIVE");
+    expect(mockedCheckAvailability).toHaveBeenCalled();
+  });
 });
 
 describe("executeVoiceTool book_appointment — apunta el intento fallido para el informe", () => {

@@ -17,6 +17,7 @@ import { AppPageHeader } from "@/components/app-page-header";
 import { SectionErrorState } from "@/components/section-card";
 import { useBusiness } from "@/components/providers";
 import { formatPrice } from "@/lib/format";
+import { suscripcionSinCobro } from "@/lib/suscripcion";
 import { webUrl } from "@/lib/web-url";
 import { formatPlanPrice, formatPriceWithVat, plans } from "@/lib/plans";
 import type { SubscriptionStatus } from "@/lib/types";
@@ -85,6 +86,9 @@ export default function BillingSettingsPage() {
   const cuota = plan ? (data?.precioDeFundador ? plan.founderPrice : plan.price) : null;
   const status = data?.status ?? null;
   const suspendido = Boolean(business?.callsSuspendedAt);
+  // Cancelada o sin cobro posible: el backend tampoco contesta las llamadas
+  // (phone/telnyxInbound.ts). El impago tiene su propio texto.
+  const sinPlan = !suspendido && suscripcionSinCobro(status ?? business?.subscriptionStatus);
 
   const incluidos = data?.includedMinutes ?? plan?.minutes ?? null;
   const consumidos = data?.consumedMinutes ?? 0;
@@ -137,6 +141,27 @@ export default function BillingSettingsPage() {
             </div>
           </div>
         </div>
+      ) : sinPlan ? (
+        <div className="rounded-2xl border border-linea bg-superficie p-4 sm:p-5">
+          <div className="flex items-start gap-3">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-urgente-fondo text-urgente">
+              <AlertTriangle className="h-5 w-5" aria-hidden="true" />
+            </span>
+            <div className="min-w-0">
+              <h2 className="text-base font-semibold text-tinta sm:text-lg">
+                Tu recepcionista no está atendiendo llamadas
+              </h2>
+              <p className="mt-1 max-w-2xl text-sm leading-6 text-apagado">
+                Tu suscripción ya no está activa, así que no contesta a tus clientes. Quita el desvío
+                de tu línea habitual o elige un plan: vuelve a atender en el mismo número, sin
+                reconfigurar nada.
+              </p>
+              <a href={webUrl("/planes")} className="btn-primary mt-4">
+                Elegir plan
+              </a>
+            </div>
+          </div>
+        </div>
       ) : null}
 
       {data ? (
@@ -183,7 +208,7 @@ export default function BillingSettingsPage() {
                     desvío de tu teléfono antes de esa fecha para que tus clientes no se queden sin
                     respuesta.
                   </p>
-                ) : data.currentPeriodEnd ? (
+                ) : data.currentPeriodEnd && !suscripcionSinCobro(status) ? (
                   <p className="mt-3 text-sm leading-6 text-muted">
                     Se renueva el {formatFecha(data.currentPeriodEnd)}.
                   </p>
