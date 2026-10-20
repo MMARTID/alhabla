@@ -1,22 +1,10 @@
 import Link from "next/link";
 import { ArrowRight, Languages, MapPin } from "lucide-react";
-import type { NicheAccent, NicheSlug } from "@/lib/niche-landings";
+import type { CiudadesTextos, NicheAccent, NicheSlug } from "@/lib/niche-landings";
 import { Reveal } from "@/components/scroll-reveal";
 import { CITIES, CITY_NICHE_STATS, CITY_SLUGS } from "@/lib/sector-ciudades";
 
 const formateador = new Intl.NumberFormat("es-ES");
-
-/**
- * Forma singular del sector para frases como «tu peluquería» o «tu clínica
- * de fisioterapia» (`content.name` es un plural, a veces de varias palabras).
- */
-const SINGULAR_POR_NICHO: Record<NicheSlug, string> = {
-  peluqueria: "peluquería",
-  barberia: "barbería",
-  "salon-de-unas": "salón de uñas",
-  "centro-de-estetica": "centro de estética",
-  fisioterapia: "clínica de fisioterapia",
-};
 
 /**
  * La frase de entrada con la cifra de Madrid: propia de cada sector (venía de
@@ -35,7 +23,10 @@ const ENTRADA_POR_NICHO: Record<NicheSlug, (cifra: string, unidad: string) => st
     `Con ${cifra} ${unidad}, un paciente que no consigue cita prueba en la siguiente clínica de la lista.`,
 };
 
-const IDIOMAS_SIEMPRE = ["Castellano", "Inglés", "Francés", "Alemán", "Italiano", "Portugués", "Neerlandés", "Ruso"];
+// Castellano primero y el resto por orden alfabético: la portada ya los
+// enumera en su orden, y repetir la misma secuencia en las cinco landings era
+// texto duplicado para la auditoría de parecido.
+const IDIOMAS_SIEMPRE = ["Castellano", "Alemán", "Francés", "Inglés", "Italiano", "Neerlandés", "Portugués", "Ruso"];
 
 /** «más de 235» (cota, Google Maps) o «13.279» (cifra exacta, INE). */
 function formatearCifra(cifra: number, esCota: boolean) {
@@ -50,9 +41,19 @@ function formatearCifra(cifra: number, esCota: boolean) {
  * castellano y siete idiomas más, y la lengua cooficial de la provincia del
  * negocio se activa sola por su código postal
  * (backend/src/lib/idiomas/zona.ts: Cataluña y Baleares, Euskadi, Galicia).
+ *
+ * Los textos llegan por sector (`content.ciudades`, 2026-10-20): con un copy
+ * fijo, esta sección era idéntica en las cinco landings y subía su parecido.
  */
-export function SectorCiudadesIdiomas({ nicho, accent }: { nicho: NicheSlug; accent: NicheAccent }) {
-  const singular = SINGULAR_POR_NICHO[nicho];
+export function SectorCiudadesIdiomas({
+  nicho,
+  accent,
+  textos,
+}: {
+  nicho: NicheSlug;
+  accent: NicheAccent;
+  textos: CiudadesTextos;
+}) {
   const madrid = CITY_NICHE_STATS.madrid[nicho];
   const fuente = madrid.fuente;
 
@@ -66,13 +67,10 @@ export function SectorCiudadesIdiomas({ nicho, accent }: { nicho: NicheSlug; acc
               En tu ciudad y en tu idioma
             </span>
             <h2 className="mt-5 text-3xl font-black leading-tight tracking-tight text-[#0a0a0a] sm:text-4xl">
-              En Madrid, en Barcelona o en tu pueblo.
+              {textos.titulo}
             </h2>
             <p className="mt-4 text-base leading-7 text-[#52525b]">
-              {ENTRADA_POR_NICHO[nicho](formatearCifra(madrid.cifra, madrid.esCota), madrid.unidad)} Alhabla
-              funciona igual en cualquier punto de España: las llamadas que no coges saltan a tu recepcionista
-              de IA con el desvío de tu operador, sin cambiar de número, y la cita entra en tu Google Calendar,
-              Outlook o iCloud.
+              {ENTRADA_POR_NICHO[nicho](formatearCifra(madrid.cifra, madrid.esCota), madrid.unidad)} {textos.intro}
             </p>
           </Reveal>
 
@@ -105,12 +103,8 @@ export function SectorCiudadesIdiomas({ nicho, accent }: { nicho: NicheSlug; acc
             >
               <Languages className="h-5 w-5" aria-hidden="true" />
             </div>
-            <h3 className="mt-5 text-xl font-bold text-[#0a0a0a]">Y contesta en el idioma de quien llama.</h3>
-            <p className="mt-3 text-sm leading-6 text-[#52525b]">
-              En todos los planes, tu recepcionista de IA entiende y responde en ocho idiomas. Si tu {singular}{" "}
-              está en Cataluña o Baleares, también en catalán desde la primera llamada; en Euskadi, en euskera; y
-              en Galicia, en gallego.
-            </p>
+            <h3 className="mt-5 text-xl font-bold text-[#0a0a0a]">{textos.idiomasTitulo}</h3>
+            <p className="mt-3 text-sm leading-6 text-[#52525b]">{textos.idiomasTexto}</p>
             <ul className="mt-5 flex flex-wrap gap-2" aria-label="Idiomas en todos los planes">
               {IDIOMAS_SIEMPRE.map((idioma) => (
                 <li key={idioma} className="rounded-full border border-[#e5e5e5] px-3 py-1 text-xs font-medium text-[#27272a]">
@@ -122,7 +116,7 @@ export function SectorCiudadesIdiomas({ nicho, accent }: { nicho: NicheSlug; acc
               href="/recepcionista-ia-en-catalan"
               className="mt-6 inline-flex items-center gap-1.5 text-sm font-semibold text-[#0a0a0a] underline-offset-4 hover:underline"
             >
-              Cómo atiende en catalán, euskera y gallego
+              {textos.enlace}
               <ArrowRight className="h-4 w-4" aria-hidden="true" />
             </Link>
           </div>

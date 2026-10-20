@@ -123,8 +123,10 @@ export function RevenueLossCalculator({
         <Reveal delay={0.1} className="mx-auto mt-10 max-w-6xl">
         <div className="panel grid overflow-hidden p-2 sm:p-3 lg:grid-cols-[0.94fr_1.06fr]">
           <div className="p-4 sm:p-7 lg:p-9">
-            <h3 className="text-2xl font-bold tracking-tight text-[#0a0a0a]">Haz una estimación rápida</h3>
-            <p className="mt-2 text-sm leading-6 text-[#52525b]">No necesitas datos exactos. Una aproximación basta para ver el impacto.</p>
+            <h3 className="text-2xl font-bold tracking-tight text-[#0a0a0a]">{content?.estimateTitle ?? "Haz una estimación rápida"}</h3>
+            <p className="mt-2 text-sm leading-6 text-[#52525b]">
+              {content?.estimateHint ?? "No necesitas datos exactos. Una aproximación basta para ver el impacto."}
+            </p>
 
             {/*
               Un único borde para las dos, no dos tarjetas repetidas: eran dos
@@ -220,7 +222,8 @@ export function RevenueLossCalculator({
         </Reveal>
 
         <p className="mx-auto mt-5 max-w-2xl text-center text-sm leading-6 text-[#71717a]">
-          Estimación orientativa basada en 4 semanas al mes. No incluye recurrencia de clientes ni ventas adicionales.
+          {content?.footnote ??
+            "Estimación orientativa basada en 4 semanas al mes. No incluye recurrencia de clientes ni ventas adicionales."}
         </p>
 
         <Reveal delay={0.15} id="soluciones" className="mx-auto mt-8 flex max-w-4xl flex-wrap items-center justify-center gap-2.5">
