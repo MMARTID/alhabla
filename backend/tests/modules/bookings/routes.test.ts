@@ -44,6 +44,10 @@ vi.mock("../../../src/lib/prisma.js", () => ({
       deleteMany: vi.fn(),
       createMany: vi.fn(),
     },
+    professionalAbsence: {
+      findMany: vi.fn(),
+      deleteMany: vi.fn(),
+    },
     // La comprobación del cupo del plan y la creación/reactivación ocurren
     // dentro de la MISMA transacción serializable, así que el cliente de la
     // transacción tiene que ofrecer también business.findUnique y
@@ -452,5 +456,98 @@ describe("profesionales — niveles por servicio", () => {
 
     expect(response.statusCode).toBe(200);
     expect(response.json()).toMatchObject({ serviceLevels: { corte: "especialista" }, serviceIds: ["corte"] });
+  });
+});
+
+describe("ausencias del panel — GET /absences y DELETE /absences/:id", () => {
+  let fastify: ReturnType<typeof Fastify>;
+
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    fastify = Fastify();
+    fastify.decorate("authenticate", async (request: any) => {
+      request.user = { businessId: "biz_1" };
+    });
+    await fastify.register(bookingSettingsRoutes);
+  });
+
+  it("lista las ausencias que se solapan con el rango, solo del negocio autenticado", async () => {
+    vi.mocked(prisma.professionalAbsence.findMany).mockResolvedValue([
+      {
+        id: "aus_1",
+        professionalId: "pro_1",
+        startsAt: new Date("2026-11-08T23:00:00.000Z"),
+        endsAt: new Date("2026-11-09T23:00:00.000Z"),
+        reason: "baja",
+        createdVia: "owner_chat",
+        professional: { name: "Marta" },
+      },
+    ] as any);
+
+    const response = await fastify.inject({
+      method: "GET",
+      url: "/absences?desde=2026-11-09T00:00:00.000Z&hasta=2026-11-16T00:00:00.000Z",
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      ausencias: [
+        {
+          id: "aus_1",
+          professionalId: "pro_1",
+          professionalName: "Marta",
+          startsAt: "2026-11-08T23:00:00.000Z",
+          endsAt: "2026-11-09T23:00:00.000Z",
+          reason: "baja",
+          createdVia: "owner_chat",
+        },
+      ],
+    });
+    expect(prisma.professionalAbsence.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          businessId: "biz_1",
+          startsAt: { lt: new Date("2026-11-16T00:00:00.000Z") },
+          endsAt: { gt: new Date("2026-11-09T00:00:00.000Z") },
+        },
+      })
+    );
+  });
+
+  it("rechaza con 400 un rango invertido o de más de 120 días", async () => {
+    const invertido = await fastify.inject({
+      method: "GET",
+      url: "/absences?desde=2026-11-16T00:00:00.000Z&hasta=2026-11-09T00:00:00.000Z",
+    });
+    expect(invertido.statusCode).toBe(400);
+    const largo = await fastify.inject({
+      method: "GET",
+      url: "/absences?desde=2026-01-01T00:00:00.000Z&hasta=2026-12-31T00:00:00.000Z",
+    });
+    expect(largo.statusCode).toBe(400);
+    expect(prisma.professionalAbsence.findMany).not.toHaveBeenCalled();
+  });
+
+  it("quita una ausencia filtrando por el negocio (204) y da 404 si no es suya", async () => {
+    vi.mocked(prisma.professionalAbsence.deleteMany).mockResolvedValueOnce({
+      count: 1,
+    });
+    const quitada = await fastify.inject({
+      method: "DELETE",
+      url: "/absences/aus_1",
+    });
+    expect(quitada.statusCode).toBe(204);
+    expect(prisma.professionalAbsence.deleteMany).toHaveBeenCalledWith({
+      where: { id: "aus_1", businessId: "biz_1" },
+    });
+
+    vi.mocked(prisma.professionalAbsence.deleteMany).mockResolvedValueOnce({
+      count: 0,
+    });
+    const ajena = await fastify.inject({
+      method: "DELETE",
+      url: "/absences/aus_de_otro",
+    });
+    expect(ajena.statusCode).toBe(404);
   });
 });

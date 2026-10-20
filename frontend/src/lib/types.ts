@@ -794,6 +794,20 @@ export type AgendaBooking = {
   origen?: { canal: CanalDeLlamada; startedAt: string; durationSecs: number | null } | null;
 };
 
+/** Ausencia de una persona del equipo (vacaciones, baja, «Laura no viene el
+ * viernes»). Se marca desde el Gestor; el panel la enseña y la puede quitar. */
+export type AusenciaDelEquipo = {
+  id: string;
+  professionalId: string;
+  professionalName: string;
+  /** Instantes ISO; el fin es exclusivo (días enteros acaban a las 00:00). */
+  startsAt: string;
+  endsAt: string;
+  reason: string | null;
+  /** "owner_chat" (el Gestor) | "panel" | null. */
+  createdVia: string | null;
+};
+
 /** Lo que vuelve al mover o cancelar una cita desde la agenda. */
 export type ResultadoDeCita = {
   ok: true;

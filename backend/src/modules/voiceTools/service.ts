@@ -95,6 +95,7 @@ import {
 import { buildCalendarIdempotencyKey } from "../../lib/calendarIdempotency.js";
 import { appUrl } from "../../lib/urls.js";
 import { guardarIntentoDeReservaFallido } from "../../lib/intentoDeReserva.js";
+import { describirAusencia } from "../bookings/ausencias.js";
 
 /** Lo que cada tool devuelve al orquestador: `result` va tal cual al LLM. */
 type ResultadoDeTool = { success: boolean; result?: Record<string, unknown> };
@@ -767,26 +768,6 @@ async function executeCheckAvailability(
 }
 
 const AUSENCIAS_LOOKAHEAD_MS = 60 * 24 * 60 * 60 * 1000;
-
-/** «del 3 al 7 de octubre» o «el 3 de octubre de 09:00 a 14:00», en la zona
- * del negocio, para el catálogo que lee el agente. */
-function describirAusencia(startsAt: Date, endsAt: Date, timezone: string): string {
-  const zona = timezone || "Europe/Madrid";
-  const dia = new Intl.DateTimeFormat("es-ES", { timeZone: zona, day: "numeric", month: "long" });
-  const horaMin = new Intl.DateTimeFormat("es-ES", { timeZone: zona, hour: "2-digit", minute: "2-digit", hour12: false });
-  // El fin es exclusivo: una ausencia de días enteros acaba a las 00:00 del
-  // día siguiente, que para el dueño es «hasta el 7».
-  const ultimoInstante = new Date(endsAt.getTime() - 60_000);
-  const diasEnteros = horaMin.format(startsAt) === "00:00" && horaMin.format(ultimoInstante) === "23:59";
-  const mismoDia = dia.format(startsAt) === dia.format(ultimoInstante);
-  if (diasEnteros) {
-    return mismoDia ? `el ${dia.format(startsAt)}` : `del ${dia.format(startsAt)} al ${dia.format(ultimoInstante)}`;
-  }
-  if (mismoDia) {
-    return `el ${dia.format(startsAt)} de ${horaMin.format(startsAt)} a ${horaMin.format(endsAt)}`;
-  }
-  return `desde el ${dia.format(startsAt)} a las ${horaMin.format(startsAt)} hasta el ${dia.format(endsAt)} a las ${horaMin.format(endsAt)}`;
-}
 
 async function executeGetCatalog(
   business: BusinessVoiceConfig,

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { prisma } from "../../../src/lib/prisma.js";
 import { DEFAULT_BUSINESS_SCHEDULE } from "../../../src/lib/businessSchedule.js";
 import { checkAvailability } from "../../../src/lib/availability.js";
@@ -32,7 +32,12 @@ vi.mock("../../../src/lib/prisma.js", () => ({
       updateMany: vi.fn(),
     },
     call: { findUnique: vi.fn() },
-    professionalAbsence: { findFirst: vi.fn(), create: vi.fn() },
+    professionalAbsence: {
+      findFirst: vi.fn(),
+      findMany: vi.fn(),
+      create: vi.fn(),
+      deleteMany: vi.fn(),
+    },
     lead: { findFirst: vi.fn(), updateMany: vi.fn() },
     ownerPendingAction: {
       create: vi.fn(),
@@ -984,6 +989,143 @@ describe("marcar_ausencia", () => {
     expect(r.mensaje).toBe(
       "Hecho: Laura no está el lunes, 9 de noviembre de 09:00 a 14:00; la recepcionista no le reservará nada ahí. Tiene 1 cita en ese tramo: dime si las movemos o las cancelamos."
     );
+  });
+});
+
+describe("quitar_ausencia", () => {
+  // Lunes 9 y martes 10 de noviembre de 2026, días enteros en Madrid (CET).
+  const AUSENCIA = {
+    id: "aus_1",
+    startsAt: new Date("2026-11-08T23:00:00.000Z"),
+    endsAt: new Date("2026-11-10T23:00:00.000Z"),
+    reason: "baja",
+    professional: { id: "pro_marta", name: "Marta" },
+  };
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-11-02T10:00:00.000Z"));
+    vi.mocked(prisma.professionalAbsence.findFirst).mockReset();
+    vi.mocked(prisma.professionalAbsence.findMany).mockReset();
+    vi.mocked(prisma.professionalAbsence.deleteMany).mockReset();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("por id: describe el tramo, avisa de las citas y normaliza los parámetros; el id se busca solo en el negocio", async () => {
+    vi.mocked(prisma.professionalAbsence.findFirst).mockResolvedValue(
+      AUSENCIA as never
+    );
+    mockedBookingCount.mockResolvedValue(1);
+    const r = await comprobar("quitar_ausencia", { ausencia: "aus_1" });
+    expect(r).toMatchObject({
+      ok: true,
+      descripcion:
+        "quitar la ausencia de Marta del 9 de noviembre al 10 de noviembre (baja): la recepcionista volverá a ofrecer ese tramo. Ya tiene 1 cita ahí",
+      parametros: { ausencia: "aus_1" },
+    });
+    expect(prisma.professionalAbsence.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "aus_1", businessId: "biz_1" },
+      })
+    );
+  });
+
+  it("rechaza una ausencia de otro negocio, una ya pasada y una propuesta sin referencia", async () => {
+    vi.mocked(prisma.professionalAbsence.findFirst).mockResolvedValueOnce(null);
+    expect(
+      (await comprobar("quitar_ausencia", { ausencia: "aus_ajena" })).motivo
+    ).toContain("No existe esa ausencia");
+    vi.mocked(prisma.professionalAbsence.findFirst).mockResolvedValueOnce({
+      ...AUSENCIA,
+      endsAt: new Date("2026-11-01T23:00:00.000Z"),
+    } as never);
+    expect(
+      (await comprobar("quitar_ausencia", { ausencia: "aus_1" })).motivo
+    ).toContain("ya ha pasado");
+    expect((await comprobar("quitar_ausencia", {})).motivo).toContain(
+      "indica la ausencia"
+    );
+  });
+
+  it("por persona: una sola ausencia por venir se resuelve sin más; con fecha filtra por el día en la zona del negocio", async () => {
+    vi.mocked(prisma.professionalAbsence.findMany).mockResolvedValue([
+      AUSENCIA,
+    ] as never);
+    mockedBookingCount.mockResolvedValue(0);
+    const r = await comprobar("quitar_ausencia", {
+      profesional: "marta",
+      fecha: "2026-11-10",
+    });
+    expect(r).toMatchObject({ ok: true, parametros: { ausencia: "aus_1" } });
+    expect(prisma.professionalAbsence.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          businessId: "biz_1",
+          professionalId: "pro_marta",
+          startsAt: { lt: new Date("2026-11-10T23:00:00.000Z") },
+        }),
+      })
+    );
+    // El día siguiente al último ya no está cubierto.
+    expect(
+      (
+        await comprobar("quitar_ausencia", {
+          profesional: "Marta",
+          fecha: "2026-11-11",
+        })
+      ).motivo
+    ).toContain("no tiene ninguna ausencia");
+  });
+
+  it("por persona con varias ausencias: no adivina, devuelve los ids para preguntar al dueño", async () => {
+    vi.mocked(prisma.professionalAbsence.findMany).mockResolvedValue([
+      AUSENCIA,
+      { ...AUSENCIA, id: "aus_2" },
+    ] as never);
+    const r = await comprobar("quitar_ausencia", { profesional: "Marta" });
+    expect(r.ok).toBe(false);
+    expect(r.motivo).toContain("[aus_1]");
+    expect(r.motivo).toContain("[aus_2]");
+    vi.mocked(prisma.professionalAbsence.findMany).mockResolvedValue([]);
+    expect(
+      (await comprobar("quitar_ausencia", { profesional: "Marta" })).motivo
+    ).toContain("no tiene ausencias por venir");
+  });
+
+  it("al confirmar borra solo dentro del negocio y lo cuenta; si ya no está, lo dice", async () => {
+    vi.mocked(prisma.professionalAbsence.findFirst).mockResolvedValue(
+      AUSENCIA as never
+    );
+    vi.mocked(prisma.professionalAbsence.deleteMany).mockResolvedValue({
+      count: 1,
+    });
+    const r = await ejecutar("quitar_ausencia", { ausencia: "aus_1" });
+    expect(prisma.professionalAbsence.deleteMany).toHaveBeenCalledWith({
+      where: { id: "aus_1", businessId: "biz_1" },
+    });
+    expect(r).toMatchObject({
+      ok: true,
+      mensaje:
+        "Hecho: quito la ausencia de Marta del 9 de noviembre al 10 de noviembre (baja); la recepcionista vuelve a ofrecer ese tramo.",
+    });
+
+    vi.mocked(prisma.professionalAbsence.deleteMany).mockResolvedValue({
+      count: 0,
+    });
+    expect(await ejecutar("quitar_ausencia", { ausencia: "aus_1" })).toEqual({
+      ok: false,
+      mensaje: "Esa ausencia ya no existe.",
+    });
+
+    vi.mocked(prisma.professionalAbsence.deleteMany).mockRejectedValue(
+      new Error("db caída")
+    );
+    expect(
+      (await ejecutar("quitar_ausencia", { ausencia: "aus_1" })).mensaje
+    ).toContain("No he podido quitar la ausencia");
   });
 });
 
