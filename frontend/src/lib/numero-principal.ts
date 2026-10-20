@@ -11,11 +11,12 @@ export const TEXTO_MOVIL_FUERA_DE_ESPANA =
  * al que se pasarán las llamadas, así que no puede seguir desviada. */
 export const TEXTO_MOVIL_SIN_DESVIO =
   "Es el móvil al que te pasará las llamadas tu recepcionista, así que no puede tener ningún desvío hacia el número de Alhabla: la llamada volvería a ella y tu móvil no sonaría nunca.";
+/** `##002#` borra también los desvíos al buzón de voz: se dice antes. */
 export const TEXTO_QUITAR_DESVIOS =
-  "Quita cualquier desvío que tuvieras en el móvil antes de confirmar. Este código anula todos los desvíos de una vez:";
+  "Quita el desvío a Alhabla antes de confirmar. Este código anula todos los desvíos del móvil de una vez, también los que mandan las llamadas a tu buzón de voz:";
 /** Recordatorio en Ajustes › Teléfono cuando Alhabla ya es el principal. */
 export const TEXTO_MOVIL_SIN_DESVIO_EN_AJUSTES =
-  "Tu móvil no puede tener un desvío hacia el número de Alhabla: la llamada que te pase tu recepcionista volvería a ella y no te llegaría. Para anular todos los desvíos del móvil, marca ##002#.";
+  "Tu móvil no puede tener un desvío hacia el número de Alhabla: la llamada que te pase tu recepcionista volvería a ella y no te llegaría. Para quitarlo, marca ##61# (y ##67#, ##62# o ##21# si los activaste). ##002# los anula todos de una vez, también los que mandan las llamadas a tu buzón de voz.";
 export const TEXTO_SIN_NUMERO =
   "Todavía no tienes un número de Alhabla activo. En cuanto lo tengas, aquí podrás usarlo como número principal.";
 export const TEXTO_YA_ES_PRINCIPAL =
