@@ -244,6 +244,10 @@ export default function PrivacidadPage() {
             .
           </li>
           <li>
+            <strong className="font-semibold text-[#0a0a0a]">Google Cloud.</strong> Aloja el servidor y la base de datos
+            de Alhabla en la Unión Europea (Bélgica).
+          </li>
+          <li>
             <strong className="font-semibold text-[#0a0a0a]">Stripe.</strong> Gestiona la suscripción y los pagos.
             Alhabla no almacena los datos completos de tu tarjeta.
           </li>
