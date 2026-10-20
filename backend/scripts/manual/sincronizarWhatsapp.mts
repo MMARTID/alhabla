@@ -96,8 +96,8 @@ async function sincronizarRemitentes(args: Argumentos): Promise<void> {
     });
     await prisma.whatsappSender.upsert({
       where: { phoneNumber: numero.phoneNumber },
-      create: datos,
-      update: datos,
+      create: { ...datos, category: plantilla.category ?? "UTILITY" },
+      update: { ...datos, category: plantilla.category ?? undefined },
     });
     console.log(
       `  ${numero.phoneNumber} → ${audience} · ${numero.status} · «${numero.displayName ?? "—"}» (${numero.displayNameStatus ?? "sin revisión"}) · calidad ${numero.qualityRating ?? "—"}`
