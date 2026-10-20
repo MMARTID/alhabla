@@ -29,4 +29,10 @@ describe("sitemap", () => {
     expect(imagenes.length).toBeGreaterThan(0);
     expect(imagenes.some((u) => u?.includes("&fit=crop"))).toBe(true);
   });
+
+  it("no lista las páginas sector × ciudad fusionadas y sí la de catalán", () => {
+    const urls = sitemap().map((e) => e.url);
+    expect(urls.some((u) => /\/(peluqueria|barberia|centro-de-estetica|salon-de-unas|fisioterapia)\/[a-z-]+$/.test(u))).toBe(false);
+    expect(urls).toContain("/recepcionista-ia-en-catalan");
+  });
 });

@@ -1,26 +1,29 @@
+import { plans } from "@/lib/plans";
+
 export const siteName = "Alhabla";
-export const defaultTitle = "Alhabla | Asistente telefónico 24/7 para peluquerías y centros de estética";
+export const defaultTitle = "Alhabla: recepcionista de IA que contesta llamadas y reserva citas";
 export const defaultDescription =
-  "Alhabla es el asistente telefónico con IA para negocios con cita previa: responde llamadas, resuelve dudas y reserva citas automáticamente las 24 horas.";
+  "Alhabla es la recepcionista de IA de tu negocio: coge el teléfono cuando tú no puedes, reserva en tu calendario y confirma cada cita por WhatsApp.";
+
+/** Rango de cuotas mensuales sin IVA, para los `AggregateOffer` del grafo. */
+export const PRECIO_MINIMO = String(Math.min(...plans.map((plan) => plan.price)));
+export const PRECIO_MAXIMO = String(Math.max(...plans.map((plan) => plan.price)));
 
 const rawSiteUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim();
 
 export const siteUrl = rawSiteUrl ? rawSiteUrl.replace(/\/$/, "") : undefined;
 
 export const seoKeywords = [
-  // Categoría principal
-  "asistente telefónico 24/7",
+  // Categoría principal: «de IA», no «virtual» (decisión del 2026-10-20).
+  "recepcionista de IA",
+  "recepcionista con IA para negocios",
+  "IA que contesta llamadas",
+  "IA para atender llamadas",
   "asistente telefónico con IA",
-  "recepción telefónica con IA",
-  "recepcionista virtual para negocios",
-  "asistente virtual de llamadas",
-  "automatizar atención telefónica",
-  "reservas telefónicas automáticas",
-  "gestión de citas con IA",
-  "integración google calendar",
-  "transcripción llamadas",
-  "resumen automático de llamadas",
+  "reservar citas por teléfono con IA",
+  "confirmación de citas por WhatsApp",
   "atención de llamadas fuera de horario",
+  "integración con Google Calendar, Outlook e iCloud",
   siteName,
 ];
 
@@ -103,7 +106,7 @@ export const landingStructuredData = {
       "@type": "SoftwareApplication",
       name: siteName,
       description:
-        "Asistente telefónico con IA para responder llamadas, organizar citas y mantener atención continua en negocios de belleza y servicios con agenda.",
+        "Recepcionista de IA que contesta las llamadas de negocios con cita previa, reserva en su calendario de Google, Outlook o iCloud y confirma por WhatsApp.",
       applicationCategory: "BusinessApplication",
       operatingSystem: "Web",
       audience: {
@@ -113,15 +116,15 @@ export const landingStructuredData = {
       url: absoluteUrl("/"),
       offers: {
         "@type": "AggregateOffer",
-        lowPrice: "69",
-        highPrice: "299",
+        lowPrice: PRECIO_MINIMO,
+        highPrice: PRECIO_MAXIMO,
         priceCurrency: "EUR",
-        offerCount: "3",
+        offerCount: String(plans.length),
       },
     },
     {
       "@type": "Service",
-      serviceType: "Asistente telefónico 24/7 con IA",
+      serviceType: "Recepcionista de IA para negocios con cita previa",
       provider: { "@id": organizationId() },
       areaServed: "ES",
       audience: {
@@ -129,7 +132,7 @@ export const landingStructuredData = {
         audienceType: "Peluquerías, barberías, salones de uñas, centros de estética y clínicas de fisioterapia",
       },
       description:
-        "Servicio de recepción telefónica inteligente para captar llamadas, reservar citas y mantener una atención constante sin ampliar equipo.",
+        "Atiende las llamadas que el negocio no puede coger, con su número de siempre, y reserva la cita en su agenda real; el dueño gestiona los cambios por WhatsApp.",
       url: absoluteUrl("/"),
     },
   ],
