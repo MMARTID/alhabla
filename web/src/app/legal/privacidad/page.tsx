@@ -27,7 +27,7 @@ export default function PrivacidadPage() {
     <LegalPage
       title="Política de privacidad"
       description="Aquí te contamos qué datos tratamos, para qué, quién más interviene y qué puedes exigirnos. Sin cláusulas copiadas: solo lo que el producto hace de verdad."
-      updatedAt="2026-10-17"
+      updatedAt="2026-10-20"
     >
       <LegalSection title="Quién es el responsable">
         <p>
@@ -115,7 +115,7 @@ export default function PrivacidadPage() {
       <LegalSection title="Datos de tu cuenta">
         <p>
           Si te registras, tratamos los datos necesarios para prestar el servicio: correo electrónico y contraseña
-          (guardada mediante hash, no en texto legible) o tu identificador de Google si entras con esa opción; y los datos del negocio
+          (guardada mediante hash, no en texto legible) o tu identificador de Google o de Facebook (y el correo asociado) si entras con una de esas opciones; y los datos del negocio
           que tú introduces — nombre, dirección, teléfono, horario, servicios, profesionales y el tipo de negocio.
         </p>
         <p>
@@ -307,6 +307,36 @@ export default function PrivacidadPage() {
             Agencia Española de Protección de Datos
           </a>
           .
+        </p>
+      </LegalSection>
+
+      <LegalSection title="Cómo eliminar tus datos" id="eliminar-datos">
+        <p>
+          Puedes borrar tu cuenta y todos los datos de tu negocio cuando quieras, también si entraste con Google o con
+          Facebook:
+        </p>
+        <ol className="list-decimal space-y-2 pl-5">
+          <li>
+            Entra en Alhabla y ve a <strong>Ajustes › Seguridad</strong>.
+          </li>
+          <li>
+            En <strong>Eliminar la cuenta</strong>, confirma y pulsa <strong>Eliminar cuenta definitivamente</strong>.
+            Se cancela la suscripción, se retira el número de Alhabla y se borran tu usuario (con el identificador de
+            Google o Facebook), el negocio, sus llamadas, grabaciones, citas y conexiones de calendario.
+          </li>
+        </ol>
+        <p>
+          Si no puedes entrar en tu cuenta, escríbenos a{" "}
+          <a href="mailto:privacidad@alhabla.ai" className="font-medium text-[#6d28d9] underline underline-offset-2">
+            privacidad@alhabla.ai
+          </a>{" "}
+          desde el correo con el que te registraste y la borraremos nosotros en el plazo legal, normalmente en un mes.
+          Solo conservaremos, bloqueado, lo que la ley nos obligue a guardar, como las facturas.
+        </p>
+        <p>
+          Si entraste con Facebook, también puedes quitar a Alhabla de tu cuenta en Facebook, en{" "}
+          <strong>Configuración y privacidad › Configuración › Apps y sitios web</strong>; así dejamos de recibir
+          cualquier dato de Facebook. Para borrar lo que ya tenemos, sigue los pasos de arriba.
         </p>
       </LegalSection>
 
