@@ -217,23 +217,66 @@ describe("AjustesTelefono", () => {
       expect(
         await screen.findByRole("button", { name: "Comprobar desvío" })
       ).toBeInTheDocument();
-      // Fijo: sin «**» y solo «si no contestas» y «todas».
+      // Fijo: sin «**», con las 9 cifras (un sobremesa no marca «+») y
+      // «si no contestas», «comunicando» y «todas».
+      const nacional = NUMERO_DE_ALHABLA.slice(3);
       expect(
         screen.getByRole("button", {
-          name: `Copiar el código *61*${NUMERO_DE_ALHABLA}#`,
+          name: `Copiar el código *61*${nacional}#`,
         })
       ).toBeInTheDocument();
       expect(
         screen.getByRole("button", {
-          name: `Copiar el código *21*${NUMERO_DE_ALHABLA}#`,
+          name: `Copiar el código *67*${nacional}#`,
         })
       ).toBeInTheDocument();
       expect(
-        screen.queryByRole("button", {
-          name: `Copiar el código **61*${NUMERO_DE_ALHABLA}#`,
+        screen.getByRole("button", {
+          name: `Copiar el código *21*${nacional}#`,
         })
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: /Copiar el código \*\*61\*/ })
       ).not.toBeInTheDocument();
       expect(screen.getByText(/contestador/)).toBeInTheDocument();
+      // Sin compañía elegida no promete que valga en todas.
+      expect(
+        screen.getByLabelText("¿Con qué compañía tienes esta línea?")
+      ).toHaveValue("");
+      expect(
+        screen.getByText(/en Vodafone, Orange y Jazztel cambia/)
+      ).toBeInTheDocument();
+      expect(screen.queryByText(/todas las compañías/)).not.toBeInTheDocument();
+      expect(
+        screen.getByRole("link", { name: "guía del desvío de llamadas" })
+      ).toHaveAttribute("href", expect.stringMatching(/\/desvio-de-llamadas$/));
+    });
+
+    it("con la compañía elegida enseña sus códigos: el fijo de Vodafone va sin # y avisa de que puede no desviar a Alhabla", async () => {
+      const user = userEvent.setup();
+      renderSeccion(negocio());
+
+      await user.selectOptions(
+        await screen.findByLabelText("¿Con qué compañía tienes esta línea?"),
+        "vodafone"
+      );
+
+      const nacional = NUMERO_DE_ALHABLA.slice(3);
+      expect(
+        screen.getByRole("button", {
+          name: `Copiar el código *61*${nacional}`,
+        })
+      ).toBeInTheDocument();
+      expect(screen.getAllByText("##61#").length).toBeGreaterThan(0);
+      expect(
+        screen.queryByRole("button", {
+          name: `Copiar el código *61*${nacional}#`,
+        })
+      ).not.toBeInTheDocument();
+      expect(
+        screen.getByText(/solo desvía a fijos y móviles de Vodafone/)
+      ).toBeInTheDocument();
+      expect(screen.getByText(/0,242 €\/min/)).toBeInTheDocument();
     });
 
     it("con la comprobación hecha dice cuándo", async () => {

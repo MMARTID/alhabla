@@ -15,6 +15,7 @@ import { getPhoneNumberInfo, updateMyBusiness } from "@/lib/api";
 import {
   TEXTO_MOVIL_FUERA_DE_ESPANA,
   TEXTO_MOVIL_SIN_DESVIO,
+  TEXTO_QUITAR_DESVIOS,
   TEXTO_SIN_MOVIL,
   TEXTO_SIN_NUMERO,
   TEXTO_YA_ES_PRINCIPAL,
@@ -147,7 +148,8 @@ describe("NumeroPrincipalPage", () => {
     expect(donde.getByText(/«otro teléfono»/)).toBeInTheDocument();
 
     // El número antiguo es un fijo: el código «todas» del fijo (*21*), sin
-    // los ** del móvil.
+    // los ** del móvil y con las 9 cifras (un sobremesa no marca «+»), y la
+    // nota de las compañías en las que cambia, con la guía pública.
     const antiguo = within(
       screen.getByRole("region", {
         name: "Qué hacer con tu número de siempre",
@@ -160,9 +162,15 @@ describe("NumeroPrincipalPage", () => {
     expect(antiguo.getByText(/Dalo de baja/)).toBeInTheDocument();
     expect(
       antiguo.getByRole("button", {
-        name: `Copiar el código *21*${NUMERO_DE_ALHABLA}#`,
+        name: `Copiar el código *21*${NUMERO_DE_ALHABLA.slice(3)}#`,
       })
     ).toBeInTheDocument();
+    expect(
+      antiguo.getByText(/En Vodafone va sin # al final/)
+    ).toBeInTheDocument();
+    expect(
+      antiguo.getByRole("link", { name: "guía del desvío de llamadas" })
+    ).toHaveAttribute("href", expect.stringMatching(/\/desvio-de-llamadas$/));
 
     const pasar = within(
       screen.getByRole("radiogroup", { name: "Cuándo pasarme llamadas" })
@@ -277,7 +285,13 @@ describe("NumeroPrincipalPage", () => {
     const anular = antiguo.getByRole("button", {
       name: "Copiar el código ##002#",
     });
-    // Los códigos de anular uno a uno, por si prefiere ir con cuidado.
+    // ##002# también borra los desvíos al buzón: se avisa, y se dan los de
+    // anular uno a uno para quitar solo los de Alhabla.
+    expect(antiguo.getByText(TEXTO_QUITAR_DESVIOS)).toBeInTheDocument();
+    expect(TEXTO_QUITAR_DESVIOS).toMatch(/buzón de voz/);
+    expect(
+      antiguo.getByText(/quitar solo los desvíos a Alhabla/)
+    ).toBeInTheDocument();
     expect(antiguo.getByText("##61#")).toBeInTheDocument();
     expect(antiguo.getByText("##21#")).toBeInTheDocument();
 
