@@ -248,7 +248,7 @@ const OFERTA_SIN_PRECIO: Record<AgentSettings["escalation"], string> = {
 
 /** Lo que vale para «Siempre» y «Si se lo preguntan». */
 const PRECIOS_DEL_CATALOGO =
-  "El precio de cada servicio solo lo sabes por get_catalog, que lo da junto a su duración; si la información del negocio dice otro, vale el de get_catalog. Si un servicio viene sin precio, no lo inventes ni lo calcules: dile que ese precio no lo tienes y que se lo confirma el negocio. Si pide varios servicios, puedes darle el precio de cada uno; si le das el total, que sea la suma exacta de esos precios. Di los precios como se dicen en España: 18 € es «dieciocho euros» y 12,50 €, «doce euros con cincuenta».";
+  "El precio de cada servicio solo lo sabes por get_catalog, que lo da junto a su duración; si la información del negocio dice otro, vale el de get_catalog. Si un servicio viene sin precio, no lo inventes ni lo calcules: si la información del negocio explica cómo se fija (por ejemplo, «desde» o «con presupuesto»), cuéntalo tal cual, sin dar una cifra que no esté escrita; si no dice nada, dile que ese precio no lo tienes y que se lo confirma el negocio. Si pide varios servicios, puedes darle el precio de cada uno; si le das el total, que sea la suma exacta de esos precios. Di los precios como se dicen en España: 18 € es «dieciocho euros» y 12,50 €, «doce euros con cincuenta».";
 
 /**
  * «## Precios» según «Dar precios» (`AgentSettings.darPrecios`, decisión

@@ -781,9 +781,9 @@ function describirAusencia(startsAt: Date, endsAt: Date, timezone: string): stri
  * prompt del assistant aún no esté al día (cambio de ajuste o deploy). */
 const REGLA_DE_PRECIOS: Record<ModoDeDarPrecios, string> = {
   siempre:
-    "Di el precio de cada servicio la primera vez que lo ofrezcas o lo confirmes. Vale el de aquí aunque la información del negocio diga otro. Si un servicio está «sin precio», no lo inventes: dile que ese precio se lo confirma el negocio.",
+    "Di el precio de cada servicio la primera vez que lo ofrezcas o lo confirmes. Vale el de aquí aunque la información del negocio diga otro. Si un servicio está «sin precio», no lo inventes: cuenta cómo se fija si la información del negocio lo explica, sin dar una cifra que no esté escrita; si no, dile que ese precio se lo confirma el negocio.",
   si_preguntan:
-    "Di el precio de un servicio solo si el cliente pregunta cuánto cuesta. Vale el de aquí aunque la información del negocio diga otro. Si un servicio está «sin precio», no lo inventes: dile que ese precio se lo confirma el negocio.",
+    "Di el precio de un servicio solo si el cliente pregunta cuánto cuesta. Vale el de aquí aunque la información del negocio diga otro. Si un servicio está «sin precio», no lo inventes: cuenta cómo se fija si la información del negocio lo explica, sin dar una cifra que no esté escrita; si no, dile que ese precio se lo confirma el negocio.",
   nunca:
     "Este negocio no da precios: si preguntan cuánto cuesta algo, dile que ese precio se lo confirma el negocio.",
 };
