@@ -723,6 +723,64 @@ describe("PATCH /business/me (móvil del dueño para WhatsApp)", () => {
     expect(response.statusCode).toBe(400);
     expect(response.json().code).toBe("OWNER_WHATSAPP_IS_ALHABLA");
   });
+
+  // «Dar precios» (2026-10-20): como el resto de «Cómo atiende», cambia el
+  // prompt y resincroniza el assistant.
+  it("«Dar precios» se guarda, rehace la copia del prompt y resincroniza el assistant", async () => {
+    const response = await patch({
+      agentSettings: { ...DEFAULT_AGENT_SETTINGS, darPrecios: "nunca" },
+    });
+
+    expect(response.statusCode).toBe(200);
+    const updateData = mockedBusinessUpdate.mock.calls[0][0].data as Record<
+      string,
+      unknown
+    >;
+    expect(updateData.agentSettings).toMatchObject({ darPrecios: "nunca" });
+    expect(updateData.systemPrompt).toContain("No des precios");
+    expect(mockedSyncTelnyx).toHaveBeenCalledWith("biz_1");
+  });
+
+  it("«Dar precios» con un valor que no existe es un 400 y no guarda nada", async () => {
+    const response = await patch({
+      agentSettings: { ...DEFAULT_AGENT_SETTINGS, darPrecios: "a_veces" },
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(mockedBusinessUpdate).not.toHaveBeenCalled();
+  });
+
+  it("la copia del prompt ofrece el recordatorio por WhatsApp solo si el plan lo manda", async () => {
+    mockedBusinessFindUnique.mockResolvedValue({
+      name: "Peluquería Test",
+      businessDetails: null,
+      agentSettings: null,
+      timezone: "Europe/Madrid",
+      plan: "pro",
+      stripePriceId: null,
+    } as any);
+    await patch({ agentSettings: DEFAULT_AGENT_SETTINGS });
+    expect(
+      (mockedBusinessUpdate.mock.calls[0][0].data as { systemPrompt: string })
+        .systemPrompt
+    ).toContain("la confirmación y un recordatorio por WhatsApp");
+
+    mockedBusinessUpdate.mockClear();
+    mockedBusinessFindUnique.mockResolvedValue({
+      name: "Peluquería Test",
+      businessDetails: null,
+      agentSettings: null,
+      timezone: "Europe/Madrid",
+      plan: "basic",
+      stripePriceId: null,
+    } as any);
+    await patch({ agentSettings: DEFAULT_AGENT_SETTINGS });
+    const enInicio = (
+      mockedBusinessUpdate.mock.calls[0][0].data as { systemPrompt: string }
+    ).systemPrompt;
+    expect(enInicio).toContain("le envías la confirmación por WhatsApp");
+    expect(enInicio).not.toContain("un recordatorio por WhatsApp");
+  });
 });
 
 describe("idiomas de la recepcionista en el panel", () => {

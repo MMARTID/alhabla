@@ -31,6 +31,9 @@ export interface ContextoDelPrompt {
   maxAppointmentDurationMinutes?: number | null;
   /** ¿Está aprobada la plantilla `hueco_libre`? Ver buildManagedAgentPrompt. */
   listaDeEspera: boolean;
+  /** ¿Incluye el plan el recordatorio por WhatsApp (`recordatorios_cita`)?
+   * Ver buildManagedAgentPrompt. */
+  recordatorioPorWhatsapp: boolean;
   /** `Business.hideOwnerNumberFromClients`. */
   ocultarNumero: boolean;
   transferenciaAlDueno?: TransferenciaAlDueno | null;
@@ -236,6 +239,46 @@ function seccionCatalogo(): Parrafos {
   ];
 }
 
+/** Con «Nunca», lo que ofrece a quien pregunta un precio: lo mismo que su
+ * forma de escalar (ESCALATION_INSTRUCTIONS). */
+const OFERTA_SIN_PRECIO: Record<AgentSettings["escalation"], string> = {
+  take_message: "ofrécele dejar un recado para que se lo confirmen",
+  request_callback: "ofrécele que le llamen para confirmárselo",
+};
+
+/** Lo que vale para «Siempre» y «Si se lo preguntan». */
+const PRECIOS_DEL_CATALOGO =
+  "El precio de cada servicio solo lo sabes por get_catalog, que lo da junto a su duración; si la información del negocio dice otro, vale el de get_catalog. Si un servicio viene sin precio, no lo inventes ni lo calcules: si la información del negocio explica cómo se fija (por ejemplo, «desde» o «con presupuesto»), cuéntalo tal cual, sin dar una cifra que no esté escrita; si no dice nada, dile que ese precio no lo tienes y que se lo confirma el negocio. Si pide varios servicios, puedes darle el precio de cada uno; si le das el total, que sea la suma exacta de esos precios. Di los precios como se dicen en España: 18 € es «dieciocho euros» y 12,50 €, «doce euros con cincuenta».";
+
+/**
+ * «## Precios» según «Dar precios» (`AgentSettings.darPrecios`, decisión
+ * del dueño del producto del 2026-10-20). Hasta entonces get_catalog no
+ * llevaba el precio y la recepcionista no lo daba nunca, aunque la web y el
+ * Gestor lo prometían. Con «Nunca», get_catalog tampoco lo lleva
+ * (executeGetCatalog en modules/voiceTools/service.ts) y su respuesta
+ * repite la regla, por si el prompt del assistant aún no está al día.
+ * Sin medir por chat todavía: no hay laboratorio de esta sección.
+ */
+function seccionPrecios({ settings }: ContextoDelPrompt): Parrafos {
+  switch (settings.darPrecios) {
+    case "siempre":
+      return [
+        "## Precios",
+        `Di el precio de cada servicio la primera vez que lo ofrezcas o lo confirmes, aunque no te lo pregunten; no hace falta repetirlo después. ${PRECIOS_DEL_CATALOGO}`,
+      ];
+    case "nunca":
+      return [
+        "## Precios",
+        `No des precios, ni aproximados ni de la información del negocio. Si preguntan cuánto cuesta algo, dile que ese precio se lo confirma el negocio y ${OFERTA_SIN_PRECIO[settings.escalation]}; después sigue con lo que necesite.`,
+      ];
+    default:
+      return [
+        "## Precios",
+        `Di el precio de un servicio solo si el cliente pregunta cuánto cuesta; si no lo pregunta, no lo menciones. ${PRECIOS_DEL_CATALOGO}`,
+      ];
+  }
+}
+
 function seccionLimites({ settings, businessType }: ContextoDelPrompt): Parrafos {
   return [
     "## Límites",
@@ -259,7 +302,13 @@ function seccionReserva(contexto: ContextoDelPrompt): Parrafos {
     "1. Datos. Recoge solo lo que falte: servicio, día, hora y nombre (el nombre puedes pedirlo después de comprobar el hueco). No preguntes con quién quiere la cita: si nombra a alguien, respétalo; si no, el sistema la asigna a quien mejor hace ese servicio. No pidas correo. Para el teléfono vale el número desde el que llama ({{user_number}}): pide otro solo si el cliente lo prefiere o si book_appointment te lo pide (por ejemplo, porque llama con número oculto). La duración es un dato interno de get_catalog: no la preguntes, y menciónala solo si pasa de 80 minutos o si te preguntan cuánto dura. Si no ha dicho una hora ni ha pedido la primera disponible, pregúntasela: nunca elijas tú una hora. Si le da igual el servicio ('lo que sea', 'el primer hueco que tengáis'), no le obligues a elegir: busca con la duración del servicio más corto de get_catalog, sin servicio concreto, y aclara el servicio al reservar.",
     buildRestrictionsFragment(contexto),
     "2. Hueco. Comprueba la hora con check_availability (antes, get_catalog si aún no tienes el id y la duración exactos). Si available es true, guarda su availabilityToken. Si es false y trae suggestedNextSlot con availabilityToken, esa alternativa ya está comprobada: ofrécela; sin alternativa, pide otro día o franja. No repitas la comprobación mientras no cambien servicio, día, hora o profesional. Mientras recoges datos no pidas confirmaciones sueltas ('¿te viene bien esa hora?', '¿confirmo con Marta?').",
-    "3. Confirmación y WhatsApp. Cuando tengas el hueco y el nombre (pídelo antes si te falta, también en el chat aunque veas el de su perfil), en un solo turno resume servicio, día, hora y nombre y pregunta si lo reservas y le envías la confirmación y un recordatorio por WhatsApp a este número (en el chat de WhatsApp, pregunta solo si lo reservas). Un sí claro confirma las dos cosas (smsConsent true). Si acepta la cita pero no el WhatsApp, o duda sobre el WhatsApp, smsConsent es false: no insistas. Si no queda claro si acepta la cita, pregunta solo eso. Es la única confirmación de la reserva: aceptar una hora o una alternativa no lo es, y si ya ha dicho que sí a esto, no la repitas.",
+    // El recordatorio solo en los planes que lo mandan (`recordatorios_cita`,
+    // programarMensajesAlCliente): antes el plan Inicio también lo prometía.
+    `3. Confirmación y WhatsApp. Cuando tengas el hueco y el nombre (pídelo antes si te falta, también en el chat aunque veas el de su perfil), en un solo turno resume servicio, día, hora y nombre y pregunta si lo reservas y le envías ${
+      contexto.recordatorioPorWhatsapp
+        ? "la confirmación y un recordatorio"
+        : "la confirmación"
+    } por WhatsApp a este número (en el chat de WhatsApp, pregunta solo si lo reservas). Un sí claro confirma las dos cosas (smsConsent true). Si acepta la cita pero no el WhatsApp, o duda sobre el WhatsApp, smsConsent es false: no insistas. Si no queda claro si acepta la cita, pregunta solo eso. Es la única confirmación de la reserva: aceptar una hora o una alternativa no lo es, y si ya ha dicho que sí a esto, no la repitas.`,
     "4. Reserva. Con su sí, usa book_appointment con su nombre en clientName (nunca vacío: si aún no lo tienes, pídelo antes) y el availabilityToken de la opción aceptada. Da la cita por hecha solo si devuelve éxito; si te pide un dato (nombre o teléfono), pídeselo y vuelve a llamarla; si falla por otra cosa, explícalo en una frase y escala.",
     // Se dice «de Alhabla», no «de un contacto llamado Alhabla Reservas»: el
     // nombre visible sigue en revisión en Meta y el cliente puede ver solo
@@ -425,6 +474,7 @@ export const SECCIONES_DEL_PROMPT: readonly Seccion[] = [
   seccionCliente,
   seccionGrabacion,
   seccionCatalogo,
+  seccionPrecios,
   seccionLimites,
   seccionReserva,
   seccionProfesionales,

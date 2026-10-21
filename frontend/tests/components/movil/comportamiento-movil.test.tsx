@@ -790,3 +790,61 @@ describe("ComportamientoMovil — la voz", () => {
     pause.mockRestore();
   });
 });
+
+// «Dar precios» (2026-10-20): la recepcionista da el precio del catálogo
+// siempre, si se lo preguntan (por defecto) o nunca.
+describe("ComportamientoMovil — dar precios", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(getBillingSummary).mockResolvedValue({ planFeatures: [] } as never);
+    vi.mocked(getCatalogoDeIdiomas).mockResolvedValue(CATALOGO_DE_IDIOMAS);
+    vi.mocked(previsualizarIdiomas).mockImplementation(async (seleccion) => vistaPrevia(seleccion, false));
+  });
+
+  const precios = () => screen.getByRole("radiogroup", { name: "Dar precios" });
+  const opcionDePrecio = (nombre: string) =>
+    within(precios()).getByRole("radio", { name: new RegExp(`^${nombre}`) });
+
+  it("ofrece las tres opciones con su ayuda, y por defecto «Si se lo preguntan»", () => {
+    renderizar();
+
+    expect(within(precios()).getAllByRole("radio").map((opcion) => opcion.textContent)).toEqual([
+      "SiempreLo dice al ofrecer o confirmar un servicio",
+      "Si se lo preguntanSolo cuando el cliente pregunta cuánto cuesta",
+      "NuncaDice que el precio lo confirma el negocio",
+    ]);
+    expect(opcionDePrecio("Si se lo preguntan")).toHaveAttribute("aria-checked", "true");
+    expect(
+      screen.getByText("Usa el precio de cada servicio de tu catálogo. Si un servicio no tiene precio, no se lo inventa.")
+    ).toBeInTheDocument();
+  });
+
+  it("un negocio de un backend anterior, sin el ajuste, sale en «Si se lo preguntan» sin nada que guardar", () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const sinElAjuste: Partial<AgentSettings> = { ...DEFAULT_AGENT_SETTINGS };
+    delete sinElAjuste.darPrecios;
+    render(
+      <QueryClientProvider client={queryClient}>
+        <ComportamientoMovil business={{ id: "biz_1", agentSettings: sinElAjuste } as Business} />
+      </QueryClientProvider>
+    );
+
+    expect(opcionDePrecio("Si se lo preguntan")).toHaveAttribute("aria-checked", "true");
+    expect(screen.queryByRole("button", { name: /Guardar/ })).toBeNull();
+  });
+
+  it("elegir «Nunca» enseña el guardado y lo guarda con el resto de ajustes", async () => {
+    const user = userEvent.setup();
+    vi.mocked(updateMyBusiness).mockResolvedValue({ id: "biz_1" } as never);
+    renderizar({ darPrecios: "siempre", tone: "direct" });
+
+    expect(opcionDePrecio("Siempre")).toHaveAttribute("aria-checked", "true");
+    await user.click(opcionDePrecio("Nunca"));
+    expect(opcionDePrecio("Nunca")).toHaveAttribute("aria-checked", "true");
+    await user.click(screen.getByRole("button", { name: /Guardar/ }));
+
+    expect(updateMyBusiness).toHaveBeenCalledWith({
+      agentSettings: expect.objectContaining({ darPrecios: "nunca", tone: "direct" }),
+    });
+  });
+});

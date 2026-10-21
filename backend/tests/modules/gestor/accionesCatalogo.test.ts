@@ -393,10 +393,86 @@ describe("editar_servicio / retirar_servicio", () => {
     );
     expect(r).toEqual({
       ok: true,
-      mensaje: "Hecho: Corte, 30 min, sin precio.",
+      mensaje:
+        "Hecho: Corte, 30 min, sin precio. Si preguntan el precio, la recepcionista dirá que se lo confirmáis vosotros.",
       nota: "Servicio Corte (id svc_corte) actualizado: 30 min, sin precio.",
     });
     expect(mockedSync).toHaveBeenCalledTimes(1);
+  });
+
+  // «Dar precios» (2026-10-20): antes la web contaba «La recepcionista ya lo
+  // dice así por teléfono» y la recepcionista no daba ningún precio.
+  describe("lo que dice del precio según «Dar precios»", () => {
+    async function cambiarPrecio(agentSettings: unknown, precioEuros = 18) {
+      mockedBizFindUnique.mockResolvedValue({ agentSettings } as never);
+      mockedUpdateService.mockResolvedValueOnce({
+        id: "svc_corte",
+        name: "Corte",
+        durationMinutes: 30,
+        priceCents: Math.round(precioEuros * 100),
+      } as never);
+      return ejecutar("editar_servicio", { servicio: "corte", precioEuros });
+    }
+
+    it("«Siempre»: ya lo dice así por teléfono", async () => {
+      expect((await cambiarPrecio({ darPrecios: "siempre" })).mensaje).toBe(
+        "Hecho: Corte, 30 min, 18 €. La recepcionista ya lo dice así por teléfono."
+      );
+    });
+
+    it("«Si se lo preguntan», también sin el ajuste guardado", async () => {
+      const esperado =
+        "Hecho: Corte, 30 min, 12,50 €. La recepcionista ya lo dice así si se lo preguntan.";
+      expect(
+        (await cambiarPrecio({ darPrecios: "si_preguntan" }, 12.5)).mensaje
+      ).toBe(esperado);
+      expect((await cambiarPrecio(null, 12.5)).mensaje).toBe(esperado);
+    });
+
+    it("«Nunca»: no promete que lo diga", async () => {
+      const r = await cambiarPrecio({ darPrecios: "nunca" });
+      expect(r.mensaje).toBe(
+        "Hecho: Corte, 30 min, 18 €. La recepcionista no da precios: lo tienes en «Nunca» en Cómo atiende."
+      );
+      expect(r.mensaje).not.toContain("ya lo dice");
+    });
+
+    it("sin cambio de precio no habla de precios", async () => {
+      mockedBizFindUnique.mockResolvedValue({
+        agentSettings: { darPrecios: "nunca" },
+      } as never);
+      mockedUpdateService.mockResolvedValueOnce({
+        id: "svc_corte",
+        name: "Corte",
+        durationMinutes: 45,
+        priceCents: 1500,
+      } as never);
+      const r = await ejecutar("editar_servicio", {
+        servicio: "corte",
+        duracionMinutos: 45,
+      });
+      expect(r.mensaje).toBe("Hecho: Corte, 45 min, 15 €.");
+    });
+
+    it("si no puede leer el ajuste, el cambio sigue hecho y lo registra", async () => {
+      mockedBizFindUnique.mockRejectedValue(new Error("Postgres caído"));
+      mockedUpdateService.mockResolvedValueOnce({
+        id: "svc_corte",
+        name: "Corte",
+        durationMinutes: 30,
+        priceCents: 1800,
+      } as never);
+      const r = await ejecutar("editar_servicio", {
+        servicio: "corte",
+        precioEuros: 18,
+      });
+      expect(r).toMatchObject({ ok: true, mensaje: "Hecho: Corte, 30 min, 18 €." });
+      expect(console.error).toHaveBeenCalledWith(
+        expect.stringContaining(
+          "[Gestor] editar_servicio del negocio biz_1: precio guardado, pero no se pudo leer «Dar precios»"
+        )
+      );
+    });
   });
 
   it("retirar borra (lógico) y avisa de que las citas se mantienen", async () => {

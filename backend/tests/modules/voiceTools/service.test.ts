@@ -888,7 +888,7 @@ describe("executeVoiceTool — catálogo y token de disponibilidad", () => {
 
   it("devuelve el catálogo bajo demanda, sin incluirlo en cada llamada", async () => {
     mockedServiceFindMany.mockResolvedValue([
-      { id: "service_123", name: "Corte", durationMinutes: 30 },
+      { id: "service_123", name: "Corte", durationMinutes: 30, priceCents: 1800 },
     ] as any);
     mockedProfessionalFindMany.mockResolvedValue([
       { id: "professional_123", name: "Ana" },
@@ -900,8 +900,100 @@ describe("executeVoiceTool — catálogo y token de disponibilidad", () => {
       params: {},
     });
 
-    expect(result.result.services).toContain("[service_123] Corte (30 min)");
+    expect(result.result.services).toContain(
+      "[service_123] Corte (30 min, 18 €)"
+    );
     expect(result.result.professionals).toContain("[professional_123] Ana");
+    expect(mockedServiceFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        select: expect.objectContaining({ priceCents: true }),
+      })
+    );
+  });
+
+  describe("«Dar precios» (AgentSettings.darPrecios)", () => {
+    const SERVICIOS = [
+      { id: "svc_corte", name: "Corte", durationMinutes: 30, priceCents: 1800 },
+      { id: "svc_color", name: "Color", durationMinutes: 90, priceCents: 1250 },
+      { id: "svc_barba", name: "Barba", durationMinutes: 20, priceCents: null },
+    ];
+
+    async function catalogoCon(agentSettings: unknown) {
+      // Sin la caché de voz de la vuelta anterior: se lee de la BD.
+      reiniciarAlmacenEnMemoria();
+      mockedBusinessFindUnique.mockResolvedValue(
+        buildBusiness({ agentSettings }) as any
+      );
+      mockedServiceFindMany.mockResolvedValue(SERVICIOS as any);
+      mockedProfessionalFindMany.mockResolvedValue([] as any);
+      const result = await executeVoiceTool({
+        businessId: "business_123",
+        toolName: "get_catalog",
+        params: {},
+      });
+      return result.result as { services: string; precios: string };
+    }
+
+    it("«Siempre»: cada servicio con su precio y la regla de decirlo al ofrecerlo", async () => {
+      const catalogo = await catalogoCon({ darPrecios: "siempre" });
+
+      expect(catalogo.services).toBe(
+        [
+          "[svc_corte] Corte (30 min, 18 €)",
+          "[svc_color] Color (90 min, 12,50 €)",
+          "[svc_barba] Barba (20 min, sin precio)",
+        ].join("\n")
+      );
+      expect(catalogo.precios).toContain(
+        "la primera vez que lo ofrezcas o lo confirmes"
+      );
+      expect(catalogo.precios).toContain("«sin precio», no lo inventes");
+    });
+
+    it("«Si se lo preguntan»: los precios, pero solo para cuando pregunte", async () => {
+      const catalogo = await catalogoCon({ darPrecios: "si_preguntan" });
+
+      expect(catalogo.services).toContain("[svc_corte] Corte (30 min, 18 €)");
+      expect(catalogo.services).toContain(
+        "[svc_barba] Barba (20 min, sin precio)"
+      );
+      expect(catalogo.precios).toContain(
+        "solo si el cliente pregunta cuánto cuesta"
+      );
+      // Si «Información para responder» trae otro precio, manda el catálogo.
+      expect(catalogo.precios).toContain(
+        "Vale el de aquí aunque la información del negocio diga otro."
+      );
+    });
+
+    it("«Nunca»: el precio no llega a la llamada", async () => {
+      const catalogo = await catalogoCon({ darPrecios: "nunca" });
+
+      expect(catalogo.services).toBe(
+        [
+          "[svc_corte] Corte (30 min)",
+          "[svc_color] Color (90 min)",
+          "[svc_barba] Barba (20 min)",
+        ].join("\n")
+      );
+      expect(catalogo.services).not.toContain("€");
+      expect(catalogo.services).not.toContain("sin precio");
+      expect(catalogo.precios).toBe(
+        "Este negocio no da precios: si preguntan cuánto cuesta algo, dile que ese precio se lo confirma el negocio."
+      );
+    });
+
+    it("un negocio sin el ajuste (o una caché anterior a él) da el precio si se lo preguntan", async () => {
+      for (const agentSettings of [undefined, null, { tone: "warm" }]) {
+        const catalogo = await catalogoCon(agentSettings);
+        expect(catalogo.services).toContain(
+          "[svc_corte] Corte (30 min, 18 €)"
+        );
+        expect(catalogo.precios).toContain(
+          "solo si el cliente pregunta cuánto cuesta"
+        );
+      }
+    });
   });
 
   it("el catálogo dice cuándo no está cada profesional (ausencias del Gestor)", async () => {

@@ -2,10 +2,13 @@ import { describe, it, expect } from "vitest";
 import {
   AgentSettingsSchema,
   buildManagedAgentPrompt,
+  modoDeDarPrecios,
   parseAgentSettings,
   DEFAULT_AGENT_SETTINGS,
   TITULO_DEL_BLOQUE_DEL_CATALOGO,
+  type AgentSettings,
 } from "../../src/lib/managedAgentPrompt.js";
+import { recordatorioIncluido } from "../../src/lib/planFeatures.js";
 import { idiomasQueHabla } from "../../src/lib/idiomas/catalogo.js";
 
 describe("buildManagedAgentPrompt", () => {
@@ -986,5 +989,172 @@ describe("buildManagedAgentPrompt — chat por WhatsApp (fase 2)", () => {
       "Al reservar pregúntale su nombre antes de ofrecerle reservar, aunque su perfil de WhatsApp muestre uno, y no preguntes por el WhatsApp"
     );
     expect(prompt).toContain("En el chat no hay saludo del sistema");
+  });
+});
+
+// «Dar precios» (decisión del dueño del producto del 2026-10-20): hasta
+// entonces get_catalog no llevaba el precio y el prompt solo decía «No
+// inventes precios».
+describe("buildManagedAgentPrompt — «Dar precios»", () => {
+  const conPrecios = (
+    darPrecios: AgentSettings["darPrecios"],
+    escalation: AgentSettings["escalation"] = "take_message"
+  ) =>
+    buildManagedAgentPrompt({
+      businessName: "Peluquería Ejemplo",
+      settings: { ...DEFAULT_AGENT_SETTINGS, darPrecios, escalation },
+    });
+  const seccion = (prompt: string) => {
+    const inicio = prompt.indexOf("## Precios");
+    return prompt.slice(inicio, prompt.indexOf("\n\n## ", inicio + 1));
+  };
+
+  it("va justo detrás de «Lo que ofrece el negocio» y conserva «No inventes precios»", () => {
+    for (const modo of ["siempre", "si_preguntan", "nunca"] as const) {
+      const prompt = conPrecios(modo);
+      expect(prompt.indexOf("## Precios")).toBeGreaterThan(
+        prompt.indexOf(TITULO_DEL_BLOQUE_DEL_CATALOGO)
+      );
+      expect(prompt.indexOf("## Precios")).toBeLessThan(
+        prompt.indexOf("## Límites")
+      );
+      expect(prompt).toContain("No inventes precios");
+    }
+  });
+
+  it("«Siempre»: lo dice al ofrecer o confirmar, del catálogo y sin inventar los que no tiene", () => {
+    const texto = seccion(conPrecios("siempre"));
+    expect(texto).toContain(
+      "Di el precio de cada servicio la primera vez que lo ofrezcas o lo confirmes, aunque no te lo pregunten"
+    );
+    expect(texto).toContain("solo lo sabes por get_catalog");
+    expect(texto).toContain(
+      "si la información del negocio dice otro, vale el de get_catalog"
+    );
+    expect(texto).toContain(
+      "Si un servicio viene sin precio, no lo inventes ni lo calcules"
+    );
+    // Sin precio en el catálogo vale lo que el negocio explica de cómo se
+    // fija («con presupuesto»), nunca una cifra que no esté escrita.
+    expect(texto).toContain("cuéntalo tal cual, sin dar una cifra que no esté escrita");
+    expect(texto).toContain("se lo confirma el negocio");
+    expect(texto).toContain("que sea la suma exacta de esos precios");
+    expect(texto).toContain("«dieciocho euros»");
+    expect(texto).not.toContain("solo si el cliente pregunta");
+  });
+
+  it("«Si se lo preguntan»: solo cuando pregunte cuánto cuesta", () => {
+    const texto = seccion(conPrecios("si_preguntan"));
+    expect(texto).toContain(
+      "Di el precio de un servicio solo si el cliente pregunta cuánto cuesta; si no lo pregunta, no lo menciones."
+    );
+    expect(texto).toContain("solo lo sabes por get_catalog");
+    expect(texto).toContain("no lo inventes ni lo calcules");
+    expect(texto).not.toContain("aunque no te lo pregunten");
+  });
+
+  it("«Nunca»: no da ninguno y ofrece lo de su forma de escalar", () => {
+    const recado = seccion(conPrecios("nunca", "take_message"));
+    expect(recado).toBe(
+      "## Precios\n\nNo des precios, ni aproximados ni de la información del negocio. Si preguntan cuánto cuesta algo, dile que ese precio se lo confirma el negocio y ofrécele dejar un recado para que se lo confirmen; después sigue con lo que necesite."
+    );
+    expect(seccion(conPrecios("nunca", "request_callback"))).toContain(
+      "ofrécele que le llamen para confirmárselo"
+    );
+    expect(recado).not.toContain("get_catalog");
+  });
+
+  it("un negocio sin el ajuste guardado da el precio si se lo preguntan", () => {
+    const guardadosAntes = {
+      version: 1,
+      tone: "direct",
+      primaryGoal: "bookings",
+      responseStyle: "concise",
+      escalation: "take_message",
+    };
+    expect(parseAgentSettings(guardadosAntes).darPrecios).toBe("si_preguntan");
+    expect(parseAgentSettings(guardadosAntes).tone).toBe("direct");
+    expect(DEFAULT_AGENT_SETTINGS.darPrecios).toBe("si_preguntan");
+    expect(
+      buildManagedAgentPrompt({
+        businessName: "Peluquería Ejemplo",
+        settings: guardadosAntes,
+      })
+    ).toContain("solo si el cliente pregunta cuánto cuesta");
+    // Sin agentSettings, también.
+    expect(
+      buildManagedAgentPrompt({
+        businessName: "Peluquería Ejemplo",
+        settings: null,
+      })
+    ).toContain("solo si el cliente pregunta cuánto cuesta");
+  });
+
+  it("un valor que no existe solo se pierde él", () => {
+    const parsed = parseAgentSettings({
+      ...DEFAULT_AGENT_SETTINGS,
+      tone: "professional",
+      darPrecios: "a_veces",
+    });
+    expect(parsed.darPrecios).toBe("si_preguntan");
+    expect(parsed.tone).toBe("professional");
+    expect(modoDeDarPrecios({ darPrecios: "a_veces" })).toBe("si_preguntan");
+    expect(modoDeDarPrecios({ darPrecios: "nunca" })).toBe("nunca");
+    expect(modoDeDarPrecios(undefined)).toBe("si_preguntan");
+  });
+
+  it("el PATCH valida el ajuste: acepta los tres y rechaza otro", () => {
+    for (const darPrecios of ["siempre", "si_preguntan", "nunca"]) {
+      expect(
+        AgentSettingsSchema.safeParse({ ...DEFAULT_AGENT_SETTINGS, darPrecios })
+          .success
+      ).toBe(true);
+    }
+    expect(
+      AgentSettingsSchema.safeParse({
+        ...DEFAULT_AGENT_SETTINGS,
+        darPrecios: "a_veces",
+      }).success
+    ).toBe(false);
+  });
+});
+
+// El recordatorio por WhatsApp es de Pro y Scale (recordatorios_cita en
+// planFeatures.ts): en Inicio la recepcionista lo ofrecía y no salía.
+describe("buildManagedAgentPrompt — recordatorio por WhatsApp según el plan", () => {
+  it("sin recordatorio en el plan, ofrece solo la confirmación", () => {
+    const prompt = buildManagedAgentPrompt({
+      businessName: "Barbería Ejemplo",
+      settings: DEFAULT_AGENT_SETTINGS,
+      recordatorioPorWhatsapp: false,
+    });
+    expect(prompt).toContain(
+      "pregunta si lo reservas y le envías la confirmación por WhatsApp a este número"
+    );
+    expect(prompt).not.toContain("un recordatorio por WhatsApp");
+  });
+
+  it("con él (o sin decir nada), la confirmación y el recordatorio", () => {
+    const conRecordatorio = buildManagedAgentPrompt({
+      businessName: "Barbería Ejemplo",
+      settings: DEFAULT_AGENT_SETTINGS,
+      recordatorioPorWhatsapp: true,
+    });
+    expect(conRecordatorio).toContain(
+      "le envías la confirmación y un recordatorio por WhatsApp a este número"
+    );
+    expect(
+      buildManagedAgentPrompt({
+        businessName: "Barbería Ejemplo",
+        settings: DEFAULT_AGENT_SETTINGS,
+      })
+    ).toBe(conRecordatorio);
+  });
+
+  it("recordatorioIncluido: Pro y Scale sí, Inicio y sin plan no", () => {
+    expect(recordatorioIncluido({ plan: "pro" })).toBe(true);
+    expect(recordatorioIncluido({ plan: "enterprise" })).toBe(true);
+    expect(recordatorioIncluido({ plan: "basic" })).toBe(false);
+    expect(recordatorioIncluido({})).toBe(false);
   });
 });

@@ -9,8 +9,8 @@ import type { TransferenciaAlDueno } from "../../src/lib/transferenciaAlDueno.js
 /**
  * Instantáneas del prompt gestionado completo en las combinaciones que lo
  * cambian: nicho, tono, objetivo, estilo, escalada, idiomas, restricciones,
- * lista de espera, privacidad del número, transferencia e información del
- * negocio. Son la red para reorganizar
+ * lista de espera, recordatorio, precios, privacidad del número,
+ * transferencia e información del negocio. Son la red para reorganizar
  * managedAgentPrompt.ts: cualquier carácter distinto cambia el
  * `telnyxConfigHash` y fuerza un updateAssistant en todos los agentes.
  * Actualizarlas solo a propósito.
@@ -87,6 +87,27 @@ const CASOS: Array<[string, Parameters<typeof buildManagedAgentPrompt>[0]]> = [
         origen: null,
         destino: null,
         activa: false,
+      },
+    },
+  ],
+  [
+    "salón de uñas que da siempre los precios, en un plan sin recordatorio",
+    {
+      businessName: "Uñas Sol",
+      businessType: "salon-de-unas",
+      settings: { ...DEFAULT_AGENT_SETTINGS, darPrecios: "siempre" },
+      recordatorioPorWhatsapp: false,
+    },
+  ],
+  [
+    "barbería que nunca da precios y pide que le llamen",
+    {
+      businessName: "Barbería Leo",
+      businessType: "barberia",
+      settings: {
+        ...DEFAULT_AGENT_SETTINGS,
+        darPrecios: "nunca",
+        escalation: "request_callback",
       },
     },
   ],

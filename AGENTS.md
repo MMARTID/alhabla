@@ -266,8 +266,9 @@ each page's image explicitly from its `openGraph`/`twitter` metadata.
   `OnboardingChecklist`, `WeeklySummary`, `UpcomingBookings` (the next 7 days of `Booking`s, not
   raw calendar events; refreshes every 5 min) and `RecentCalls`.
 - `BusinessHoursEditor` — Weekly schedule editor (up to 3 intervals per day), in `/agente`.
-- `AgentSettingsEditor` — Tone, goal, response style, escalation strategy, voice gender and
-  languages, in `/agente`.
+- `AgentSettingsEditor` — Tone, goal, response style, escalation strategy, «Dar precios», voice
+  gender and languages, in `/agente` (today `ComportamientoMovil`, «Cómo atiende», on mobile and
+  desktop).
 - `CallForwardingCard`, `TarjetasDeLinea`, `AjustesTelefono`, `PasarLlamadas`, `WhatsappDueno` —
   Customer line, forwarding, main number and the owner's mobile (see § Telefonía).
 - `ajustes/` — `MarcoDeAjustes` (header, tabs and shared data) and one `seccion-*` per tab:
@@ -1133,9 +1134,9 @@ hablando por el que elige `identificarRemitente`.
   `POST /webhooks/telnyx/gestor/:toolName` (`modules/webhooksTelnyx/routes.ts`): misma firma
   Ed25519 que las tools de voz; `modules/gestor/tools.ts › handleGestorToolInvocation` exige la cabecera del negocio
   (400 si falta o llega el placeholder sin resolver) y `role === "owner"` (403). Tools:
-  `contexto_negocio` (negocio, sector, zona, teléfonos, plan, servicios con precio en euros,
-  profesionales, horario, calendario operativo, `faltaPorConfigurar`, citas pendientes y
-  recados con sus ids), `listar_agenda({ dia: hoy|manana|AAAA-MM-DD })`, `resumen_llamadas({
+  `contexto_negocio` (negocio, sector, zona, teléfonos, plan, `recepcionistaDaPrecios`,
+  servicios con precio en euros, profesionales, horario, calendario operativo,
+  `faltaPorConfigurar`, citas pendientes y recados con sus ids), `listar_agenda({ dia: hoy|manana|AAAA-MM-DD })`, `resumen_llamadas({
   dias 1-31 })` (excluye las Call `whatsapp`, resultados traducidos) y `proponer_accion`.
 - **Regla de oro (`modules/gestor/acciones.ts`)**: el LLM nunca ejecuta. `proponer_accion`
   valida tipo y parámetros (Zod `.strict()` por tipo), comprueba que el recurso sea del negocio
@@ -1204,7 +1205,7 @@ hablando por el que elige `identificarRemitente`.
   `contexto_negocio`.
 - `contexto_negocio` devuelve además los niveles de cada profesional (`especialista`,
   `noSugerir` por nombre de servicio), `enlaces` (`panel`, `calendario` = `/agente`,
-  `ajustes`) y el estado del calendario con matices (`conectado` · `sin conectar` · `a medias:
+  `comoAtiende` = `/agente/comportamiento`, `ajustes`) y el estado del calendario con matices (`conectado` · `sin conectar` · `a medias:
   falta elegir el calendario` · `caducado`). **El calendario no se puede conectar desde el
   chat**: el OAuth exige la cookie de estado del navegador (`GET /calendar/auth/google` la fija
   en la misma respuesta) y un enlace abierto desde el móvil sin sesión acaba en `/login` sin
@@ -2053,7 +2054,9 @@ Telnyx assistant itself (MCP `ver_assistant_telnyx`), not only the DB.
   the `default` branch of `executeVoiceTool` (warning log, empty result) and `book_appointment`
   would still validate everything. `check_availability` also accepts an optional
   `professionalId` (copied from `get_catalog`; the prompt only sends it when the caller named
-  someone) to check that specific professional instead of "anyone free".
+  someone) to check that specific professional instead of "anyone free". `get_catalog` returns
+  each service with its duration and, unless «Dar precios» is `nunca`, its price («18 €», «sin
+  precio»), plus a `precios` rule (see § Agent Configuration › Agent Settings).
 - **Classification.** The three custom insights (`call_outcome`, `escalation_reason`,
   `tool_failure_detected`; ids in `TELNYX_INSIGHT_*_ID`, created by
   `scripts/createTelnyxCallInsights.ts`) arrive as `call.conversation_insights.generated` and
@@ -2687,6 +2690,8 @@ operativos o de auditoría creados por sus flujos específicos.
 - **Primary goal:** `bookings` / `customer_service` / `lead_capture`
 - **Response style:** `concise` / `balanced`
 - **Escalation:** `take_message` / `request_callback`
+- **Dar precios** (`darPrecios`, since 2026-10-20): `siempre` / `si_preguntan` / `nunca` → the
+  «## Precios» block right after «## Lo que ofrece el negocio» (see Agent Settings below)
 - **Niche instructions** (`NICHE_INSTRUCTIONS`, keyed by `BusinessType`) — one sentence per vertical about what to additionally ask when booking (e.g. peluquería asks the service type, fisioterapia asks the reason for the visit **in general terms only, no structured health data** — see below). Adding a vertical is one line here, not a code branch.
 
 The prompt includes:
@@ -2715,6 +2720,51 @@ generic `fields` array pattern as tone/goal/style/escalation — no registration
 The assistant's voice comes from `lib/idiomas/` (`resolverIdiomas`, below): the chosen voice
 (`AgentSettings.voz`) if it is one of the main language's, otherwise the first of its gender
 (`voiceGender`).
+
+**«Dar precios» (`AgentSettings.darPrecios`, desde el 2026-10-20, decisión del dueño del
+producto).** Hasta entonces la recepcionista no daba ningún precio: `get_catalog` no llevaba
+`Service.priceCents` y el prompt solo decía «No inventes precios» (que se queda, en «## Límites»).
+Tres valores (`MODOS_DE_DAR_PRECIOS` en `managedAgentPrompt.ts`), con `.default("si_preguntan")`
+como `voiceGender`: los negocios que ya existían quedan en «si se lo preguntan» sin migración
+(es un campo del JSON `Business.agentSettings`, no una columna). `parseAgentSettings` lo lee
+campo a campo (un valor que no existe vuelve al de por defecto sin tocar el resto) y
+`modoDeDarPrecios()` lo lee suelto para `get_catalog` y el Gestor.
+- **Prompt** (`seccionPrecios` en `seccionesDelPrompt.ts`): `siempre` = dice el precio la
+  primera vez que ofrece o confirma un servicio; `si_preguntan` = solo si el cliente pregunta
+  cuánto cuesta; las dos: el precio solo sale de `get_catalog` (si `businessDetails` trae otro,
+  manda el catálogo), un servicio «sin precio» no se inventa («ese precio no lo tengo, se lo
+  confirma el negocio»), varios servicios = el de cada uno y, si da total, la suma exacta, y se
+  dicen como en España («dieciocho euros», «doce euros con cincuenta»). `nunca` = no da
+  ninguno (tampoco los de `businessDetails`): «se lo confirma el negocio» y ofrece lo de su
+  `escalation` (recado o que le llamen). Sin medir por chat todavía.
+- **`get_catalog`** (`executeGetCatalog`): cada servicio como `[id] Corte (30 min, 18 €)` o
+  `(20 min, sin precio)`, con el precio de `lib/precio.ts › precioParaDecir` («18 €»,
+  «12,50 €», «15.000 €»; el mismo que usa el Gestor). Con `nunca` la línea va sin precio, así
+  que el precio no llega a la llamada. La respuesta trae además `precios`: la misma regla en
+  una frase, para que valga aunque el prompt del assistant aún no esté al día. El ajuste viaja
+  en la caché de voz (`BusinessVoiceConfig.agentSettings`; una entrada anterior sin él = el de
+  por defecto) y `PATCH /business/me` la invalida al cambiar `agentSettings`.
+- **Panel**: «Dar precios» en «Cómo atiende» (`comportamiento-movil.tsx`, el mismo en móvil y
+  escritorio), con «Usa el precio de cada servicio de tu catálogo. Si un servicio no tiene
+  precio, no se lo inventa.» Se guarda con el resto de `agentSettings`: resincroniza el prompt
+  como cualquier otro ajuste.
+- **Gestor**: `contexto_negocio` devuelve `negocio.recepcionistaDaPrecios` y
+  `enlaces.comoAtiende` (el ajuste se cambia en el panel, no por chat), y el «Hecho» de
+  `editar_servicio` con precio dice lo que hará la recepcionista («ya lo dice así por teléfono»,
+  «… si se lo preguntan» o «no da precios: lo tienes en «Nunca»»).
+- **Tras el deploy**: el cambio toca `managedAgentPrompt.ts`/`seccionesDelPrompt.ts`, así que
+  el workflow lanza `telnyx-reconciler` y todos los assistants reciben «## Precios» (el
+  `telnyxConfigHash` cambia en todos). Hasta entonces, `get_catalog` ya da los precios con su
+  regla.
+
+**Recordatorio por WhatsApp según el plan (desde el 2026-10-20).** El paso 3 de «## Reserva»
+ofrecía «la confirmación y un recordatorio por WhatsApp» también en Inicio, donde
+`programarMensajesAlCliente` no lo manda (`recordatorios_cita` es de Pro y Scale). Ahora
+`buildManagedAgentPrompt` recibe `recordatorioPorWhatsapp` (`recordatorioIncluido()` en
+`planFeatures.ts`, que calculan `telnyxAgentSync`, `PATCH /business/me` y `createBusinessAgent`
+con `plan`/`stripePriceId`) y sin él ofrece solo la confirmación. Como el prompt depende del
+plan, cada `customer.subscription.*` de Stripe llama a `syncAgentToTelnyx` (solo habla con
+Telnyx si el payload cambia).
 
 #### Idiomas de atención y voz en Telnyx (desde 2026-10-02)
 
