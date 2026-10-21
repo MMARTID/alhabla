@@ -6,6 +6,11 @@ import {
   leerClave,
 } from "../../lib/almacenTemporal.js";
 import { nombreParaElCliente } from "../../lib/nombreProfesional.js";
+import { precioParaDecir } from "../../lib/precio.js";
+import {
+  modoDeDarPrecios,
+  type ModoDeDarPrecios,
+} from "../../lib/managedAgentPrompt.js";
 import { esNombreDeClienteValido } from "../../lib/nombreDelCliente.js";
 import { guardarIdiomaDelCliente } from "../../lib/idiomaDelCliente.js";
 import {
@@ -95,6 +100,7 @@ import {
 import { buildCalendarIdempotencyKey } from "../../lib/calendarIdempotency.js";
 import { appUrl } from "../../lib/urls.js";
 import { guardarIntentoDeReservaFallido } from "../../lib/intentoDeReserva.js";
+import { describirAusencia } from "../bookings/ausencias.js";
 
 /** Lo que cada tool devuelve al orquestador: `result` va tal cual al LLM. */
 type ResultadoDeTool = { success: boolean; result?: Record<string, unknown> };
@@ -266,7 +272,15 @@ type BusinessVoiceConfig = FilaDeConexionDeCalendario & {
   // faltar en entradas de caché anteriores a estas columnas.
   callsSuspendedAt?: Date | string | null;
   paymentFailureSuspensionAt?: Date | string | null;
+  // De aquí sale «Dar precios» (modoDeDarPrecios), que decide si get_catalog
+  // lleva el precio. Puede faltar en entradas de caché anteriores: sin él,
+  // el de por defecto. PATCH /business/me invalida la caché al cambiarlo.
+  agentSettings?: unknown;
 };
+
+/** Lo que oye el cliente cuando el pago del negocio corta las reservas. */
+const MENSAJE_SERVICIO_SUSPENDIDO =
+  "No puedo agendar la cita en este momento. Por favor, contacta con el negocio directamente.";
 
 async function loadBusinessConfig(
   businessId: string
@@ -288,6 +302,7 @@ async function loadBusinessConfig(
       subscriptionStatus: true,
       callsSuspendedAt: true,
       paymentFailureSuspensionAt: true,
+      agentSettings: true,
     },
   });
 }
@@ -428,6 +443,24 @@ async function executeCheckAvailability(
       typeof params?.durationMinutes === "number" ? params.durationMinutes : 0;
     if (!isValidAppointmentDuration(durationMinutes)) {
       return invalidDurationResult();
+    }
+
+    // Si el pago corta el servicio, book_appointment va a rechazar la cita
+    // (SUBSCRIPTION_INACTIVE): no se ofrece una hora que no se va a poder
+    // reservar. Normalmente la llamada ni se contesta (selectTelnyxInboundAgent),
+    // pero la suscripción puede cancelarse con la llamada en curso.
+    if (servicioSuspendidoPorPago(business)) {
+      console.warn(
+        `[VoiceTools] ${callLabel} check_availability sin ofrecer horas: suscripción en estado ${business.subscriptionStatus} o servicio suspendido por impago`
+      );
+      return {
+        success: true,
+        result: {
+          available: false,
+          code: "SUBSCRIPTION_INACTIVE",
+          message: MENSAJE_SERVICIO_SUSPENDIDO,
+        },
+      };
     }
 
     // Antelación mínima, duración máxima y horizonte de 120 días: las mismas
@@ -746,24 +779,34 @@ async function executeCheckAvailability(
 
 const AUSENCIAS_LOOKAHEAD_MS = 60 * 24 * 60 * 60 * 1000;
 
-/** «del 3 al 7 de octubre» o «el 3 de octubre de 09:00 a 14:00», en la zona
- * del negocio, para el catálogo que lee el agente. */
-function describirAusencia(startsAt: Date, endsAt: Date, timezone: string): string {
-  const zona = timezone || "Europe/Madrid";
-  const dia = new Intl.DateTimeFormat("es-ES", { timeZone: zona, day: "numeric", month: "long" });
-  const horaMin = new Intl.DateTimeFormat("es-ES", { timeZone: zona, hour: "2-digit", minute: "2-digit", hour12: false });
-  // El fin es exclusivo: una ausencia de días enteros acaba a las 00:00 del
-  // día siguiente, que para el dueño es «hasta el 7».
-  const ultimoInstante = new Date(endsAt.getTime() - 60_000);
-  const diasEnteros = horaMin.format(startsAt) === "00:00" && horaMin.format(ultimoInstante) === "23:59";
-  const mismoDia = dia.format(startsAt) === dia.format(ultimoInstante);
-  if (diasEnteros) {
-    return mismoDia ? `el ${dia.format(startsAt)}` : `del ${dia.format(startsAt)} al ${dia.format(ultimoInstante)}`;
-  }
-  if (mismoDia) {
-    return `el ${dia.format(startsAt)} de ${horaMin.format(startsAt)} a ${horaMin.format(endsAt)}`;
-  }
-  return `desde el ${dia.format(startsAt)} a las ${horaMin.format(startsAt)} hasta el ${dia.format(endsAt)} a las ${horaMin.format(endsAt)}`;
+/** La regla de «Dar precios» en la respuesta de get_catalog: la misma que
+ * «## Precios» del prompt (seccionesDelPrompt.ts), para que valga aunque el
+ * prompt del assistant aún no esté al día (cambio de ajuste o deploy). */
+const REGLA_DE_PRECIOS: Record<ModoDeDarPrecios, string> = {
+  siempre:
+    "Di el precio de cada servicio la primera vez que lo ofrezcas o lo confirmes. Vale el de aquí aunque la información del negocio diga otro. Si un servicio está «sin precio», no lo inventes: cuenta cómo se fija si la información del negocio lo explica, sin dar una cifra que no esté escrita; si no, dile que ese precio se lo confirma el negocio.",
+  si_preguntan:
+    "Di el precio de un servicio solo si el cliente pregunta cuánto cuesta. Vale el de aquí aunque la información del negocio diga otro. Si un servicio está «sin precio», no lo inventes: cuenta cómo se fija si la información del negocio lo explica, sin dar una cifra que no esté escrita; si no, dile que ese precio se lo confirma el negocio.",
+  nunca:
+    "Este negocio no da precios: si preguntan cuánto cuesta algo, dile que ese precio se lo confirma el negocio.",
+};
+
+/** «[id] Corte (30 min, 18 €)»: con «Nunca», sin el precio, que así no
+ * llega a la llamada. */
+function lineaDelServicio(
+  service: {
+    id: string;
+    name: string;
+    durationMinutes: number;
+    priceCents: number | null;
+  },
+  darPrecios: ModoDeDarPrecios
+): string {
+  const precio =
+    darPrecios === "nunca"
+      ? ""
+      : `, ${precioParaDecir(service.priceCents) ?? "sin precio"}`;
+  return `[${service.id}] ${service.name} (${service.durationMinutes} min${precio})`;
 }
 
 async function executeGetCatalog(
@@ -772,10 +815,16 @@ async function executeGetCatalog(
 ): Promise<ResultadoDeTool> {
   try {
     const ahora = new Date();
+    const darPrecios = modoDeDarPrecios(business.agentSettings);
     const [services, professionals, ausencias] = await Promise.all([
       prisma.service.findMany({
         where: { businessId: business.id, active: true, deletedAt: null },
-        select: { id: true, name: true, durationMinutes: true },
+        select: {
+          id: true,
+          name: true,
+          durationMinutes: true,
+          priceCents: true,
+        },
         orderBy: { name: "asc" },
         take: MAX_CATALOG_ITEMS,
       }),
@@ -808,8 +857,11 @@ async function executeGetCatalog(
       success: true,
       result: {
         services: services.length
-          ? services.map((service) => `[${service.id}] ${service.name} (${service.durationMinutes} min)`).join("\n")
+          ? services
+              .map((service) => lineaDelServicio(service, darPrecios))
+              .join("\n")
           : "No hay servicios configurados.",
+        precios: REGLA_DE_PRECIOS[darPrecios],
         professionals: professionals.length
           ? professionals
               .map((professional) => {
@@ -1645,8 +1697,7 @@ async function executeBookAppointment(
       result: {
         success: false,
         code: "SUBSCRIPTION_INACTIVE",
-        message:
-          "No puedo agendar la cita en este momento. Por favor, contacta con el negocio directamente.",
+        message: MENSAJE_SERVICIO_SUSPENDIDO,
       },
     };
   }

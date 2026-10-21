@@ -4,6 +4,8 @@ import { errorMessage } from "../../lib/logUtils.js";
 import { timezoneOffsetMinutes } from "../../lib/voiceDateTime.js";
 import { formatScheduleForPrompt } from "../../lib/businessSchedule.js";
 import { resolvePlanId } from "../../lib/planFeatures.js";
+import { precioParaDecir } from "../../lib/precio.js";
+import { modoDeDarPrecios } from "../../lib/managedAgentPrompt.js";
 import {
   BUSINESS_TYPE_LABELS,
   isBusinessType,
@@ -90,6 +92,8 @@ const SELECT_NEGOCIO_DEL_GESTOR = {
   stripePriceId: true,
   subscriptionStatus: true,
   active: true,
+  // «Dar precios»: si la recepcionista dice los precios del catálogo.
+  agentSettings: true,
   calendarProvider: true,
   calendarConnections: SELECT_CONEXION_DE_CALENDARIO.calendarConnections,
   services: {
@@ -111,11 +115,20 @@ const SELECT_NEGOCIO_DEL_GESTOR = {
   },
 } as const;
 
+/** «18 €», «12,50 €» o «sin precio»: como lo dice la recepcionista. */
 function euros(priceCents: number | null): string {
-  if (priceCents === null) return "sin precio";
-  const euros = priceCents / 100;
-  return `${Number.isInteger(euros) ? euros : euros.toFixed(2).replace(".", ",")} €`;
+  return precioParaDecir(priceCents) ?? "sin precio";
 }
+
+/** «Dar precios» como se lo explica el Gestor al dueño. */
+const DAR_PRECIOS_PARA_EL_GESTOR: Record<
+  ReturnType<typeof modoDeDarPrecios>,
+  string
+> = {
+  siempre: "siempre: dice el precio al ofrecer o confirmar un servicio",
+  si_preguntan: "si se lo preguntan",
+  nunca: "nunca: dice que el precio lo confirma el negocio",
+};
 
 function hora(fecha: Date, timezone: string): string {
   return new Intl.DateTimeFormat("es-ES", {
@@ -280,6 +293,10 @@ async function contextoNegocio(businessId: string) {
         direccion: business.address,
         plan: resolvePlanId(business),
         suscripcion: business.subscriptionStatus ?? "sin suscripción",
+        // Se cambia desde el panel (Cómo atiende); el Gestor no lo toca.
+        recepcionistaDaPrecios: DAR_PRECIOS_PARA_EL_GESTOR[
+          modoDeDarPrecios(business.agentSettings)
+        ],
       },
       servicios: business.services.map((s) => ({
         servicioId: s.id,
@@ -315,6 +332,8 @@ async function contextoNegocio(businessId: string) {
       enlaces: {
         panel: panelUrl("/"),
         calendario: panelUrl("/agente"),
+        // «Cómo atiende» (tono, idioma, voz y «Dar precios»).
+        comoAtiende: panelUrl("/agente/comportamiento"),
         ajustes: panelUrl("/ajustes"),
       },
       citasPendientes,
@@ -402,6 +421,7 @@ async function listarAgenda(
       endsAt: { gt: limites.inicio },
     },
     select: {
+      id: true,
       startsAt: true,
       endsAt: true,
       reason: true,
@@ -414,6 +434,8 @@ async function listarAgenda(
       dia: limites.etiqueta,
       total: reservas.length,
       ausencias: ausencias.map((a) => ({
+        // Para proponer quitar_ausencia.
+        ausenciaId: a.id,
         profesional: a.professional.name,
         // Recortado al día consultado: una ausencia de una semana se lee
         // «todo el día» en cada uno de sus días.

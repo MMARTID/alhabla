@@ -39,6 +39,10 @@ import {
 import { proveedorDesdeErrorDeReconexion } from "../../adapters/calendar/errors.js";
 import { normalizarProveedorDeCalendario } from "../../adapters/calendar/CalendarProvider.js";
 import { cancelarReserva } from "../bookings/cancelacion.js";
+import {
+  describirAusencia,
+  quitarAusencia as quitarAusenciaDelNegocio,
+} from "../bookings/ausencias.js";
 import { estaDadoDeBaja } from "../whatsapp/bajas.js";
 import { guardarHorarioDelNegocio } from "../businesses/horario.js";
 import { formatearCita, nombreDeServicios } from "../whatsapp/avisosNegocio.js";
@@ -59,8 +63,8 @@ import { PREFIJO_DE_CALL_DEL_GESTOR } from "../../lib/citasDelDueno.js";
 /**
  * Acciones de agenda del Gestor (PLAN-CANAL-DUENO.md § 8, «Gestión de la
  * agenda»), fase 2 / PR 4: añadir, mover y cancelar citas en nombre de un
- * cliente, avisarle por WhatsApp, marcar ausencias de una persona del equipo
- * y bloquear tramos del negocio. Mismo registro que el catálogo: el LLM
+ * cliente, avisarle por WhatsApp, marcar y quitar ausencias de una persona
+ * del equipo y bloquear tramos del negocio. Mismo registro que el catálogo: el LLM
  * PROPONE con `proponer_accion`, el botón «Confirmar» ejecuta.
  *
  * Una cita creada desde aquí cuelga de una Call sintética
@@ -1508,6 +1512,160 @@ const marcarAusencia: AccionDelGestor<MarcarAusencia> = {
 };
 
 // ---------------------------------------------------------------------------
+// quitar_ausencia
+// ---------------------------------------------------------------------------
+
+/** El dueño señala la ausencia por su id (`ausenciaId` de listar_agenda) o
+ * por la persona (y, si tiene varias, por un día que cubra). Al proponer se
+ * normaliza a `{ ausencia: id }`: el botón actúa sobre esa fila y no sobre
+ * otra que se haya creado después. */
+const QuitarAusenciaParams = z
+  .object({
+    ausencia: Id.optional(),
+    profesional: Id.optional(),
+    fecha: Fecha.optional(),
+  })
+  .strict()
+  .refine(
+    (p) => p.ausencia !== undefined || p.profesional !== undefined,
+    "indica la ausencia (ausenciaId de listar_agenda) o la persona"
+  );
+
+type QuitarAusencia = z.infer<typeof QuitarAusenciaParams>;
+
+interface AusenciaGuardada {
+  id: string;
+  startsAt: Date;
+  endsAt: Date;
+  reason: string | null;
+  professional: { id: string; name: string };
+}
+
+const SELECT_AUSENCIA = {
+  id: true,
+  startsAt: true,
+  endsAt: true,
+  reason: true,
+  professional: { select: { id: true, name: true } },
+} as const;
+
+function textoDeAusenciaGuardada(a: AusenciaGuardada, timezone: string) {
+  return `${a.professional.name} ${describirAusencia(a.startsAt, a.endsAt, timezone)}${a.reason ? ` (${a.reason})` : ""}`;
+}
+
+async function resolverAusencia(
+  businessId: string,
+  timezone: string,
+  params: QuitarAusencia
+): Promise<
+  { ok: true; ausencia: AusenciaGuardada } | { ok: false; motivo: string }
+> {
+  const ahora = new Date();
+  if (params.ausencia) {
+    const encontrada = await prisma.professionalAbsence.findFirst({
+      where: { id: params.ausencia, businessId },
+      select: SELECT_AUSENCIA,
+    });
+    if (!encontrada) {
+      return { ok: false, motivo: "No existe esa ausencia en este negocio." };
+    }
+    if (encontrada.endsAt.getTime() <= ahora.getTime()) {
+      return { ok: false, motivo: "Esa ausencia ya ha pasado." };
+    }
+    return { ok: true, ausencia: encontrada };
+  }
+  const r = await resolverProfesional(businessId, params.profesional ?? "");
+  if (!r.ok) return r;
+  const candidatas = await prisma.professionalAbsence.findMany({
+    where: {
+      businessId,
+      professionalId: r.profesional.id,
+      endsAt: { gt: ahora },
+      ...(params.fecha
+        ? {
+            startsAt: {
+              lt: instanteLocal(timezone, sumarDias(params.fecha, 1), "00:00"),
+            },
+          }
+        : {}),
+    },
+    orderBy: { startsAt: "asc" },
+    take: 10,
+    select: SELECT_AUSENCIA,
+  });
+  const dia = params.fecha
+    ? candidatas.filter(
+        (a) =>
+          a.endsAt.getTime() >
+          instanteLocal(timezone, params.fecha!, "00:00").getTime()
+      )
+    : candidatas;
+  if (dia.length === 0) {
+    return {
+      ok: false,
+      motivo: params.fecha
+        ? `${r.profesional.name} no tiene ninguna ausencia el ${fechaLarga(params.fecha)}.`
+        : `${r.profesional.name} no tiene ausencias por venir.`,
+    };
+  }
+  if (dia.length > 1) {
+    return {
+      ok: false,
+      motivo: `${r.profesional.name} tiene varias ausencias (${dia
+        .map(
+          (a) =>
+            `[${a.id}] ${describirAusencia(a.startsAt, a.endsAt, timezone)}`
+        )
+        .join(
+          "; "
+        )}): pregunta al dueño cuál y vuelve a proponer con su ausenciaId.`,
+    };
+  }
+  return { ok: true, ausencia: dia[0] };
+}
+
+const quitarAusencia: AccionDelGestor<QuitarAusencia> = {
+  schema: QuitarAusenciaParams,
+  async comprobar(ctx, params) {
+    const r = await resolverAusencia(ctx.businessId, ctx.timezone, params);
+    if (!r.ok) return r;
+    const citas = await citasEnElTramo(
+      ctx.businessId,
+      r.ausencia.professional.id,
+      r.ausencia.startsAt,
+      r.ausencia.endsAt
+    );
+    return {
+      ok: true,
+      descripcion: `quitar la ausencia de ${textoDeAusenciaGuardada(r.ausencia, ctx.timezone)}: la recepcionista volverá a ofrecer ese tramo${citas > 0 ? `. Ya tiene ${citas} cita${citas === 1 ? "" : "s"} ahí` : ""}`,
+      parametros: { ausencia: r.ausencia.id },
+    };
+  },
+  async ejecutar(ctx, params) {
+    const r = await resolverAusencia(ctx.businessId, ctx.timezone, params);
+    if (!r.ok) return { ok: false, mensaje: r.motivo };
+    let quitada: boolean;
+    try {
+      quitada = await quitarAusenciaDelNegocio(ctx.businessId, r.ausencia.id);
+    } catch (error) {
+      return {
+        ok: false,
+        mensaje: `No he podido quitar la ausencia: ${mensajeDeError(error, "quitar_ausencia", ctx.businessId)}`,
+      };
+    }
+    if (!quitada) {
+      return { ok: false, mensaje: "Esa ausencia ya no existe." };
+    }
+    const texto = textoDeAusenciaGuardada(r.ausencia, ctx.timezone);
+    return {
+      ok: true,
+      mensaje: `Hecho: quito la ausencia de ${texto}; la recepcionista vuelve a ofrecer ese tramo.`,
+      nota: `Ausencia ${r.ausencia.id} de ${r.ausencia.professional.name} (${r.ausencia.professional.id}) quitada: ${texto}.`,
+    };
+  },
+};
+
+// ---------------------------------------------------------------------------
 // bloquear_franja (y cerrar_dia con rango, en accionesCatalogo.ts)
 // ---------------------------------------------------------------------------
 
@@ -1704,5 +1862,6 @@ export const ACCIONES_DE_AGENDA: Record<string, AccionDelGestor<unknown>> = {
   cancelar_cita: cancelarCita as AccionDelGestor<unknown>,
   avisar_cliente: avisarCliente as AccionDelGestor<unknown>,
   marcar_ausencia: marcarAusencia as AccionDelGestor<unknown>,
+  quitar_ausencia: quitarAusencia as AccionDelGestor<unknown>,
   bloquear_franja: bloquearFranja as AccionDelGestor<unknown>,
 };

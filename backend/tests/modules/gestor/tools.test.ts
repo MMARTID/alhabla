@@ -274,6 +274,8 @@ describe("contexto_negocio", () => {
       numeroDeAlhabla: "+34930111222",
       plan: "inicio",
       suscripcion: "ACTIVE",
+      // Sin el ajuste guardado: el de por defecto.
+      recepcionistaDaPrecios: "si se lo preguntan",
     });
     expect(body.servicios).toEqual([
       {
@@ -321,6 +323,7 @@ describe("contexto_negocio", () => {
     expect(body.enlaces).toEqual({
       panel: "https://alhabla.ai/",
       calendario: "https://alhabla.ai/agente",
+      comoAtiende: "https://alhabla.ai/agente/comportamiento",
       ajustes: "https://alhabla.ai/ajustes",
     });
     expect(body.citasPendientes).toEqual([
@@ -381,6 +384,33 @@ describe("contexto_negocio", () => {
       (body.negocio as Record<string, unknown>).numeroDeAlhabla
     ).toBeNull();
     expect((body.negocio as Record<string, unknown>).sector).toBe("otro");
+  });
+});
+
+describe("contexto_negocio — «Dar precios»", () => {
+  it("dice si la recepcionista da los precios, con el ajuste guardado", async () => {
+    const leer = async (agentSettings: unknown) => {
+      mockedBizFindUnique.mockResolvedValueOnce({
+        ...NEGOCIO,
+        agentSettings,
+      } as never);
+      const r = await handleGestorToolInvocation({
+        ...CABECERAS,
+        toolName: "contexto_negocio",
+        params: {},
+      });
+      return (r.body as { negocio: Record<string, unknown> }).negocio
+        .recepcionistaDaPrecios;
+    };
+
+    expect(await leer({ darPrecios: "siempre" })).toBe(
+      "siempre: dice el precio al ofrecer o confirmar un servicio"
+    );
+    expect(await leer({ darPrecios: "nunca" })).toBe(
+      "nunca: dice que el precio lo confirma el negocio"
+    );
+    // Un valor que no existe cae al de por defecto, como en la recepcionista.
+    expect(await leer({ darPrecios: "a_veces" })).toBe("si se lo preguntan");
   });
 });
 

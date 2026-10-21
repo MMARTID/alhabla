@@ -12,6 +12,7 @@ import { getStripeClient } from "../../../src/lib/stripe.js";
 import { enqueueEmailJob } from "../../../src/lib/cloudTasks.js";
 import { provisionPhoneNumber } from "../../../src/modules/phone/service.js";
 import { acquireLock, releaseLock } from "../../../src/lib/bookingLock.js";
+import { syncAgentToTelnyx } from "../../../src/lib/telnyxAgentSync.js";
 import type Stripe from "stripe";
 
 vi.mock("../../../src/lib/prisma.js", () => ({
@@ -53,6 +54,12 @@ vi.mock("../../../src/lib/cloudTasks.js", () => ({
 
 vi.mock("../../../src/modules/phone/service.js", () => ({
   provisionPhoneNumber: vi.fn(),
+}));
+
+// Tras un evento de suscripción se resincroniza la recepcionista (el
+// recordatorio por WhatsApp depende del plan); su lógica tiene sus tests.
+vi.mock("../../../src/lib/telnyxAgentSync.js", () => ({
+  syncAgentToTelnyx: vi.fn(),
 }));
 
 vi.mock("../../../src/modules/whatsapp/alertas.js", () => ({
@@ -402,6 +409,12 @@ describe("handleStripeEvent", () => {
         }),
       })
     );
+    // El plan decide si la recepcionista ofrece el recordatorio por
+    // WhatsApp: se resincroniza con lo que acaba de quedar guardado.
+    expect(vi.mocked(syncAgentToTelnyx)).toHaveBeenCalledWith(businessId);
+    expect(
+      vi.mocked(syncAgentToTelnyx).mock.invocationCallOrder[0]
+    ).toBeGreaterThan(mockedBusinessUpdateMany.mock.invocationCallOrder[0]);
   });
 
   it("marca suscripción como cancelada en customer.subscription.deleted", async () => {
@@ -466,6 +479,8 @@ describe("handleStripeEvent", () => {
         }),
       })
     );
+    // Descartado: nada que resincronizar.
+    expect(vi.mocked(syncAgentToTelnyx)).not.toHaveBeenCalled();
   });
 
   it("aplica un evento de suscripción más reciente que el ya aplicado", async () => {

@@ -3,13 +3,15 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { CalendarDays, CalendarRange, Check, ChevronLeft, ChevronRight, ExternalLink, LoaderCircle, Phone, TriangleAlert } from "lucide-react";
+import { CalendarDays, CalendarOff, CalendarRange, Check, ChevronLeft, ChevronRight, ExternalLink, LoaderCircle, Phone, TriangleAlert } from "lucide-react";
 import { getAgenda, getBookingSettings, moverCita } from "@/lib/api";
+import { textoDeAusenciaEnElDia, tramoDeAusenciaEnElDia } from "@/lib/ausencias";
 import { formatPhoneLocal, formatPrice } from "@/lib/format";
 import {
   claveDeDia,
   diaLargo,
   horaDelNegocio,
+  inicioDelDia,
   instanteAntesDelDia,
   lunesDe,
   minutosDelDia,
@@ -19,10 +21,11 @@ import {
 import { horaDeMinutos, horarioDelNegocio, importeDeCitas, rangoDeHoras, tramosDelDia } from "@/lib/agenda-escritorio";
 import { getCalendarState } from "@/lib/calendar-state";
 import { enlaceTel } from "@/lib/llamadas";
-import type { AgendaBooking, Business } from "@/lib/types";
+import type { AgendaBooking, AusenciaDelEquipo, Business } from "@/lib/types";
 import { useAhora } from "@/hooks/use-es-movil";
 import { AvisoFlotante, useAviso } from "@/components/aviso-flotante";
 import { SectionErrorState } from "@/components/section-card";
+import { DialogoQuitarAusencia, useAusencias, useQuitarAusencia } from "@/components/ausencias";
 import { importeDeCita, nombreDeCita } from "@/components/movil/hoja-cita";
 import { ColumnaDelDia, RegletaDeHoras, ALTO_DE_HORA } from "@/components/escritorio/columna-del-dia";
 import { Dialogo } from "@/components/escritorio/dialogo";
@@ -112,6 +115,10 @@ export function AgendaEscritorio({ business }: { business: Business }) {
   });
   const ajustes = useQuery({ queryKey: ["booking-settings"], queryFn: getBookingSettings });
   const profesionales = (ajustes.data?.professionals ?? []).filter((profesional) => profesional.active);
+  // Quién no está el día que se mira (la vista Día las pinta y deja quitarlas).
+  const ausenciasDelDia = useAusencias(inicioDelDia(dia, timeZone), inicioDelDia(sumarDias(dia, 1), timeZone));
+  const [ausenciaAQuitar, setAusenciaAQuitar] = useState<AusenciaDelEquipo | null>(null);
+  const quitarAusencia = useQuitarAusencia(avisar, () => setAusenciaAQuitar(null));
 
   const dias = Array.from({ length: 7 }, (_, indice) => sumarDias(lunes, indice));
   const todas = consulta.data ?? [];
@@ -289,6 +296,8 @@ export function AgendaEscritorio({ business }: { business: Business }) {
               rango={rango}
               tramos={tramosDelDia(horario, dia)}
               profesionales={profesionalId ? profesionales.filter((profesional) => profesional.id === profesionalId) : profesionales}
+              ausencias={ausenciasDelDia.data ?? []}
+              onQuitarAusencia={setAusenciaAQuitar}
               timeZone={timeZone}
               ahora={ahora}
               seleccionada={citaId}
@@ -360,6 +369,13 @@ export function AgendaEscritorio({ business }: { business: Business }) {
             </>
           ) : null
         }
+      />
+      <DialogoQuitarAusencia
+        ausencia={ausenciaAQuitar}
+        timeZone={timeZone}
+        quitando={quitarAusencia.isPending}
+        onCerrar={() => setAusenciaAQuitar(null)}
+        onConfirmar={(ausencia) => quitarAusencia.mutate(ausencia)}
       />
       {aviso ? <AvisoFlotante aviso={aviso} onClose={cerrar} /> : null}
     </div>
@@ -454,6 +470,8 @@ function VistaDelDia({
   rango,
   tramos,
   profesionales,
+  ausencias,
+  onQuitarAusencia,
   timeZone,
   ahora,
   seleccionada,
@@ -465,21 +483,37 @@ function VistaDelDia({
   rango: { desde: number; hasta: number };
   tramos: ReturnType<typeof tramosDelDia>;
   profesionales: Array<{ id: string; name: string }>;
+  ausencias: AusenciaDelEquipo[];
+  onQuitarAusencia: (ausencia: AusenciaDelEquipo) => void;
   timeZone: string;
   ahora: Date;
   seleccionada: string | null;
   onAbrir: (cita: AgendaBooking) => void;
 }) {
-  const columnas: Array<{ id: string; nombre: string; citas: AgendaBooking[] }> =
+  // Con un solo profesional la columna es «todas las citas»; sus ausencias
+  // se pintan igual en esa columna.
+  const deLaColumna = (profesionalId: string | undefined) =>
+    ausencias.flatMap((ausencia) => {
+      if (profesionalId && ausencia.professionalId !== profesionalId) return [];
+      const tramo = tramoDeAusenciaEnElDia(ausencia, dia, timeZone);
+      return tramo ? [{ ausencia, tramo }] : [];
+    });
+  const columnas: Array<{
+    id: string;
+    nombre: string;
+    citas: AgendaBooking[];
+    ausencias: Array<{ ausencia: AusenciaDelEquipo; tramo: { desde: number; hasta: number } }>;
+  }> =
     profesionales.length > 1
       ? profesionales.map((profesional) => ({
           id: profesional.id,
           nombre: profesional.name,
           citas: citas.filter((cita) => cita.professional?.id === profesional.id),
+          ausencias: deLaColumna(profesional.id),
         }))
-      : [{ id: "todas", nombre: profesionales[0]?.name ?? "Citas", citas }];
+      : [{ id: "todas", nombre: profesionales[0]?.name ?? "Citas", citas, ausencias: deLaColumna(profesionales[0]?.id) }];
   const sinAsignar = profesionales.length > 1 ? citas.filter((cita) => !profesionales.some((p) => p.id === cita.professional?.id)) : [];
-  if (sinAsignar.length > 0) columnas.push({ id: "sin-asignar", nombre: "Sin asignar", citas: sinAsignar });
+  if (sinAsignar.length > 0) columnas.push({ id: "sin-asignar", nombre: "Sin asignar", citas: sinAsignar, ausencias: [] });
   const cerrado = tramos !== null && tramos.length === 0;
 
   return (
@@ -490,6 +524,20 @@ function VistaDelDia({
           <div key={columna.id} className="min-w-0 flex-1 border-l border-linea-suave py-2.5 text-center text-sm font-semibold text-tinta-2">
             {columna.nombre}
             <span className="ml-1.5 text-xs text-muted">· {columna.citas.length}</span>
+            {columna.ausencias.map(({ ausencia, tramo }) => (
+              <div key={ausencia.id} className="mt-1 flex items-center justify-center gap-1.5 px-2 text-xs font-semibold text-morado-tinta">
+                <CalendarOff className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                <span className="truncate">Ausente {textoDeAusenciaEnElDia(tramo)}</span>
+                <button
+                  type="button"
+                  onClick={() => onQuitarAusencia(ausencia)}
+                  aria-label={`Quitar la ausencia de ${ausencia.professionalName} (${textoDeAusenciaEnElDia(tramo)})`}
+                  className="shrink-0 rounded-md px-1.5 py-0.5 underline underline-offset-2 transition hover:bg-lavado focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-morado"
+                >
+                  Quitar
+                </button>
+              </div>
+            ))}
           </div>
         ))}
       </div>
@@ -508,6 +556,7 @@ function VistaDelDia({
                 seleccionada={seleccionada}
                 onAbrir={onAbrir}
                 cerradoTodoElDia={cerrado}
+                ausencias={columna.ausencias.map(({ tramo }) => tramo)}
                 alto={ALTO_DE_HORA}
               />
             </div>

@@ -1,6 +1,11 @@
 import { z } from "zod";
 import { prisma } from "../../lib/prisma.js";
 import { errorMessage } from "../../lib/logUtils.js";
+import { precioParaDecir } from "../../lib/precio.js";
+import {
+  modoDeDarPrecios,
+  type ModoDeDarPrecios,
+} from "../../lib/managedAgentPrompt.js";
 import {
   PlanLimitError,
   getPlanLimits,
@@ -95,10 +100,49 @@ const DIA_EN_ESPANOL: Record<WeekDay, string> = {
   sunday: "domingo",
 };
 
+/** «18 €», «12,50 €» o «sin precio»: como lo dice la recepcionista. */
 function euros(priceCents: number | null): string {
-  if (priceCents === null) return "sin precio";
-  const e = priceCents / 100;
-  return `${Number.isInteger(e) ? e : e.toFixed(2).replace(".", ",")} €`;
+  return precioParaDecir(priceCents) ?? "sin precio";
+}
+
+/**
+ * Lo que la recepcionista hace con un precio recién cambiado, según «Dar
+ * precios» (AgentSettings.darPrecios): hasta el 2026-10-20 no daba
+ * ninguno, y el Gestor no puede prometer lo contrario.
+ */
+export function fraseDelPrecio(
+  modo: ModoDeDarPrecios,
+  priceCents: number | null
+): string {
+  if (modo === "nunca") {
+    return "La recepcionista no da precios: lo tienes en «Nunca» en Cómo atiende.";
+  }
+  if (priceCents === null) {
+    return "Si preguntan el precio, la recepcionista dirá que se lo confirmáis vosotros.";
+  }
+  return modo === "siempre"
+    ? "La recepcionista ya lo dice así por teléfono."
+    : "La recepcionista ya lo dice así si se lo preguntan.";
+}
+
+/** fraseDelPrecio con el ajuste guardado. Best-effort: el cambio ya está
+ * hecho, así que si no se puede leer el ajuste el «Hecho» sale sin ella. */
+async function fraseDelPrecioDelNegocio(
+  businessId: string,
+  priceCents: number | null
+): Promise<string | null> {
+  try {
+    const negocio = await prisma.business.findUnique({
+      where: { id: businessId },
+      select: { agentSettings: true },
+    });
+    return fraseDelPrecio(modoDeDarPrecios(negocio?.agentSettings), priceCents);
+  } catch (error) {
+    console.error(
+      `[Gestor] editar_servicio del negocio ${businessId}: precio guardado, pero no se pudo leer «Dar precios» para decir cómo lo da la recepcionista: ${errorMessage(error)}`
+    );
+    return null;
+  }
 }
 
 function aCentimos(
@@ -446,9 +490,18 @@ const editarServicio: AccionDelGestor<z.infer<typeof EditarServicioParams>> = {
       if (!actualizado)
         return { ok: false, mensaje: "Ese servicio ya no existe." };
       await sincronizarCatalogo(ctx.businessId, "editar_servicio");
+      // Solo si ha cambiado el precio: es lo que el dueño quiere saber si
+      // la recepcionista dice.
+      const comoLoDice =
+        params.precioEuros !== undefined
+          ? await fraseDelPrecioDelNegocio(
+              ctx.businessId,
+              actualizado.priceCents
+            )
+          : null;
       return {
         ok: true,
-        mensaje: `Hecho: ${actualizado.name}, ${actualizado.durationMinutes} min, ${euros(actualizado.priceCents)}.`,
+        mensaje: `Hecho: ${actualizado.name}, ${actualizado.durationMinutes} min, ${euros(actualizado.priceCents)}.${comoLoDice ? ` ${comoLoDice}` : ""}`,
         nota: `Servicio ${actualizado.name} (id ${actualizado.id}) actualizado: ${actualizado.durationMinutes} min, ${euros(actualizado.priceCents)}.`,
       };
     } catch (error) {

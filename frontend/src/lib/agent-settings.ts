@@ -21,4 +21,5 @@ export const DEFAULT_AGENT_SETTINGS: AgentSettings = {
     "ru-RU",
   ],
   voiceLanguage: "es-ES",
+  darPrecios: "si_preguntan",
 };

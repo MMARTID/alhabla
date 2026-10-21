@@ -328,6 +328,64 @@ describe("acciones de agenda del Gestor (integración)", () => {
     });
     expect(tarde.available).toBe(false);
   });
+
+  it("quitar_ausencia borra la fila y la disponibilidad real vuelve a ofrecer a esa persona; no toca la ausencia de otro negocio", async () => {
+    const business = await createTestBusiness({ bookingCapacity: 2 });
+    const laura = await createTestProfessional(business.id, "Laura");
+    const otro = await createTestBusiness({ bookingCapacity: 2 });
+    const otraLaura = await createTestProfessional(otro.id, "Laura");
+    const { fecha } = lunesLocal();
+    await proponerYConfirmar(business.id, "marcar_ausencia", {
+      profesional: "Laura",
+      desde: fecha,
+    });
+    const ajena = await prisma.professionalAbsence.create({
+      data: {
+        businessId: otro.id,
+        professionalId: otraLaura.id,
+        startsAt: new Date(Date.now() + 86_400_000),
+        endsAt: new Date(Date.now() + 2 * 86_400_000),
+      },
+    });
+    const inicio = new Date(nextOpenSlot().iso);
+    const conLaura = () =>
+      checkAvailability({
+        businessId: business.id,
+        schedule: business.schedule,
+        timezone: "Europe/Madrid",
+        bookingCapacity: 2,
+        startDateTime: inicio.toISOString(),
+        durationMinutes: 30,
+        professionalId: laura.id,
+      });
+    expect((await conLaura()).available).toBe(false);
+
+    // Una ausencia de otro negocio no se puede señalar por su id.
+    const rechazada = await registrarPropuesta({
+      businessId: business.id,
+      timezone: "Europe/Madrid",
+      conversationId: null,
+      inboundMessageId: "in_test",
+      tipo: "quitar_ausencia",
+      parametros: { ausencia: ajena.id },
+      resumen: "Quito la ausencia.",
+    });
+    expect(rechazada.ok).toBe(false);
+    expect(
+      await prisma.professionalAbsence.count({ where: { id: ajena.id } })
+    ).toBe(1);
+
+    const quitada = await proponerYConfirmar(business.id, "quitar_ausencia", {
+      profesional: "Laura",
+    });
+    expect(quitada.decision.estado).toBe("ejecutada");
+    expect(
+      await prisma.professionalAbsence.count({
+        where: { businessId: business.id },
+      })
+    ).toBe(0);
+    expect((await conLaura()).available).toBe(true);
+  });
 });
 
 describe("el Gestor desde el panel (integración)", () => {

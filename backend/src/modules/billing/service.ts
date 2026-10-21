@@ -31,6 +31,7 @@ import {
 } from "../../lib/planFeatures.js";
 import { appUrl } from "../../lib/urls.js";
 import { invalidarCacheDeVoz } from "../../lib/voiceConfigCache.js";
+import { syncAgentToTelnyx } from "../../lib/telnyxAgentSync.js";
 
 const CHECKOUT_TRIAL_DAYS = 7;
 /**
@@ -712,6 +713,12 @@ async function processStripeEvent(event: Stripe.Event) {
           serviceEndsAt: subscriptionPeriod(subscription).end,
         });
       }
+      // El prompt de la recepcionista depende del plan: solo ofrece el
+      // recordatorio por WhatsApp si el plan lo manda (recordatorioIncluido).
+      // Sin esto, tras subir o bajar de plan seguía con el de antes hasta el
+      // reconciliador de las 04:00. Nunca lanza y solo habla con Telnyx si
+      // el payload cambia (en una renovación, no).
+      if (businessId) await syncAgentToTelnyx(businessId);
       return businessId;
     }
     case "invoice.paid": {

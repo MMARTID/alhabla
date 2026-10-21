@@ -20,6 +20,7 @@ import {
   updateProfessional,
   updateService,
 } from "./service.js";
+import { listarAusencias, quitarAusencia } from "./ausencias.js";
 import { prisma } from "../../lib/prisma.js";
 import { PlanLimitError } from "../../lib/planFeatures.js";
 
@@ -34,6 +35,18 @@ function sendPlanLimitError(
     limit: error.limit,
   });
 }
+
+const AusenciasQuerySchema = z
+  .object({
+    desde: z.coerce.date(),
+    hasta: z.coerce.date(),
+    profesionalId: z.string().min(1).optional(),
+  })
+  .refine((q) => q.hasta > q.desde, "hasta debe ser posterior a desde")
+  .refine(
+    (q) => q.hasta.getTime() - q.desde.getTime() <= 120 * 24 * 60 * 60 * 1000,
+    "El rango no puede pasar de 120 días"
+  );
 
 function sendValidationError(
   reply: { status: (code: number) => { send: (body: unknown) => unknown } },
@@ -284,6 +297,54 @@ export async function bookingSettingsRoutes(fastify: FastifyInstance) {
         return reply
           .status(500)
           .send({ error: "No se pudo retirar el profesional" });
+      }
+    }
+  );
+  // Ausencias de los profesionales (vacaciones, bajas). Se crean desde el
+  // Gestor (`marcar_ausencia`); el panel las enseña y puede quitarlas.
+  fastify.get<{ Querystring: z.infer<typeof AusenciasQuerySchema> }>(
+    "/absences",
+    auth,
+    async (request, reply) => {
+      try {
+        const query = AusenciasQuerySchema.parse(request.query);
+        const ausencias = await listarAusencias(request.user!.businessId, {
+          desde: query.desde,
+          hasta: query.hasta,
+          profesionalId: query.profesionalId,
+        });
+        return reply.send({ ausencias });
+      } catch (error) {
+        if (error instanceof z.ZodError) return sendValidationError(reply, error);
+        fastify.log.error(error);
+        return reply
+          .status(500)
+          .send({ error: "No se pudieron obtener las ausencias" });
+      }
+    }
+  );
+
+  fastify.delete<{ Params: z.infer<typeof ResourceIdParamsSchema> }>(
+    "/absences/:id",
+    auth,
+    async (request, reply) => {
+      try {
+        const { id } = ResourceIdParamsSchema.parse(request.params);
+        const businessId = request.user!.businessId;
+        const quitada = await quitarAusencia(businessId, id);
+        if (!quitada) {
+          return reply.status(404).send({ error: "Ausencia no encontrada" });
+        }
+        fastify.log.info(
+          `[Booking settings] Ausencia ${id} del negocio ${businessId} quitada desde el panel`
+        );
+        return reply.status(204).send();
+      } catch (error) {
+        if (error instanceof z.ZodError) return sendValidationError(reply, error);
+        fastify.log.error(error);
+        return reply
+          .status(500)
+          .send({ error: "No se pudo quitar la ausencia" });
       }
     }
   );

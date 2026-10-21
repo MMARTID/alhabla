@@ -60,9 +60,16 @@ export type AgentSettings = {
   /** «Cuándo pasarme llamadas» (fase 4 del plan de telefonía). Sin valor,
    * el backend aplica el de por defecto (ver lib/pasar-llamadas.ts). */
   pasarLlamadas?: ModoDePasarLlamadas;
+  /** «Dar precios»: si la recepcionista dice el precio de cada servicio del
+   * catálogo. Opcional porque un backend anterior no lo devuelve; sin
+   * valor, «si se lo preguntan» (DEFAULT_AGENT_SETTINGS). */
+  darPrecios?: ModoDeDarPrecios;
 };
 
 export type ModoDePasarLlamadas = "nunca" | "si_lo_pide" | "siempre";
+
+/** Los de MODOS_DE_DAR_PRECIOS en backend/src/lib/managedAgentPrompt.ts. */
+export type ModoDeDarPrecios = "siempre" | "si_preguntan" | "nunca";
 
 /** Código BCP-47 de un idioma de atención («es-ES», «ca-ES»…). Los define
  * el catálogo del backend (backend/src/lib/idiomas/catalogo.ts); el panel
@@ -792,6 +799,20 @@ export type AgendaBooking = {
   createdVia?: string | null;
   /** La conversación en la que se reservó; null si la apuntó el dueño. */
   origen?: { canal: CanalDeLlamada; startedAt: string; durationSecs: number | null } | null;
+};
+
+/** Ausencia de una persona del equipo (vacaciones, baja, «Laura no viene el
+ * viernes»). Se marca desde el Gestor; el panel la enseña y la puede quitar. */
+export type AusenciaDelEquipo = {
+  id: string;
+  professionalId: string;
+  professionalName: string;
+  /** Instantes ISO; el fin es exclusivo (días enteros acaban a las 00:00). */
+  startsAt: string;
+  endsAt: string;
+  reason: string | null;
+  /** "owner_chat" (el Gestor) | "panel" | null. */
+  createdVia: string | null;
 };
 
 /** Lo que vuelve al mover o cancelar una cita desde la agenda. */
