@@ -92,7 +92,7 @@ export const PAGINAS: readonly PaginaIndexable[] = [
     [
       ["/peluqueria", "Peluquerías", "Contesta mientras cortas: cortes, color y mechas con su duración y con quien toca."],
       ["/barberia", "Barberías", "Coge el teléfono con las sillas llenas y reserva corte, barba o pack con el barbero que piden."],
-      ["/centro-de-estetica", "Centros de estética", "Informa de tratamientos y bonos y reserva por cabina y profesional sin sacarte de cabina."],
+      ["/centro-de-estetica", "Centros de estética", "Informa de tratamientos y bonos y reserva con la profesional que toca, sin pasar de las citas que caben a la vez."],
       ["/salon-de-unas", "Salones de uñas", "Da el precio de cada técnica, pregunta por la retirada y reserva manicuras y pedicuras."],
       ["/fisioterapia", "Fisioterapia", "Atiende mientras tratas: primeras visitas, sesiones de seguimiento y bonos."],
     ] as const
@@ -132,7 +132,8 @@ export const PAGINAS: readonly PaginaIndexable[] = [
   {
     ruta: "/agenda-por-whatsapp",
     nombre: "El Gestor por WhatsApp",
-    resumen: "Cambia horarios, ausencias, precios y citas escribiendo a tu recepcionista por WhatsApp.",
+    foto: "peluqueraConElMovil",
+    resumen: "Cambia horarios, ausencias, precios y citas escribiendo o con notas de voz a tu Gestor por WhatsApp; nada cambia sin tu «Confirmar».",
     seccion: "funciones",
     prioridad: 0.7,
     frecuencia: "monthly",

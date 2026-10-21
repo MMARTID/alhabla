@@ -234,7 +234,7 @@ export default function PeluqueriaCaninaPage() {
             ],
             [
               "«¿Puedo cambiar la cita del sábado?»",
-              "La encuentra cuando la llamada viene del número con el que se pidió y el dueño aceptó los mensajes; entonces la pasa a otra hora o la anula. Responder al WhatsApp de la cita sirve igual.",
+              "La encuentra cuando la llamada viene del número con el que se pidió; entonces la pasa a otra hora o la anula. Responder al WhatsApp de la cita sirve igual.",
             ],
             [
               "«¿Venís a domicilio?»",

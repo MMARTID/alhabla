@@ -207,7 +207,9 @@ export function relato(g: GuionRelato) {
   const nombre = (completo: string) => completo.split(" ")[0];
   const [s0, s1, s2, s3] = g.otrosServicios;
   const [c0, c1, c2, c3] = g.otrosClientes;
-  const saludo = `Hola, gracias por llamar a ${g.negocio}. ¿En qué te puedo ayudar?`;
+  // El saludo real (backend/src/lib/idiomas/catalogo.ts, `presentacion`):
+  // avisa de que es una IA, como pide el art. 50 del Reglamento de IA.
+  const saludo = `${g.negocio}, te atiende su asistente de inteligencia artificial. ¿En qué te ayudo?`;
   // La recepcionista solo menciona la duración si es una cita larga.
   const ofrece =
     servicio.minutos > 80
@@ -221,11 +223,14 @@ export function relato(g: GuionRelato) {
     franja,
     /**
      * La llamada entera, turno a turno, como la lleva de verdad la
-     * recepcionista (sus instrucciones en Telnyx): saluda con el nombre del
-     * negocio; solo dice la duración si pasa de 80 minutos; no rellena el
-     * silencio mientras mira la agenda; recoge el nombre; pregunta siempre si
-     * puede mandar la confirmación por WhatsApp; resume y pide el sí antes de
-     * reservar; y avisa de que le llega un WhatsApp de Alhabla.
+     * recepcionista (sus instrucciones en Telnyx, lib/seccionesDelPrompt.ts):
+     * saluda con el nombre del negocio y el aviso de IA; solo dice la
+     * duración si pasa de 80 minutos; a quien llama por primera vez le pide
+     * permiso para grabar mientras comprueba el hueco (voiceTools,
+     * `pregunta_de_grabacion`); recoge el nombre; en un solo turno resume y
+     * pregunta si reserva y manda la confirmación por WhatsApp; y avisa de
+     * que le llega un WhatsApp de Alhabla. El recordatorio no se nombra: solo
+     * sale en Pro y Scale.
      */
     turnos: [
       { agente: true, texto: saludo },
@@ -234,18 +239,17 @@ export function relato(g: GuionRelato) {
       { agente: false, texto: franja },
       {
         agente: true,
+        texto: `Mientras lo compruebo, ¿te parece bien que grabe tus llamadas para que ${g.negocio} pueda revisarlas?`,
+      },
+      { agente: false, texto: "Sí, vale." },
+      {
+        agente: true,
         texto: `Mañana tengo a las ${HORA_CITA} con ${profesional}. ¿A nombre de quién la pongo?`,
       },
       { agente: false, texto: `${cliente.nombre}.` },
       {
         agente: true,
-        texto:
-          "¿Puedo enviarte la confirmación y un recordatorio por WhatsApp a este número?",
-      },
-      { agente: false, texto: "Sí, claro." },
-      {
-        agente: true,
-        texto: `Entonces, ${enFrase(servicio.nombre)} mañana jueves a las ${HORA_CITA} con ${profesional}, a nombre de ${cliente.nombre}. ¿Te la reservo?`,
+        texto: `Entonces, ${enFrase(servicio.nombre)} mañana jueves a las ${HORA_CITA} con ${profesional}, a nombre de ${cliente.nombre}. ¿Te la reservo y te mando la confirmación por WhatsApp a este número?`,
       },
       { agente: false, texto: "Sí, perfecto." },
       {
@@ -353,12 +357,16 @@ export function relato(g: GuionRelato) {
         chip: "Reserva creada",
       },
     ] as { quien: string; cuando: string; chip: string | null }[],
-    /** Panel: la conversación con el asistente (una baja y sus citas). */
+    /**
+     * Panel: la conversación con el Gestor (una baja y sus citas), con sus
+     * tools reales: `listar_agenda` (las citas, no los huecos), `buscar_hueco`
+     * para cada hora y una propuesta a la vez con «Confirmar».
+     */
     asistente: {
       pregunta: "¿Cómo tenemos mañana?",
-      respuesta: `Mañana, jueves, hay 9 citas. Te quedan dos huecos: de 12:00 a 13:00 con ${companera} y de 19:00 a 20:00 con ${profesional}.`,
-      baja: `${profesional} no viene mañana, está con fiebre.`,
-      analisis: `${profesional} tenía 3 citas. ${companera} puede quedarse dos a la misma hora; la de las ${HORA_CITA} no cabe.`,
+      respuesta: `Mañana, jueves, hay 9 citas. ${profesional} tiene 3: a las 10:00, a las 12:30 y a las ${HORA_CITA}.`,
+      baja: `${profesional} no viene mañana, está con fiebre. ¿${companera} puede quedarse sus citas?`,
+      analisis: `${companera} tiene hueco a las 10:00 y a las 12:30; a las ${HORA_CITA} no.`,
       tabla: [
         { hora: "10:00", cita: `${s2.nombre} · ${c2}`, libre: true },
         { hora: "12:30", cita: `${s3.nombre} · ${c3}`, libre: true },
@@ -368,18 +376,17 @@ export function relato(g: GuionRelato) {
           libre: false,
         },
       ],
-      orden: `Pásale esas dos a ${companera} y a ${cliente.nombre} ofrécele el viernes a la misma hora.`,
+      orden: `Vale. Márcala ausente y luego pásale esas dos a ${companera}.`,
       /**
-       * Como el Gestor real: propone, y no cambia nada hasta que el dueño
-       * pulsa «Confirmar».
+       * Como el Gestor real: una propuesta cada vez, y nada cambia hasta que
+       * el dueño pulsa «Confirmar» (textos de modules/gestor/accionesAgenda.ts).
        */
-      propuesta: `Te propongo: ${profesional} ausente el jueves, las citas de las 10:00 y las 12:30 para ${companera}, y escribir a ${cliente.nombre} por WhatsApp para ofrecerle el viernes a las ${HORA_CITA}.`,
-      hecho: [
-        `${profesional} ausente el jueves`,
-        `2 citas pasadas a ${companera}`,
-        `WhatsApp enviado a ${cliente.nombre}`,
-      ],
-      cierre: "Hecho. Ya está en tu agenda.",
+      propuesta: `¿Confirmas? Marcar a ${profesional} como ausente el jueves: la recepcionista no le reservará nada. Ojo: ya tiene 3 citas ahí, que no se mueven solas.`,
+      hecho: {
+        texto: `Hecho: ${profesional} no está el jueves; la recepcionista no le reservará nada ahí.`,
+        etiqueta: `${profesional}, ausente el jueves`,
+      },
+      siguiente: `¿Confirmas? Mover la cita de ${nombre(c2)} (${enFrase(s2.nombre)}) del jueves a las 10:00 con ${companera}.`,
     },
   };
 }

@@ -134,9 +134,10 @@ export default function VsHumanaPage() {
                 <ListaCheck
                   items={[
                     "Coge el teléfono a cualquier hora, también en festivos.",
-                    "No deja llamadas en espera aunque haya cola en el mostrador.",
+                    "Contesta mientras tu equipo atiende a quien tiene delante.",
                     "Mira la agenda real y reserva con quien toca, sin errores de apunte.",
-                    "Habla catalán, euskera, gallego y ocho idiomas más.",
+                    "Habla castellano y siete idiomas más, y la lengua cooficial de tu zona.",
+                    "Si falta alguien, el Gestor recoloca sus citas y avisa a cada cliente cuando tú lo confirmas.",
                   ]}
                 />
               ),

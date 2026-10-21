@@ -67,7 +67,7 @@ const faqs = [
   {
     question: "¿La recepcionista atiende en euskera?",
     answer:
-      "Si tu negocio está en Euskadi, sí: el euskera se activa solo por el código postal, y también puedes elegirlo como idioma principal.",
+      "Si tu negocio está en Euskadi, sí: el euskera se activa solo con el código postal de la dirección de tu negocio. Si la dirección no lo lleva, elige el euskera como idioma principal en Agente › Cómo atiende.",
   },
 ];
 
@@ -99,7 +99,7 @@ export default function DesvioEuskaltelPage() {
           href: "/recepcionista-ia-en-euskera",
           titulo: "Atención en euskera",
           texto:
-            "En Euskadi entiende y contesta en euskera sin configurar nada.",
+            "En Euskadi, en euskera con el código postal de tu dirección.",
         },
         {
           href: "/desvio-de-llamadas/telecable",
@@ -277,8 +277,11 @@ export default function DesvioEuskaltelPage() {
               </p>
             </Texto>
             <Nota tipo="info" titulo="En Euskadi, también en euskera">
-              Si tu negocio está en Euskadi, tu recepcionista entiende y
-              contesta en euskera a quien llama en euskera, sin configurar nada.{" "}
+              Si tu negocio está en Euskadi y su dirección lleva el código
+              postal, tu recepcionista entiende y contesta en euskera a quien
+              llama en euskera, sin configurar nada más. Si la dirección no lo
+              lleva, elige el euskera como idioma principal en Agente › Cómo
+              atiende.{" "}
               <Link
                 href="/recepcionista-ia-en-euskera"
                 className="font-semibold underline underline-offset-4"

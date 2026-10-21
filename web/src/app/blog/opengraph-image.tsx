@@ -10,7 +10,7 @@ export default function OpenGraphImage() {
     etiqueta: "Blog",
     titulo: "Ideas para no perder ni una llamada",
     subtitulo:
-      "Lo que aprendemos atendiendo el teléfono de peluquerías, barberías, centros de estética, salones de uñas y fisios.",
+      "Cómo no perder llamadas ni citas en peluquerías, barberías, centros de estética, salones de uñas y fisios.",
     pastilla: null,
     pie: "Guías cortas, sin humo",
     derecha: {

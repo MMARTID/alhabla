@@ -2,6 +2,7 @@
 titulo: "Baja de un trabajador: reorganizar la agenda sin drama"
 resumen: "«Pedro no viene mañana». Qué pasa con sus citas, cómo avisar a los clientes afectados y cómo resolverlo desde WhatsApp sin abrir la agenda."
 fecha: "2026-09-23"
+actualizado: "2026-10-20"
 autor: "Miguel Martín Delgado"
 sector: ""
 imagen: "https://images.unsplash.com/photo-1499750310107-5fef28a66643?auto=format&fit=crop&w=1600&q=80"
@@ -20,17 +21,19 @@ Cuando alguien del equipo falta, hay tres frentes abiertos a la vez: bloquear su
 
 ## Cómo se resuelve diciéndolo por WhatsApp
 
-Con Alhabla, ese mensaje de las 21:30 se lo mandas a tu recepcionista. Ella bloquea la agenda de Pedro, revisa sus citas de mañana y te propone a quién moverlas según quién tiene hueco y quién puede hacer cada servicio. Tú confirmas con un botón y, si hace falta, ella avisa a los clientes.
+Con Alhabla, ese mensaje de las 21:30 se lo mandas al Gestor, el asistente que te atiende a ti por WhatsApp (y también en el panel). Te propone marcar la ausencia de Pedro y, cuando pulsas «Confirmar», la recepcionista deja de darle citas y el Gestor te dice cuántas tenía ya. Después decides qué hacer con cada una: pasarla a otra profesional, moverla a otra hora o cancelarla. Cada cambio es una propuesta, de una en una, y solo se hace cuando la confirmas.
 
-<ChatWhatsApp titulo="WhatsApp · Tu Gestor de Alhabla" mensajes={[{ autor: "negocio", texto: "Pedro no viene mañana" }, { autor: "alhabla", texto: "Entendido. Dejo de ofrecer hueco con Pedro mañana. Tenía un corte a las 10:00 y un color a las 13:30 — ¿se los muevo a Carla, que tiene hueco a esas horas?" }, { autor: "negocio", texto: "Sí, muévelos" }, { autor: "alhabla", texto: "Hecho ✓ Las dos citas ya están con Carla. ¿Aviso a los clientes por WhatsApp?" }, { autor: "negocio", texto: "Sí, avísales" }, { autor: "alhabla", texto: "Avisados ✓ Les he ofrecido la misma hora con Carla y ambos han confirmado." }]} />
+<ChatWhatsApp titulo="WhatsApp · Tu Gestor de Alhabla" mensajes={[{ autor: "negocio", texto: "Pedro no viene mañana" }, { autor: "alhabla", texto: "Marcar a Pedro como ausente mañana: la recepcionista no le reservará nada en ese tramo. Ojo: ya tiene 2 citas ahí, que no se mueven solas." }, { autor: "negocio", texto: "Confirmar" }, { autor: "alhabla", texto: "Hecho: Pedro no está mañana; la recepcionista no le reservará nada ahí. Tiene 2 citas en ese tramo: dime si las movemos o las cancelamos." }, { autor: "negocio", texto: "La de las 10, pásala a Carla" }, { autor: "alhabla", texto: "Carla tiene libre esa hora. Mover la cita de Lucía de mañana a las 10:00 (corte) con Pedro a la misma hora con Carla." }, { autor: "negocio", texto: "Confirmar" }, { autor: "alhabla", texto: "Hecho: la cita de Lucía pasa a las 10:00 con Carla. El calendario ya está al día." }, { autor: "alhabla", texto: "¿Le aviso a Lucía por WhatsApp de la nueva hora? Si prefieres llamarle tú: 600 000 000." }, { autor: "negocio", texto: "Sí, avísale" }, { autor: "alhabla", texto: "Le aviso a Lucía al 600 000 000." }]} />
 
-## Si la hora no cuadra, se propone el cambio
+Con el color de las 13:30 se hace lo mismo: a otra profesional, a otra hora o cancelado, cada paso con su «Confirmar». Y si prefieres llamar tú al cliente, pulsas «Le llamo yo» y el Gestor no le escribe.
 
-A veces el cliente no puede con la nueva profesional o la nueva hora. Entonces la recepcionista le ofrece alternativas reales —huecos que existen en tu agenda, no promesas— y deja constancia de todo. Si un cambio choca con otra reserva, te lo dice en lugar de pisarla.
+## Si al cliente no le va bien
+
+Lucía recibe el aviso por WhatsApp con dos botones: «Vale» y «No me va bien». Si pulsa «No me va bien», te llega como recado, por WhatsApp y en el panel, para que le busques otra hora. Y si le pides al Gestor un cambio que no cabe —la profesional no está o la hora ya está ocupada—, te lo dice en lugar de pisar otra reserva.
 
 ## Qué debería poder hacer tu sistema
 
-<Checklist items={[{ texto: "Bloquear la agenda de quien falta para que no entren citas nuevas" }, { texto: "Proponerte a quién mover cada cita, con el servicio y el hueco en cuenta" }, { texto: "No ejecutar nada hasta que tú confirmas con un botón" }, { texto: "Avisar al cliente por WhatsApp si su cita cambia de profesional u hora" }, { texto: "Dejar todo anotado en la agenda real, no solo en la conversación" }]} />
+<Checklist items={[{ texto: "Bloquear la agenda de quien falta para que no entren citas nuevas" }, { texto: "Decirte qué citas tenía y moverlas a otra profesional u otra hora solo si ese hueco existe" }, { texto: "No ejecutar nada hasta que tú confirmas con un botón" }, { texto: "Avisar al cliente por WhatsApp si su cita cambia de profesional u hora, y que pueda contestar si no le va bien" }, { texto: "Dejar todo anotado en la agenda real, no solo en la conversación" }]} />
 
 <Aviso tipo="consejo">Prueba el escenario antes de necesitarlo: simula una baja un martes por la tarde y mira cuánto tardas en reorganizar el día siguiente. Esa es la hora que te ahorras cada vez que pasa de verdad.</Aviso>
 

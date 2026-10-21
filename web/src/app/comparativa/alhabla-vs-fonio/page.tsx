@@ -103,15 +103,17 @@ export default function VsFonioPage() {
             ["Confirmación de la cita al cliente", "Por WhatsApp", "Por SMS o correo"],
             ["WhatsApp con el cliente", "Confirmación, recordatorios (Pro y Scale) y conversación incluidos", "Chatbot de WhatsApp como producto aparte, desde 79 €/mes"],
             ["El dueño cambia su agenda por WhatsApp", "Sí (el Gestor)", "No consta"],
-            ["Catalán / euskera / gallego", "Sí / sí / sí, automáticos por código postal", "Sí / no / no, según su lista"],
+            ["Si falta alguien del equipo", "El Gestor bloquea su agenda, te ayuda a recolocar cada cita y avisa a cada cliente por WhatsApp", "No consta"],
+            ["Desvío desde operadores españoles", "Guía por operador y «Comprobar desvío» con una llamada real", "Su guía es de operadores británicos; para España remite a tu operador"],
+            ["Catalán / euskera / gallego", "Sí / sí / sí: la de tu zona, sola por código postal", "Sí / no / no, según su lista"],
             ["Aviso de que es una IA", "Fijo en la primera frase", "Lo configura el cliente en el saludo"],
             ["Grabación", "Solo con permiso del cliente", "Opcional; se borra a los 30 días"],
-            ["Pasar la llamada a una persona", "Con aviso previo al dueño", "Transferencia ciega (con aviso, solo con su centralita)"],
+            ["Pasar la llamada a una persona", "Con aviso previo al dueño, si el número de Alhabla es tu número principal", "Transferencia ciega (con aviso, solo con su centralita)"],
             ["Datos", "Proveedores con garantías para fuera del EEE", "Servidores en Alemania; telefonía de Twilio"],
             ["Soporte", "Formulario y WhatsApp del equipo, en español", "Correo; primero responde una IA"],
             ["Prueba", "7 días", "14 días y devolución en 30 días"],
           ]}
-          nota="Datos de fonio en fonio.ai/es/precios, fonio.ai/es/integraciones y su centro de ayuda fonio.info (idiomas, citas, transferencia, WhatsApp, alojamiento de datos), consultados el 20-10-2026. «No consta» significa que no aparece en su web pública."
+          nota="Datos de fonio en fonio.ai/es/precios, fonio.ai/es/integraciones y su centro de ayuda fonio.info (idiomas, citas, transferencia, WhatsApp, conectar tu número, alojamiento de datos), consultados el 20-10-2026. «No consta» significa que no aparece en su web pública."
         />
       </Seccion>
 

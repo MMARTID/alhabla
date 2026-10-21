@@ -9,7 +9,7 @@ export default function OpenGraphImage() {
   return imagenOg({
     etiqueta: "Català · Euskara · Galego",
     titulo: "Tu recepcionista de IA también atiende en catalán",
-    subtitulo: "En Cataluña y Baleares, desde la primera llamada. Y euskera, gallego y ocho idiomas más.",
+    subtitulo: "En Cataluña y Baleares, desde la primera llamada. Y en castellano y siete idiomas más.",
     pie: "Incluido en todos los planes",
     derecha: { tipo: "panel", grande: "Bon dia!", pequeno: "En què et puc ajudar?" },
   });

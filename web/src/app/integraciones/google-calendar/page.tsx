@@ -102,7 +102,7 @@ export default function GoogleCalendarPage() {
             ["Un evento cancelado", "No", "Ya no ocupa la agenda."],
             ["Una cita de tu calendario de citas de Google", "Sí", "Entra en tu calendario como cualquier evento."],
           ]}
-          nota="Además de tu calendario, cuenta tu horario de apertura y el de cada profesional que configures en el panel."
+          nota="Además de tu calendario, cuenta tu horario de apertura y las ausencias que marques a cada profesional."
         />
       </Seccion>
 
@@ -119,7 +119,7 @@ export default function GoogleCalendarPage() {
             },
             {
               titulo: "O díselo al Gestor",
-              texto: "Si prefieres no abrir el calendario, escribe por WhatsApp «cerramos el lunes» y Alhabla lo bloquea en tu agenda tras tu confirmación.",
+              texto: "Si prefieres no abrir el calendario, escribe por WhatsApp «cerramos el lunes» y, tras tu confirmación, ese día queda cerrado en tu horario de Alhabla y la recepcionista no lo ofrece (no crea un evento en tu calendario).",
             },
           ]}
         />
@@ -134,8 +134,8 @@ export default function GoogleCalendarPage() {
             recomienda a las apps que acceden a datos de usuarios.
           </p>
           <p>
-            Si un día revocas el acceso o cambias la contraseña y Google invalida el permiso, Alhabla lo detecta en la
-            siguiente llamada, deja de reservar en ese calendario y te avisa en el panel para que lo reconectes.
+            Si un día revocas el acceso o cambias la contraseña y Google invalida el permiso, Alhabla no reserva a ciegas: la
+            cita que no puede entrar en tu calendario queda pendiente y te avisa por WhatsApp para que lo reconectes.
           </p>
         </Texto>
         <div className="mt-6">

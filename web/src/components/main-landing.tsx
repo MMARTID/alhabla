@@ -15,7 +15,7 @@ import { LlamadaScroll } from "@/components/llamada-scroll";
 import { GestorSimulacionSection } from "@/components/gestor-simulacion";
 import { PuntosFuertesSection } from "@/components/puntos-fuertes-section";
 import { WhatsAppClientesSection } from "@/components/whatsapp-clientes-section";
-import { generalOwnerAssistant } from "@/lib/niche-landings";
+import { generalOwnerAssistant, nicheLinks } from "@/lib/niche-landings";
 import { HOME_QUICK_FAQS } from "@/lib/home-faqs";
 import { formatExtraMinute, formatIncludedMinutes, plans, TRIAL_REASSURANCE } from "@/lib/plans";
 import { AvisoDeFundador, PrecioDePlan } from "@/components/precio-de-plan";
@@ -36,6 +36,8 @@ const SECTORES = [
   { href: "/centro-de-estetica", title: "Centros de estética", description: "Reservas y dudas resueltas mientras estás en cabina.", imagen: "/heroes/centro-de-estetica.jpg" },
   { href: "/fisioterapia", title: "Fisioterapia", description: "Las citas entran solas mientras tratas en camilla.", imagen: "/heroes/fisioterapia.jpg" },
 ] as const;
+
+const OTROS_SECTORES = nicheLinks.filter(({ href }) => !SECTORES.some((s) => s.href === href));
 
 /**
  * Escritorio: acordeón horizontal. Los cinco sectores comparten una sola
@@ -416,6 +418,16 @@ export function MainLanding() {
             <SectorAccordionVertical sectores={SECTORES} />
             <SectorCarousel sectores={SECTORES} />
           </div>
+          {/* Los sectores con página propia que no caben en el acordeón
+              (pensado para cinco fotos): salen del registro de páginas. */}
+          <Reveal className="mt-8 flex flex-wrap items-center gap-2 text-sm">
+            <span className="mr-1 font-semibold text-tinta">También para</span>
+            {OTROS_SECTORES.map(({ href, label }) => (
+              <Link key={href} href={href} className="btn-secondary h-10 px-4 text-sm">
+                {label}
+              </Link>
+            ))}
+          </Reveal>
         </div>
       </section>
 

@@ -15,7 +15,7 @@ const OTRAS = [
     Icono: Store,
     titulo: "Hecha para tu sector",
     texto:
-      "Peluquerías, barberías, uñas, estética y fisioterapia: arranca con los servicios, las duraciones y las preguntas típicas de tu oficio, no con una plantilla genérica.",
+      "En peluquerías, barberías, uñas, estética y fisioterapia arranca con los servicios típicos de tu oficio y sus duraciones, no con una plantilla genérica.",
   },
   {
     Icono: MessageSquareText,
@@ -25,9 +25,9 @@ const OTRAS = [
   },
   {
     Icono: CalendarX2,
-    titulo: "Si tu calendario falla, te avisa",
+    titulo: "Si tu calendario falla, no reserva a ciegas",
     texto:
-      "Si la conexión con tu calendario caduca, te avisa para que la renueves y ninguna reserva se quede en el aire.",
+      "Si tu calendario no responde, la cita queda pendiente, te llega un WhatsApp con botones para resolverla y se reintenta durante dos días. Si la conexión caduca, te avisa para que la renueves.",
   },
 ] as const;
 

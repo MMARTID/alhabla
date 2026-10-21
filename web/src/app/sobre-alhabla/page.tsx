@@ -62,7 +62,7 @@ export default function SobrePage() {
         {
           question: "¿Desde cuándo existe?",
           answer:
-            "Desde 2026. Las primeras llamadas reales se atendieron en septiembre y en la página de novedades contamos, mes a mes, lo que hemos ido mejorando.",
+            "Desde 2026. Las primeras llamadas por teléfono, en un número real, se atendieron en septiembre, y en la página de novedades contamos, mes a mes, lo que hemos ido mejorando.",
         },
         {
           question: "¿Puedo hablar con una persona antes de contratar?",
@@ -97,7 +97,7 @@ export default function SobrePage() {
         <Tarjetas
           items={[
             { titulo: "Manos para el oficio", texto: "Quien corta, trata o rehabilita no debería elegir entre el cliente que tiene delante y el que llama." },
-            { titulo: "Cada uno, en su lengua", texto: "Castellano, catalán, euskera, gallego y ocho idiomas más. También para quien prefiere llamar antes que escribir." },
+            { titulo: "Cada uno, en su lengua", texto: "Castellano y siete idiomas más, y la lengua cooficial de tu zona: catalán, euskera o gallego. También para quien prefiere llamar antes que escribir." },
             { titulo: "Honestidad por diseño", texto: "Dice que es una inteligencia artificial, nunca promete un hueco que no existe y pregunta antes de grabar." },
             { titulo: "Tecnología que suma personas", texto: "Cubre las llamadas que hoy nadie coge. El trato personal sigue siendo del equipo y el dueño decide siempre." },
             { titulo: "Menos huecos vacíos", texto: "Cada cita que se pierde es tiempo de un profesional que nadie aprovecha. Llenar la agenda es cuidar ese trabajo." },

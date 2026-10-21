@@ -61,6 +61,11 @@ const faqs = [
       "No. El desvío se activa dentro de tu línea: tus clientes marcan el número de siempre y no notan nada. Lo único que cambia es a dónde va la llamada cuando tú no la coges.",
   },
   {
+    question: "¿Cómo sé que el desvío funciona de verdad?",
+    answer:
+      "Con «Comprobar desvío», en Ajustes › Teléfono de tu panel: Alhabla hace una llamada real a la línea de tu negocio y, si no la coges, mira si el desvío la devuelve a tu recepcionista. Si falla, te dice el motivo: la has cogido, la línea comunicaba o no ha saltado el desvío. No gasta minutos de tu plan y puedes repetirla hasta tres veces por hora.",
+  },
+  {
     question: "¿Cuánto me cobra el operador por desviar?",
     answer:
       "Activarlo suele ser gratis, pero cada llamada desviada es una llamada que sale de tu línea hacia el número de Alhabla, y se cobra según tu tarifa. Hay excepciones que conviene conocer: el fijo de Movistar cobra 4 € al mes por cada tipo de desvío, y el de Vodafone 0,182 € por llamada desviada más 0,242 € el minuto, IVA incluido.",
@@ -254,8 +259,9 @@ export default function DesvioDeLlamadasPage() {
             el número de Alhabla y <Codigo>#</Codigo>.
           </p>
           <p>
-            Aquí tienes qué desvío conviene, los códigos estándar y lo que
-            cambia en cada operador, sacado de su ayuda oficial.
+            Aquí tienes qué desvío conviene, los códigos estándar, lo que cambia
+            en cada operador según su ayuda oficial y cómo comprobar con una
+            llamada real que el desvío funciona.
           </p>
         </>
       }
@@ -397,8 +403,8 @@ export default function DesvioDeLlamadasPage() {
                 ],
                 [
                   "Pasar la llamada a tu móvil",
-                  "No hace falta: si la coges tú, ya es tuya",
-                  "Con «Cuándo pasarme llamadas»: nunca, si el cliente lo pide o siempre",
+                  "No la pasa: si puedes cogerla, ya la coges tú",
+                  "Con «Cuándo pasarme llamadas»: nunca, si el cliente lo pide o, solo dentro de tu horario, también ante una queja o una urgencia",
                 ],
                 [
                   "Qué cobra tu operador",
@@ -520,8 +526,63 @@ export default function DesvioDeLlamadasPage() {
         </Seccion>
 
         <Seccion
-          id="operadores"
+          id="comprobar"
           fondo
+          titulo="Comprueba que el desvío funciona"
+          entradilla={
+            <p>
+              Dos pasos: primero preguntas a la red y luego Alhabla hace una
+              llamada real a tu línea para ver si el desvío salta.
+            </p>
+          }
+        >
+          <div className="grid gap-6 lg:grid-cols-2">
+            <div className="panel p-6">
+              <h3 className="text-lg font-bold text-tinta">
+                1. Pregunta a la red
+              </h3>
+              <div className="mt-2 text-sm leading-6 text-muted">
+                <p>
+                  Marca <Codigo>*#61#</Codigo> y pulsa llamar. La pantalla
+                  muestra si el desvío si no contesta está activo, a qué número
+                  va y con cuántos segundos. Lo mismo con <Codigo>*#67#</Codigo>{" "}
+                  y <Codigo>*#62#</Codigo>. Si sale otro número (el del buzón),
+                  el tuyo no se guardó.
+                </p>
+              </div>
+            </div>
+            <div className="panel p-6">
+              <h3 className="text-lg font-bold text-tinta">
+                2. «Comprobar desvío» en tu panel
+              </h3>
+              <div className="mt-2 text-sm leading-6 text-muted">
+                <p>
+                  En <strong>Ajustes › Teléfono</strong>, pulsa «Comprobar
+                  desvío». Alhabla llama de verdad a la línea de tu negocio
+                  desde tu número de Alhabla. No la cojas: si el desvío
+                  funciona, esa llamada vuelve a entrar por Alhabla y el panel
+                  dice «Desvío funcionando». Si no, te dice el motivo: la has
+                  cogido tú (o un contestador), la línea comunicaba o no ha
+                  saltado el desvío.
+                </p>
+              </div>
+            </div>
+          </div>
+          <div className="mt-6">
+            <ListaCheck
+              items={[
+                "No gasta minutos de tu plan de Alhabla.",
+                "Hasta 3 comprobaciones por hora: cada una es una llamada real.",
+                "Funciona con fijos y móviles españoles.",
+                "Si a las 24 horas de tener tu número aún no lo has comprobado y no te ha entrado ninguna llamada, Alhabla te lo recuerda por WhatsApp o por correo.",
+                "Es la prueba que vale para los casos dudosos de esta guía: el fijo de Vodafone, los códigos que un operador no publica o un iPhone con VoLTE.",
+              ]}
+            />
+          </div>
+        </Seccion>
+
+        <Seccion
+          id="operadores"
           titulo="El desvío si no contesta en cada operador"
           entradilla={
             <p>
@@ -552,6 +613,7 @@ export default function DesvioDeLlamadasPage() {
 
         <Seccion
           id="diferencias"
+          fondo
           titulo="Lo que de verdad cambia entre operadores"
           entradilla={
             <p>
@@ -623,7 +685,6 @@ export default function DesvioDeLlamadasPage() {
 
         <Seccion
           id="quitar"
-          fondo
           titulo="Quitar el desvío sin perder el buzón de voz"
           entradilla={
             <p>
@@ -699,58 +760,6 @@ export default function DesvioDeLlamadasPage() {
                   </Link>,
                   "Desde Mi Lowi",
                 ],
-              ]}
-            />
-          </div>
-        </Seccion>
-
-        <Seccion
-          id="comprobar"
-          titulo="Comprueba que el desvío funciona"
-          entradilla={
-            <p>
-              Dos pasos: primero preguntas a la red, luego haces que Alhabla
-              llame de verdad.
-            </p>
-          }
-        >
-          <div className="grid gap-6 lg:grid-cols-2">
-            <div className="panel p-6">
-              <h3 className="text-lg font-bold text-tinta">
-                1. Pregunta a la red
-              </h3>
-              <div className="mt-2 text-sm leading-6 text-muted">
-                <p>
-                  Marca <Codigo>*#61#</Codigo> y pulsa llamar. La pantalla
-                  muestra si el desvío si no contesta está activo, a qué número
-                  va y con cuántos segundos. Lo mismo con <Codigo>*#67#</Codigo>{" "}
-                  y <Codigo>*#62#</Codigo>. Si sale otro número (el del buzón),
-                  el tuyo no se guardó.
-                </p>
-              </div>
-            </div>
-            <div className="panel p-6">
-              <h3 className="text-lg font-bold text-tinta">
-                2. «Comprobar desvío» en tu panel
-              </h3>
-              <div className="mt-2 text-sm leading-6 text-muted">
-                <p>
-                  Alhabla llama a la línea de tu negocio desde tu número de
-                  Alhabla. No la cojas: si el desvío funciona, esa llamada
-                  vuelve a entrar por Alhabla y el panel dice «Desvío
-                  funcionando». Si no, te dice el motivo: la has cogido tú, la
-                  línea comunicaba o no había desvío.
-                </p>
-              </div>
-            </div>
-          </div>
-          <div className="mt-6">
-            <ListaCheck
-              items={[
-                "Funciona con fijos y móviles españoles.",
-                "Puedes repetirla hasta 3 veces por hora.",
-                "Si a las 24 horas de tener tu número aún no lo has comprobado, Alhabla te lo recuerda por WhatsApp.",
-                "Es la prueba que vale para los casos dudosos de esta guía: el fijo de Vodafone, los códigos que un operador no publica o un iPhone con VoLTE.",
               ]}
             />
           </div>

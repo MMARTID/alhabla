@@ -108,6 +108,8 @@ export default function VsCentralitaPage() {
             ["Entender lo que pide el cliente con sus palabras", "Con menús o reconocimiento básico", "Sí, conversando"],
             ["Reservar la cita en tu agenda", "No", "Sí, mirando la agenda real"],
             ["Atender fuera de horario", "Locución y buzón", "Atiende y reserva"],
+            ["Confirmar y recordar la cita", "No", "Por WhatsApp: confirmación en todos los planes, recordatorio en Pro y Scale"],
+            ["Cambiar tu agenda sin abrir un panel", "No", "Escribiendo al Gestor por WhatsApp, con tu «Confirmar»"],
             ["Llamadas salientes y equipo en oficina", "Sí", "No"],
             ["Coste", "Cuota por usuario o extensión", "Cuota con minutos incluidos"],
           ]}

@@ -264,8 +264,8 @@ export default function MensajesDeContestadorPage() {
           </p>
           <p>
             Si son muchas, o llegan cuando tienes las manos ocupadas, la diferencia está en quién resuelve la llamada.
-            Una recepcionista de IA contesta a esas mismas llamadas, mira tu agenda y deja la cita apuntada con su
-            confirmación por WhatsApp, también a las once de la noche. Lo contamos con calma en{" "}
+            Una recepcionista de IA contesta a esas mismas llamadas, mira tu agenda y deja la cita apuntada, con la
+            confirmación por WhatsApp si el cliente la quiere, también a las once de la noche. Lo contamos con calma en{" "}
             <Link href="/blog/contestador-automatico-vs-recepcionista-virtual">contestador automático o recepcionista de IA</Link>.
           </p>
         </Texto>
