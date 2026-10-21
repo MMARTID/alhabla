@@ -19,6 +19,8 @@ import {
   avisarCitaPendiente,
   avisarNuevaReserva,
   avisarRecado,
+  avisarReintentosAgotados,
+  avisarReservaPerdida,
   describirServicio,
   formatearCita,
   formatearCitaCorta,
@@ -146,6 +148,17 @@ describe("helpers de formato", () => {
       "la conexión con tu calendario estaba caducada"
     );
     expect(motivoDeFallo("lo que sea")).toBe("tu calendario no respondió");
+    // El código que escribe voiceTools de verdad (codigoDeReconexion): antes
+    // caía en «no respondió».
+    for (const codigo of [
+      "GOOGLE_CALENDAR_RECONNECT_REQUIRED",
+      "OUTLOOK_CALENDAR_RECONNECT_REQUIRED",
+      "CALDAV_CALENDAR_RECONNECT_REQUIRED",
+    ]) {
+      expect(motivoDeFallo(codigo)).toBe(
+        "la conexión con tu calendario estaba caducada"
+      );
+    }
     // Los códigos del cerrojo que escribe voiceTools: ni uno ni otro es
     // culpa del calendario.
     expect(motivoDeFallo("BOOKING_LOCK_TIMEOUT")).toBe(
@@ -411,6 +424,85 @@ describe("avisarCitaPendiente", () => {
       where: { id: "lead_1" },
       data: { notifiedAt: undefined, notifiedVia: "ninguna:tope por hora" },
     });
+  });
+});
+
+describe("final de una cita pendiente", () => {
+  const FINAL = {
+    businessId: "biz_1",
+    businessName: "Peluquería Ana",
+    timezone: "Europe/Madrid",
+    leadId: "lead_1",
+    clientName: "Juan",
+    clientPhone: "+34600111222",
+    startDateTime: CITA,
+  };
+
+  it("reserva perdida: el motivo, el teléfono para llamarle y un «Vale» con su propia clave", async () => {
+    expect(
+      await avisarReservaPerdida({
+        ...FINAL,
+        motivo: "ese hueco se ha ocupado mientras tanto",
+      })
+    ).toEqual({ via: "interactivo" });
+    const enviado = mockedBotones.mock.calls[0][0];
+    expect(enviado.body).toContain("no he podido dejar la cita de Juan");
+    expect(enviado.body).toContain("ese hueco se ha ocupado mientras tanto");
+    expect(enviado.body).toContain("Llámale al +34600111222");
+    expect(enviado.buttons).toEqual([
+      { id: "aviso:cita_pendiente:lead_1:perdida:vale", title: "Vale" },
+    ]);
+    // No choca con la clave del primer aviso de cita pendiente.
+    expect(vi.mocked(reclamarEnvio)).toHaveBeenCalledWith(
+      "whatsapp",
+      "aviso:cita_pendiente:lead_1:perdida",
+      expect.anything()
+    );
+  });
+
+  it("reserva perdida sin teléfono: no promete una llamada", async () => {
+    await avisarReservaPerdida({
+      ...FINAL,
+      clientPhone: null,
+      motivo: "la hora ya ha pasado",
+    });
+    expect(mockedBotones.mock.calls[0][0].body).toContain("No dejó teléfono");
+  });
+
+  it("sin WhatsApp posible, la reserva perdida cae al email", async () => {
+    mockedBizFindUnique.mockResolvedValue(
+      negocio({ ownerWhatsappOptInAt: null }) as never
+    );
+    const email = vi.fn().mockResolvedValue(undefined);
+    expect(
+      await avisarReservaPerdida({
+        ...FINAL,
+        motivo: "la hora ya ha pasado",
+        email,
+      })
+    ).toEqual({ via: "email", motivo: "el móvil del dueño no está activo" });
+    expect(email).toHaveBeenCalledTimes(1);
+  });
+
+  it("reintentos agotados: los botones de la cita pendiente, con el id del lead tal cual", async () => {
+    expect(await avisarReintentosAgotados(FINAL)).toEqual({
+      via: "interactivo",
+    });
+    const enviado = mockedBotones.mock.calls[0][0];
+    expect(enviado.body).toContain(
+      "llevo dos días sin poder dejar la cita de Juan"
+    );
+    expect(enviado.body).toContain("Su teléfono: +34600111222");
+    expect(enviado.buttons).toEqual([
+      { id: "aviso:cita_pendiente:lead_1:apuntada", title: "La apunté yo" },
+      { id: "aviso:cita_pendiente:lead_1:reintentar", title: "Reintentar" },
+      { id: "aviso:cita_pendiente:lead_1:reconectar", title: "Reconectar" },
+    ]);
+    expect(vi.mocked(reclamarEnvio)).toHaveBeenCalledWith(
+      "whatsapp",
+      "aviso:cita_pendiente:lead_1:agotada",
+      expect.anything()
+    );
   });
 });
 

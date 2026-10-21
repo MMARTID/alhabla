@@ -1,5 +1,5 @@
 import { prisma } from "../lib/prisma.js";
-import { enqueueRetryBookingJob } from "../lib/cloudTasks.js";
+import { enqueueEmailJob, enqueueRetryBookingJob } from "../lib/cloudTasks.js";
 import { buildCalendarIdempotencyKey } from "../lib/calendarIdempotency.js";
 import { calendarService } from "../modules/calendar/service.js";
 import {
@@ -22,7 +22,14 @@ import {
 } from "../lib/availability.js";
 import { acquireBookingLock, releaseBookingLock } from "../lib/bookingLock.js";
 import { RetryFailedBookingJob } from "../lib/jobTypes.js";
-import { avisarCitaRecuperada } from "../modules/whatsapp/avisosNegocio.js";
+import {
+  avisarCitaRecuperada,
+  avisarReintentosAgotados,
+  avisarReservaPerdida,
+} from "../modules/whatsapp/avisosNegocio.js";
+import { finalDeReservaPendienteEmail } from "../lib/emailTemplates.js";
+import { errorMessage } from "../lib/logUtils.js";
+import { appUrl } from "../lib/urls.js";
 import { programarMensajesAlCliente } from "../modules/whatsapp/mensajesCliente.js";
 import { whatsappAdapter } from "../adapters/whatsapp/WhatsAppAdapter.js";
 import { anularLaCitaCambiada } from "../modules/bookings/reservaModificada.js";
@@ -63,6 +70,102 @@ async function abandonLead(leadId: string, reason: string): Promise<void> {
   });
 }
 
+/** Lo que necesitan los avisos del final de una cita pendiente. */
+interface FinalDeLaCita {
+  leadId: string;
+  businessId: string;
+  businessName: string;
+  timezone: string;
+  clientName: string;
+  clientPhone: string | null;
+  startDate: Date;
+}
+
+/** Por qué una cita pendiente ya no cabe, en palabras del dueño. */
+const MOTIVO_DE_RESTRICCION: Record<string, string> = {
+  APPOINTMENT_IN_PAST: "la hora ya ha pasado",
+  MIN_ADVANCE_NOT_MET:
+    "ya no queda la antelación mínima que pides para reservar",
+  TOO_FAR_IN_ADVANCE: "la fecha queda más lejos de lo que permites reservar",
+  MAX_DURATION_EXCEEDED: "la cita dura más de lo que permites",
+  INVALID_DATE_TIME: "la fecha de la cita no era válida",
+};
+
+/** El email de respaldo de los dos avisos del final. Nunca lanza. */
+function emailDelFinal(
+  cita: FinalDeLaCita,
+  tipo: "perdida" | "agotada",
+  motivo?: string
+): () => Promise<void> {
+  return async () => {
+    try {
+      const negocio = await prisma.business.findUnique({
+        where: { id: cita.businessId },
+        select: { users: { select: { email: true }, take: 1 } },
+      });
+      const email = negocio?.users[0]?.email;
+      if (!email) {
+        console.warn(
+          `[Job] Lead ${cita.leadId} (${tipo}): el negocio ${cita.businessId} no tiene email; el aviso no sale por ninguna vía`
+        );
+        return;
+      }
+      const formattedDateTime = new Intl.DateTimeFormat("es-ES", {
+        timeZone: cita.timezone,
+        weekday: "long",
+        day: "numeric",
+        month: "long",
+        hour: "2-digit",
+        minute: "2-digit",
+      }).format(cita.startDate);
+      const { subject, html } = finalDeReservaPendienteEmail({
+        tipo,
+        businessName: cita.businessName,
+        clientName: cita.clientName,
+        clientPhone: cita.clientPhone,
+        formattedDateTime,
+        motivo,
+        panelUrl: `${appUrl()}/`,
+      });
+      await enqueueEmailJob(
+        { fromAlias: "support", toAddress: email, subject, html },
+        `reserva-${tipo}-${cita.leadId}`
+      );
+    } catch (error) {
+      console.error(
+        `[Job] Lead ${cita.leadId} (${tipo}): no se pudo encolar el email al negocio ${cita.businessId}: ${errorMessage(error)}`
+      );
+    }
+  };
+}
+
+/**
+ * La cita ya no se puede hacer (hueco ocupado, fuera de horario o de plazo):
+ * se cierra el lead y se avisa al dueño, porque al cliente se le dijo «he
+ * tomado nota para confirmártela». Antes se cerraba en silencio.
+ */
+async function perderReserva(
+  cita: FinalDeLaCita,
+  motivoDelLog: string,
+  motivo: string
+): Promise<void> {
+  await abandonLead(cita.leadId, motivoDelLog);
+  const aviso = await avisarReservaPerdida({
+    businessId: cita.businessId,
+    businessName: cita.businessName,
+    timezone: cita.timezone,
+    leadId: cita.leadId,
+    clientName: cita.clientName,
+    clientPhone: cita.clientPhone,
+    startDateTime: cita.startDate,
+    motivo,
+    email: emailDelFinal(cita, "perdida", motivo),
+  });
+  console.log(
+    `[Job] Lead ${cita.leadId} perdido (${motivoDelLog}); aviso al negocio ${cita.businessId}: ${aviso.via}${aviso.motivo ? ` (${aviso.motivo})` : ""}`
+  );
+}
+
 /**
  * Reintenta en segundo plano una reserva que falló durante la llamada (ver
  * capturePendingBookingLead en voiceTools/service.ts) por un fallo probablemente
@@ -75,6 +178,45 @@ async function abandonLead(leadId: string, reason: string): Promise<void> {
  * un negocio pequeño en darse cuenta por el aviso del panel o del correo. */
 const HORAS_ENTRE_REINTENTOS = 6;
 const MAX_REINTENTOS_POR_CALENDARIO = 8;
+
+/**
+ * El calendario está desconectado: se reprograma el propio reintento unas
+ * horas más tarde y, agotado el plazo, se avisa al dueño. Antes esto lanzaba,
+ * y Cloud Tasks gastaba sus cuatro reintentos en cuestión de minutos mientras
+ * el negocio tardaba días en reconectar; y al agotar el plazo no se avisaba
+ * a nadie. La cita sigue sin resolver (panel, resumen semanal) para que el
+ * dueño la apunte o la reintente desde el aviso.
+ */
+async function esperarAlCalendario(
+  intento: number | undefined,
+  cita: FinalDeLaCita
+): Promise<void> {
+  const siguienteIntento = (intento ?? 0) + 1;
+  if (siguienteIntento <= MAX_REINTENTOS_POR_CALENDARIO) {
+    await enqueueRetryBookingJob(
+      { leadId: cita.leadId, attempt: siguienteIntento },
+      `retry-failed-booking-${cita.leadId}-${siguienteIntento}`,
+      new Date(Date.now() + HORAS_ENTRE_REINTENTOS * 60 * 60 * 1000)
+    );
+    console.log(
+      `[Job] Calendario de ${cita.businessId} aún desconectado; reintento ${siguienteIntento}/${MAX_REINTENTOS_POR_CALENDARIO} del lead ${cita.leadId} programado para dentro de ${HORAS_ENTRE_REINTENTOS}h`
+    );
+    return;
+  }
+  const aviso = await avisarReintentosAgotados({
+    businessId: cita.businessId,
+    businessName: cita.businessName,
+    timezone: cita.timezone,
+    leadId: cita.leadId,
+    clientName: cita.clientName,
+    clientPhone: cita.clientPhone,
+    startDateTime: cita.startDate,
+    email: emailDelFinal(cita, "agotada"),
+  });
+  console.warn(
+    `[Job] Lead ${cita.leadId}: se agotaron los reintentos con el calendario desconectado; queda pendiente de gestión manual. Aviso al negocio ${cita.businessId}: ${aviso.via}${aviso.motivo ? ` (${aviso.motivo})` : ""}`
+  );
+}
 
 export async function processRetryFailedBookingJob(
   data: RetryFailedBookingJob
@@ -126,31 +268,31 @@ export async function processRetryFailedBookingJob(
     );
   }
 
+  // Igual que en la reserva en vivo: si el cliente no dio un teléfono
+  // distinto, se usa el de la llamada, si es un teléfono (con número
+  // oculto el evento decía «Teléfono: anonymous»). El del lead se
+  // normaliza: los anteriores al 16-10 se guardaban tal cual los dictaba.
+  const effectiveClientPhone =
+    normalizarTelefono(data_.clientPhone) ??
+    (call.fromNumber && isValidE164Phone(call.fromNumber)
+      ? call.fromNumber
+      : undefined);
+
+  const cita: FinalDeLaCita = {
+    leadId,
+    businessId: call.businessId,
+    businessName: business.name,
+    timezone: business.timezone || "Europe/Madrid",
+    clientName: data_.clientName,
+    clientPhone: effectiveClientPhone ?? null,
+    startDate,
+  };
+
   const conexion = resolverConexionDeCalendario(business);
 
   if (!conexionOperativa(conexion)) {
-    // El negocio sigue sin reconectar el calendario. Antes esto lanzaba, y
-    // Cloud Tasks gastaba sus cuatro reintentos en cuestión de minutos
-    // mientras el negocio tardaba días en reconectar: el lead se quedaba
-    // pendiente para siempre y nadie volvía a intentarlo. Ahora se reprograma
-    // el propio reintento unas horas más tarde, hasta agotar el plazo.
-    const siguienteIntento = (data.attempt ?? 0) + 1;
-    if (siguienteIntento <= MAX_REINTENTOS_POR_CALENDARIO) {
-      await enqueueRetryBookingJob(
-        { leadId, attempt: siguienteIntento },
-        `retry-failed-booking-${leadId}-${siguienteIntento}`,
-        new Date(Date.now() + HORAS_ENTRE_REINTENTOS * 60 * 60 * 1000)
-      );
-      console.log(
-        `[Job] Calendario de ${call.businessId} aún desconectado; reintento ${siguienteIntento}/${MAX_REINTENTOS_POR_CALENDARIO} del lead ${leadId} programado para dentro de ${HORAS_ENTRE_REINTENTOS}h`
-      );
-      return;
-    }
-    // Agotado el plazo: el lead sigue sin resolver, visible en el panel y en
-    // el resumen semanal del negocio, que es quien tiene que llamar al cliente.
-    console.warn(
-      `[Job] Lead ${leadId}: se agotaron los reintentos con el calendario desconectado; queda pendiente de gestión manual`
-    );
+    // El negocio sigue sin reconectar el calendario (ver esperarAlCalendario).
+    await esperarAlCalendario(data.attempt, cita);
     return;
   }
 
@@ -272,9 +414,10 @@ export async function processRetryFailedBookingJob(
       data_.durationMinutes
     );
     if (!businessHours.success || !businessHours.isOpen) {
-      await abandonLead(
-        leadId,
-        `fuera del horario actual del negocio (${businessHours.code ?? "sin código"})`
+      await perderReserva(
+        cita,
+        `fuera del horario actual del negocio (${businessHours.code ?? "sin código"})`,
+        "esa hora ya queda fuera de tu horario"
       );
       return;
     }
@@ -285,7 +428,12 @@ export async function processRetryFailedBookingJob(
       data_.durationMinutes
     );
     if (!restrictions.success) {
-      await abandonLead(leadId, restrictions.code);
+      await perderReserva(
+        cita,
+        restrictions.code,
+        MOTIVO_DE_RESTRICCION[restrictions.code] ??
+          "la cita ya no cumple tus reglas de reserva"
+      );
       return;
     }
 
@@ -351,24 +499,15 @@ export async function processRetryFailedBookingJob(
         : {}),
     });
     if (!availability.available) {
-      await abandonLead(
-        leadId,
-        `${availability.code} (el hueco se ocupó mientras esperaba el reintento)`
+      await perderReserva(
+        cita,
+        `${availability.code} (el hueco se ocupó mientras esperaba el reintento)`,
+        "ese hueco se ha ocupado mientras tanto"
       );
       return;
     }
     const resolvedProfessionalId =
       verifiedProfessionalId ?? availability.availableProfessionals[0]?.id;
-
-    // Igual que en la reserva en vivo: si el cliente no dio un teléfono
-    // distinto, se usa el de la llamada, si es un teléfono (con número
-    // oculto el evento decía «Teléfono: anonymous»). El del lead se
-    // normaliza: los anteriores al 16-10 se guardaban tal cual los dictaba.
-    const effectiveClientPhone =
-      normalizarTelefono(data_.clientPhone) ??
-      (call.fromNumber && isValidE164Phone(call.fromNumber)
-        ? call.fromNumber
-        : undefined);
 
     let result: unknown;
     try {
@@ -406,10 +545,13 @@ export async function processRetryFailedBookingJob(
           { modo: "revocar" },
           { prefijo: "[Job]" }
         );
-        await abandonLead(
-          leadId,
-          `conexión de ${DESCRIPTORES_DE_PROVEEDOR[proveedorRoto].nombreCorto} revocada o expirada; requiere reconexión manual`
+        // Antes el lead se cerraba aquí y la cita se perdía aunque el dueño
+        // reconectara al rato. Ahora espera como cualquier cita con el
+        // calendario desconectado: se reintenta cada 6 h hasta dos días.
+        console.warn(
+          `[Job] Lead ${leadId}: la conexión de ${DESCRIPTORES_DE_PROVEEDOR[proveedorRoto].nombreCorto} está revocada o expirada; la cita espera a que el negocio reconecte`
         );
+        await esperarAlCalendario(data.attempt, cita);
         return;
       }
       throw error;

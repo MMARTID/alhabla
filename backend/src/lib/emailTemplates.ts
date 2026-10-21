@@ -195,6 +195,44 @@ export function pendingBookingAlertEmail(input: {
   return { subject, html };
 }
 
+/**
+ * Respaldo por email del final de una cita pendiente (jobs/
+ * retryFailedBooking.ts): `perdida` cuando el reintento ya no puede hacerla
+ * (el lead se cierra); `agotada` cuando se acabaron los reintentos con el
+ * calendario desconectado (sigue pendiente, a mano).
+ */
+export function finalDeReservaPendienteEmail(input: {
+  tipo: "perdida" | "agotada";
+  businessName: string;
+  clientName: string;
+  clientPhone: string | null;
+  formattedDateTime: string;
+  /** Solo en `perdida`: «ese hueco se ha ocupado mientras tanto». */
+  motivo?: string;
+  panelUrl: string;
+}): { subject: string; html: string } {
+  const contacto = input.clientPhone
+    ? `<strong>${escaparHtml(input.clientName)}</strong> (${escaparHtml(input.clientPhone)})`
+    : `<strong>${escaparHtml(input.clientName)}</strong>`;
+  const perdida = input.tipo === "perdida";
+  const subject = perdida
+    ? `Una cita no ha podido entrar en tu calendario — ${input.businessName}`
+    : `Una cita sigue sin entrar en tu calendario — ${input.businessName}`;
+  const explicacion = perdida
+    ? `No ha podido entrar en tu calendario porque ${escaparHtml(input.motivo ?? "ya no cabía")}, así que ya no lo intentamos más.`
+    : "Tu calendario lleva dos días desconectado y ya no lo intentamos más solos.";
+  const accion = perdida
+    ? `La recepcionista le dijo que se la confirmaríais: ${input.clientPhone ? "llámale para darle otra hora." : "no dejó teléfono; si vuelve a llamar, la recepcionista le dará otra hora."}`
+    : "Reconecta el calendario en el panel y vuelve a intentarlo, o apúntala tú a mano.";
+  const html = emailShell(`
+    <p style="font-size:18px;font-weight:600;margin:0 0 16px 0;">${perdida ? "Hay un cliente al que llamar" : "Hay una cita pendiente de apuntar a mano"}</p>
+    <p style="margin:0 0 16px 0;">${contacto} pidió cita para el <strong>${escaparHtml(input.formattedDateTime)}</strong>. ${explicacion}</p>
+    <p style="margin:0;">${escaparHtml(accion)}</p>
+    ${ctaButton(input.panelUrl, "Ver las citas pendientes")}
+  `);
+  return { subject, html };
+}
+
 /** Aviso #2 (recado) cuando el dueño no tiene WhatsApp activo. */
 export function messageLeadEmail(input: {
   businessName: string;

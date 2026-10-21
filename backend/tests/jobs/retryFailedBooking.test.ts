@@ -1,6 +1,13 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { filaDeConexion } from "../helpers/conexionDeCalendario.js";
-import { enqueueRetryBookingJob } from "../../src/lib/cloudTasks.js";
+import {
+  enqueueEmailJob,
+  enqueueRetryBookingJob,
+} from "../../src/lib/cloudTasks.js";
+import {
+  avisarReintentosAgotados,
+  avisarReservaPerdida,
+} from "../../src/modules/whatsapp/avisosNegocio.js";
 import { processRetryFailedBookingJob } from "../../src/jobs/retryFailedBooking.js";
 import { prisma } from "../../src/lib/prisma.js";
 import { calendarService } from "../../src/modules/calendar/service.js";
@@ -24,9 +31,12 @@ import { anularLaCitaCambiada } from "../../src/modules/bookings/reservaModifica
 
 vi.mock("../../src/lib/cloudTasks.js", () => ({
   enqueueRetryBookingJob: vi.fn(),
+  enqueueEmailJob: vi.fn(),
 }));
 vi.mock("../../src/modules/whatsapp/avisosNegocio.js", () => ({
   avisarCitaRecuperada: vi.fn().mockResolvedValue({ via: "interactivo" }),
+  avisarReservaPerdida: vi.fn().mockResolvedValue({ via: "interactivo" }),
+  avisarReintentosAgotados: vi.fn().mockResolvedValue({ via: "interactivo" }),
 }));
 vi.mock("../../src/modules/whatsapp/mensajesCliente.js", () => ({
   programarMensajesAlCliente: vi
@@ -261,9 +271,20 @@ describe("processRetryFailedBookingJob", () => {
     await processRetryFailedBookingJob({ leadId, attempt: 8 });
 
     // El lead sigue sin resolver: aparece en el panel y en el resumen
-    // semanal para que el negocio llame al cliente.
+    // semanal. Y ahora el dueño se entera (antes no se avisaba a nadie).
     expect(mockedEnqueueRetryBookingJob).not.toHaveBeenCalled();
     expect(mockedBookAppointment).not.toHaveBeenCalled();
+    expect(mockedLeadUpdate).not.toHaveBeenCalled();
+    expect(vi.mocked(avisarReintentosAgotados)).toHaveBeenCalledWith(
+      expect.objectContaining({
+        businessId: "biz_1",
+        leadId,
+        clientName: "Ana García",
+        clientPhone: "+34600123456",
+        startDateTime: new Date(pendingBookingData.startDateTime),
+        email: expect.any(Function),
+      })
+    );
   });
 
   it("reprograma también si Outlook es el proveedor y sigue sin reconectar", async () => {
@@ -561,7 +582,7 @@ describe("processRetryFailedBookingJob", () => {
     expect(lockOrder).toBeLessThan(idempotencyCheckOrder);
   });
 
-  it("marca el calendario como desconectado y resuelve el lead (sin relanzar) si bookAppointment falla por reconexión requerida", async () => {
+  it("marca el calendario como desconectado y deja la cita esperando a que reconecte si bookAppointment falla por reconexión requerida", async () => {
     mockedLeadFindUnique.mockResolvedValue(buildLead() as any);
     mockedCallFindUnique.mockResolvedValue({ businessId: "biz_1" } as any);
     mockedBusinessFindUnique.mockResolvedValue(buildBusiness() as any);
@@ -598,12 +619,113 @@ describe("processRetryFailedBookingJob", () => {
     expect(almacenEnMemoria.borrarClave).toHaveBeenCalledWith(
       "voice_config:biz_1"
     );
-    // abandonLead usa prisma.lead.update directamente (fuera de la
-    // transacción del camino feliz), no el tx.lead.update mockeado como
-    // mockLeadUpdate.
-    expect(mockedLeadUpdate).toHaveBeenCalledWith({
-      where: { id: leadId },
-      data: { resolvedAt: expect.any(Date) },
+    // Antes el lead se cerraba aquí y la cita se perdía aunque el dueño
+    // reconectara al rato: ahora espera como cualquier cita con el
+    // calendario desconectado.
+    expect(mockedLeadUpdate).not.toHaveBeenCalled();
+    expect(mockedEnqueueRetryBookingJob).toHaveBeenCalledWith(
+      { leadId, attempt: 1 },
+      `retry-failed-booking-${leadId}-1`,
+      expect.any(Date)
+    );
+    expect(vi.mocked(avisarReservaPerdida)).not.toHaveBeenCalled();
+  });
+
+  describe("cuando la cita ya no se puede hacer", () => {
+    beforeEach(() => {
+      mockedLeadFindUnique.mockResolvedValue(buildLead() as any);
+      mockedCallFindUnique.mockResolvedValue({ businessId: "biz_1" } as any);
+      mockedBusinessFindUnique.mockResolvedValue(
+        buildBusiness({
+          name: "Peluquería Ana",
+          timezone: "Europe/Madrid",
+        }) as any
+      );
+    });
+
+    it("hueco ocupado: cierra el lead y avisa al dueño con el teléfono del cliente", async () => {
+      mockedCheckAvailability.mockResolvedValue({
+        available: false,
+        code: "NO_CAPACITY",
+        message: "",
+      } as any);
+
+      await processRetryFailedBookingJob({ leadId });
+
+      expect(mockedBookAppointment).not.toHaveBeenCalled();
+      expect(mockedLeadUpdate).toHaveBeenCalledWith({
+        where: { id: leadId },
+        data: { resolvedAt: expect.any(Date) },
+      });
+      expect(vi.mocked(avisarReservaPerdida)).toHaveBeenCalledWith(
+        expect.objectContaining({
+          businessId: "biz_1",
+          businessName: "Peluquería Ana",
+          leadId,
+          clientName: "Ana García",
+          clientPhone: "+34600123456",
+          motivo: "ese hueco se ha ocupado mientras tanto",
+        })
+      );
+    });
+
+    it("fuera de horario o con la hora ya pasada: lo dice con palabras", async () => {
+      mockedCheckBusinessHours.mockReturnValueOnce({
+        success: true,
+        isOpen: false,
+      } as any);
+      await processRetryFailedBookingJob({ leadId });
+      expect(vi.mocked(avisarReservaPerdida)).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          motivo: "esa hora ya queda fuera de tu horario",
+        })
+      );
+
+      mockedCheckBookingRestrictions.mockReturnValueOnce({
+        success: false,
+        code: "APPOINTMENT_IN_PAST",
+      } as any);
+      await processRetryFailedBookingJob({ leadId });
+      expect(vi.mocked(avisarReservaPerdida)).toHaveBeenLastCalledWith(
+        expect.objectContaining({ motivo: "la hora ya ha pasado" })
+      );
+    });
+
+    it("el respaldo por email va al correo del dueño", async () => {
+      mockedCheckAvailability.mockResolvedValue({
+        available: false,
+        code: "NO_CAPACITY",
+        message: "",
+      } as any);
+      await processRetryFailedBookingJob({ leadId });
+      const { email } = vi.mocked(avisarReservaPerdida).mock.calls[0][0];
+
+      mockedBusinessFindUnique.mockResolvedValue({
+        users: [{ email: "dueno@peluqueria.es" }],
+      } as any);
+      await email!();
+
+      expect(vi.mocked(enqueueEmailJob)).toHaveBeenCalledWith(
+        expect.objectContaining({
+          toAddress: "dueno@peluqueria.es",
+          subject: expect.stringContaining(
+            "no ha podido entrar en tu calendario"
+          ),
+        }),
+        `reserva-perdida-${leadId}`
+      );
+    });
+
+    it("si ya había una reserva para esa llamada no es una pérdida: no avisa", async () => {
+      mockedBookingFindUnique.mockResolvedValue({
+        externalEventId: "evt_1",
+        programedAt: new Date(pendingBookingData.startDateTime),
+        durationMinutes: 30,
+      } as any);
+
+      await processRetryFailedBookingJob({ leadId });
+
+      expect(vi.mocked(avisarReservaPerdida)).not.toHaveBeenCalled();
     });
   });
 
