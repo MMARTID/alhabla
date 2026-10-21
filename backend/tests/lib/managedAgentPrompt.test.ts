@@ -1032,7 +1032,7 @@ describe("buildManagedAgentPrompt — «Dar precios»", () => {
       "si la información del negocio dice otro, vale el de get_catalog"
     );
     expect(texto).toContain(
-      "Si un servicio viene sin precio, no lo inventes ni lo calcules"
+      "Si un servicio viene sin precio, o get_catalog no trae ningún precio, trátalo como sin precio y no lo inventes ni lo calcules"
     );
     // Sin precio en el catálogo vale lo que el negocio explica de cómo se
     // fija («con presupuesto»), nunca una cifra que no esté escrita.
