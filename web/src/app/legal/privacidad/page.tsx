@@ -31,11 +31,11 @@ export default function PrivacidadPage() {
     >
       <LegalSection title="Quién es el responsable">
         <p>
-          Esta política se aplica específicamente a <strong className="font-semibold text-[#0a0a0a]">Alhabla</strong>.
-          El responsable del tratamiento es <strong className="font-semibold text-[#0a0a0a]">Miguel Martín
+          Esta política se aplica específicamente a <strong className="font-semibold text-tinta">Alhabla</strong>.
+          El responsable del tratamiento es <strong className="font-semibold text-tinta">Miguel Martín
           Delgado</strong>, profesional autónomo con NIF 49456776Z y domicilio fiscal en Carrer Sot De Bacs 175,
           08470 Sant Celoni, Barcelona. Para cualquier cuestión sobre privacidad puedes escribir a{" "}
-          <a href="mailto:privacidad@alhabla.ai" className="font-medium text-[#6d28d9] underline underline-offset-2">
+          <a href="mailto:privacidad@alhabla.ai" className="font-medium text-morado-tinta underline underline-offset-2">
             privacidad@alhabla.ai
           </a>{" "}
           . Alhabla es una actividad profesional de autónomo, no una sociedad mercantil.
@@ -84,7 +84,7 @@ export default function PrivacidadPage() {
         </p>
         <p>
           En la demo hablas con una inteligencia artificial y{" "}
-          <strong className="font-semibold text-[#0a0a0a]">no grabamos el audio</strong>. La conversación se transcribe
+          <strong className="font-semibold text-tinta">no grabamos el audio</strong>. La conversación se transcribe
           en tiempo real, a través de nuestro proveedor de voz, para que la recepcionista te entienda y te responda, y
           guardamos esa transcripción (solo el texto) para revisar y mejorar las demos. Al pulsar «Empezar demo»
           aceptas ese uso. La demo no crea ninguna cita real ni queda asociada a ninguna cuenta.
@@ -133,9 +133,9 @@ export default function PrivacidadPage() {
         <p>
           Esto es importante y conviene que lo sepas antes de contratar, porque afecta a las personas que llaman a tu
           negocio: las llamadas que atiende tu recepcionista de IA{" "}
-          <strong className="font-semibold text-[#0a0a0a]">se transcriben y se clasifican</strong> para que puedas
+          <strong className="font-semibold text-tinta">se transcriben y se clasifican</strong> para que puedas
           consultarlas en tu panel, saber qué pidió cada cliente y comprobar que la cita se registró bien, y{" "}
-          <strong className="font-semibold text-[#0a0a0a]">solo se graban si quien llama da permiso</strong>.
+          <strong className="font-semibold text-tinta">solo se graban si quien llama da permiso</strong>.
         </p>
         <p>
           Al descolgar, la recepcionista dice que es una inteligencia artificial. Cuando un cliente pide un servicio por
@@ -150,8 +150,9 @@ export default function PrivacidadPage() {
           los datos de tu cuenta, facturación y seguridad del servicio, Alhabla es responsable del tratamiento.
         </p>
         <p>
-          Las grabaciones y transcripciones se almacenan cifradas y solo son accesibles desde tu cuenta. Puedes
-          solicitar su eliminación escribiéndonos.
+          En Alhabla, las grabaciones y transcripciones se almacenan cifradas y solo son accesibles desde tu cuenta.
+          Telnyx, nuestro proveedor de telefonía, guarda además su propia copia, como explicamos en «Cuánto tiempo
+          conservamos los datos». Puedes solicitar la eliminación de la nuestra escribiéndonos.
         </p>
       </LegalSection>
 
@@ -160,16 +161,17 @@ export default function PrivacidadPage() {
           La recepcionista utiliza inteligencia artificial para comprender la llamada, producir una transcripción,
           clasificar su resultado y proponer o registrar una cita conforme a la configuración del negocio. No usamos esos
           procesos para adoptar decisiones automatizadas que produzcan efectos jurídicos o efectos equivalentes
-          significativos sobre quien llama. La persona puede pedir atención humana o contactar directamente con el
-          negocio cuando una respuesta o reserva no sea correcta.
+          significativos sobre quien llama. Cuando una respuesta o una reserva no sea correcta, la persona puede dejar
+          un recado para el negocio o contactar con él directamente. Si el negocio usa el número de Alhabla como su
+          número principal y lo ha activado, también puede pedir que le pasen la llamada a una persona del negocio.
         </p>
       </LegalSection>
 
       <LegalSection title="Tu calendario">
         <p>
-          Si conectas Google Calendar o Outlook, te pedimos permiso para consultar tu disponibilidad y crear, modificar
-          o cancelar citas. No leemos el contenido de tu correo, Drive, contactos ni otros servicios ajenos al
-          calendario que conectas.
+          Si conectas Google Calendar, Outlook o el Calendario de Apple (iCloud), te pedimos permiso para consultar tu
+          disponibilidad y crear, modificar o cancelar citas. No leemos el contenido de tu correo, Drive, contactos ni
+          otros servicios ajenos al calendario que conectas.
         </p>
         <p>
           En Google Calendar solicitamos únicamente los permisos <code>calendar.events</code>, para gestionar las
@@ -179,11 +181,17 @@ export default function PrivacidadPage() {
           administración de calendarios.
         </p>
         <p>
-          Los tokens de acceso y renovación se almacenan cifrados en reposo. Los usamos exclusivamente para prestar la
-          funcionalidad de agenda solicitada por el negocio; no los vendemos, usamos para publicidad ni empleamos para
-          entrenar modelos. Puedes revocar el acceso desde los ajustes de seguridad de Google o Microsoft, o desconectar
-          el calendario desde el panel; en ambos casos la recepcionista deja de poder reservar. Cuando revocas el acceso,
-          eliminamos las credenciales de conexión almacenadas.
+          El Calendario de Apple se conecta por CalDAV, el protocolo de calendarios de iCloud, con tu Apple ID y una
+          contraseña de aplicación que generas tú en tu cuenta de Apple; nunca te pedimos la contraseña de tu cuenta.
+          Solo la usamos para leer y escribir en el calendario que eliges.
+        </p>
+        <p>
+          Los tokens de acceso y renovación, y la contraseña de aplicación de Apple, se almacenan cifrados en reposo.
+          Los usamos exclusivamente para prestar la funcionalidad de agenda solicitada por el negocio; no los vendemos,
+          usamos para publicidad ni empleamos para entrenar modelos. Puedes revocar el acceso cuando quieras desde los
+          ajustes de seguridad de tu cuenta de Google o de Microsoft, o borrando la contraseña de aplicación en tu
+          cuenta de Apple; desde ese momento la recepcionista deja de poder consultar tu agenda y reservar. Las
+          credenciales guardadas dejan de servir, y las borramos al eliminar tu cuenta o antes si nos lo pides.
         </p>
       </LegalSection>
 
@@ -205,7 +213,7 @@ export default function PrivacidadPage() {
             href="https://developers.google.com/terms/api-services-user-data-policy"
             target="_blank"
             rel="noreferrer"
-            className="font-medium text-[#6d28d9] underline underline-offset-2"
+            className="font-medium text-morado-tinta underline underline-offset-2"
           >
             Política de Datos de Usuario de los Servicios API de Google
           </a>{" "}
@@ -219,7 +227,7 @@ export default function PrivacidadPage() {
         </p>
         <ul className="list-disc space-y-2 pl-5">
           <li>
-            <strong className="font-semibold text-[#0a0a0a]">Telnyx.</strong> Proporciona telefonía, mensajería y
+            <strong className="font-semibold text-tinta">Telnyx.</strong> Proporciona telefonía, mensajería y
             WhatsApp para cursar llamadas y comunicaciones del servicio, y la recepcionista con inteligencia
             artificial que atiende a quien llama o escribe por WhatsApp: transcribe la voz, genera las respuestas y,
             en las llamadas, las convierte en voz. Para generar las respuestas usa un modelo de lenguaje de OpenAI,
@@ -228,7 +236,7 @@ export default function PrivacidadPage() {
               href="https://telnyx.com/privacy-policy"
               target="_blank"
               rel="noreferrer"
-              className="font-medium text-[#6d28d9] underline underline-offset-2"
+              className="font-medium text-morado-tinta underline underline-offset-2"
             >
               política de privacidad
             </a>{" "}
@@ -237,26 +245,26 @@ export default function PrivacidadPage() {
               href="https://telnyx.com/legal/data-processing-addendum"
               target="_blank"
               rel="noreferrer"
-              className="font-medium text-[#6d28d9] underline underline-offset-2"
+              className="font-medium text-morado-tinta underline underline-offset-2"
             >
               anexo de tratamiento de datos
             </a>
             .
           </li>
           <li>
-            <strong className="font-semibold text-[#0a0a0a]">Google Cloud.</strong> Aloja el servidor y la base de datos
+            <strong className="font-semibold text-tinta">Google Cloud.</strong> Aloja el servidor y la base de datos
             de Alhabla en la Unión Europea (Bélgica).
           </li>
           <li>
-            <strong className="font-semibold text-[#0a0a0a]">Stripe.</strong> Gestiona la suscripción y los pagos.
+            <strong className="font-semibold text-tinta">Stripe.</strong> Gestiona la suscripción y los pagos.
             Alhabla no almacena los datos completos de tu tarjeta.
           </li>
           <li>
-            <strong className="font-semibold text-[#0a0a0a]">Google y Microsoft.</strong> Prestan los servicios de
-            calendario que conectas voluntariamente.
+            <strong className="font-semibold text-tinta">Google, Microsoft y Apple.</strong> Prestan los servicios
+            de calendario que conectas voluntariamente (Google Calendar, Outlook y el Calendario de iCloud).
           </li>
           <li>
-            <strong className="font-semibold text-[#0a0a0a]">Cloudflare R2, Vercel y Zoho Mail.</strong> Permiten,
+            <strong className="font-semibold text-tinta">Cloudflare R2, Vercel y Zoho Mail.</strong> Permiten,
             respectivamente, almacenar grabaciones cifradas, servir la aplicación y entregar correos transaccionales.
           </li>
         </ul>
@@ -278,12 +286,22 @@ export default function PrivacidadPage() {
 
       <LegalSection title="Cuánto tiempo conservamos los datos">
         <p>
-          Las grabaciones se conservan durante 30 días. Las transcripciones, los resúmenes de las llamadas y los
-          mensajes de WhatsApp recibidos se conservan durante 90 días. Después se eliminan. Los datos de la cuenta,
-          negocio, configuración y reservas se conservan mientras la suscripción esté activa y durante tres meses tras
-          la baja, salvo que debamos conservarlos bloqueados para atender responsabilidades legales. Las credenciales de
-          calendario se eliminan cuando revocas el acceso. Al terminar cada plazo, los datos se eliminan o se anonimizan,
-          salvo conservación obligatoria o necesaria para formular, ejercer o defender reclamaciones.
+          En Alhabla, las grabaciones se conservan durante 30 días. Las transcripciones, los resúmenes de las llamadas y
+          los mensajes de WhatsApp recibidos se conservan durante 90 días. Después se eliminan.
+        </p>
+        <p>
+          Esos plazos son los de nuestra copia. Telnyx, que presta la telefonía y la recepcionista, conserva además
+          su propia copia de las conversaciones y, si la llamada se grabó, de la grabación, durante el tiempo que marque
+          su política de conservación, que no fijamos nosotros. Puedes consultarla en los enlaces de Telnyx del apartado
+          «Con quién compartimos datos».
+        </p>
+        <p>
+          Los datos de la cuenta, el negocio, la configuración y las reservas se conservan mientras tengas la cuenta.
+          Cuando la eliminas desde el panel, los borramos junto con el negocio y todo lo que depende de él, como
+          explicamos en «Cómo eliminar tus datos». Cancelar la suscripción no elimina la cuenta: si quieres que la
+          borremos nosotros, escríbenos. Las credenciales de calendario se borran al eliminar la cuenta o antes, a
+          petición tuya. En todos los casos conservamos, bloqueado, solo lo que la ley nos obligue a guardar o lo
+          necesario para formular, ejercer o defender reclamaciones.
         </p>
         <p>
           La información de facturación se conserva durante seis años, conforme a las obligaciones contables y fiscales
@@ -295,7 +313,7 @@ export default function PrivacidadPage() {
         <p>
           Puedes solicitar acceso a tus datos, su rectificación o supresión, la limitación u oposición al tratamiento,
           y la portabilidad; también puedes retirar el consentimiento cuando esa sea la base del tratamiento. Escríbenos a{" "}
-          <a href="mailto:privacidad@alhabla.ai" className="font-medium text-[#6d28d9] underline underline-offset-2">
+          <a href="mailto:privacidad@alhabla.ai" className="font-medium text-morado-tinta underline underline-offset-2">
             privacidad@alhabla.ai
           </a>{" "}
           y te responderemos en el plazo legal, normalmente en un mes.
@@ -306,7 +324,7 @@ export default function PrivacidadPage() {
             href="https://www.aepd.es/"
             target="_blank"
             rel="noreferrer"
-            className="font-medium text-[#6d28d9] underline underline-offset-2"
+            className="font-medium text-morado-tinta underline underline-offset-2"
           >
             Agencia Española de Protección de Datos
           </a>
@@ -330,8 +348,12 @@ export default function PrivacidadPage() {
           </li>
         </ol>
         <p>
+          Eso borra la copia que guarda Alhabla. La que conserva Telnyx de esas llamadas sigue su propia política,
+          como explicamos en «Cuánto tiempo conservamos los datos».
+        </p>
+        <p>
           Si no puedes entrar en tu cuenta, escríbenos a{" "}
-          <a href="mailto:privacidad@alhabla.ai" className="font-medium text-[#6d28d9] underline underline-offset-2">
+          <a href="mailto:privacidad@alhabla.ai" className="font-medium text-morado-tinta underline underline-offset-2">
             privacidad@alhabla.ai
           </a>{" "}
           desde el correo con el que te registraste y la borraremos nosotros en el plazo legal, normalmente en un mes.
@@ -372,9 +394,9 @@ export default function PrivacidadPage() {
         </p>
       </LegalSection>
 
-      <p className="max-w-[68ch] text-base leading-8 text-[#54634b]">
+      <p className="max-w-[68ch] text-base leading-8 text-apagado">
         ¿Te queda alguna duda antes de empezar? Está resuelta en las{" "}
-        <Link href="/landing#preguntas" className="font-medium text-[#6d28d9] underline underline-offset-2">
+        <Link href="/#preguntas" className="font-medium text-morado-tinta underline underline-offset-2">
           preguntas frecuentes
         </Link>{" "}
         o escribiéndonos directamente.

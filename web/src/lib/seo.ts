@@ -139,9 +139,22 @@ export const landingStructuredData = {
         "Recepcionista de IA que contesta las llamadas de negocios con cita previa, reserva en su calendario de Google, Outlook o iCloud y confirma por WhatsApp.",
       applicationCategory: "BusinessApplication",
       operatingSystem: "Web",
+      // Lo que hace de verdad, comprobado contra el código el 2026-10-20
+      // (la misma lista que «Qué hace distinto» de /llms.txt).
+      featureList: [
+        "Contesta las llamadas que el negocio no coge, con su número de siempre (desvío)",
+        "Comprueba el hueco en Google Calendar, Outlook o iCloud antes de reservar",
+        "Reparto de citas por especialidad de cada profesional",
+        "Confirmación de la cita por WhatsApp y recordatorio con botones (Pro y Scale)",
+        "Lista de espera por WhatsApp",
+        "El Gestor: el dueño cambia citas, horario, precios y equipo por WhatsApp, con notas de voz",
+        "Ausencias del equipo: recoloca las citas y avisa a cada cliente, con la confirmación del dueño",
+        "Castellano y siete idiomas más, y catalán, euskera o gallego según la zona",
+        "Aviso de inteligencia artificial al descolgar y grabación solo con permiso",
+      ],
       audience: {
         "@type": "Audience",
-        audienceType: "Peluquerías, barberías, centros de estética y negocios con cita previa",
+        audienceType: "Peluquerías, barberías, salones de uñas, centros de estética, fisioterapia, pestañas y cejas, spa y masajes, peluquería canina y otros negocios con cita previa",
       },
       url: absoluteUrl("/"),
       offers: {
@@ -159,7 +172,7 @@ export const landingStructuredData = {
       areaServed: "ES",
       audience: {
         "@type": "Audience",
-        audienceType: "Peluquerías, barberías, salones de uñas, centros de estética y clínicas de fisioterapia",
+        audienceType: "Peluquerías, barberías, salones de uñas, centros de estética, fisioterapia, pestañas y cejas, spa y masajes y peluquería canina",
       },
       description:
         "Atiende las llamadas que el negocio no puede coger, con su número de siempre, y reserva la cita en su agenda real; el dueño gestiona los cambios por WhatsApp.",

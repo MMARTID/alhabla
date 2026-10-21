@@ -40,17 +40,17 @@ El detalle de contestador frente a IA está en [contestador automático o recepc
 Una inteligencia artificial para contestar llamadas parece una sola cosa, pero son cuatro piezas que trabajan en cadena en cada turno de la conversación:
 
 1. **El oído: voz a texto.** Un sistema de transcripción convierte en texto lo que dice quien llama, mientras lo dice.
-2. **La cabeza: un modelo de lenguaje.** Lee ese texto junto con las instrucciones y los datos de tu negocio —servicios, duraciones, precios, horario, equipo— y decide qué contestar o qué hacer.
+2. **La cabeza: un modelo de lenguaje.** Lee ese texto junto con las instrucciones y los datos de tu negocio —servicios, duraciones, precios si se los das, horario, equipo— y decide qué contestar o qué hacer.
 3. **La voz: texto a voz.** Una síntesis de voz convierte la respuesta en habla natural.
 4. **Las manos: herramientas.** Es lo que separa a una IA que conversa de una que trabaja. Con acceso a tu calendario puede *consultar la disponibilidad* de un servicio y *crear la reserva*; sin herramientas, solo puede hablar y apuntar recados.
 
-El ciclo se repite en cada frase, y la IA responde en pocos segundos. Cuando tiene que mirar la agenda, una IA bien hecha lo dice en voz alta en lugar de quedarse callada.
+El ciclo se repite en cada frase, y la IA responde en pocos segundos. Cuando tiene que mirar la agenda, una IA bien hecha la consulta antes de decir sí o no, en lugar de improvisar una respuesta.
 
 <Aviso tipo="ejemplo" titulo="Así suena una reserva">
 
 **Cliente:** Hola, quería cita para cortarme el pelo el jueves por la tarde.
 
-**IA:** Un momento, que lo miro… El jueves tengo hueco a las 17:00 y a las 18:30. ¿Cuál te va mejor?
+**IA:** El jueves tengo hueco a las 17:00 y a las 18:30. ¿Cuál te va mejor?
 
 **Cliente:** A las cinco.
 
@@ -58,7 +58,7 @@ El ciclo se repite en cada frase, y la IA responde en pocos segundos. Cuando tie
 
 **Cliente:** Carmen.
 
-**IA:** Te resumo: corte el jueves a las 17:00, a nombre de Carmen. ¿Te lo reservo?
+**IA:** Te resumo: corte el jueves a las 17:00, a nombre de Carmen. ¿Te lo reservo y te mando la confirmación por WhatsApp a este número?
 
 **Cliente:** Sí.
 
@@ -70,7 +70,7 @@ Detrás de esas frases hay dos herramientas: una consulta de disponibilidad ante
 
 ## Cómo poner una IA que conteste el teléfono de tu negocio
 
-<Pasos pasos={[{ titulo: "Elige un servicio que reserve de verdad", texto: "Si solo toma recados, seguirás devolviendo llamadas. Más abajo tienes las preguntas para comprobarlo antes de pagar." }, { titulo: "Dale los datos de tu negocio", texto: "Servicios con su duración y su precio, horario y festivos, y quién del equipo hace cada cosa. Es todo lo que sabe: lo que no le cuentes, no lo dirá." }, { titulo: "Conecta tu calendario", texto: "Google, Outlook o iCloud, el que uses. Ahí lee los huecos libres y ahí escribe las citas, así que tu agenda sigue siendo la de siempre." }, { titulo: "Activa el desvío «si no contesta»", texto: "Un código en tu móvil o tu fijo manda a la IA las llamadas que no coges, sin cambiar de número. En un móvil suele ser **61*número#." }, { titulo: "Llámala tú antes que tus clientes", texto: "Desde otro teléfono: pide cita, cambia de idea a mitad, pregunta un precio y pide algo que no haces. Si algo falla, casi siempre es un dato que faltaba en el paso 2." }]} />
+<Pasos pasos={[{ titulo: "Elige un servicio que reserve de verdad", texto: "Si solo toma recados, seguirás devolviendo llamadas. Más abajo tienes las preguntas para comprobarlo antes de pagar." }, { titulo: "Dale los datos de tu negocio", texto: "Servicios con su duración (y su precio, si quieres que lo diga), horario y festivos, y quién del equipo hace cada cosa. Es todo lo que sabe: lo que no le cuentes, no lo dirá." }, { titulo: "Conecta tu calendario", texto: "Google, Outlook o iCloud, el que uses. Ahí lee los huecos libres y ahí escribe las citas, así que tu agenda sigue siendo la de siempre." }, { titulo: "Activa el desvío «si no contesta»", texto: "Un código en tu móvil o tu fijo manda a la IA las llamadas que no coges, sin cambiar de número. En un móvil suele ser **61*número#." }, { titulo: "Llámala tú antes que tus clientes", texto: "Desde otro teléfono: pide cita, cambia de idea a mitad, pregunta un precio y pide algo que no haces. Si algo falla, casi siempre es un dato que faltaba en el paso 2." }]} />
 
 Los códigos de desvío para móvil y fijo, y qué hacer si tu fijo tiene contestador, están en [cómo desviar llamadas sin cambiar de número](/blog/desviar-llamadas-sin-cambiar-de-numero), y los de cada operador, en [desvío de llamadas si no contesta](/blog/desvio-de-llamadas-si-no-contesta).
 
@@ -101,19 +101,19 @@ La voz y el teléfono de quien llama son datos personales. El [RGPD](https://eur
 
 ## Cómo lo hace Alhabla
 
-Alhabla es una recepcionista de IA para peluquerías, barberías, centros de estética, salones de uñas y clínicas de fisioterapia. Esto es lo que hace hoy:
+Alhabla es una recepcionista de IA para negocios con cita previa: peluquerías, barberías, salones de uñas, centros de estética, fisioterapia, pestañas y cejas, spas y masajes, y peluquerías caninas. Esto es lo que hace hoy:
 
 - Contesta con **tu número de siempre**, gracias al desvío «si no contesta».
-- **Saluda con el nombre de tu negocio y avisa de que quien atiende es una inteligencia artificial.**
-- Entiende y habla **castellano, inglés, francés, alemán, italiano, portugués, neerlandés y ruso**, y además **catalán, euskera o gallego** según la zona.
+- **Saluda con el nombre de tu negocio y avisa de que quien atiende es una inteligencia artificial**: «Peluquería Sol, te atiende su asistente de inteligencia artificial. ¿En qué te ayudo?».
+- Entiende y habla **castellano y siete idiomas más** (inglés, francés, alemán, italiano, portugués, neerlandés y ruso) y **una lengua cooficial por negocio**: la de su zona según el código postal (catalán en Cataluña y Baleares, euskera en Euskadi, gallego en Galicia) o la que elijas como idioma principal.
 - **Consulta tu horario y tu calendario** de Google, Outlook o iCloud antes de ofrecer un hueco: no reserva a ciegas ni solapa citas, y elige al profesional que hace ese servicio.
-- Antes de reservar **pide el nombre, resume la cita y espera el sí**; después, la confirmación le llega al cliente por WhatsApp.
-- **Graba solo con permiso**: si quien llama dice que no, no se graba. La transcripción de cada llamada queda en tu panel.
-- Tú cambias la agenda **por WhatsApp, hablando con tu Gestor**: «el sábado cerramos», «Ana está de baja hoy».
+- Antes de reservar **pide el nombre, resume la cita y espera el sí**; si el cliente acepta recibir mensajes, la confirmación le llega por WhatsApp.
+- **Graba solo con permiso**: se lo pregunta una vez a quien llama y, si dice que no, no se graba. La transcripción de cada llamada queda en tu panel.
+- Tú cambias la agenda **por WhatsApp, hablando con tu Gestor**: «el sábado cerramos», «Ana está de baja hoy». Cada cambio es una propuesta y solo se hace cuando pulsas «Confirmar».
 
 Lo que no hace: no se conecta con las agendas de Booksy, Treatwell o Fresha; trabaja sobre Google, Outlook o iCloud.
 
-Los planes empiezan en 59 € al mes más IVA, con minutos de llamada incluidos, 7 días de prueba y sin permanencia: [ver planes](/planes). Si quieres comparar, tienes los precios de varias en [cuánto cuesta una recepcionista de IA](/blog/cuanto-cuesta-una-recepcionista-de-ia). Para ver cómo atiende en tu sector, mira [peluquerías](/peluqueria), [barberías](/barberia), [centros de estética](/centro-de-estetica), [salones de uñas](/salon-de-unas) o [fisioterapia](/fisioterapia).
+Los planes empiezan en 59 € al mes más IVA, con minutos de llamada incluidos, 7 días de prueba y sin permanencia: [ver planes](/planes). Si quieres comparar, tienes los precios de varias en [cuánto cuesta una recepcionista de IA](/blog/cuanto-cuesta-una-recepcionista-de-ia). Para ver cómo atiende en tu sector, mira [peluquerías](/peluqueria), [barberías](/barberia), [salones de uñas](/salon-de-unas), [centros de estética](/centro-de-estetica), [fisioterapia](/fisioterapia), [pestañas y cejas](/pestanas-y-cejas), [spas y masajes](/spa-y-masajes) o [peluquerías caninas](/peluqueria-canina).
 
 ## Preguntas frecuentes
 

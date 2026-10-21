@@ -105,7 +105,7 @@ export default function DesvioVodafonePage() {
           href: "/desvio-de-llamadas#cual",
           titulo: "Alhabla como número principal",
           texto:
-            "La alternativa al desvío, con las llamadas que te pasa al móvil.",
+            "La alternativa al desvío, y cuándo te pasa llamadas al móvil.",
         },
         {
           href: "/desvio-de-llamadas/iphone-y-android",
@@ -250,8 +250,9 @@ export default function DesvioVodafonePage() {
                     <>
                       Publicas el número de Alhabla en Google, tu web y tus
                       tarjetas; no hay desvío, así que no hay limitación ni
-                      coste por llamada desviada. La recepcionista te pasa al
-                      móvil las que elijas.{" "}
+                      coste por llamada desviada. Y con «Cuándo pasarme
+                      llamadas» eliges si la recepcionista te pasa al móvil a
+                      quien pida hablar contigo.{" "}
                       <Link
                         href="/desvio-de-llamadas#cual"
                         className="font-semibold text-morado-tinta underline underline-offset-4"

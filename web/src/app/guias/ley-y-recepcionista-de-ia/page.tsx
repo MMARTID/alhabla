@@ -62,7 +62,7 @@ export default function LeyPage() {
         {
           question: "¿Puede ser la IA el único teléfono de mi negocio?",
           answer:
-            "La ley de consumidores pide que la atención al cliente por teléfono garantice una atención personal directa, más allá de otros medios técnicos. Para no depender de cómo se interprete, deja siempre una vía para hablar con una persona: con Alhabla puedes pasar la llamada a tu móvil cuando el cliente lo pida.",
+            "La ley de consumidores pide que la atención al cliente por teléfono garantice una atención personal directa, más allá de otros medios técnicos. Para no depender de cómo se interprete, deja siempre una vía para hablar con una persona. Si das el número de Alhabla como número principal de tu negocio, la recepcionista puede pasar la llamada a tu móvil cuando el cliente lo pida. Con el desvío no hace falta: tu teléfono suena primero y la recepcionista solo coge lo que tú no coges.",
         },
         {
           question: "¿Tengo que firmar algo con el proveedor de la recepcionista?",
@@ -117,8 +117,10 @@ export default function LeyPage() {
           <p>
             Cómo lo hace Alhabla: la primera frase de cada llamada nombra tu negocio y dice que atiende una
             inteligencia artificial, en el idioma en que saluda. En castellano: <strong>«Peluquería Sol, te atiende su
-            asistente de inteligencia artificial»</strong>; en catalán, euskera, gallego y los demás idiomas, la misma
-            idea con las palabras «inteligencia artificial» traducidas, nunca «asistente» a secas.
+            asistente de inteligencia artificial. ¿En qué te ayudo?»</strong>; en catalán, euskera, gallego y los demás
+            idiomas, la misma idea con las palabras «inteligencia artificial» traducidas, nunca «asistente» a secas. A
+            quien ya ha reservado le saluda por su nombre sin quitar el aviso: «Hola, Laura, soy la asistente de
+            inteligencia artificial de Peluquería Sol».
           </p>
           <p>
             Sanciones: hasta 15 millones de euros o el 3 % del volumen de negocio (art. 99.4), la cifra menor en el caso
@@ -146,10 +148,10 @@ export default function LeyPage() {
           </p>
           <p>
             Cómo lo hace Alhabla: <strong>solo graba con permiso del cliente</strong>. La recepcionista se lo pregunta
-            durante la llamada, mientras comprueba la agenda, y le dice para qué: que el negocio pueda escucharla. A
+            una sola vez, mientras comprueba la agenda, y le dice para qué: que el negocio pueda revisar sus llamadas. A
             quien ya aceptó, se lo recuerda al descolgar («La llamada se graba; si prefieres que no, dímelo»). Si no
-            acepta, no se guarda audio. La transcripción de cada llamada sí se guarda en tu panel para que veas qué se
-            pidió; menciónalo en la información de privacidad de tu negocio.
+            acepta, no se guarda audio. La transcripción de cada llamada sí se guarda siempre, durante 90 días, en tu
+            panel para que veas qué se pidió; menciónalo en la información de privacidad de tu negocio.
           </p>
         </Texto>
         <div className="mt-6">
@@ -184,8 +186,9 @@ export default function LeyPage() {
           </p>
           <p>
             Cómo lo hace Alhabla: con el desvío, tu teléfono sigue sonando primero y la recepcionista solo coge lo que
-            tú no puedes. Si publicas el número de Alhabla como principal, puedes elegir que pase la llamada a tu móvil
-            cuando el cliente lo pida, con un aviso previo para que sepas quién es.
+            tú no puedes; en ese caso no pasa llamadas. Si publicas el número de Alhabla como principal, puedes elegir
+            que te pase la llamada al móvil cuando el cliente lo pida o, solo dentro de tu horario, también ante una
+            queja o una urgencia, con un aviso previo para que sepas quién es.
           </p>
         </Texto>
       </Seccion>
@@ -205,9 +208,9 @@ export default function LeyPage() {
         <div className="mt-6">
           <Texto>
             <p>
-              Alhabla activa sola la lengua cooficial según el código postal del negocio (Cataluña y Baleares, catalán;
-              Euskadi, euskera; Galicia, gallego) y en la Comunitat Valenciana puedes elegir el catalán como idioma
-              principal. Detalles en <Link href="/recepcionista-ia-en-catalan">catalán</Link>,{" "}
+              Alhabla activa sola la lengua cooficial según el código postal de la dirección del negocio (Cataluña y
+              Baleares, catalán; Euskadi, euskera; Galicia, gallego). Si la dirección no lo lleva, puedes elegir esa
+              lengua como idioma principal, y en la Comunitat Valenciana, el catalán. Detalles en <Link href="/recepcionista-ia-en-catalan">catalán</Link>,{" "}
               <Link href="/recepcionista-ia-en-euskera">euskera</Link> y <Link href="/recepcionista-ia-en-gallego">gallego</Link>.
             </p>
           </Texto>
@@ -225,8 +228,8 @@ export default function LeyPage() {
           </p>
           <p>
             Regla práctica: un recordatorio dice el servicio, el día, la hora y cómo cambiarla. Si quieres anunciar una
-            promoción, hazlo aparte y con el consentimiento de quien la recibe. Los recordatorios de Alhabla solo llevan
-            los datos de la cita y los botones para cambiarla o cancelarla.
+            promoción, hazlo aparte y con el consentimiento de quien la recibe. Los recordatorios de Alhabla (en los
+            planes Pro y Scale) solo llevan los datos de la cita y los botones Confirmo, Cancelar y Cambiar.
           </p>
         </Texto>
       </Seccion>

@@ -96,17 +96,31 @@ const ESCENARIOS: [Escenario, Escenario, Escenario] = [
       {
         de: "gestor",
         texto:
-          "Hecho: Ana no está hoy. Su cita de las 11:00 es Carmen R., corte y peinado, y Lucía tiene hueco a esa hora. ¿Confirmas? Mover la cita de Carmen R. a Lucía, hoy a las 11:00.",
-        botones: ["Confirmar", "Cancelar"],
+          "Hecho: Ana no está hoy. Tiene 1 cita en ese tramo: dime si las movemos o las cancelamos.",
         hora: "8:42",
-        espera: 3400,
+        espera: 2000,
       },
-      { de: "boton", texto: "Confirmar", hora: "8:42", espera: 700, hito: "movida" },
+      { de: "dueno", texto: "Pásasela a Lucía, a la misma hora", hora: "8:42", espera: 900 },
       { de: "escribiendo", espera: 1000 },
       {
         de: "gestor",
         texto:
-          "Hecho: la cita de Carmen R. pasa a las 11:00 con Lucía. El calendario ya está al día. ¿Le aviso a Carmen por WhatsApp del cambio?",
+          "¿Confirmas? Mover la cita de Carmen R. (corte y peinado) a hoy a las 11:00 con Lucía.",
+        botones: ["Confirmar", "Cancelar"],
+        hora: "8:42",
+        espera: 2600,
+      },
+      { de: "boton", texto: "Confirmar", hora: "8:43", espera: 700, hito: "movida" },
+      { de: "escribiendo", espera: 1000 },
+      {
+        de: "gestor",
+        texto: "Hecho: la cita de Carmen R. pasa a las 11:00 con Lucía. El calendario ya está al día.",
+        hora: "8:43",
+        espera: 1200,
+      },
+      {
+        de: "gestor",
+        texto: "¿Le aviso a Carmen por WhatsApp de la nueva hora? Si prefieres llamarle tú: 612 345 678.",
         botones: ["Sí, avísale", "Le llamo yo"],
         hora: "8:43",
         espera: 2600,
@@ -115,7 +129,7 @@ const ESCENARIOS: [Escenario, Escenario, Escenario] = [
       { de: "escribiendo", espera: 800 },
       {
         de: "gestor",
-        texto: "Avisada: Carmen ya sabe que hoy la atiende Lucía.",
+        texto: "Le aviso a Carmen al 612 345 678.",
         hora: "8:43",
         espera: 0,
         hito: "avisada",

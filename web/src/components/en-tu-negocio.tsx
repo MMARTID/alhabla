@@ -102,8 +102,8 @@ function pasosDe(g: GuionRelato): [PasoCopy, PasoCopy, PasoCopy] {
       texto:
         "Pregúntale por la agenda y pídele cambios. Es el mismo gestor que te atiende por WhatsApp.",
       detalles: [
-        "Te resume el día y los huecos que quedan",
-        "Marca una ausencia y reparte sus citas",
+        "Te resume el día y te dice si una hora está libre",
+        "Marca una ausencia y te ayuda a recolocar sus citas",
         `Avisa a ${g.palabras.tusClientes.toLowerCase()} por WhatsApp; nada cambia sin tu «Confirmar»`,
       ],
     },
@@ -773,28 +773,26 @@ export function EnTuNegocioScroll({
                       <time>17:06</time>
                     </div>
                     <div className="mx-msg bot" data-a=".85">
-                      {r.asistente.cierre}
+                      {r.asistente.hecho.texto}
                       <div className="mx-hecho">
                         <span>
                           <svg>
                             <use href="#ng-i-check" />
                           </svg>
-                          {r.asistente.hecho[0]}
-                        </span>
-                        <span>
-                          <svg>
-                            <use href="#ng-i-check" />
-                          </svg>
-                          {r.asistente.hecho[1]}
-                        </span>
-                        <span>
-                          <svg>
-                            <use href="#ng-i-check" />
-                          </svg>
-                          {r.asistente.hecho[2]}
+                          {r.asistente.hecho.etiqueta}
                         </span>
                       </div>
                       <time>17:06</time>
+                    </div>
+                    {/* La siguiente propuesta: cada cita se mueve con su
+                        propio «Confirmar», nunca todas de golpe. */}
+                    <div className="mx-msg bot" data-a=".87">
+                      {r.asistente.siguiente}
+                      <div className="mx-botones">
+                        <span>Confirmar</span>
+                        <span>Cancelar</span>
+                      </div>
+                      <time>17:07</time>
                     </div>
                   </div>
                   <div className="mx-escribir">

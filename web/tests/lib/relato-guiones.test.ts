@@ -36,16 +36,23 @@ describe("relato-guiones", () => {
     ...SECTORES.map((s) => [s, GUIONES_SECTOR[s]] as const),
   ])("el guion %s cuenta la historia completa con sus nombres", (_, guion) => {
     const r = relato(guion);
+    // El saludo real: el nombre del negocio y el aviso de IA (art. 50 RIA).
     expect(r.saludo).toContain(guion.negocio);
-    // Como la recepcionista real: la duración solo si pasa de 80 minutos,
-    // y siempre pide el WhatsApp antes del resumen final.
+    expect(r.saludo).toContain("inteligencia artificial");
+    // Como la recepcionista real: la duración solo si pasa de 80 minutos;
+    // el permiso de grabar, mientras comprueba el hueco; y el resumen y el
+    // WhatsApp en un solo turno, sin prometer el recordatorio (Pro y Scale).
     expect(r.ofrece.includes("minutos")).toBe(guion.servicio.minutos > 80);
     const textos = r.turnos.map((t) => t.texto);
-    const whatsapp = textos.findIndex((t) => t.includes("por WhatsApp"));
-    const resumen = textos.findIndex((t) => t.includes("¿Te la reservo?"));
-    expect(whatsapp).toBeGreaterThan(0);
-    expect(resumen).toBeGreaterThan(whatsapp);
+    const grabar = textos.findIndex((t) => t.includes("grabe tus llamadas"));
+    const nombre = textos.findIndex((t) => t.includes("¿A nombre de quién"));
+    const resumen = textos.findIndex((t) => t.includes("¿Te la reservo"));
+    expect(grabar).toBeGreaterThan(0);
+    expect(nombre).toBeGreaterThan(grabar);
+    expect(resumen).toBeGreaterThan(nombre);
     expect(textos[resumen]).toContain(guion.profesional);
+    expect(textos[resumen]).toContain("por WhatsApp");
+    expect(textos.some((t) => t.includes("recordatorio"))).toBe(false);
     expect(textos.some((t) => t.includes("Un momento"))).toBe(false);
     // La agenda: la cuarta fila es el hueco libre, con su duración.
     expect(r.agenda).toHaveLength(6);
@@ -59,9 +66,12 @@ describe("relato-guiones", () => {
     expect(r.avisos[0].texto).toBe(
       `${guion.negocio}: nueva cita. ${guion.cliente.nombre}, jueves ${HORA_CITA}, ${guion.servicio.nombre}, con ${guion.profesional}. Ya está en tu agenda.`
     );
-    // El asistente reparte las citas de quien falta a su compañera.
+    // El Gestor: la baja y las citas, una propuesta cada vez.
     expect(r.asistente.baja).toContain(guion.profesional);
     expect(r.asistente.orden).toContain(guion.companera);
+    expect(r.asistente.propuesta).toMatch(/^¿Confirmas\? Marcar a /);
+    expect(r.asistente.siguiente).toMatch(/^¿Confirmas\? Mover /);
+    expect(r.asistente.siguiente).toContain(guion.companera);
     expect(guion.companera).not.toBe(guion.profesional);
     // Los teléfonos son del rango sin atribuir (79…).
     expect(guion.cliente.telefono).toMatch(/^\+34 79/);
@@ -71,8 +81,29 @@ describe("relato-guiones", () => {
     for (const sector of SECTORES) {
       const { chat } = nicheLandings[sector].ownerAssistant;
       const g = GUIONES_SECTOR[sector];
-      expect(chat.ownerMessage).toContain(g.profesional);
-      expect(chat.proposal).toContain(g.companera);
+      expect(chat.mensajes[0]).toMatchObject({ de: "dueno" });
+      expect(chat.mensajes[0].texto).toContain(g.profesional);
+      expect(chat.mensajes.some((m) => m.de === "gestor" && m.texto.includes(g.companera))).toBe(true);
+    }
+  });
+
+
+  it("el chat del Gestor sigue el orden real: ausencia, Hecho, mover, ¿le aviso?", () => {
+    for (const sector of SECTORES) {
+      const { mensajes } = nicheLandings[sector].ownerAssistant.chat;
+      const textos = mensajes.map((m) => m.texto);
+      const ausencia = textos.findIndex((t) => t.startsWith("¿Confirmas? Marcar a "));
+      const hecho = textos.findIndex((t) => t.includes("dime si las movemos o las cancelamos"));
+      const mover = textos.findIndex((t) => t.startsWith("¿Confirmas? Mover "));
+      const aviso = textos.findIndex((t) => t.startsWith("¿Le aviso a "));
+      expect(ausencia).toBe(1);
+      expect(hecho).toBeGreaterThan(ausencia);
+      expect(mover).toBeGreaterThan(hecho + 1);
+      expect(aviso).toBeGreaterThan(mover);
+      // Antes de mover, el dueño dice a quién: el sistema no reparte solo.
+      expect(mensajes[hecho + 1].de).toBe("dueno");
+      // El Gestor no usa emojis.
+      expect(textos.join(" ")).not.toMatch(/✓|✔/);
     }
   });
 });

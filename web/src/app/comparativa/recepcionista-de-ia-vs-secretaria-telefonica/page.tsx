@@ -78,9 +78,11 @@ export default function VsSecretariaPage() {
             ["Horario", "El del servicio; las 24 h suelen costar más", "Las 24 horas, todos los días, en todos los planes"],
             ["Cómo cobra", "Cuota + precio por llamada o bono", "Cuota mensual con minutos incluidos"],
             ["Conoce tus servicios", "Lo que pongas en su ficha", "Tu catálogo con duración, precio y quién hace cada cosa"],
-            ["Idiomas", "Los del equipo que le toque", "11, con catalán, euskera y gallego"],
-            ["Confirmación al cliente", "Depende del servicio", "Por WhatsApp, siempre"],
-            ["Si el cliente quiere a una persona", "Ya es una persona", "Puede pasarte la llamada al móvil"],
+            ["Idiomas", "Los del equipo que le toque", "Castellano y 7 más, y el catalán, euskera o gallego de tu zona"],
+            ["Confirmación al cliente", "Depende del servicio", "Por WhatsApp, si el cliente lo acepta en la llamada"],
+            ["Si el cliente quiere a una persona", "Ya es una persona", "Te pasa la llamada al móvil si Alhabla es tu número principal; si no, toma el recado"],
+            ["Si falta alguien de tu equipo", "Normalmente no toca tu agenda: lo haces tú", "Se lo dices al Gestor por WhatsApp: recoloca cada cita con tu «Confirmar» y avisa al cliente"],
+            ["Cambiar horario, precios o un cierre", "Llamando o escribiendo al servicio", "Escribiendo al Gestor, a cualquier hora"],
           ]}
           nota="Descripción general de cómo funcionan estos servicios en España; cada proveedor tiene sus condiciones. Compara siempre con su página de precios."
         />

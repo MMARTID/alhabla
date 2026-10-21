@@ -259,7 +259,9 @@ export default function DesvioSimyoPage() {
                 publicarlo como número principal
               </Link>{" "}
               en Google y en tu web: la recepcionista contesta y, con «Cuándo
-              pasarme llamadas», te pasa al móvil las que elijas.
+              pasarme llamadas», eliges si te pasa llamadas al móvil: nunca,
+              cuando el cliente lo pide o, solo dentro de tu horario, también
+              ante una queja o una urgencia.
             </Nota>
           </div>
         </Seccion>

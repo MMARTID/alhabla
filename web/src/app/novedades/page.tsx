@@ -35,7 +35,7 @@ const MESES: { mes: string; fecha: string; novedades: Novedad[] }[] = [
         texto: "La recepcionista pide permiso para grabar mientras busca hueco y explica para qué. A quien ya aceptó se lo recuerda al descolgar; si dice que no, solo queda la transcripción.",
       },
       {
-        titulo: "Te reconoce si ya has llamado",
+        titulo: "Te reconoce si ya has reservado",
         texto: "A quien ya reservó con ese teléfono lo saluda por su nombre y le propone repetir lo de la última vez.",
       },
       {
@@ -86,7 +86,7 @@ const MESES: { mes: string; fecha: string; novedades: Novedad[] }[] = [
       },
       {
         titulo: "Cambiar una cita sin llamar",
-        texto: "El cliente puede mover o cancelar su cita respondiendo al WhatsApp de confirmación.",
+        texto: "El cliente puede mover o cancelar su cita escribiendo a la recepcionista en el mismo chat de WhatsApp de la confirmación.",
       },
       {
         titulo: "Escucha la demo en la web",
@@ -94,7 +94,7 @@ const MESES: { mes: string; fecha: string; novedades: Novedad[] }[] = [
       },
       {
         titulo: "Primeras llamadas reales",
-        texto: "Alhabla atiende sus primeras llamadas de clientes reales y abre el registro a negocios de toda España.",
+        texto: "Alhabla atiende sus primeras llamadas por teléfono en un número real y abre el registro a negocios de toda España.",
       },
     ],
   },

@@ -266,7 +266,8 @@ export default function DesvioMovistarPage() {
               >
                 usar Alhabla como número principal
               </Link>{" "}
-              y que te pase las que quieras al móvil.
+              y elegir en «Cuándo pasarme llamadas» si te pasa al móvil a quien
+              pida hablar contigo.
             </Nota>
           </div>
         </Seccion>

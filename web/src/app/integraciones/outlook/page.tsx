@@ -120,7 +120,7 @@ export default function OutlookPage() {
             },
             {
               titulo: "Si prefieres el móvil",
-              texto: "La app de Outlook en el móvil enseña las mismas citas. Y para cambios rápidos, el Gestor por WhatsApp.",
+              texto: "La app de Outlook en el móvil enseña las mismas citas. Y para cambios rápidos, el Gestor por WhatsApp: lo que mueve o cancela, cambia también en tu Outlook.",
             },
           ]}
         />

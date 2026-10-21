@@ -292,8 +292,9 @@ export default function DesvioPepephonePage() {
               >
                 publicar el número de Alhabla como principal
               </Link>{" "}
-              y que te pase al móvil las llamadas que quieras. Si lo consigues
-              desviar, «Comprobar desvío» te dirá si llega.
+              y elegir en «Cuándo pasarme llamadas» si te pasa al móvil a quien
+              pida hablar contigo. Si lo consigues desviar, «Comprobar desvío»
+              te dirá si llega.
             </Nota>
           </div>
         </Seccion>

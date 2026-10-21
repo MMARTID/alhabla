@@ -15,9 +15,11 @@ import { metadataDePagina } from "@/lib/seo";
  * RGPD art. 6.1.b, LSSI art. 21 y la guía de la AEPD para el sector
  * sanitario (apartados 5 y 7.C). Lo de los SMS (GSM-7, remitente
  * alfanumérico), en la documentación de Twilio. Lo que hace Alhabla sale
- * de backend/src/modules/whatsapp/mensajesCliente.ts: confirmación siempre,
- * recordatorio 24 h antes con el plan que incluye recordatorios, hueco
- * libre, y cambio o cancelación cuando el dueño lo pide desde el Gestor.
+ * de backend/src/modules/whatsapp/mensajesCliente.ts: confirmación en todos
+ * los planes si el cliente acepta mensajes en la llamada, recordatorio 24 h
+ * antes (si la cita está a más de 24 h) con botones Confirmo, Cancelar y
+ * Cambiar en los planes que incluyen recordatorios, hueco libre, y cambio o
+ * cancelación cuando el dueño lo pide desde el Gestor.
  */
 const ruta = "/herramientas/plantillas-recordatorio-de-cita";
 const titulo = "Plantillas para confirmar y recordar citas por WhatsApp y SMS";
@@ -265,7 +267,9 @@ export default function PlantillasRecordatorioPage() {
           <p>
             Si las llamadas las atiende tu <Link href="/" className="font-semibold text-morado-tinta underline underline-offset-4">recepcionista de IA</Link>,
             parte de esta página deja de ser trabajo tuyo. Los mensajes salen por WhatsApp con un texto ya aprobado
-            por WhatsApp, y el cliente puede contestar a ellos para cambiar o anular la cita.
+            por WhatsApp. Para cambiar o anular la cita, el cliente escribe por WhatsApp a la recepcionista o llama
+            desde el número con el que reservó; en los planes {nombresConRecordatorio}, también puede usar los botones
+            del recordatorio.
           </p>
         }
       >
@@ -276,25 +280,25 @@ export default function PlantillasRecordatorioPage() {
               icono: CalendarCheck,
               antetitulo: "Todos los planes",
               titulo: "Confirmación al reservar",
-              texto: "En cuanto la recepcionista cierra una cita por teléfono, el cliente recibe día, hora, servicio y profesional por WhatsApp.",
+              texto: "Antes de reservar, la recepcionista pregunta al cliente si le manda la confirmación por WhatsApp. Si acepta, en cuanto cierra la cita le llegan el día, la hora, el servicio y el profesional.",
             },
             {
               icono: BellRing,
               antetitulo: `Planes ${nombresConRecordatorio}`,
               titulo: "Recordatorio 24 horas antes",
-              texto: "Se programa al reservar y se revisa antes de salir: si la cita ya no existe o ha cambiado, no se manda un aviso que no dice la verdad.",
+              texto: "Si la cita se reservó con más de un día de margen, le llega 24 horas antes con tres botones: Confirmo, Cancelar y Cambiar. Se revisa antes de salir: si la cita ya no existe o ha cambiado, no se manda un aviso que no dice la verdad.",
             },
             {
               icono: RefreshCw,
               antetitulo: "Todos los planes",
               titulo: "Cambio y cancelación",
-              texto: "Si mueves o anulas una cita escribiendo al Gestor por WhatsApp, puedes pedir que se avise al cliente con el mensaje de cambio o de cancelación.",
+              texto: "El cliente puede cambiar o anular su cita llamando desde el mismo número o escribiendo a la recepcionista por WhatsApp. Y si la mueves o la anulas tú escribiendo al Gestor, puedes pedir que se le avise con el mensaje de cambio o de cancelación.",
             },
             {
               icono: Users,
               antetitulo: "Todos los planes",
               titulo: "Hueco libre",
-              texto: "Cuando no hay hora para quien llama, la recepcionista le ofrece la lista de espera; si se libera una, le avisa para que la coja.",
+              texto: "Si la hora que pide un cliente está ocupada y no le encaja ninguna otra, la recepcionista le ofrece avisarle por WhatsApp si se libera; si alguien la deja libre, le llega el aviso para que la coja.",
             },
           ]}
         />

@@ -1,61 +1,57 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, CalendarClock, Check, Lightbulb, Mic, Scissors, Users } from "lucide-react";
-import { SiteFooter } from "@/components/site-footer";
-import { SiteHeader } from "@/components/site-header";
-import { nicheLinks } from "@/lib/niche-landings";
-import { TRIAL_REASSURANCE } from "@/lib/plans";
 import {
-  absoluteUrl,
-  buildBreadcrumbStructuredData,
-  buildFaqPageStructuredData,
-  ogImages,
-  siteName,
-  websiteId,
-} from "@/lib/seo";
+  BellRing,
+  CalendarClock,
+  Check,
+  Lightbulb,
+  MessageCircle,
+  Mic,
+  Scissors,
+  ShieldCheck,
+  Users,
+} from "lucide-react";
+import { OwnerAssistantChatMockup } from "@/components/owner-assistant-chat";
+import { Nota, PaginaGuia, Pasos, Seccion, Tabla, Tarjetas, Texto } from "@/components/pagina-guia";
+import { nicheLandings, nicheLinks } from "@/lib/niche-landings";
+import { plans } from "@/lib/plans";
+import { metadataDePagina } from "@/lib/seo";
 
 /**
- * El Gestor por WhatsApp, 2026-10-20: lo que ningún competidor ofrece (el
- * dueño cambia su agenda escribiendo o con notas de voz). La ruta no puede
- * ser /gestor: next.config.mjs la redirige a la app.
+ * El Gestor por WhatsApp (2026-10-20, rehecha sobre `PaginaGuia`): el
+ * asistente del dueño. Ya no se vende como «lo que nadie tiene» — mims
+ * (mims.studio) publica un asistente por WhatsApp para el dueño desde 79 € —,
+ * sino por lo que de verdad no publica nadie: la ausencia de punta a punta
+ * con el aviso a cada cliente, cada cambio con su «Confirmar», y que va en
+ * todos los planes. La ruta no puede ser /gestor: next.config.mjs la
+ * redirige a la app.
  *
- * Cada ejemplo sale de una acción o tool real del Gestor
- * (backend/src/modules/gestor): listar_agenda, buscar_hueco, anadir_cita,
- * mover_cita, cancelar_cita, avisar_cliente, marcar_ausencia (propone a quién
- * pasar las citas), bloquear_franja, cerrar_dia (con `hastaFecha` para
- * vacaciones), fijar_horario, editar_servicio, retirar_servicio,
- * crear_profesionales, fijar_especialidad, dudas_sin_respuesta +
- * actualizar_informacion («enseñar a la recepcionista»). Toda acción pasa por
- * proponer_accion y espera el «Confirmar». Las notas de voz llegan
- * transcritas por Telnyx (modules/whatsapp/router.ts); el idioma de la
- * respuesta lo fija lib/gestorPayload.ts.
+ * Todo sale del código (backend/src/modules/gestor y modules/whatsapp):
+ * - acciones (siempre propuesta + «Confirmar», una a la vez, caducan a las
+ *   24 h; el texto de lo que se va a hacer lo escribe el sistema): añadir,
+ *   mover y cancelar citas, avisar al cliente, marcar ausencias (hasta 62
+ *   días), bloquear un tramo, cerrar días (hasta 31 seguidos), horario,
+ *   servicios, profesionales y su especialidad, e «información del negocio»
+ *   (actualizar_informacion);
+ * - consultas: contexto_negocio, listar_agenda (citas, no huecos),
+ *   resumen_llamadas, buscar_hueco (una hora concreta o la más cercana),
+ *   buscar_cliente, dudas_sin_respuesta;
+ * - AGENDA / HOY / MAÑANA (router.ts) y los avisos de avisosNegocio.ts y
+ *   alertas.ts, con sus botones reales;
+ * - las notas de voz se transcriben (webhooks.ts); idioma de respuesta en
+ *   lib/gestorPayload.ts; las citas del Gestor no gastan minutos
+ *   (durationSecs 0).
+ * Lo que NO hace se dice: reabrir un día cerrado (panel), llamar a nadie.
  */
 
+const ruta = "/agenda-por-whatsapp";
 const titulo = "Gestiona tu agenda por WhatsApp con IA";
 const descripcion =
-  "Escríbele o mándale una nota de voz a tu Gestor: mueve citas, marca una baja o cambia un precio. Te propone el cambio y no hace nada sin tu «Confirmar».";
-const ruta = "/agenda-por-whatsapp";
+  "Escríbele o mándale una nota de voz a tu Gestor: marca una baja, mueve sus citas y avisa a cada cliente, cambia un precio o cierra un día. Cada cambio espera tu «Confirmar».";
 
-export const metadata: Metadata = {
-  title: titulo,
-  description: descripcion,
-  alternates: { canonical: absoluteUrl(ruta) },
-  openGraph: {
-    type: "website",
-    locale: "es_ES",
-    url: absoluteUrl(ruta),
-    siteName,
-    title: `${titulo} | ${siteName}`,
-    description: descripcion,
-    images: ogImages(ruta, `${titulo} | ${siteName}`),
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: `${titulo} | ${siteName}`,
-    description: descripcion,
-    images: ogImages(ruta, `${titulo} | ${siteName}`),
-  },
-};
+export const metadata: Metadata = metadataDePagina({ ruta, titulo, descripcion });
+
+const desde = Math.min(...plans.map((p) => p.price));
 
 const grupos = [
   {
@@ -63,16 +59,18 @@ const grupos = [
     icono: CalendarClock,
     ejemplos: [
       "«¿Qué tengo mañana?»",
-      "«¿Cuándo hay hueco para un tinte el jueves?»",
+      "«¿Hay hueco el jueves a las 5 para un tinte?»: si no, te da la hora libre más cercana",
       "«Apúntame a Carmen el viernes a las 17:00 para corte»",
-      "«Mueve la cita de las 5 al sábado y avísale»",
+      "«Mueve la cita de las 5 al sábado» o «cancela la de Pablo»",
+      "«¿Cuándo vino Carmen la última vez?»",
     ],
   },
   {
     titulo: "Tu equipo",
     icono: Users,
     ejemplos: [
-      "«Marta no viene mañana»: te propone a quién pasar sus citas",
+      "«Marta no viene mañana»: te dice qué citas tenía",
+      "«Irene no está el jueves de 9 a 12, tiene formación»",
       "«Laura es la especialista en color»",
       "«Ha entrado Pablo, hace cortes de caballero»",
     ],
@@ -93,6 +91,7 @@ const grupos = [
     ejemplos: [
       "«¿Qué te han preguntado que no supiste?»",
       "«Sí, aceptamos Bizum»: y a partir de ahí lo contesta ella",
+      "«¿Cuántas llamadas hubo esta semana y cuántas acabaron en cita?»",
     ],
   },
 ] as const;
@@ -106,205 +105,240 @@ const faqs = [
   {
     question: "¿Puede cambiar algo sin que yo lo sepa?",
     answer:
-      "No. Te propone cada cambio con lo que va a hacer y espera a que pulses «Confirmar». Si no confirmas, no toca nada.",
+      "No. Cada cambio llega como una propuesta con lo que va a hacer, y solo se hace cuando pulsas «Confirmar». Si no confirmas, no toca nada, y la propuesta caduca a las 24 horas.",
+  },
+  {
+    question: "Si falta alguien, ¿mueve sus citas solo?",
+    answer:
+      "No, y es a propósito. Primero confirmas la ausencia; luego le dices qué hacer con cada cita y confirmas cada cambio; y al final decides si avisa al cliente o le llamas tú. Así nunca se mueve una cita que no querías mover.",
+  },
+  {
+    question: "¿Se entera el cliente de los cambios?",
+    answer:
+      "Solo si tú quieres. Después de mover o cancelar una cita, el Gestor te pregunta si le avisa por WhatsApp, con su móvil a la vista por si prefieres llamarle. El cliente puede contestar «Vale» o «No me va bien», y eso último te llega como recado.",
   },
   {
     question: "¿Le puedo hablar en vez de escribir?",
-    answer:
-      "Sí. Le mandas una nota de voz como a cualquier contacto y la entiende igual que un mensaje escrito. Si no se pudo entender, te lo dice.",
+    answer: "Sí. Le mandas una nota de voz como a cualquier contacto y la entiende igual que un mensaje escrito.",
   },
   {
     question: "¿Y si prefiero hacerlo desde el ordenador?",
-    answer: "El mismo Gestor está en tu panel web, con la agenda al lado. Lo que hagas en un sitio se ve en el otro.",
+    answer:
+      "El mismo Gestor está en tu panel web, con la agenda al lado y el registro de los cambios que ha hecho. Lo que hagas en un sitio se ve en el otro.",
   },
   {
-    question: "¿Está en todos los planes?",
-    answer: "Sí. El Gestor por WhatsApp va incluido en todos los planes, también en el de entrada.",
+    question: "¿Puede escribirle alguien de mi equipo?",
+    answer:
+      "No. Solo responde al móvil que vinculaste como dueño. Tu equipo puede seguir mirando la agenda en el calendario de siempre.",
+  },
+  {
+    question: "¿Cuánto cuesta?",
+    answer: `Va incluido en todos los planes, también en el de ${desde} € + IVA al mes, y lo que hablas con él no gasta minutos de tu plan.`,
+  },
+  {
+    question: "¿Hay algo que no pueda hacer por WhatsApp?",
+    answer:
+      "Reabrir un día que ya cerraste se hace desde el panel. Y el Gestor no llama a nadie ni manda promociones: solo avisa al cliente de su cita cuando tú se lo dices.",
+  },
+  {
+    question: "¿Funciona sin calendario conectado?",
+    answer:
+      "Para apuntar o mover citas necesita leer tu calendario, igual que la recepcionista: así nunca reserva encima de algo que ya tenías. El horario, los servicios y el equipo los cambias igual.",
   },
   {
     question: "¿En qué idioma me contesta?",
-    answer: "En castellano, o en catalán, gallego, euskera o inglés si le escribes en ese idioma.",
+    answer:
+      "En castellano, o en catalán, gallego, euskera o inglés si le escribes en ese idioma. Los avisos automáticos van en castellano.",
   },
 ];
 
-const datosEstructurados = {
-  "@context": "https://schema.org",
-  "@graph": [
-    {
-      "@type": "WebPage",
-      "@id": `${absoluteUrl(ruta)}#webpage`,
-      name: `${titulo} | ${siteName}`,
-      description: descripcion,
-      url: absoluteUrl(ruta),
-      inLanguage: "es-ES",
-      isPartOf: { "@id": websiteId() },
-    },
-    buildBreadcrumbStructuredData([{ name: "Agenda por WhatsApp", path: ruta }]),
-    buildFaqPageStructuredData(faqs),
-  ],
-};
-
 export default function AgendaPorWhatsappPage() {
   return (
-    <>
-      <SiteHeader />
-      <main id="main-content" className="min-h-screen bg-white text-tinta">
-        <nav aria-label="Migas de pan" className="mx-auto max-w-5xl px-4 pt-6 text-sm text-muted sm:px-6 lg:px-8">
-          <ol className="flex flex-wrap items-center gap-1.5">
-            <li>
-              <Link href="/" className="hover:text-tinta">
-                Inicio
-              </Link>
-            </li>
-            <li aria-hidden="true">/</li>
-            <li aria-current="page" className="text-tinta">
-              Agenda por WhatsApp
-            </li>
-          </ol>
-        </nav>
-
-        <section className="mx-auto grid max-w-5xl gap-10 px-4 py-10 sm:px-6 sm:py-14 lg:grid-cols-[1.1fr_1fr] lg:px-8">
+    <PaginaGuia
+      ruta={ruta}
+      migas={[{ name: "Agenda por WhatsApp", path: ruta }]}
+      etiqueta={{ icono: MessageCircle, texto: "Tu Gestor · incluido en todos los planes" }}
+      titulo={titulo}
+      descripcion={descripcion}
+      entradilla={
+        <>
+          <p>
+            Tu recepcionista de IA atiende a tus clientes. El Gestor te atiende a ti: le escribes o le mandas una nota de
+            voz por WhatsApp lo que ha cambiado —una baja, un cierre, la cita que te piden en caja, un precio nuevo—, te
+            propone el cambio y lo hace cuando pulsas «Confirmar».
+          </p>
+          <p>Va en todos los planes, desde {desde} € + IVA al mes, y hablar con él no gasta minutos.</p>
+        </>
+      }
+      ctaSecundario={{ texto: "Ver cómo resuelve una baja", href: "#una-baja" }}
+      ubicacion="gestor"
+      faqs={faqs}
+      tituloFaqs="Preguntas sobre el Gestor"
+      relacionadas={[
+        { href: "/blog/baja-de-un-trabajador-reorganizar-agenda", titulo: "Baja de un trabajador: reorganizar la agenda", texto: "Qué hacer con sus citas y cómo avisar a los clientes afectados." },
+        { href: "/integraciones/whatsapp", titulo: "WhatsApp para tus clientes", texto: "Lo que le llega a cada cliente: confirmación, recordatorio y lista de espera." },
+        { href: "/blog/cambiar-cita-por-whatsapp-peluqueria", titulo: "Cambiar una cita por WhatsApp", texto: "Cómo mueve o anula su cita el cliente sin llamarte." },
+        { href: "/integraciones", titulo: "Calendarios que conecta", texto: "Google Calendar, Outlook e iCloud: lo que mueve el Gestor se mueve en tu calendario." },
+        { href: "/comparativa/alhabla-vs-heydiga", titulo: "Alhabla frente a HeyDiga", texto: "Precio, WhatsApp y gestión de la agenda, con los datos que publica cada uno." },
+        { href: "/glosario", titulo: "Glosario", texto: "Desvío, lista de espera, reparto por especialidad y el resto de términos." },
+      ]}
+      cierre="Tu agenda, en el mismo sitio que tus mensajes."
+    >
+      <Seccion
+        id="una-baja"
+        titulo="«Mañana falta Marta», resuelto desde el chat."
+        entradilla={
+          <p>
+            Es lo que pasa cada semana en un negocio con equipo, y lo que más tiempo quita: alguien no viene y hay que
+            bloquear su agenda, recolocar sus citas y avisar a cada cliente. Con el Gestor son tres pasos, cada uno con su
+            «Confirmar».
+          </p>
+        }
+      >
+        <div className="grid items-start gap-8 lg:grid-cols-[1fr_1.05fr]">
+          <Pasos
+            pasos={[
+              {
+                titulo: "Marcas la ausencia",
+                texto:
+                  "«Marta está de baja hoy», «no viene el jueves» o «está de vacaciones hasta el 30». Al confirmar, la recepcionista deja de darle citas en ese tramo (un día, unas horas o hasta dos meses) y el Gestor te dice cuántas tenía: «dime si las movemos o las cancelamos».",
+              },
+              {
+                titulo: "Recolocas cada cita",
+                texto:
+                  "Le dices a quién pasar cada una o a qué hora moverla. El Gestor comprueba el hueco en tu agenda real, con quien lo hace y sin pisar otra cita, y al confirmar la cambia también en tu calendario. Si prefieres cancelarla, el hueco se ofrece a quien esperaba esa hora en la lista de espera.",
+              },
+              {
+                titulo: "Decides si avisa al cliente",
+                texto:
+                  "Tras cada cambio te pregunta «¿Le aviso por WhatsApp de la nueva hora?», con su móvil a la vista: «Sí, avísale» o «Le llamo yo». El cliente recibe el aviso y contesta «Vale» o «No me va bien»; si no le va bien, te llega como recado.",
+              },
+            ]}
+          />
           <div>
-            <span className="badge-soft">Tu Gestor · incluido en todos los planes</span>
-            <h1 className="mt-5 text-balance text-4xl font-black leading-[1.05] tracking-[-0.03em] sm:text-5xl">
-              {titulo}
-            </h1>
-            <p className="mt-5 text-lg leading-8 text-muted">
-              Tu recepcionista de IA atiende a tus clientes. Tu Gestor te atiende a ti: le escribes o le mandas una nota
-              de voz por WhatsApp lo que cambia en el día a día, te propone el cambio y, cuando pulsas «Confirmar», queda
-              en tu agenda.
+            <OwnerAssistantChatMockup data={nicheLandings.peluqueria.ownerAssistant.chat} />
+            <p className="mt-3 px-1 text-xs leading-5 text-tenue">
+              Ejemplo con los mensajes que escribe el Gestor; los nombres son inventados.
             </p>
-            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-              <Link href="/planes" className="btn-primary h-12 px-6" data-evento="clic_probar" data-ubicacion="gestor">
-                Probar Alhabla 7 días <ArrowRight className="h-4 w-4" aria-hidden="true" />
-              </Link>
-              <Link href="#que-pedirle" className="btn-secondary h-12 px-6">
-                Qué le puedes pedir
-              </Link>
-            </div>
-            <p className="mt-3 text-sm text-muted">{TRIAL_REASSURANCE}</p>
           </div>
+        </div>
+        <div className="mt-8">
+          <Nota titulo="¿Por qué no lo hace todo de golpe?">
+            Porque quien sabe si Rosa prefiere a Laura o cambiar de día eres tú. El Gestor hace el trabajo pesado —mirar
+            huecos, cambiar el calendario, escribir al cliente— y tú decides en cada paso con un toque.
+          </Nota>
+        </div>
+      </Seccion>
 
-          <figure className="panel p-6" aria-label="Ejemplo de conversación con el Gestor">
-            <ol className="space-y-3 text-sm leading-6">
-              <li className="ml-8 rounded-2xl border border-[#e5e5e5] px-4 py-3 text-tinta">Marta no viene mañana, está con fiebre</li>
-              <li className="rounded-2xl bg-lavado px-4 py-3 text-tinta">
-                Entendido, dejo de ofrecer hueco con Marta. Tenía unas mechas a las 11:00: ¿se las paso a Laura, que tiene
-                hueco a esa hora?
-              </li>
-              <li className="ml-8 flex justify-end gap-2">
-                <span className="rounded-[10px] bg-tinta px-3 py-1.5 text-xs font-semibold text-white">Confirmar</span>
-                <span className="rounded-[10px] border border-[#e5e5e5] px-3 py-1.5 text-xs font-semibold text-tinta">
-                  Cancelar
-                </span>
-              </li>
-              <li className="rounded-2xl bg-lavado px-4 py-3 text-tinta">
-                Hecho ✓ Las mechas de las 11:00 ya están con Laura. ¿Aviso a la clienta por WhatsApp?
-              </li>
-            </ol>
-            <figcaption className="mt-4 text-xs leading-5 text-muted">
-              Ejemplo ilustrativo; los nombres son inventados.
-            </figcaption>
-          </figure>
-        </section>
-
-        <section id="que-pedirle" className="scroll-m-20 border-y border-[#e5e5e5] py-14 sm:py-16">
-          <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
-            <h2 className="text-2xl font-black tracking-tight sm:text-3xl">Lo que le puedes pedir, como a una persona.</h2>
-            <p className="mt-3 max-w-2xl text-base leading-7 text-muted">
-              Sin menús ni formularios: le hablas como le hablarías a quien lleva tu mostrador. Estos son ejemplos de lo
-              que entiende hoy.
-            </p>
-            <ul className="mt-8 grid gap-4 sm:grid-cols-2">
-              {grupos.map(({ titulo: tituloGrupo, icono: Icono, ejemplos }) => (
-                <li key={tituloGrupo} className="panel p-6">
-                  <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-lavado text-morado">
-                    <Icono className="h-5 w-5" aria-hidden="true" />
-                  </span>
-                  <h3 className="mt-4 text-lg font-bold text-tinta">{tituloGrupo}</h3>
-                  <ul className="mt-3 space-y-2 text-sm leading-6 text-muted">
-                    {ejemplos.map((ejemplo) => (
-                      <li key={ejemplo} className="flex items-start gap-2">
-                        <Check className="mt-1 h-4 w-4 shrink-0 text-morado" aria-hidden="true" />
-                        {ejemplo}
-                      </li>
-                    ))}
-                  </ul>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </section>
-
-        <section className="mx-auto max-w-5xl px-4 py-14 sm:px-6 sm:py-16 lg:px-8">
-          <div className="grid gap-6 lg:grid-cols-3">
-            <div className="panel p-6">
-              <h2 className="text-lg font-bold text-tinta">Nada cambia sin tu «Confirmar»</h2>
-              <p className="mt-2 text-sm leading-6 text-muted">
-                Antes de tocar la agenda te dice exactamente qué va a hacer. Si no confirmas, no pasa nada.
-              </p>
-            </div>
-            <div className="panel p-6">
-              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-lavado text-morado">
-                <Mic className="h-5 w-5" aria-hidden="true" />
+      <Seccion
+        id="que-pedirle"
+        fondo
+        titulo="Lo que le puedes pedir, como a una persona."
+        entradilla={
+          <p>
+            Sin menús ni formularios: le hablas como le hablarías a quien lleva tu mostrador. Estos son ejemplos de lo que
+            entiende hoy.
+          </p>
+        }
+      >
+        <ul className="grid gap-4 sm:grid-cols-2">
+          {grupos.map(({ titulo: tituloGrupo, icono: Icono, ejemplos }) => (
+            <li key={tituloGrupo} className="panel p-6">
+              <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-lavado text-morado">
+                <Icono className="h-5 w-5" aria-hidden="true" />
               </span>
-              <h2 className="mt-4 text-lg font-bold text-tinta">También con notas de voz</h2>
-              <p className="mt-2 text-sm leading-6 text-muted">
-                Con las manos ocupadas, mándale un audio. Lo entiende igual que un mensaje escrito.
-              </p>
-            </div>
-            <div className="panel p-6">
-              <h2 className="text-lg font-bold text-tinta">Y te avisa de cada cita nueva</h2>
-              <p className="mt-2 text-sm leading-6 text-muted">
-                Cuando tu recepcionista de IA reserva una cita, te llega el aviso al mismo WhatsApp.
-              </p>
-            </div>
-          </div>
-        </section>
+              <h3 className="mt-4 text-lg font-bold text-tinta">{tituloGrupo}</h3>
+              <ul className="mt-3 space-y-2 text-sm leading-6 text-muted">
+                {ejemplos.map((ejemplo) => (
+                  <li key={ejemplo} className="flex items-start gap-2">
+                    <Check className="mt-1 h-4 w-4 shrink-0 text-morado" aria-hidden="true" />
+                    {ejemplo}
+                  </li>
+                ))}
+              </ul>
+            </li>
+          ))}
+        </ul>
+        <p className="mt-6 text-sm leading-6 text-muted">
+          ¿Solo quieres ver el día? Escribe <strong className="font-semibold text-tinta">HOY</strong>,{" "}
+          <strong className="font-semibold text-tinta">MAÑANA</strong> o{" "}
+          <strong className="font-semibold text-tinta">AGENDA</strong> y te llega la lista de citas al momento.
+        </p>
+      </Seccion>
 
-        <section className="border-t border-[#e5e5e5] py-14 sm:py-16">
-          <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
-            <h2 className="text-2xl font-black tracking-tight sm:text-3xl">Preguntas sobre el Gestor</h2>
-            <div className="mt-8 grid items-start gap-3 sm:grid-cols-2">
-              {faqs.map(({ question, answer }) => (
-                <details key={question} className="group rounded-2xl border border-[#e5e5e5] bg-white p-5">
-                  <summary className="flex cursor-pointer list-none items-start justify-between gap-4 text-sm font-semibold leading-6 text-tinta marker:content-none">
-                    {question}
-                    <span className="mt-1 text-lg leading-none text-morado transition group-open:rotate-45" aria-hidden="true">
-                      +
-                    </span>
-                  </summary>
-                  <p className="mt-3 border-t border-[#e5e5e5] pt-3 text-sm leading-6 text-muted">{answer}</p>
-                </details>
-              ))}
-            </div>
+      <Seccion
+        titulo="Y te avisa de lo que importa, con un botón para resolverlo."
+        entradilla={
+          <p>
+            Al mismo WhatsApp te llegan los avisos del día a día. Cada uno trae los botones para resolverlo sin abrir el
+            panel.
+          </p>
+        }
+      >
+        <Tabla
+          cabecera={["Cuando…", "Te llega", "Lo resuelves con"]}
+          filas={[
+            ["La recepcionista reserva una cita", "Quién, qué, cuándo y con quién", "«Vale» · «Ver agenda de hoy»"],
+            [
+              "Una cita no ha podido entrar en tu calendario",
+              "El motivo; la cita queda pendiente y se reintenta cada 6 horas durante dos días",
+              "«La apunté yo» · «Reintentar» · «Reconectar»",
+            ],
+            ["Un cliente cancela", "Qué cita se ha liberado", "«Avisar lista espera»"],
+            ["Alguien deja un recado", "Su nombre, su teléfono y lo que quería", "«Atendido» · «Recuérdamelo mañana»"],
+            ["Tu calendario se desconecta", "Qué calendario y qué hacer", "«Ir a Ajustes»"],
+            ["Llevas el 80 % de tus minutos", "Cuántos te quedan este mes", "«Ir a Ajustes»"],
+          ]}
+          nota="Si no quieres el aviso de cada cita nueva, se apaga en Ajustes. Los demás llegan siempre: son los que evitan que una cita se pierda."
+        />
+      </Seccion>
 
-            <h2 className="mt-14 text-xl font-bold text-tinta">Cómo trabaja en tu sector</h2>
-            <ul className="mt-4 flex flex-wrap gap-2">
-              {nicheLinks.map(({ href, label }) => (
-                <li key={href}>
-                  <Link href={href} className="btn-secondary h-10 px-4 text-sm">
-                    {label}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </section>
+      <Seccion fondo titulo="Seguro por diseño.">
+        <Tarjetas
+          items={[
+            {
+              icono: ShieldCheck,
+              titulo: "Nada cambia sin tu «Confirmar»",
+              texto:
+                "La IA solo puede proponer. Lo que se va a hacer lo escribe el sistema, con los datos reales, y la propuesta caduca a las 24 horas si no la confirmas.",
+            },
+            {
+              icono: Users,
+              titulo: "Solo tu número",
+              texto: "Responde al móvil que vinculaste como dueño. Una propuesta a la vez, y dos toques seguidos no hacen el cambio dos veces.",
+            },
+            {
+              icono: BellRing,
+              titulo: "El cliente, solo si tú quieres",
+              texto: "No escribe a nadie por su cuenta, y nunca a quien pidió no recibir mensajes.",
+            },
+            {
+              icono: Mic,
+              titulo: "Con las manos ocupadas",
+              texto: "Le mandas una nota de voz entre clienta y clienta y la entiende igual que un mensaje escrito.",
+            },
+          ]}
+          columnas={2}
+        />
+      </Seccion>
 
-        <section className="bg-[#0a0a0a] text-white">
-          <div className="mx-auto flex max-w-5xl flex-col items-start gap-6 px-4 py-14 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
-            <h2 className="max-w-xl text-3xl font-black tracking-tight sm:text-4xl">
-              Tu agenda, en el mismo sitio que tus mensajes.
-            </h2>
-            <Link href="/planes" className="btn-purple" data-evento="clic_probar" data-ubicacion="gestor_cierre">
-              Empezar ahora <ArrowRight className="h-4 w-4" aria-hidden="true" />
-            </Link>
-          </div>
-        </section>
-      </main>
-      <SiteFooter />
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(datosEstructurados) }} />
-    </>
+      <Seccion titulo="Cómo trabaja en tu sector">
+        <Texto>
+          <p>
+            Cada página de sector cuenta las bajas, los cierres y los cambios con los servicios de ese oficio: unas mechas
+            que pasan a otra estilista, un facial a otra esteticista, el baño de un perro a otro día.
+          </p>
+        </Texto>
+        <ul className="mt-6 flex flex-wrap gap-2">
+          {nicheLinks.map(({ href, label }) => (
+            <li key={href}>
+              <Link href={href} className="btn-secondary h-10 px-4 text-sm">
+                {label}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </Seccion>
+    </PaginaGuia>
   );
 }

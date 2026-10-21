@@ -8,7 +8,7 @@ import { absoluteUrl, buildBreadcrumbStructuredData, ogImages, organizationId, s
 
 const blogTitle = "Blog: llamadas, citas y atención al cliente";
 const blogDescription =
-  "Guías y consejos para peluquerías, barberías, centros de estética, salones de uñas y clínicas de fisioterapia que no quieren perder ni una llamada.";
+  "Guías y consejos para peluquerías, barberías, centros de estética, salones de uñas, fisioterapia y otros negocios con cita previa que no quieren perder ni una llamada.";
 
 export const metadata: Metadata = {
   title: blogTitle,
@@ -62,8 +62,8 @@ export default async function BlogPage() {
               Ideas para no perder ni una llamada
             </h1>
             <p className="mt-4 text-base leading-7 text-muted sm:text-lg">
-              Lo que aprendemos atendiendo el teléfono de peluquerías, barberías, centros de estética, salones de uñas
-              y clínicas de fisioterapia, contado sin humo.
+              Cómo atender el teléfono, llenar la agenda y no perder citas en peluquerías, barberías, centros de estética,
+              salones de uñas, fisioterapia y otros negocios con cita previa, contado sin humo.
             </p>
           </section>
 

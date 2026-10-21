@@ -66,7 +66,7 @@ const faqs = [
   {
     question: "¿La recepcionista habla gallego?",
     answer:
-      "Si tu negocio está en Galicia, sí: atiende en gallego a quien llama en gallego, sin que tengas que configurar nada.",
+      "Si tu negocio está en Galicia y su dirección lleva el código postal, sí: atiende en gallego a quien llama en gallego, sin que tengas que configurar nada más. Si la dirección no lo lleva, elige el gallego como idioma principal en Agente › Cómo atiende.",
   },
 ];
 
@@ -303,8 +303,11 @@ export default function DesvioRGaliciaPage() {
           </div>
           <div className="mt-8">
             <Nota tipo="info" titulo="En Galicia, también en gallego">
-              Tu recepcionista atiende en gallego a quien llama en gallego, y en
-              castellano a quien prefiere el castellano.{" "}
+              Con el código postal de Galicia en la dirección de tu negocio, tu
+              recepcionista atiende en gallego a quien llama en gallego, y en
+              castellano a quien prefiere el castellano. Si la dirección no lo
+              lleva, elige el gallego como idioma principal en Agente › Cómo
+              atiende.{" "}
               <Link
                 href="/recepcionista-ia-en-gallego"
                 className="font-semibold underline underline-offset-4"

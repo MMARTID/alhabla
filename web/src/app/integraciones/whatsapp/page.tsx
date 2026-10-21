@@ -13,7 +13,7 @@ import { metadataDePagina } from "@/lib/seo";
 const ruta = "/integraciones/whatsapp";
 const titulo = "WhatsApp para confirmar y recordar citas";
 const descripcion =
-  "Cada cita que reserva tu recepcionista de IA se confirma por WhatsApp, se recuerda antes de venir y se cambia respondiendo al mensaje. Cómo funciona.";
+  "Cada cita que reserva tu recepcionista de IA se confirma por WhatsApp, se recuerda antes de venir (Pro y Scale) y se cambia respondiendo al mensaje. Cómo funciona.";
 
 export const metadata = metadataDePagina({ ruta, titulo, descripcion });
 
