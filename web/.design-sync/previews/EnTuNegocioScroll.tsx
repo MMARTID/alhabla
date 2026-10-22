@@ -8,7 +8,7 @@ import { EnTuNegocioScroll } from "alhabla-web-ui";
  * en el bundle (recursosPublicos en prepare.mjs): sin él, la sección caería a
  * su versión quieta.
  *
- * La sección mide 360vh con el escenario pegado arriba (sticky). Esta caja,
+ * La sección mide 470vh con el escenario pegado arriba (sticky). Esta caja,
  * con el alto del viewport de la tarjeta (cfg.overrides) y overflow oculto,
  * recorta el recorrido que sobra. En una página se monta tal cual.
  */

@@ -7,7 +7,7 @@ import { LlamadaScroll } from "alhabla-web-ui";
  * enseñaría la animación. Aquí sale el escenario tal y como se ve al llegar a
  * la sección, en el paso 1 («Contesta»); el resto lo mueve el scroll.
  *
- * La sección mide 340vh con el escenario pegado arriba (sticky). Esta caja,
+ * La sección mide 510vh con el escenario pegado arriba (sticky). Esta caja,
  * con el alto del viewport de la tarjeta (cfg.overrides) y overflow oculto,
  * recorta el recorrido que sobra. En una página se monta tal cual.
  */
