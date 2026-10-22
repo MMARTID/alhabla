@@ -76,34 +76,4 @@ describe("relato-guiones", () => {
     // Los teléfonos son del rango sin atribuir (79…).
     expect(guion.cliente.telefono).toMatch(/^\+34 79/);
   });
-
-  it("los profesionales de cada sector son los de su landing (el Gestor)", () => {
-    for (const sector of SECTORES) {
-      const { chat } = nicheLandings[sector].ownerAssistant;
-      const g = GUIONES_SECTOR[sector];
-      expect(chat.mensajes[0]).toMatchObject({ de: "dueno" });
-      expect(chat.mensajes[0].texto).toContain(g.profesional);
-      expect(chat.mensajes.some((m) => m.de === "gestor" && m.texto.includes(g.companera))).toBe(true);
-    }
-  });
-
-
-  it("el chat del Gestor sigue el orden real: ausencia, Hecho, mover, ¿le aviso?", () => {
-    for (const sector of SECTORES) {
-      const { mensajes } = nicheLandings[sector].ownerAssistant.chat;
-      const textos = mensajes.map((m) => m.texto);
-      const ausencia = textos.findIndex((t) => t.startsWith("¿Confirmas? Marcar a "));
-      const hecho = textos.findIndex((t) => t.includes("dime si las movemos o las cancelamos"));
-      const mover = textos.findIndex((t) => t.startsWith("¿Confirmas? Mover "));
-      const aviso = textos.findIndex((t) => t.startsWith("¿Le aviso a "));
-      expect(ausencia).toBe(1);
-      expect(hecho).toBeGreaterThan(ausencia);
-      expect(mover).toBeGreaterThan(hecho + 1);
-      expect(aviso).toBeGreaterThan(mover);
-      // Antes de mover, el dueño dice a quién: el sistema no reparte solo.
-      expect(mensajes[hecho + 1].de).toBe("dueno");
-      // El Gestor no usa emojis.
-      expect(textos.join(" ")).not.toMatch(/✓|✔/);
-    }
-  });
 });

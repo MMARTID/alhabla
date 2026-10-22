@@ -13,7 +13,8 @@ import {
 } from "lucide-react";
 import { OwnerAssistantChatMockup } from "@/components/owner-assistant-chat";
 import { Nota, PaginaGuia, Pasos, Seccion, Tabla, Tarjetas, Texto } from "@/components/pagina-guia";
-import { nicheLandings, nicheLinks } from "@/lib/niche-landings";
+import { nicheLinks } from "@/lib/niche-landings";
+import { GUIONES_GESTOR } from "@/lib/gestor-guiones";
 import { plans } from "@/lib/plans";
 import { metadataDePagina } from "@/lib/seo";
 
@@ -216,7 +217,7 @@ export default function AgendaPorWhatsappPage() {
             ]}
           />
           <div>
-            <OwnerAssistantChatMockup data={nicheLandings.peluqueria.ownerAssistant.chat} />
+            <OwnerAssistantChatMockup escenario={GUIONES_GESTOR.peluqueria.escenarios[0]} />
             <p className="mt-3 px-1 text-xs leading-5 text-tenue">
               Ejemplo con los mensajes que escribe el Gestor; los nombres son inventados.
             </p>

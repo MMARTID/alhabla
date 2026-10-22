@@ -16,9 +16,9 @@ const PARA_CLIENTE = [
 ] as const;
 
 /**
- * Continuación de El Gestor (owner-assistant-section.tsx), montada justo
+ * Continuación de El Gestor (gestor-simulacion.tsx), montada justo
  * después — no una sección nueva (2026-09-24). El Gestor ya cuenta el lado
- * del dueño con prosa, ejemplos y un mockup de chat; repetirlo aquí en una
+ * del dueño con prosa, ejemplos y la simulación; repetirlo aquí en una
  * columna "Para tu negocio" era la misma historia dos veces. Esta pieza
  * cierra el otro lado del mismo canal: qué recibe el cliente que llama,
  * información que ningún otro bloque de la landing cubre.

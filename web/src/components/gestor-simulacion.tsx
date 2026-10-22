@@ -1,7 +1,9 @@
 "use client";
 
-import { Fragment, useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import Link from "next/link";
+import { Fragment, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import {
+  ArrowRight,
   Bot,
   CalendarDays,
   Check,
@@ -9,244 +11,152 @@ import {
   LayoutDashboard,
   MessageSquareText,
   Mic,
+  Pause,
   PhoneCall,
+  Play,
   Plus,
+  RotateCcw,
+  SendHorizontal,
   Settings,
   type LucideIcon,
 } from "lucide-react";
 import { SiWhatsapp } from "@icons-pack/react-simple-icons";
 
 import { useMovimientoReducido } from "@/hooks/use-movimiento-reducido";
-import type { OwnerAssistant } from "@/lib/niche-landings";
+import type { NicheAccent, OwnerAssistant } from "@/lib/niche-landings";
+import {
+  RITMO,
+  duracionDe,
+  estadoDeTurnos,
+  hitosAlcanzados,
+  horaDelTurno,
+  pasosDe,
+  progresoEn,
+  vistaActiva,
+  type Escenario,
+  type EstadoDeTurno,
+  type GuionGestor,
+  type Hito,
+  type Turno,
+  type Vista,
+  type VistaAgenda,
+  type VistaHorario,
+  type VistaInformacion,
+  type VistaResumen,
+  type VistaServicios,
+} from "@/lib/gestor-guiones";
 import { MODELO } from "@/lib/portatil-3d";
 import { Reveal } from "@/components/scroll-reveal";
 import type { PortatilMontado } from "./gestor-mac-escena";
 import styles from "./gestor-simulacion.module.css";
 
 /**
- * «Y cuando algo cambia, se lo dices por WhatsApp» (2026-09-30): el Gestor
- * en acción. A la derecha, el iPhone con el WhatsApp del dueño (el mismo
- * render de «En tu bolsillo»); detrás, el portátil 3D de «En tu negocio» con
- * el panel reaccionando a cada cambio. La conversación se reproduce sola,
- * turno a turno, cuando la sección está a la vista, y encadena las tres
- * situaciones de `data.examples`; los botones de la cabecera saltan a una.
+ * «Y cuando algo cambia, se lo dices por WhatsApp» (2026-09-30; por sector
+ * y a otro ritmo desde el 2026-10-22): el Gestor en acción. A la derecha,
+ * el iPhone con el WhatsApp del dueño (el mismo render de «En tu bolsillo»);
+ * detrás, el portátil 3D de «En tu negocio» con el panel reaccionando a
+ * cada cambio. La conversación se reproduce sola en cuanto el teléfono se
+ * ve casi entero y encadena las tres situaciones de `data.examples`, con el
+ * guion de la landing (`lib/gestor-guiones.ts`: la portada tiene el
+ * general y cada sector el suyo, con sus nombres y sus servicios).
  *
- * Los tres guiones reproducen acciones REALES del Gestor
- * (`backend/src/modules/gestor/`): `marcar_ausencia` + `mover_cita` +
- * `avisar_cliente` (una profesional de baja), `cerrar_dia` (un festivo) y
- * `editar_servicio` (un precio). Los textos siguen el patrón del código:
- * el Gestor PROPONE («¿Confirmas? …» con Confirmar · Cancelar) y solo el
- * botón ejecuta; tras mover una cita pregunta «¿Le aviso…?» con «Sí,
- * avísale» · «Le llamo yo». Nada cambia sin pulsar Confirmar.
+ * Lo que se ve es lo que el Gestor hace de verdad: propone, el botón
+ * ejecuta, el «Hecho» llega y el panel cambia (la honestidad de cada
+ * texto está contrastada en el módulo de guiones). Nada cambia sin pulsar
+ * Confirmar.
  *
- * Mecánica: `beat` es cuántos turnos van a la vista; un cronómetro lo
- * avanza con la espera de cada turno y, al acabar, pasa a la siguiente
- * situación. Se para fuera de pantalla y con la pestaña oculta. Con
- * movimiento reducido no hay cronómetro: cada situación se enseña entera.
- * Los hitos (`hito` en un turno) son los cambios que el panel refleja.
+ * Mecánica: el guion se compila a `pasos` (`pasosDe`): cada letra que
+ * teclea el dueño, los puntos del Gestor, cada mensaje, cada botón. Un
+ * cronómetro aplica un paso tras otro con la espera de cada uno y, al
+ * acabar, pasa a la siguiente situación; `paso` es cuántos van aplicados.
+ * Se para fuera de pantalla, con la pestaña oculta, con el ratón sobre el
+ * teléfono (para leer) y con el botón de pausa. Con movimiento reducido no
+ * hay cronómetro: cada situación se enseña entera.
  *
- * El portátil es three.js y se monta al acercarse (import dinámico). En
- * móvil no se monta: allí manda el teléfono y lo que cambió en el panel se
- * resume en los chips de debajo.
+ * Los hitos (`hito` en un botón, o en una consulta del Gestor) son lo que
+ * el panel refleja: la vista activa (`vistaActiva`) pinta su cambio, el
+ * aviso «desde WhatsApp» entra en el panel y la pantalla destella. En
+ * móvil el portátil no se monta —manda el teléfono— y lo que cambió en el
+ * panel se resume en los chips de debajo.
+ *
+ * El portátil es three.js y se monta al acercarse (import dinámico).
  */
-
-type Hito = "ausente" | "movida" | "avisada" | "cerrado" | "precio";
-
-type Turno =
-  | { de: "dueno"; texto: string; hora: string; espera: number; hito?: Hito }
-  | { de: "boton"; texto: string; hora: string; espera: number; hito?: Hito }
-  | {
-      de: "gestor";
-      texto: string;
-      hora: string;
-      botones?: [string, string];
-      espera: number;
-      hito?: Hito;
-    }
-  | { de: "escribiendo"; espera: number };
-
-type Escenario = {
-  id: "ausencia" | "cierre" | "precio";
-  /** Hora del reloj del teléfono y del portátil. */
-  reloj: string;
-  /** `espera`: ms que pasan después de que el turno aparezca. */
-  turnos: Turno[];
-  /** Lo que enseña el panel al alcanzar cada hito (y los chips de móvil). */
-  avisos: Partial<Record<Hito, { titulo: string; detalle: string }>>;
-};
-
-/** En el orden de `data.examples` de la landing principal. */
-const ESCENARIOS: [Escenario, Escenario, Escenario] = [
-  {
-    id: "ausencia",
-    reloj: "8:41",
-    turnos: [
-      { de: "dueno", texto: "Ana está de baja hoy", hora: "8:41", espera: 900 },
-      { de: "escribiendo", espera: 1100 },
-      {
-        de: "gestor",
-        texto:
-          "¿Confirmas? Marcar a Ana como ausente hoy (baja): la recepcionista no le reservará nada. Ojo: ya tiene 1 cita ahí, que no se mueve sola.",
-        botones: ["Confirmar", "Cancelar"],
-        hora: "8:41",
-        espera: 2800,
-      },
-      { de: "boton", texto: "Confirmar", hora: "8:42", espera: 700, hito: "ausente" },
-      { de: "escribiendo", espera: 1000 },
-      {
-        de: "gestor",
-        texto:
-          "Hecho: Ana no está hoy. Tiene 1 cita en ese tramo: dime si las movemos o las cancelamos.",
-        hora: "8:42",
-        espera: 2000,
-      },
-      { de: "dueno", texto: "Pásasela a Lucía, a la misma hora", hora: "8:42", espera: 900 },
-      { de: "escribiendo", espera: 1000 },
-      {
-        de: "gestor",
-        texto:
-          "¿Confirmas? Mover la cita de Carmen R. (corte y peinado) a hoy a las 11:00 con Lucía.",
-        botones: ["Confirmar", "Cancelar"],
-        hora: "8:42",
-        espera: 2600,
-      },
-      { de: "boton", texto: "Confirmar", hora: "8:43", espera: 700, hito: "movida" },
-      { de: "escribiendo", espera: 1000 },
-      {
-        de: "gestor",
-        texto: "Hecho: la cita de Carmen R. pasa a las 11:00 con Lucía. El calendario ya está al día.",
-        hora: "8:43",
-        espera: 1200,
-      },
-      {
-        de: "gestor",
-        texto: "¿Le aviso a Carmen por WhatsApp de la nueva hora? Si prefieres llamarle tú: 612 345 678.",
-        botones: ["Sí, avísale", "Le llamo yo"],
-        hora: "8:43",
-        espera: 2600,
-      },
-      { de: "boton", texto: "Sí, avísale", hora: "8:43", espera: 700 },
-      { de: "escribiendo", espera: 800 },
-      {
-        de: "gestor",
-        texto: "Le aviso a Carmen al 612 345 678.",
-        hora: "8:43",
-        espera: 0,
-        hito: "avisada",
-      },
-    ],
-    avisos: {
-      ausente: { titulo: "Ana, ausente hoy", detalle: "Baja · sin citas nuevas" },
-      movida: { titulo: "Cita movida a Lucía", detalle: "Carmen R. · 11:00" },
-      avisada: { titulo: "Carmen R. avisada", detalle: "WhatsApp enviado" },
-    },
-  },
-  {
-    id: "cierre",
-    reloj: "20:12",
-    turnos: [
-      { de: "dueno", texto: "El lunes 12 cerramos, es festivo", hora: "20:12", espera: 900 },
-      { de: "escribiendo", espera: 1100 },
-      {
-        de: "gestor",
-        texto:
-          "¿Confirmas? Cerrar el lunes 12 de octubre (festivo): la recepcionista no reservará ese día.",
-        botones: ["Confirmar", "Cancelar"],
-        hora: "20:12",
-        espera: 2400,
-      },
-      { de: "boton", texto: "Confirmar", hora: "20:12", espera: 700, hito: "cerrado" },
-      { de: "escribiendo", espera: 1000 },
-      {
-        de: "gestor",
-        texto:
-          "Hecho: el lunes 12 de octubre queda cerrado. No tenías citas ese día; a quien llame, la recepcionista le ofrecerá otro.",
-        hora: "20:13",
-        espera: 0,
-      },
-    ],
-    avisos: {
-      cerrado: { titulo: "Lunes 12 de octubre, cerrado", detalle: "Festivo · día especial" },
-    },
-  },
-  {
-    id: "precio",
-    reloj: "20:15",
-    turnos: [
-      { de: "dueno", texto: "El corte de caballero sube a 18 €", hora: "20:15", espera: 900 },
-      { de: "escribiendo", espera: 1100 },
-      {
-        de: "gestor",
-        texto: "¿Confirmas? El servicio Corte caballero: 18 € (ahora 15 €).",
-        botones: ["Confirmar", "Cancelar"],
-        hora: "20:15",
-        espera: 2200,
-      },
-      { de: "boton", texto: "Confirmar", hora: "20:15", espera: 700, hito: "precio" },
-      { de: "escribiendo", espera: 1000 },
-      {
-        de: "gestor",
-        texto:
-          "Hecho: Corte caballero, 30 min, 18 €. La recepcionista ya lo dice así por teléfono.",
-        hora: "20:16",
-        espera: 0,
-      },
-    ],
-    avisos: {
-      precio: { titulo: "Corte caballero: 18 €", detalle: "Antes 15 € · catálogo al día" },
-    },
-  },
-];
 
 /** Tamaño de la pantalla del portátil (px CSS) antes de proyectarla. */
 const PANTALLA_W = 1200;
 const PANTALLA_H = 776;
-/** Antes del primer turno de una situación y después del último. */
-const PAUSA_INICIAL = 800;
-const PAUSA_FINAL = 4200;
 /** A qué distancia de la pantalla se empieza a descargar three.js. */
 const MARGEN_DE_CARGA = "60% 0px";
+/** Filas de media hora que enseña la agenda. */
+const FILAS_DE_AGENDA = 10;
+/** Qué parte del teléfono (de lo que cabe en pantalla) tiene que verse para
+ * que la conversación arranque, y por debajo de cuánto se para. */
+const UMBRAL_DE_ARRANQUE = 0.8;
+const UMBRAL_DE_PARADA = 0.2;
 
-function hitosAlcanzados(escenario: Escenario, beat: number): Hito[] {
-  const hitos: Hito[] = [];
-  for (const turno of escenario.turnos.slice(0, beat)) {
-    if ("hito" in turno && turno.hito) hitos.push(turno.hito);
-  }
-  return hitos;
-}
-
-export function GestorSimulacionSection({ data }: { data: OwnerAssistant }) {
+export function GestorSimulacionSection({
+  data,
+  guion,
+  accent,
+  masInfoHref,
+}: {
+  data: OwnerAssistant;
+  guion: GuionGestor;
+  /** El color de la landing de sector; la portada va con el morado. */
+  accent?: NicheAccent;
+  /** Enlace a la página del Gestor; solo lo pasan las páginas de sector. */
+  masInfoHref?: string;
+}) {
   // Con movimiento reducido, la versión quieta llega tras montar: el servidor
   // no sabe la preferencia (ver useMovimientoReducido).
   const reducir = useMovimientoReducido();
-  const escenarioEl = useRef<HTMLDivElement>(null);
+  const telefonoEl = useRef<HTMLDivElement>(null);
   const macEl = useRef<HTMLDivElement>(null);
   const lienzoEl = useRef<HTMLDivElement>(null);
   const pantallaEl = useRef<HTMLDivElement>(null);
   const portatil = useRef<PortatilMontado | null>(null);
   const [escenario, setEscenario] = useState(0);
-  const [beat, setBeat] = useState(0);
+  const [paso, setPaso] = useState(0);
   const [aLaVista, setALaVista] = useState(false);
   const [pestanaVisible, setPestanaVisible] = useState(true);
+  const [pausado, setPausado] = useState(false);
+  const [leyendo, setLeyendo] = useState(false);
   const [sinMac, setSinMac] = useState(false);
 
-  const activo = aLaVista && pestanaVisible;
-  const actual = ESCENARIOS[escenario];
-  const total = actual.turnos.length;
-  const hitos = hitosAlcanzados(actual, beat);
-  // El cronómetro y el portátil leen estos dos sin volver a suscribirse.
+  const actual = guion.escenarios[escenario];
+  const pasos = useMemo(() => pasosDe(actual), [actual]);
+  const duracion = useMemo(() => duracionDe(actual), [actual]);
+  const activo = aLaVista && pestanaVisible && !pausado && !leyendo;
+  const aplicados = reducir ? pasos.length : paso;
+  const { estados, letras } = estadoDeTurnos(actual, pasos, aplicados);
+  const hitos = hitosAlcanzados(actual, estados);
+  const vista = vistaActiva(actual, hitos);
+  const progreso = reducir ? 1 : progresoEn(pasos, paso, duracion);
+  // El portátil lee estos dos al montar sin volver a suscribirse.
   const activoRef = useRef(activo);
-  activoRef.current = activo;
   const reducirRef = useRef(reducir);
-  reducirRef.current = reducir;
-
-  // Solo corre con el escenario a la vista y la pestaña delante.
   useEffect(() => {
-    const el = escenarioEl.current;
+    activoRef.current = activo;
+    reducirRef.current = reducir;
+  }, [activo, reducir]);
+
+  // Solo corre con el teléfono a la vista y la pestaña delante. Arranca
+  // cuando el teléfono se ve casi entero: la conversación crece desde
+  // abajo, junto a la caja de escribir, y con solo el borde de arriba a la
+  // vista el visitante se perdía el primer mensaje. «Casi entero» es sobre
+  // lo que cabe: en una pantalla más baja que el teléfono también arranca.
+  // Se para cuando casi ha salido (dos umbrales, para que no se encienda y
+  // se apague en el borde).
+  useEffect(() => {
+    const el = telefonoEl.current;
     if (!el) return;
     const enPantalla = new IntersectionObserver(
-      ([entrada]) => setALaVista(entrada.isIntersecting),
-      { threshold: 0.35 }
+      ([entrada]) => {
+        const cabe = Math.min(entrada.boundingClientRect.height, entrada.rootBounds?.height ?? window.innerHeight);
+        const visto = cabe > 0 ? entrada.intersectionRect.height / cabe : 0;
+        setALaVista((antes) => (antes ? visto > UMBRAL_DE_PARADA : visto >= UMBRAL_DE_ARRANQUE));
+      },
+      { threshold: Array.from({ length: 21 }, (_, i) => i / 20) }
     );
     enPantalla.observe(el);
     const alCambiarPestana = () => setPestanaVisible(!document.hidden);
@@ -257,30 +167,20 @@ export function GestorSimulacionSection({ data }: { data: OwnerAssistant }) {
     };
   }, []);
 
-  // Movimiento reducido: la situación entera a la vista, sin cronómetro.
-  useEffect(() => {
-    if (reducir) setBeat(total);
-  }, [reducir, total]);
-
-  // El cronómetro: cada turno espera lo suyo; al acabar, siguiente situación.
+  // El cronómetro: tras cada paso, su espera; al acabar, siguiente situación.
   useEffect(() => {
     if (reducir || !activo) return;
-    const espera =
-      beat === 0
-        ? PAUSA_INICIAL
-        : beat >= total
-          ? PAUSA_FINAL
-          : actual.turnos[beat - 1].espera;
+    const espera = paso === 0 ? RITMO.inicial : paso >= pasos.length ? RITMO.final : pasos[paso - 1].espera;
     const id = window.setTimeout(() => {
-      if (beat >= total) {
-        setEscenario((e) => (e + 1) % ESCENARIOS.length);
-        setBeat(0);
+      if (paso >= pasos.length) {
+        setEscenario((e) => (e + 1) % guion.escenarios.length);
+        setPaso(0);
       } else {
-        setBeat((b) => b + 1);
+        setPaso((p) => p + 1);
       }
     }, espera);
     return () => window.clearTimeout(id);
-  }, [reducir, activo, beat, total, actual]);
+  }, [reducir, activo, paso, pasos, guion.escenarios.length]);
 
   // El portátil 3D: solo en escritorio, y solo cuando la sección se acerca.
   useEffect(() => {
@@ -328,8 +228,8 @@ export function GestorSimulacionSection({ data }: { data: OwnerAssistant }) {
 
   // La tapa se abre la primera vez que la sección está a la vista.
   useEffect(() => {
-    if (activo) portatil.current?.abrir(!reducir);
-  }, [activo, reducir]);
+    if (aLaVista && pestanaVisible) portatil.current?.abrir(!reducir);
+  }, [aLaVista, pestanaVisible, reducir]);
 
   // Pantalla plana (sin 3D): a la escala que quepa en el hueco.
   useEffect(() => {
@@ -338,10 +238,7 @@ export function GestorSimulacionSection({ data }: { data: OwnerAssistant }) {
     if (!raiz) return;
     const medir = () => {
       const r = raiz.getBoundingClientRect();
-      raiz.style.setProperty(
-        "--k",
-        String(Math.min(r.width / PANTALLA_W, r.height / PANTALLA_H))
-      );
+      raiz.style.setProperty("--k", String(Math.min(r.width / PANTALLA_W, r.height / PANTALLA_H)));
     };
     const alCambiarTamano = new ResizeObserver(medir);
     alCambiarTamano.observe(raiz);
@@ -351,15 +248,34 @@ export function GestorSimulacionSection({ data }: { data: OwnerAssistant }) {
 
   const elegir = (i: number) => {
     setEscenario(i);
-    setBeat(reducir ? ESCENARIOS[i].turnos.length : 0);
+    setPaso(0);
+    setPausado(false);
   };
 
+  const a = accent;
+  const enPausa = !reducir && (pausado || leyendo);
+  const ultimoHito = [...hitos].reverse().find((h) => actual.avisos[h]);
+  const aviso = ultimoHito ? actual.avisos[ultimoHito] : undefined;
+  // En móvil, el sitio de los chips es el de la situación que más avisos da.
+  const filasDeHechos = Math.max(...guion.escenarios.map((e) => Object.keys(e.avisos).length));
+
   return (
-    <section className={styles.seccion} aria-labelledby="gestor-titulo">
+    <section
+      className={styles.seccion}
+      aria-labelledby="gestor-titulo"
+      style={
+        a
+          ? ({ "--acento": a.strong, "--acento-suave": a.soft, "--acento-tinta": a.deep } as CSSProperties)
+          : undefined
+      }
+    >
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className={styles.cabecera}>
           <Reveal>
-            <span className="badge-soft gap-2">
+            <span
+              className={a ? styles.badgeSector : "badge-soft gap-2"}
+              style={a ? ({ backgroundColor: a.soft, color: a.deep, "--tw-ring-color": `${a.strong}33` } as CSSProperties) : undefined}
+            >
               <Check className="h-3.5 w-3.5" aria-hidden="true" />
               {data.badge}
             </span>
@@ -378,7 +294,7 @@ export function GestorSimulacionSection({ data }: { data: OwnerAssistant }) {
                   className={styles.situacion}
                   aria-pressed={i === escenario}
                   onClick={() => elegir(i)}
-                  style={{ "--p": i === escenario ? beat / total : 0 } as CSSProperties}
+                  style={{ "--p": i === escenario ? progreso : 0 } as CSSProperties}
                 >
                   <span className={styles.situacionNumero}>0{i + 1}</span>
                   <span className={styles.situacionTitulo}>{ejemplo.title}</span>
@@ -391,18 +307,42 @@ export function GestorSimulacionSection({ data }: { data: OwnerAssistant }) {
                 </button>
               ))}
             </div>
+            {reducir ? null : (
+              <div className={styles.controles}>
+                <button type="button" className={styles.control} onClick={() => setPausado((p) => !p)} aria-pressed={pausado}>
+                  {pausado ? <Play aria-hidden="true" /> : <Pause aria-hidden="true" />}
+                  {pausado ? "Seguir" : "Pausar"}
+                </button>
+                <button type="button" className={styles.control} onClick={() => elegir(escenario)}>
+                  <RotateCcw aria-hidden="true" />
+                  Ver otra vez
+                </button>
+                <span className={styles.pista}>Deja el ratón sobre el teléfono para leer con calma.</span>
+              </div>
+            )}
           </Reveal>
         </div>
 
-        <div ref={escenarioEl} className={styles.escenario} aria-hidden="true">
+        <div className={styles.escenario} aria-hidden="true">
           <div ref={macEl} className={styles.mac} data-plana={sinMac ? "" : undefined}>
             <div ref={lienzoEl} className={styles.lienzo} />
             <div ref={pantallaEl} className={styles.pantalla}>
-              <PantallaMac escenario={actual} hitos={hitos} />
+              <PantallaMac escenario={actual} vista={vista} hitos={hitos} negocio={guion.negocio} aviso={aviso} ultimoHito={ultimoHito} />
             </div>
           </div>
 
-          <div className={styles.telefono}>
+          <div
+            ref={telefonoEl}
+            className={styles.telefono}
+            // Un ratón que de verdad se mueve sobre el teléfono pausa para
+            // leer. Solo con movimiento: al hacer scroll bajo un ratón quieto
+            // Chrome dispara eventos sintéticos (movimiento cero) y la
+            // simulación se quedaría parada antes de empezar.
+            onPointerMove={(e) => {
+              if (e.pointerType === "mouse" && (e.movementX !== 0 || e.movementY !== 0)) setLeyendo(true);
+            }}
+            onPointerLeave={() => setLeyendo(false)}
+          >
             <span className={styles.sombraTelefono} />
             <div className={styles.hueco}>
               <span className={styles.isla} />
@@ -410,24 +350,38 @@ export function GestorSimulacionSection({ data }: { data: OwnerAssistant }) {
                 <span>{actual.reloj}</span>
                 <span>5G</span>
               </div>
-              <PantallaWhatsApp escenario={actual} beat={beat} />
+              <PantallaWhatsApp escenario={actual} estados={estados} letras={letras} />
             </div>
             {/* eslint-disable-next-line @next/next/no-img-element -- render local, el marco del teléfono */}
             <img src="/telefono/frente.svg" alt="" className={styles.marco} width={1335} height={2859} />
+            {enPausa ? (
+              <span className={styles.enPausa}>
+                <Pause aria-hidden="true" />
+                En pausa
+              </span>
+            ) : null}
           </div>
         </div>
 
-        <ul className={styles.hechos} aria-hidden="true">
-          {hitos.map((hito) => (
-            <li key={`${actual.id}-${hito}`} className={styles.hecho}>
-              <Check strokeWidth={2.5} aria-hidden="true" />
-              {actual.avisos[hito]?.titulo}
-            </li>
-          ))}
+        <ul className={styles.hechos} aria-hidden="true" style={{ "--filas": filasDeHechos } as CSSProperties}>
+          {hitos
+            .filter((hito) => actual.avisos[hito])
+            .map((hito) => (
+              <li key={`${actual.id}-${hito}`} className={styles.hecho}>
+                <Check strokeWidth={2.5} aria-hidden="true" />
+                {actual.avisos[hito].titulo}
+              </li>
+            ))}
         </ul>
 
         <Reveal y={8}>
           <p className={styles.cierre}>{data.closing}</p>
+          {masInfoHref ? (
+            <Link href={masInfoHref} className={styles.masInfo}>
+              Todo lo que puedes pedirle a tu Gestor
+              <ArrowRight className="h-4 w-4" aria-hidden="true" />
+            </Link>
+          ) : null}
         </Reveal>
         {/* Crédito que exige la licencia CC BY 4.0 del modelo: no quitar. */}
         <p className={styles.credito}>
@@ -449,12 +403,11 @@ export function GestorSimulacionSection({ data }: { data: OwnerAssistant }) {
 
       {/* Las tres conversaciones, para quien no ve la simulación. */}
       <ol className="sr-only">
-        {ESCENARIOS.map((esc, i) => (
+        {guion.escenarios.map((esc, i) => (
           <li key={esc.id}>
             <strong>{data.examples[i].title}.</strong>{" "}
             {esc.turnos
-              .filter((t): t is Exclude<Turno, { de: "escribiendo" }> => t.de !== "escribiendo")
-              .map((t) => `${t.de === "gestor" ? "Alhabla" : "Tú"}: ${t.texto}`)
+              .map((t) => (t.de === "gestor" ? `Alhabla: ${t.texto}` : t.de === "boton" ? `Pulsas «${t.texto}».` : `Tú: ${t.texto}`))
               .join(" ")}
           </li>
         ))}
@@ -465,8 +418,17 @@ export function GestorSimulacionSection({ data }: { data: OwnerAssistant }) {
 
 /* ── El WhatsApp del dueño ───────────────────────────────────────── */
 
-function PantallaWhatsApp({ escenario, beat }: { escenario: Escenario; beat: number }) {
-  const visibles = escenario.turnos.slice(0, beat);
+function PantallaWhatsApp({
+  escenario,
+  estados,
+  letras,
+}: {
+  escenario: Escenario;
+  estados: EstadoDeTurno[];
+  letras: number;
+}) {
+  const tecleando = escenario.turnos.findIndex((_, i) => estados[i] === "tecleando");
+  const borrador = tecleando >= 0 ? (escenario.turnos[tecleando] as Extract<Turno, { de: "dueno" }>).texto.slice(0, letras) : "";
   return (
     <div className={styles.wa}>
       <div className={styles.waCabecera}>
@@ -481,39 +443,39 @@ function PantallaWhatsApp({ escenario, beat }: { escenario: Escenario; beat: num
       </div>
       <div className={styles.waChat}>
         <span className={styles.waFecha}>Hoy</span>
-        {visibles.map((turno, i) => {
+        {escenario.turnos.map((turno, i) => {
+          const estado = estados[i];
+          if (estado === "oculto" || estado === "tecleando") return null;
           // La clave lleva la situación: al cambiar, las burbujas vuelven a
           // entrar con su animación.
           const clave = `${escenario.id}-${i}`;
-          if (turno.de === "escribiendo") {
-            // Los puntos solo mientras el Gestor «escribe»: el turno
-            // siguiente los sustituye.
-            return i === beat - 1 ? (
-              <div key={clave} className={styles.escribiendo}>
-                <i />
-                <i />
-                <i />
-              </div>
-            ) : null;
-          }
+          const hora = horaDelTurno(escenario.reloj, i);
           if (turno.de === "dueno" || turno.de === "boton") {
             return (
               <div key={clave} className={`${styles.burbuja} ${styles.burbujaDueno}`}>
                 {turno.texto}
-                <span className={styles.hora}>{turno.hora} ✓✓</span>
+                <span className={styles.hora}>{hora} ✓✓</span>
+              </div>
+            );
+          }
+          if (estado === "escribiendo") {
+            return (
+              <div key={clave} className={styles.escribiendo}>
+                <i />
+                <i />
+                <i />
               </div>
             );
           }
           // Botones bajo la propuesta; cuando el dueño pulsa uno (el turno
           // siguiente), se queda marcado y el otro se apaga.
           const siguiente = escenario.turnos[i + 1];
-          const pulsado =
-            turno.botones && siguiente?.de === "boton" && beat > i + 1 ? siguiente.texto : null;
+          const pulsado = turno.botones && siguiente?.de === "boton" && estados[i + 1] === "visible" ? siguiente.texto : null;
           return (
             <Fragment key={clave}>
-              <div className={`${styles.burbuja} ${styles.burbujaGestor}`}>
+              <div className={`${styles.burbuja} ${styles.burbujaGestor}`} data-hecho={turno.texto.startsWith("Hecho:") ? "" : undefined}>
                 {turno.texto}
-                <span className={styles.hora}>{turno.hora}</span>
+                <span className={styles.hora}>{hora}</span>
               </div>
               {turno.botones ? (
                 <div className={styles.botones}>
@@ -534,9 +496,11 @@ function PantallaWhatsApp({ escenario, beat }: { escenario: Escenario; beat: num
         })}
       </div>
       <div className={styles.waEscribir}>
-        <span className={styles.waCaja}>Mensaje</span>
+        <span className={styles.waCaja} data-borrador={borrador ? "" : undefined}>
+          {borrador || "Mensaje"}
+        </span>
         <span className={styles.waMicro}>
-          <Mic color="#fff" strokeWidth={2.4} />
+          {borrador ? <SendHorizontal color="#fff" strokeWidth={2.4} /> : <Mic color="#fff" strokeWidth={2.4} />}
         </span>
       </div>
     </div>
@@ -545,15 +509,7 @@ function PantallaWhatsApp({ escenario, beat }: { escenario: Escenario; beat: num
 
 /* ── El panel del negocio (pantalla del portátil) ────────────────── */
 
-function Item({
-  icono: Icono,
-  activo,
-  children,
-}: {
-  icono: LucideIcon;
-  activo?: boolean;
-  children: ReactNode;
-}) {
+function Item({ icono: Icono, activo, children }: { icono: LucideIcon; activo?: boolean; children: ReactNode }) {
   return (
     <div className={styles.item} data-activo={activo ? "" : undefined}>
       <Icono strokeWidth={2} />
@@ -562,10 +518,23 @@ function Item({
   );
 }
 
-function PantallaMac({ escenario, hitos }: { escenario: Escenario; hitos: Hito[] }) {
-  const ultimo = hitos[hitos.length - 1];
-  const aviso = ultimo ? escenario.avisos[ultimo] : undefined;
-  const enAgenda = escenario.id === "ausencia";
+function PantallaMac({
+  escenario,
+  vista,
+  hitos,
+  negocio,
+  aviso,
+  ultimoHito,
+}: {
+  escenario: Escenario;
+  vista: Vista;
+  hitos: Hito[];
+  negocio: string;
+  aviso?: { titulo: string; detalle: string };
+  ultimoHito?: Hito;
+}) {
+  const enAgenda = vista.tipo === "agenda";
+  const enPanel = vista.tipo === "resumen";
   return (
     <>
       <div className={styles.menu}>
@@ -575,7 +544,9 @@ function PantallaMac({ escenario, hitos }: { escenario: Escenario; hitos: Hito[]
         <span>Ver</span>
         <span>Ventana</span>
         <i className={styles.notch} />
-        <span className={styles.menuHora}>Mié {escenario.reloj}</span>
+        <span className={styles.menuHora}>
+          {escenario.diaCorto} {escenario.reloj}
+        </span>
       </div>
       <div className={styles.app}>
         <aside className={styles.lateral}>
@@ -584,17 +555,19 @@ function PantallaMac({ escenario, hitos }: { escenario: Escenario; hitos: Hito[]
             <img src="/brand/alhabla-isotipo.svg" alt="" />
             <div>
               <b>Alhabla</b>
-              <small>Peluquería Nuria</small>
+              <small>{negocio}</small>
             </div>
           </div>
           <p className={styles.grupo}>OPERACIÓN</p>
-          <Item icono={LayoutDashboard}>Panel</Item>
+          <Item icono={LayoutDashboard} activo={enPanel}>
+            Panel
+          </Item>
           <Item icono={CalendarDays} activo={enAgenda}>
             Agenda
           </Item>
           <Item icono={PhoneCall}>Llamadas</Item>
           <p className={styles.grupo}>RECEPCIONISTA</p>
-          <Item icono={Bot} activo={!enAgenda}>
+          <Item icono={Bot} activo={!enAgenda && !enPanel}>
             Agente
           </Item>
           <Item icono={MessageSquareText}>Gestor</Item>
@@ -605,70 +578,80 @@ function PantallaMac({ escenario, hitos }: { escenario: Escenario; hitos: Hito[]
           </div>
         </aside>
         <div className={styles.principal}>
-          {enAgenda ? (
-            <VistaAgenda hitos={hitos} />
+          {vista.tipo === "agenda" ? (
+            <VistaAgendaDelDia vista={vista} hitos={hitos} />
+          ) : vista.tipo === "resumen" ? (
+            <VistaDelPanel vista={vista} hitos={hitos} negocio={negocio} />
           ) : (
-            <VistaAgente seccion={escenario.id === "cierre" ? "horario" : "servicios"} hitos={hitos} />
+            <VistaAgente vista={vista} hitos={hitos} />
           )}
           {aviso ? (
-            <div key={`${escenario.id}-${ultimo}`} className={styles.aviso}>
-              <SiWhatsapp color="#25D366" aria-hidden="true" />
+            <div key={`${escenario.id}-${ultimoHito}`} className={styles.aviso}>
+              <span className={styles.avisoIcono}>
+                <SiWhatsapp aria-hidden="true" />
+              </span>
               <div>
                 <b>{aviso.titulo}</b>
-                <small>{aviso.detalle} · desde WhatsApp</small>
+                <small>{aviso.detalle} · confirmado por WhatsApp</small>
               </div>
             </div>
           ) : null}
+          {/* La pantalla destella cuando aterriza un cambio: causa en el
+              teléfono, efecto en el panel. */}
+          {ultimoHito ? <i key={`${escenario.id}-${ultimoHito}-destello`} className={styles.destello} /> : null}
         </div>
       </div>
     </>
   );
 }
 
-/* 1 · La agenda de hoy, por profesional. Filas de media hora desde las 9:00. */
+/* 1 · La agenda del día, por profesional. Filas de media hora. */
 
-const PROFESIONALES = ["Ana", "Marta", "Lucía"] as const;
-const FILAS_DE_MEDIA_HORA = 10;
-const CITAS = [
-  { col: 1, inicio: 2, filas: 4, titulo: "Mechas", cliente: "Elena S." },
-  { col: 1, inicio: 7, filas: 1, titulo: "Corte caballero", cliente: "Sergio P." },
-  { col: 2, inicio: 1, filas: 3, titulo: "Alisado", cliente: "Rosa M." },
-  { col: 2, inicio: 8, filas: 2, titulo: "Peinado", cliente: "Paula V." },
-] as const;
-/** La cita de Ana que se mueve a Lucía (misma hora: las 11:00). */
-const CITA_DE_CARMEN = { inicio: 4, filas: 2, titulo: "Corte y peinado", cliente: "Carmen R." };
-
-function VistaAgenda({ hitos }: { hitos: Hito[] }) {
-  const ausente = hitos.includes("ausente");
-  const movida = hitos.includes("movida");
-  const avisada = hitos.includes("avisada");
+function VistaAgendaDelDia({ vista, hitos }: { vista: VistaAgenda; hitos: Hito[] }) {
+  const ausencia = vista.ausencia && hitos.includes(vista.ausencia.hito) ? vista.ausencia : null;
+  const desdeFila = ausencia?.fila ?? 0;
+  const hastaFila = desdeFila + (ausencia?.filas ?? FILAS_DE_AGENDA);
   const celdas: ReactNode[] = [];
-  for (let fila = 0; fila < FILAS_DE_MEDIA_HORA; fila++) {
+  for (let fila = 0; fila < FILAS_DE_AGENDA; fila++) {
     if (fila % 2 === 0) {
       celdas.push(
         <span key={`h${fila}`} className={styles.horaEtiqueta} style={{ gridRow: fila + 1 }}>
-          {9 + fila / 2}:00
+          {vista.desdeHora + fila / 2}:00
         </span>
       );
     }
-    for (let col = 0; col < PROFESIONALES.length; col++) {
+    for (let col = 0; col < vista.profesionales.length; col++) {
+      const rayada = ausencia !== null && col === ausencia.col && fila >= desdeFila && fila < hastaFila;
       celdas.push(
         <i
           key={`c${fila}-${col}`}
           className={styles.celda}
           style={{ gridColumn: col + 2, gridRow: fila + 1 }}
           data-media={fila % 2 ? "" : undefined}
-          data-ausente={ausente && col === 0 ? "" : undefined}
+          data-ausente={rayada ? "" : undefined}
         />
       );
     }
   }
-  const carmen = (
+  const c = vista.cita;
+  const movida = c?.movida && hitos.includes(c.movida.hito) ? c.movida : null;
+  const existe = !c?.nueva || hitos.includes(c.nueva);
+  const whatsapp = c?.whatsapp && hitos.includes(c.whatsapp.hito) ? c.whatsapp.etiqueta : null;
+  const huerfana = ausencia !== null && c !== undefined && c.cita.col === ausencia.col && !movida;
+  const cuerpo = c ? (
     <>
-      <b>{CITA_DE_CARMEN.titulo}</b>
-      <small>{CITA_DE_CARMEN.cliente} · 11:00 – 12:00</small>
+      <b>{c.cita.titulo}</b>
+      <small>
+        {c.cita.cliente} · {c.horas}
+      </small>
     </>
-  );
+  ) : null;
+  const etiquetaWa = whatsapp ? (
+    <span className={styles.etiquetaWa}>
+      <SiWhatsapp aria-hidden="true" />
+      {whatsapp}
+    </span>
+  ) : null;
   return (
     <>
       <header className={styles.cab}>
@@ -681,57 +664,58 @@ function VistaAgenda({ hitos }: { hitos: Hito[] }) {
         </div>
       </header>
       <div className={styles.barra}>
-        <span className={`${styles.chip} ${styles.chipActivo}`}>Hoy</span>
+        <span className={`${styles.chip} ${styles.chipActivo}`}>Día</span>
         <span className={styles.chip}>7 días</span>
         <span className={styles.chip}>30 días</span>
-        <span className={styles.diaActual}>Miércoles, 30 de septiembre</span>
+        <span className={styles.diaActual}>{vista.dia}</span>
       </div>
       <div className={styles.agenda}>
         <div className={styles.columnas}>
           <span />
-          {PROFESIONALES.map((nombre, col) => (
-            <div key={nombre} className={styles.columnaCab} data-ausente={ausente && col === 0 ? "" : undefined}>
+          {vista.profesionales.map((nombre, col) => (
+            <div key={nombre} className={styles.columnaCab} data-ausente={ausencia && col === ausencia.col ? "" : undefined}>
               {nombre}
-              {ausente && col === 0 ? <span className={styles.chip}>Ausente hoy · baja</span> : null}
+              {ausencia && col === ausencia.col ? <span className={styles.chip}>{ausencia.etiqueta}</span> : null}
             </div>
           ))}
         </div>
         <div className={styles.rejilla}>
           {celdas}
-          {CITAS.map((cita) => (
+          {vista.citas.map((cita) => (
             <div
-              key={cita.cliente}
+              key={`${cita.col}-${cita.fila}`}
               className={`${styles.cita} ${styles.citaGris}`}
-              style={{ gridColumn: cita.col + 2, gridRow: `${cita.inicio + 1} / span ${cita.filas}` }}
+              style={{ gridColumn: cita.col + 2, gridRow: `${cita.fila + 1} / span ${cita.filas}` }}
             >
               <b>{cita.titulo}</b>
               <small>{cita.cliente}</small>
             </div>
           ))}
-          {/* En la columna de Ana hasta que se mueve; entonces entra en la
-              de Lucía, a la misma hora. */}
-          <div
-            className={styles.cita}
-            style={{ gridColumn: 2, gridRow: `${CITA_DE_CARMEN.inicio + 1} / span ${CITA_DE_CARMEN.filas}` }}
-            data-huerfana={ausente && !movida ? "" : undefined}
-            data-sale={movida ? "" : undefined}
-          >
-            {carmen}
-            {ausente && !movida ? <small>Sin quien la atienda</small> : null}
-          </div>
-          {movida ? (
+          {c && existe ? (
+            // En su columna hasta que se mueve; entonces entra en la otra (o
+            // se va a otro día y aquí queda su hueco).
             <div
               className={styles.cita}
-              style={{ gridColumn: 4, gridRow: `${CITA_DE_CARMEN.inicio + 1} / span ${CITA_DE_CARMEN.filas}` }}
+              style={{ gridColumn: c.cita.col + 2, gridRow: `${c.cita.fila + 1} / span ${c.cita.filas}` }}
+              data-huerfana={huerfana ? "" : undefined}
+              data-sale={movida && movida.col !== undefined ? "" : undefined}
+              data-fuera={movida && movida.destino ? "" : undefined}
+              data-entra={c.nueva ? "" : undefined}
+            >
+              {cuerpo}
+              {huerfana ? <small>Sin quien la atienda</small> : null}
+              {movida?.destino ? <span className={styles.destino}>→ {movida.destino}</span> : null}
+              {movida?.destino || !movida ? etiquetaWa : null}
+            </div>
+          ) : null}
+          {c && movida && movida.col !== undefined ? (
+            <div
+              className={styles.cita}
+              style={{ gridColumn: movida.col + 2, gridRow: `${c.cita.fila + 1} / span ${c.cita.filas}` }}
               data-entra=""
             >
-              {carmen}
-              {avisada ? (
-                <span className={styles.etiquetaWa}>
-                  <SiWhatsapp aria-hidden="true" />
-                  Avisada
-                </span>
-              ) : null}
+              {cuerpo}
+              {etiquetaWa}
             </div>
           ) : null}
         </div>
@@ -740,28 +724,9 @@ function VistaAgenda({ hitos }: { hitos: Hito[] }) {
   );
 }
 
-/* 2 y 3 · «Tu agente»: el horario (con sus días especiales) y los servicios. */
+/* 2 · «Tu agente»: el horario, el catálogo o la información del negocio. */
 
-const SEMANA = [
-  ["Lunes", "10:00 – 14:00 · 16:00 – 20:00"],
-  ["Martes", "10:00 – 14:00 · 16:00 – 20:00"],
-  ["Miércoles", "10:00 – 14:00 · 16:00 – 20:00"],
-  ["Jueves", "10:00 – 14:00 · 16:00 – 20:00"],
-  ["Viernes", "10:00 – 14:00 · 16:00 – 21:00"],
-  ["Sábado", "9:30 – 14:00"],
-  ["Domingo", null],
-] as const;
-
-const SERVICIOS = [
-  { nombre: "Corte caballero", duracion: 30, precio: 15, cambia: true },
-  { nombre: "Corte señora", duracion: 45, precio: 24 },
-  { nombre: "Corte y color", duracion: 90, precio: 58 },
-  { nombre: "Mechas", duracion: 120, precio: 75 },
-  { nombre: "Alisado", duracion: 90, precio: 65 },
-  { nombre: "Peinado", duracion: 45, precio: 22 },
-] as const;
-
-function VistaAgente({ seccion, hitos }: { seccion: "horario" | "servicios"; hitos: Hito[] }) {
+function VistaAgente({ vista, hitos }: { vista: VistaHorario | VistaServicios | VistaInformacion; hitos: Hito[] }) {
   return (
     <>
       <header className={styles.cab}>
@@ -774,16 +739,34 @@ function VistaAgente({ seccion, hitos }: { seccion: "horario" | "servicios"; hit
         </div>
         <span className={styles.botonPanel}>Probar el agente</span>
       </header>
-      {seccion === "horario" ? (
-        <VistaHorario cerrado={hitos.includes("cerrado")} />
+      {vista.tipo === "horario" ? (
+        <VistaDelHorario vista={vista} cerrado={hitos.includes(vista.nuevo.hito)} />
+      ) : vista.tipo === "servicios" ? (
+        <VistaDeServicios vista={vista} hitos={hitos} />
       ) : (
-        <VistaServicios cambiado={hitos.includes("precio")} />
+        <VistaDeInformacion vista={vista} ensenado={hitos.includes(vista.nueva.hito)} />
       )}
     </>
   );
 }
 
-function VistaHorario({ cerrado }: { cerrado: boolean }) {
+function DiaEspecialFila({ dia, nuevo }: { dia: VistaHorario["especiales"][number]; nuevo?: boolean }) {
+  return (
+    <div className={styles.especial} data-nuevo={nuevo ? "" : undefined}>
+      <span className={styles.fecha}>
+        {dia.fecha[0]}
+        <b>{dia.fecha[1]}</b>
+      </span>
+      <div>
+        <b>{dia.titulo}</b>
+        <small>{dia.detalle}</small>
+      </div>
+      <span className={`${styles.chip} ${nuevo ? styles.chipMorado : ""}`}>{dia.chip}</span>
+    </div>
+  );
+}
+
+function VistaDelHorario({ vista, cerrado }: { vista: VistaHorario; cerrado: boolean }) {
   return (
     <div className={styles.seccionPanel}>
       <p className={styles.h2}>Disponibilidad</p>
@@ -798,7 +781,7 @@ function VistaHorario({ cerrado }: { cerrado: boolean }) {
             <span className={`${styles.chip} ${styles.chipOk}`}>Sincronizado</span>
           </div>
           <div className={styles.semana}>
-            {SEMANA.map(([dia, tramos]) => (
+            {vista.semana.map(([dia, tramos]) => (
               <div key={dia} className={styles.diaFila}>
                 <b>{dia}</b>
                 {tramos ? <span>{tramos}</span> : <span className={styles.diaCerrado}>Cerrado</span>}
@@ -814,28 +797,10 @@ function VistaHorario({ cerrado }: { cerrado: boolean }) {
             </div>
           </div>
           <div className={styles.especiales}>
-            <div className={styles.especial}>
-              <span className={styles.fecha}>
-                JUE<b>1</b>
-              </span>
-              <div>
-                <b>Jueves 1 de octubre</b>
-                <small>10:00 – 14:00 · 16:00 – 18:00</small>
-              </div>
-              <span className={styles.chip}>Cierra antes</span>
-            </div>
-            {cerrado ? (
-              <div className={styles.especial} data-nuevo="">
-                <span className={styles.fecha}>
-                  LUN<b>12</b>
-                </span>
-                <div>
-                  <b>Lunes 12 de octubre</b>
-                  <small>Festivo</small>
-                </div>
-                <span className={`${styles.chip} ${styles.chipMorado}`}>Cerrado</span>
-              </div>
-            ) : null}
+            {vista.especiales.map((dia) => (
+              <DiaEspecialFila key={dia.titulo} dia={dia} />
+            ))}
+            {cerrado ? <DiaEspecialFila dia={vista.nuevo} nuevo /> : null}
             <span className={styles.anadir}>
               <Plus strokeWidth={2.5} />
               Añadir día especial
@@ -847,7 +812,10 @@ function VistaHorario({ cerrado }: { cerrado: boolean }) {
   );
 }
 
-function VistaServicios({ cambiado }: { cambiado: boolean }) {
+function VistaDeServicios({ vista, hitos }: { vista: VistaServicios; hitos: Hito[] }) {
+  const cambio = vista.cambio && hitos.includes(vista.cambio.hito) ? vista.cambio : null;
+  const nuevo = vista.nuevo && hitos.includes(vista.nuevo.hito) ? vista.nuevo : null;
+  const filas = nuevo ? [...vista.servicios, nuevo] : vista.servicios;
   return (
     <div className={styles.seccionPanel}>
       <p className={styles.h2}>Catálogo y equipo</p>
@@ -858,23 +826,38 @@ function VistaServicios({ cambiado }: { cambiado: boolean }) {
             <p className={styles.h2}>Servicios</p>
             <p>Lo que la recepcionista puede ofrecer, con su duración y su precio.</p>
           </div>
-          <span className={styles.chip}>{SERVICIOS.length} activos</span>
+          <span className={styles.chip}>{filas.length} activos</span>
         </div>
         <div className={styles.servicios}>
-          {SERVICIOS.map((servicio) => {
-            const esteCambia = "cambia" in servicio && cambiado;
+          {filas.map((servicio) => {
+            const esteCambia = cambio?.nombre === servicio.nombre ? cambio : null;
+            const esNuevo = nuevo?.nombre === servicio.nombre;
             return (
-              <div key={servicio.nombre} className={styles.servicioFila} data-cambiado={esteCambia ? "" : undefined}>
+              <div
+                key={servicio.nombre}
+                className={styles.servicioFila}
+                data-cambiado={esteCambia ? "" : undefined}
+                data-nuevo={esNuevo ? "" : undefined}
+              >
                 <div>
                   <b>{servicio.nombre}</b>
                   <small>Todo el equipo</small>
                 </div>
-                <span className={styles.duracion}>{servicio.duracion} min</span>
-                <span className={styles.precio}>
-                  {esteCambia ? (
+                <span className={styles.duracion}>
+                  {esteCambia?.duracion !== undefined ? (
                     <>
-                      <s className={styles.precioViejo}>{servicio.precio} €</s>
-                      <span className={styles.precioNuevo}>18 €</span>
+                      <s className={styles.valorViejo}>{servicio.duracion} min</s>
+                      <span className={styles.valorNuevo}>{esteCambia.duracion} min</span>
+                    </>
+                  ) : (
+                    `${servicio.duracion} min`
+                  )}
+                </span>
+                <span className={styles.precio}>
+                  {esteCambia?.precio !== undefined ? (
+                    <>
+                      <s className={styles.valorViejo}>{servicio.precio} €</s>
+                      <span className={styles.valorNuevo}>{esteCambia.precio} €</span>
                     </>
                   ) : (
                     `${servicio.precio} €`
@@ -887,5 +870,65 @@ function VistaServicios({ cambiado }: { cambiado: boolean }) {
         </div>
       </div>
     </div>
+  );
+}
+
+function VistaDeInformacion({ vista, ensenado }: { vista: VistaInformacion; ensenado: boolean }) {
+  return (
+    <div className={styles.seccionPanel}>
+      <p className={styles.h2}>Información del negocio</p>
+      <p>Dirección, contacto y políticas útiles: lo que la recepcionista cuenta cuando se lo preguntan.</p>
+      <div className={`${styles.tarjeta} ${styles.tarjetaCuerpo}`} style={{ marginTop: 14 }}>
+        <div className={styles.tarjetaCab}>
+          <div>
+            <p className={styles.h2}>Lo que sabe la recepcionista</p>
+            <p>Frases cortas; las lee tal cual en cada llamada.</p>
+          </div>
+          <span className={`${styles.chip} ${styles.chipOk}`}>Sincronizado</span>
+        </div>
+        <div className={styles.informacion}>
+          {vista.lineas.map((linea) => (
+            <p key={linea} className={styles.linea}>
+              {linea}
+            </p>
+          ))}
+          {ensenado ? (
+            <p className={styles.linea} data-nueva="">
+              {vista.nueva.texto}
+            </p>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* 3 · El panel de inicio: las cifras que el Gestor resume. */
+
+function VistaDelPanel({ vista, hitos, negocio }: { vista: VistaResumen; hitos: Hito[]; negocio: string }) {
+  const resalta = hitos.includes(vista.hito);
+  return (
+    <>
+      <header className={styles.cab}>
+        <span className={styles.ico}>
+          <LayoutDashboard strokeWidth={2} />
+        </span>
+        <div>
+          <p className={styles.h1}>Panel</p>
+          <p>Cómo va {negocio} esta semana: lo que ha atendido tu recepcionista y lo que te queda por resolver.</p>
+        </div>
+      </header>
+      <div className={styles.seccionPanel}>
+        <p className={styles.h2}>Esta semana</p>
+        <div className={styles.cifras}>
+          {vista.cifras.map(([etiqueta, valor]) => (
+            <div key={etiqueta} className={`${styles.tarjeta} ${styles.cifra}`} data-resalta={resalta ? "" : undefined}>
+              <small>{etiqueta}</small>
+              <b>{valor}</b>
+            </div>
+          ))}
+        </div>
+      </div>
+    </>
   );
 }
