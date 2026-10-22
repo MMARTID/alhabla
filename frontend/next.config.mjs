@@ -8,6 +8,18 @@ const nextConfig = {
   // es esta carpeta, para Turbopack y para el trazado de ficheros.
   turbopack: { root: import.meta.dirname },
   outputFileTracingRoot: import.meta.dirname,
+  // Nada de la app se indexa: además del `noindex` de las páginas
+  // (layout.tsx), la cabecera cubre cualquier respuesta, también las que no
+  // son HTML. Va con robots.txt abierto (app/robots.ts), que es lo que deja
+  // a los buscadores leerla.
+  async headers() {
+    return [
+      {
+        source: "/:path*",
+        headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow" }],
+      },
+    ];
+  },
   async rewrites() {
     return [
       {
