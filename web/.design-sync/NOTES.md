@@ -12,12 +12,14 @@ tabla completa de los dos, en `../../.design-sync/NOTES.md`.
   especificador que importan las previews).
 - Proyecto en claude.ai/design: **«Alhabla Web»** (`projectId` en el config),
   creado y subido por primera vez el 2026-09-29. La app va en «Alhabla App».
-- 19 componentes: 14 de marketing —entre ellos las dos secciones animadas de
+- Componentes: los de marketing —entre ellos las dos secciones animadas de
   la portada, «En tu bolsillo» (`LlamadaScroll`) y «En tu negocio»
-  (`EnTuNegocioScroll`), desde el 2026-09-30— y los 5 compartidos con la app (`BrandMark`,
-  `RangeSlider`, `GoogleAuthButton`, `ParticleField`, `ParticleMouseLayer`),
-  copias idénticas en las dos webs. **Si cambias la preview o el doc de uno de
-  los compartidos, cópialo al paquete de la app.**
+  (`EnTuNegocioScroll`), desde el 2026-09-30—, las páginas enteras
+  (`MainLanding` y `SiteLanding`, desde el 2026-10-22) y los 5 compartidos
+  con la app (`BrandMark`, `RangeSlider`, `GoogleAuthButton`,
+  `ParticleField`, `ParticleMouseLayer`), copias idénticas en las dos webs.
+  **Si cambias la preview o el doc de uno de los compartidos, cópialo al
+  paquete de la app.**
 
 ## Qué genera el prepare
 
@@ -56,7 +58,7 @@ de cada pieza y sus trampas está en las notas de la app; lo propio de la web:
 - **Las previews de las dos secciones no importan `_sin-movimiento`**: con
   movimiento reducido cambian a su versión quieta. Enseñan el escenario al
   llegar a la sección (paso 1) dentro de una caja de 800 px con overflow oculto,
-  que recorta los 340/360vh de recorrido.
+  que recorta los 510/470vh de recorrido.
 
 El prepare **aborta** si `componentSrcMap` apunta a un fichero que no existe o
 si el barrel no compila, en lugar de dejar la tarjeta vacía.
@@ -84,12 +86,19 @@ si el barrel no compila, en lugar de dejar la tarjeta vacía.
 
 ## Cosas que se quedaron fuera a propósito
 
-- Las composiciones a nivel de página (`MainLanding`, `SiteLanding`,
-  `CityNicheLanding`, `SiteHeader`, `SiteFooter`, `PlansWithRoi`, `LegalPage`)
-  y las secciones de una sola landing (`HeroHilos` y las `*-section` salvo
-  `SectorDataSection`): sólo se sincronizan las piezas reutilizables del
-  sistema. Excepción: «En tu bolsillo» y «En tu negocio», a petición del
-  usuario el 2026-09-30.
+- Las demás composiciones a nivel de página (`SiteHeader`, `SiteFooter`,
+  `PlansWithRoi`, `LegalPage`) y las secciones de una sola landing
+  (`HeroHilos` y las `*-section` salvo `SectorDataSection`): sólo se
+  sincronizan las piezas reutilizables del sistema. Excepciones, a petición
+  del usuario: «En tu bolsillo» y «En tu negocio» (2026-09-30), y la portada
+  y las cinco landings de sector enteras (`MainLanding`, `SiteLanding`, el
+  2026-10-22: «pasar las landings a design»). Sus previews importan
+  `_sin-movimiento` (la tarjeta es una captura y sin él el hero sale a mitad
+  de aparecer), así que dentro de ellas las secciones con escenario fijo van
+  en su versión quieta; la animación se ve en las tarjetas propias de esas
+  secciones. Las fotos de los sectores de la portada (`public/heroes/`, ~1,2
+  MB) van embebidas en `recursosPublicos`: el bundle pasó de ~4,5 MB a ~6,5
+  MB.
 - Ninguna tarjeta tipográfica: desde el 2026-09-29 todos los componentes tienen
   preview. `DemoVoiceCall` (viewport 900x760, primer paso de la demo, sin red
   ni micrófono) y `ParticleMouseLayer` (900x480, copia de la preview de la app

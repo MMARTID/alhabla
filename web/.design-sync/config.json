@@ -34,7 +34,10 @@
     "ParticleMouseLayer": "src/components/particle-mouse-layer.tsx",
     "DemoVoiceCall": "src/components/demo-voice-call.tsx",
     "LlamadaScroll": "src/components/llamada-scroll.tsx",
-    "EnTuNegocioScroll": "src/components/en-tu-negocio.tsx"
+    "EnTuNegocioScroll": "src/components/en-tu-negocio.tsx",
+    "MainLanding": "src/components/main-landing.tsx",
+    "SiteLanding": "src/components/site-landing.tsx",
+    "GestorSimulacionSection": "src/components/gestor-simulacion.tsx"
   },
   "overrides": {
     "MobileNav": {
@@ -71,6 +74,20 @@
     "EnTuNegocioScroll": {
       "cardMode": "single",
       "viewport": "1280x800"
+    },
+    "MainLanding": {
+      "cardMode": "single",
+      "viewport": "1280x800"
+    },
+    "SiteLanding": {
+      "cardMode": "single",
+      "primaryStory": "Peluqueria",
+      "viewport": "1280x800"
+    },
+    "GestorSimulacionSection": {
+      "cardMode": "single",
+      "primaryStory": "Portada",
+      "viewport": "1280x1400"
     }
   },
   "dtsPropsFor": {

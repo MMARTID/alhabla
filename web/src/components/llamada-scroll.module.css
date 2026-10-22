@@ -8,6 +8,8 @@
  * coordenadas del hueco del render; las medidas de dentro van en cqw de la
  * pantalla para que todo escale con el teléfono. Los giros y apariciones los
  * pone framer-motion desde el progreso del scroll (ver llamada-scroll.tsx).
+ * Al final el teléfono se zambulle en la cámara y crece varias veces: lo
+ * recorta el escenario (overflow hidden), no su columna.
  *
  * «En tu negocio» solapa el final de esta sección: no lleva borde de abajo.
  */
@@ -386,20 +388,10 @@
   inset: 0;
 }
 
-/* El relevo: un rectángulo negro que nace sobre la silueta del teléfono
-   tumbado y se estira hasta la pantalla del portátil de «En tu negocio».
-   Posición, tamaño y esquinas los pone llamada-scroll.tsx. */
-.relevo {
-  position: absolute;
-  z-index: 2;
-  display: none;
-  background: #000;
-  pointer-events: none;
-}
-
 /* La pantalla apagada: se funde a negro al tumbarse el teléfono, antes de
-   que lo releve la pantalla (también apagada) del portátil de «En tu
-   negocio». Por encima de todo, isla incluida. */
+   la zambullida en la que ese negro cubre el escenario y lo releva la
+   pantalla (también apagada) del portátil de «En tu negocio». Por encima de
+   todo, isla incluida. */
 .apagada {
   position: absolute;
   inset: 0;

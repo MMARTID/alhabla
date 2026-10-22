@@ -14,9 +14,7 @@ import { Check, Mic, Phone } from "lucide-react";
 import { SiApple, SiGooglecalendar } from "@icons-pack/react-simple-icons";
 
 import { MicrosoftLogo } from "@/components/brand-icons";
-import { PantallaBloqueo } from "@/components/pantalla-bloqueo";
 import type { NicheAccent } from "@/lib/niche-landings";
-import { pintarBloqueo } from "@/lib/pantalla-bloqueo";
 import { GUION_GENERAL, relato, type GuionRelato, type Relato } from "@/lib/relato-guiones";
 import { useMovimientoReducido } from "@/hooks/use-movimiento-reducido";
 import { marcarRelato } from "@/lib/relato-fijo";
@@ -24,12 +22,10 @@ import { escucharScrollSuave, progresoDe } from "@/lib/scroll-suave";
 import {
   ALTO_BOLSILLO_VH,
   BOLSILLO_P,
-  PANTALLA_HTML,
+  HOLGURA_CUBRE,
+  aumentoQueCubre,
   hayNegocioEnEscena,
-  pantallaDelPortatil,
-  publicarTelefono,
-  vhRelevoDesdeBolsillo,
-  type TelefonoTumbado,
+  zambullida,
 } from "@/lib/transicion-bolsillo-negocio";
 import styles from "./llamada-scroll.module.css";
 
@@ -55,10 +51,11 @@ import styles from "./llamada-scroll.module.css";
  * - Nada fuerza la posición del scroll salvo el clic en la barra de pasos.
  *
  * Desde el 2026-09-30 la sección no termina: al acabar el tercer paso el
- * teléfono se tumba en su sitio, se le apaga la pantalla (fase «Vuelco») y se
- * funde con la pantalla, también apagada, del portátil de «En tu negocio»,
- * que solapa a esta sección. El reparto de los tramos y cómo se encuentran
- * están en `lib/transicion-bolsillo-negocio.ts`.
+ * teléfono se tumba en su sitio y se le apaga la pantalla (fase «Vuelco»); y
+ * desde el 2026-10-22 se zambulle: se viene hacia la cámara hasta que su
+ * pantalla negra lo cubre todo, y de ese negro sale, en «En tu negocio» (que
+ * solapa a esta sección), la pantalla del portátil. El reparto de los tramos
+ * y cómo se encuentran están en `lib/transicion-bolsillo-negocio.ts`.
  */
 
 type PasoCopy = {
@@ -129,7 +126,7 @@ const ANCLAS = [0.3, 0.62, 0.88] as const;
 
 /**
  * Los tres pasos ocupan el progreso 0→FIN_PASOS de la sección; de ahí a
- * FIN_VUELCO va el vuelco, hasta INICIO_CRUCE el estirado y el resto es el
+ * FIN_VUELCO va el vuelco, hasta INICIO_CRUCE la zambullida y el resto es el
  * cruce con «En tu negocio». Todo lo de arriba (costuras, momentos, anclas)
  * va sobre el progreso de los pasos, que es el de antes estirado a 0→1.
  */
@@ -137,11 +134,21 @@ const { finPasos: FIN_PASOS, finVuelco: FIN_VUELCO, inicioCruce: INICIO_CRUCE } 
 /**
  * El cuerpo del teléfono dentro de su imagen (public/telefono/frente.svg),
  * sin los botones ni el margen transparente: alto como fracción del alto del
- * elemento (tumbado, es el ancho de la silueta), y su ancho y el radio de sus
- * esquinas como fracción de ese alto.
+ * elemento (tumbado, es el ancho de la silueta).
  */
 const CUERPO_ALTO = 2704 / 2859;
-const CUERPO = { ancho: 1290 / 2704, radio: 222 / 2704 } as const;
+/**
+ * La pantalla del teléfono (`.hueco`, ver el CSS) como fracción del ancho y
+ * del alto del elemento: es lo que tiene que cubrir el escenario al final de
+ * la zambullida.
+ */
+const HUECO = { ancho: 0.892, alto: 0.911 } as const;
+/**
+ * El giro en Y de la zambullida, en grados: el teléfono se ladea un poco al
+ * arrancar y se endereza al llegar, para que el acercamiento tenga volumen y
+ * no sea un simple aumento.
+ */
+const LADEO_ZAMBULLIDA = 7;
 /**
  * Tumbado, la silueta del teléfono mide esto por el alto que tenía de pie:
  * crece un poco, para que la cámara de «En tu negocio» tenga de dónde
@@ -279,17 +286,47 @@ export function LlamadaScroll({ guion = GUION_GENERAL, acento }: { guion?: Guion
   const xFinal = useMotionValue(0);
   const yFinal = useMotionValue(0);
   const escalaFinal = useMotionValue(1);
-  const rotateY = useTransform([giroY, tv], ([g, t]: number[]) => g * (1 - t) - 8 * Math.sin(Math.PI * t));
+  /**
+   * Zambullida (FIN_VUELCO→INICIO_CRUCE): el teléfono tumbado se va al
+   * centro del escenario y se viene hacia la cámara acelerando (la curva
+   * `zambullida`, en escala logarítmica para que el crecimiento sea parejo)
+   * hasta que su pantalla negra cubre el escenario entero y de sobra: el
+   * marco sale de cuadro y solo queda negro, que es donde «En tu negocio»
+   * hace el corte a la pantalla de su portátil. Por el camino se ladea un
+   * poco en Y y se endereza al llegar. Cuánto ampliar y a dónde ir dependen
+   * del layout, se miden (ver `medir`). Solo transform: nada de animar
+   * tamaño o posición, y nada se desenfoca porque lo único a la vista es
+   * negro. Sin escena 3D no hay relevo: el teléfono se queda tumbado.
+   */
+  const tZambullida = useTransform(s, [FIN_VUELCO, INICIO_CRUCE], [0, 1]);
+  const tz = useTransform(tZambullida, (t) => (hayNegocioEnEscena() ? zambullida(t) : 0));
+  const lnCubre = useMotionValue(0);
+  const xCentro = useMotionValue(0);
+  const yCentro = useMotionValue(0);
+  const ladeo = useTransform([tZambullida, tz], ([t, d]: number[]) =>
+    d > 0 ? -LADEO_ZAMBULLIDA * Math.sin(Math.PI * t) : 0
+  );
+  const rotateY = useTransform(
+    [giroY, tv, ladeo],
+    ([g, t, l]: number[]) => g * (1 - t) - 8 * Math.sin(Math.PI * t) + l
+  );
   const rotateX = useTransform([giroX, tv], ([g, t]: number[]) => g * (1 - t));
   const rotate = useTransform([inclina, tv], ([r, t]: number[]) => r - 90 * t);
   // A mitad del giro el teléfono encoge un poco: en diagonal es más ancho y
   // así no se mete en la columna del texto mientras este se va.
   const scale = useTransform(
-    [zoom, tv, escalaFinal],
-    ([z, t, ef]: number[]) => z * (1 + (ef - 1) * t) * (1 - 0.08 * Math.sin(Math.PI * t))
+    [zoom, tv, escalaFinal, tz, lnCubre],
+    ([z, t, ef, d, ln]: number[]) =>
+      z * (1 + (ef - 1) * t) * (1 - 0.08 * Math.sin(Math.PI * t)) * Math.exp(ln * d)
   );
-  const x = useTransform([deriva, tv, xFinal], ([d, t, xf]: number[]) => d * (1 - t) + xf * t);
-  const y = useTransform([subida, tv, yFinal], ([sb, t, yf]: number[]) => sb * (1 - t) + yf * t);
+  const x = useTransform(
+    [deriva, tv, xFinal, tz, xCentro],
+    ([dr, t, xf, d, xc]: number[]) => dr * (1 - t) + xf * t + (xc - xf) * d
+  );
+  const y = useTransform(
+    [subida, tv, yFinal, tz, yCentro],
+    ([sb, t, yf, d, yc]: number[]) => sb * (1 - t) + yf * t + (yc - yf) * d
+  );
   const originY = useTransform(tVuelco, [0, 0.25], [0.36, 0.5]);
   // El texto, el rótulo y la barra de pasos se van mientras el teléfono
   // empieza a girar; la sombra del teléfono también.
@@ -300,53 +337,6 @@ export function LlamadaScroll({ guion = GUION_GENERAL, acento }: { guion?: Guion
   // La sombra acompaña: se estrecha al girar y se aclara al subir.
   const sombraX = useTransform(giroY, (v) => 1 - Math.abs(v) / 60);
   const sombraO = useTransform([subida, tVuelco], ([sb, t]: number[]) => (1 - 0.2 * tramo(sb, 0, -14)) * (1 - tramo(t, 0, 0.3)));
-  /**
-   * Estirado (FIN_VUELCO→INICIO_CRUCE): sobre la silueta del teléfono tumbado
-   * nace un rectángulo negro con sus mismas esquinas, que se estira hasta la
-   * pantalla del portátil (`pantallaDelPortatil`), donde «En tu negocio» la
-   * releva en el cruce. Va sobre el mismo muelle que el teléfono, así que no
-   * se despegan aunque el scroll vaya a saltos; el teléfono se apaga debajo
-   * al empezar. Sin escena 3D no hay relevo: el teléfono se queda.
-   */
-  const tEstirado = useTransform(s, [FIN_VUELCO, INICIO_CRUCE], [0, 1]);
-  const te = useTransform(tEstirado, cubico);
-  // Cada medida nueva (ver `medir`) cambia esto, para que el rectángulo se
-  // recoloque aunque el scroll no se mueva.
-  const tumbado = useRef<TelefonoTumbado | null>(null);
-  const medida = useMotionValue(0);
-  const relevo = useTransform([te, medida], ([t]: number[]) => {
-    const tel = tumbado.current;
-    if (!tel || !hayNegocioEnEscena()) return null;
-    const pc = pantallaDelPortatil(tel);
-    const mezcla = (a: number, b: number) => a + (b - a) * t;
-    const ancho = mezcla(tel.ancho, pc.ancho);
-    const alto = mezcla(tel.alto, pc.alto);
-    const escalaPc = pc.ancho / PANTALLA_HTML.ancho;
-    return {
-      left: mezcla(tel.x, pc.x) - ancho / 2,
-      top: mezcla(tel.y, pc.y) - alto / 2,
-      width: ancho,
-      height: alto,
-      arriba: mezcla(tel.radio, PANTALLA_HTML.radioArriba * escalaPc),
-      abajo: mezcla(tel.radio, PANTALLA_HTML.radioAbajo * escalaPc),
-    };
-  });
-  const relevoDisplay = useTransform(relevo, (r) => (r && tEstirado.get() > 0 ? "block" : "none"));
-  const relevoLeft = useTransform(relevo, (r) => r?.left ?? 0);
-  const relevoTop = useTransform(relevo, (r) => r?.top ?? 0);
-  const relevoWidth = useTransform(relevo, (r) => r?.width ?? 0);
-  const relevoHeight = useTransform(relevo, (r) => r?.height ?? 0);
-  const relevoRadio = useTransform(relevo, (r) =>
-    r ? `${r.arriba}px ${r.arriba}px ${r.abajo}px ${r.abajo}px` : "0px"
-  );
-  // La pantalla de bloqueo del relevo se mide en 1/1200 del ancho del negro,
-  // como la del portátil (ver components/pantalla-bloqueo.tsx).
-  const relevoU = useTransform(relevo, (r) => `${(r?.width ?? 0) / PANTALLA_HTML.ancho}px`);
-  const bloqueo = useRef<HTMLDivElement>(null);
-  useMotionValueEvent(s, "change", (v) => {
-    if (bloqueo.current) pintarBloqueo(bloqueo.current, vhRelevoDesdeBolsillo(v));
-  });
-  const opacidadTelefono = useTransform(tEstirado, (t) => (hayNegocioEnEscena() ? 1 - tramo(t, 0, 0.2) : 1));
 
   // Riel de pasos (vertical, a la izquierda del texto): cada tramo se llena
   // con su parte del progreso suavizado.
@@ -361,8 +351,9 @@ export function LlamadaScroll({ guion = GUION_GENERAL, acento }: { guion?: Guion
    * CRECE_TUMBADO veces su alto de pie y, en escritorio, tan centrado en su
    * columna como quepa sin salirse; en móvil y tableta, en el centro (allí el
    * teléfono de pie va abajo, bajo el texto, y tumbado ahí dejaba media
-   * pantalla vacía). Lo publica para la escena de «En tu negocio». Se repite
-   * al cambiar el tamaño de algo.
+   * pantalla vacía). Y la zambullida: cuánto más hay que ampliarlo, ya
+   * tumbado y en el centro del escenario, para que su pantalla lo cubra
+   * entero. Se repite al cambiar el tamaño de algo.
    */
   useEffect(() => {
     const esc = escenario.current;
@@ -373,7 +364,8 @@ export function LlamadaScroll({ guion = GUION_GENERAL, acento }: { guion?: Guion
       const ancho = esc.clientWidth;
       const alto = esc.clientHeight;
       const h = tel.offsetHeight;
-      const centroX = col.offsetLeft + tel.offsetLeft + tel.offsetWidth / 2;
+      const w = tel.offsetWidth;
+      const centroX = col.offsetLeft + tel.offsetLeft + w / 2;
       const centroY = col.offsetTop + tel.offsetTop + h / 2;
       const escritorio = window.innerWidth >= 1024;
       const cabe = Math.max(0, ancho - 2 * MARGEN_TUMBADO);
@@ -385,30 +377,29 @@ export function LlamadaScroll({ guion = GUION_GENERAL, acento }: { guion?: Guion
       // El centro del hueco que deja la cabecera (el padding de arriba del
       // escenario) y el margen de abajo.
       const estilo = getComputedStyle(esc);
-      const yCentro = (parseFloat(estilo.paddingTop) + alto - parseFloat(estilo.paddingBottom)) / 2;
+      const yTumbado = (parseFloat(estilo.paddingTop) + alto - parseFloat(estilo.paddingBottom)) / 2;
       xFinal.set(x - centroX);
-      yFinal.set(yCentro - centroY);
+      yFinal.set(yTumbado - centroY);
       escalaFinal.set(e);
-      tumbado.current = {
-        x,
-        y: yCentro,
-        ancho: silueta,
-        alto: CUERPO.ancho * silueta,
-        radio: CUERPO.radio * silueta,
-      };
-      publicarTelefono(tumbado.current);
-      medida.set(medida.get() + 1);
+      // La pantalla tumbada, en px del escenario (su alto de pie es el ancho
+      // tumbado), y lo que hay que ampliarla, en logaritmo, para cubrir el
+      // escenario entero (la cabecera queda encima, da igual) desde su centro.
+      const pantalla = { ancho: HUECO.alto * h * e, alto: HUECO.ancho * w * e };
+      lnCubre.set(
+        h > 0 && w > 0
+          ? Math.log(aumentoQueCubre(pantalla, { ancho, alto }, HOLGURA_CUBRE.telefono))
+          : 0
+      );
+      xCentro.set(ancho / 2 - centroX);
+      yCentro.set(alto / 2 - centroY);
     };
     const observador = new ResizeObserver(medir);
     observador.observe(esc);
     observador.observe(col);
     observador.observe(tel);
     medir();
-    return () => {
-      observador.disconnect();
-      publicarTelefono(null);
-    };
-  }, [reducir, xFinal, yFinal, escalaFinal, medida]);
+    return () => observador.disconnect();
+  }, [reducir, xFinal, yFinal, escalaFinal, lnCubre, xCentro, yCentro]);
 
   // Mientras el escenario está fijo, el botón de «Configurar cookies» se
   // esconde (tapaba la barra de pasos en móvil). Ver lib/relato-fijo.ts.
@@ -486,7 +477,6 @@ export function LlamadaScroll({ guion = GUION_GENERAL, acento }: { guion?: Guion
                 rotate,
                 scale,
                 originY,
-                opacity: opacidadTelefono,
                 transformPerspective: 1400,
               }}
             >
@@ -515,24 +505,6 @@ export function LlamadaScroll({ guion = GUION_GENERAL, acento }: { guion?: Guion
             <motion.div className={styles.velo} style={{ opacity: opacidadTexto }} />
           </div>
         </div>
-        <motion.div
-          ref={bloqueo}
-          className={styles.relevo}
-          aria-hidden="true"
-          style={
-            {
-              display: relevoDisplay,
-              left: relevoLeft,
-              top: relevoTop,
-              width: relevoWidth,
-              height: relevoHeight,
-              borderRadius: relevoRadio,
-              "--u": relevoU,
-            } as unknown as CSSProperties
-          }
-        >
-          <PantallaBloqueo guion={guion} />
-        </motion.div>
       </motion.div>
 
       <ol className="sr-only">

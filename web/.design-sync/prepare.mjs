@@ -45,19 +45,32 @@ export function PreviewProviders({ children }: { children: React.ReactNode }) {
 prepararPaquete({
   proyecto: resolve(AQUI, ".."),
   config: join(AQUI, "config.json"),
-  // El copy real de cada landing de sector, para que las previews (y el
-  // agente de diseño) compongan con él en vez de inventar relleno. No genera
-  // tarjeta.
-  datosExtra: [["../src/lib/niche-landings", ["nicheLandings"]]],
+  // El copy real de cada landing de sector (y el de la portada para el
+  // Gestor), para que las previews (y el agente de diseño) compongan con él
+  // en vez de inventar relleno. No genera tarjeta.
+  datosExtra: [
+    ["../src/lib/niche-landings", ["nicheLandings", "generalOwnerAssistant"]],
+    // Los guiones del Gestor en acción, el de la portada y uno por sector
+    // (GestorSimulacionSection los necesita, no tienen valor por defecto).
+    ["../src/lib/gestor-guiones", ["GUIONES_GESTOR", "GUION_GESTOR_GENERAL"]],
+  ],
   // Rutas de public/ que cargan las secciones de la portada: el teléfono y el
   // logo del chat de «En tu bolsillo» (<img>) y el portátil 3D de «En tu
   // negocio» (fetch del GLTFLoader). Fuera de Next no existen: sin ellos el
   // teléfono sale roto y «En tu negocio» cae a su versión quieta. El modelo
-  // pesa 1,3 MB y es lo que más engorda el bundle (ver NOTES.md).
+  // pesa 1,3 MB y es lo que más engorda el bundle (ver NOTES.md). Desde el
+  // 2026-10-22 van también las páginas enteras: la portada (`MainLanding`)
+  // enseña en su bloque de sectores las cinco fotos de public/heroes/
+  // (~1,2 MB entre todas).
   recursosPublicos: [
     "/telefono/frente.svg",
     "/brand/alhabla-isotipo.svg",
     "/modelos/macbook.glb",
+    "/heroes/peluqueria.jpg",
+    "/heroes/barberia.jpg",
+    "/heroes/salon-de-unas.jpg",
+    "/heroes/centro-de-estetica.jpg",
+    "/heroes/fisioterapia.jpg",
   ],
   providers: PROVIDERS,
 });

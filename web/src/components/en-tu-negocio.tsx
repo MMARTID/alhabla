@@ -40,11 +40,12 @@ import "./en-tu-negocio.css";
  *
  * Desde el 2026-09-30 la sección solapa el final de «En tu bolsillo» (margen
  * negativo, ver `lib/transicion-bolsillo-negocio.ts`): su escenario fijo se
- * pone encima del teléfono tumbado, transparente; la pantalla apagada del
- * portátil nace sobre la silueta del teléfono y se estira hasta su sitio, el
- * portátil (ya abierto) se enciende alrededor, y la cámara se aleja hasta el
- * encuadre del paso 1 mientras entra el título. Por eso el texto, el rótulo y
- * el crédito empiezan invisibles (CSS) y los enciende la escena.
+ * pone encima, transparente, mientras el teléfono se zambulle hasta que su
+ * pantalla negra lo cubre todo; en ese negro se enciende la pantalla del
+ * portátil, bloqueada y pegada a la cámara, y la cámara se aleja hasta el
+ * encuadre del paso 1 descubriendo el portátil, mientras la pantalla se
+ * desbloquea y entra el título. Por eso el texto, el rótulo y el crédito
+ * empiezan invisibles (CSS) y los enciende la escena.
  * La versión quieta no solapa nada.
  *
  * El CSS (`en-tu-negocio.css`) es global pero va todo colgado de
@@ -112,8 +113,8 @@ function pasosDe(g: GuionRelato): [PasoCopy, PasoCopy, PasoCopy] {
 
 /** Al pulsar un paso en la barra se cae con todo ya a la vista. */
 const ANCLAS = [0.3, 0.6, 0.9] as const;
-/** Los tres pasos empiezan cuando acaba el zoom out. */
-const INICIO_PASOS = NEGOCIO_P.finZoom;
+/** Los tres pasos empiezan cuando acaba la salida (el zoom out). */
+const INICIO_PASOS = NEGOCIO_P.finSalida;
 
 /**
  * A qué distancia de la pantalla se empieza a descargar three.js y el modelo:
@@ -285,7 +286,8 @@ export function EnTuNegocioScroll({
       <div className="ng-escenario">
         <div className="ng-lienzo" />
         <div className="mx" aria-hidden="true">
-          {/* La pantalla de bloqueo del relevo: la escena la desvanece al
+          {/* La pantalla de bloqueo del relevo: negra en el corte con el
+              teléfono, luego la hora y el aviso, y la escena la desvanece al
               desbloquear (ver components/pantalla-bloqueo.tsx). */}
           <div className="mx-bloqueo">
             <PantallaBloqueo guion={guion} />
