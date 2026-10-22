@@ -14,7 +14,7 @@ import { siteUrl } from "@/lib/seo";
  * `X-Robots-Tag: noindex` por su cuenta.
  */
 export default function robots(): MetadataRoute.Robots {
-  const host = siteUrl ?? "https://alhabla.ai";
+  const host = siteUrl;
 
   return {
     rules: [

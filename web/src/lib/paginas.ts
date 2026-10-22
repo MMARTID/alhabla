@@ -35,35 +35,45 @@ export type PaginaIndexable = {
   /** Una frase para la tarjeta del índice de su sección y para /llms.txt. */
   resumen: string;
   seccion: SeccionDelSitio;
-  prioridad: number;
-  frecuencia: "weekly" | "monthly" | "yearly";
   /**
-   * AAAA-MM-DD de la última revisión de fondo (no de una errata). Va al
-   * `lastmod` del sitemap; sin él no se publica, porque un `lastmod` que
-   * miente («todo cambió hoy» en cada deploy) hace que Google lo ignore.
+   * AAAA-MM-DD de la última revisión de fondo de ESTA página: lo que dice,
+   * sus datos o sus enlaces. No se sube por una errata, por cambiar una
+   * palabra ni por tocar algo común a todas (el pie). Va al `lastmod` del
+   * sitemap, al `dateModified` y al «Actualizado el…» de PaginaGuia; Google
+   * solo usa el `lastmod` si es «consistently and verifiably accurate», y
+   * Bing dice que el error típico es que todas las fechas sean iguales. Por
+   * eso cada entrada lleva la suya y no hay una constante común.
+   *
+   * Sin `priority` ni `changefreq` (2026-10-22): Google y Bing los ignoran.
    */
   actualizado?: string;
-  /** Foto de cabecera (lib/fotos.ts): la pinta PaginaGuia y va al sitemap de imágenes. */
+  /** Foto de cabecera de banco (lib/fotos.ts) que pinta PaginaGuia. No va
+   * al sitemap: Google solo admite imágenes de otro dominio si verificas
+   * ese dominio en Search Console, y Unsplash o Pexels no se pueden. */
   foto?: NombreDeFoto;
-  /** Otras imágenes que se ven en la página (ruta bajo public/ o URL absoluta de
-   * Unsplash/Pexels), para el sitemap de imágenes. */
+  /** Imágenes propias (rutas bajo public/) que se ven en la página, para el
+   * sitemap de imágenes. Solo las que salen de verdad en su HTML. */
   imagenes?: string[];
 };
 
-const HOY = "2026-10-20";
+/*
+ * Tope del registro (regla nuestra, no de Google; 2026-10-22): entre 75 y
+ * 85 páginas hasta que más de la mitad estén indexadas. Con poca autoridad,
+ * Google rastrea poco y cada página nueva le quita rastreo a las demás. Las
+ * nuevas, de una en una, con contenido propio y pasando `seo:similitud`.
+ */
 
-/** Páginas de valor nuevas (todas revisadas hoy): ruta, nombre, resumen y sección. */
-function guias(filas: readonly (readonly [string, string, string, SeccionDelSitio, NombreDeFoto?])[]): PaginaIndexable[] {
-  return filas.map(([ruta, nombre, resumen, seccion, foto]) => ({
+/** Páginas de guía: ruta, nombre, resumen, sección, fecha de revisión y foto. */
+function guias(
+  filas: readonly (readonly [string, string, string, SeccionDelSitio, string, NombreDeFoto?])[]
+): PaginaIndexable[] {
+  return filas.map(([ruta, nombre, resumen, seccion, actualizado, foto]) => ({
     ruta,
     nombre,
     resumen,
     seccion,
+    actualizado,
     ...(foto ? { foto } : {}),
-    // Los índices de sección pesan más que sus hijas.
-    prioridad: ruta.split("/").length === 2 ? 0.7 : 0.6,
-    frecuencia: "monthly",
-    actualizado: HOY,
   }));
 }
 
@@ -73,19 +83,19 @@ export const PAGINAS: readonly PaginaIndexable[] = [
     nombre: "Alhabla",
     resumen: "Recepcionista de IA que contesta las llamadas de tu negocio, reserva en tu calendario y confirma por WhatsApp.",
     seccion: "principal",
-    prioridad: 1,
-    frecuencia: "weekly",
-    actualizado: HOY,
-    imagenes: ["/heroes/general.jpg"],
+    actualizado: "2026-10-20",
+    // Las fotos de los sectores que se ven en la portada (main-landing.tsx).
+    // general.jpg no: solo la usa la imagen para compartir.
+    imagenes: ["peluqueria", "barberia", "salon-de-unas", "centro-de-estetica", "fisioterapia"].map(
+      (sector) => `/heroes/${sector}.jpg`
+    ),
   },
   {
     ruta: "/planes",
     nombre: "Planes y precios",
     resumen: "Inicio, Pro y Scale: cuota sin IVA, minutos incluidos, precio del minuto extra y qué cuenta como minuto.",
     seccion: "principal",
-    prioridad: 0.9,
-    frecuencia: "weekly",
-    actualizado: HOY,
+    actualizado: "2026-10-20",
   },
   // Sectores con landing completa (lib/niche-landings.ts).
   ...(
@@ -102,10 +112,7 @@ export const PAGINAS: readonly PaginaIndexable[] = [
       nombre,
       resumen,
       seccion: "sectores",
-      prioridad: 0.85,
-      frecuencia: "weekly",
-      actualizado: HOY,
-      imagenes: [`/heroes${ruta}.jpg`],
+      actualizado: "2026-10-20",
     })
   ),
   // Sectores sin datos de salud (2026-10-20): misma recepcionista, página
@@ -124,9 +131,7 @@ export const PAGINAS: readonly PaginaIndexable[] = [
       resumen,
       foto,
       seccion: "sectores",
-      prioridad: 0.8,
-      frecuencia: "monthly",
-      actualizado: HOY,
+      actualizado: "2026-10-20",
     })
   ),
   {
@@ -135,98 +140,90 @@ export const PAGINAS: readonly PaginaIndexable[] = [
     foto: "peluqueraConElMovil",
     resumen: "Cambia horarios, ausencias, precios y citas escribiendo o con notas de voz a tu Gestor por WhatsApp; nada cambia sin tu «Confirmar».",
     seccion: "funciones",
-    prioridad: 0.7,
-    frecuencia: "monthly",
-    actualizado: HOY,
+    actualizado: "2026-10-20",
   },
   {
     ruta: "/recepcionista-ia-en-catalan",
     nombre: "Atención en catalán",
     resumen: "En Cataluña y Baleares entiende y contesta en catalán desde la primera llamada.",
     seccion: "funciones",
-    prioridad: 0.7,
-    frecuencia: "monthly",
-    actualizado: HOY,
+    actualizado: "2026-10-20",
   },
   ...guias([
-    ["/recepcionista-ia-en-euskera", "Atención en euskera", "En Euskadi entiende y contesta en euskera a quien llama en euskera, sin configurar nada.", "funciones", "bilbaoRia"],
-    ["/recepcionista-ia-en-gallego", "Atención en gallego", "En Galicia atiende en gallego a quien llama en gallego, y en castellano a quien prefiere el castellano.", "funciones", "santiagoCatedral"],
+    ["/recepcionista-ia-en-euskera", "Atención en euskera", "En Euskadi entiende y contesta en euskera a quien llama en euskera, sin configurar nada.", "funciones", "2026-10-20", "bilbaoRia"],
+    ["/recepcionista-ia-en-gallego", "Atención en gallego", "En Galicia atiende en gallego a quien llama en gallego, y en castellano a quien prefiere el castellano.", "funciones", "2026-10-20", "santiagoCatedral"],
     // Integraciones: solo lo que Alhabla hace de verdad (AGENTS.md § Calendar Integration).
-    ["/integraciones", "Integraciones", "Los calendarios y canales con los que trabaja tu recepcionista de IA: Google, Outlook, iCloud y WhatsApp.", "integraciones", "calendarioEnPantalla"],
-    ["/integraciones/google-calendar", "Google Calendar", "Reserva en tu Google Calendar con permisos mínimos y respeta lo que ya tienes apuntado.", "integraciones", "calendarioEnOrdenador"],
-    ["/integraciones/outlook", "Outlook", "Conecta tu calendario de Outlook o Microsoft 365 y elige en cuál entran las citas.", "integraciones", "portatilEnMesa"],
-    ["/integraciones/icloud", "Calendario de Apple (iCloud)", "Con tu Apple ID y una contraseña de aplicación, las citas entran en el calendario de tu iPhone.", "integraciones", "calendarioEnMovil"],
-    ["/integraciones/whatsapp", "WhatsApp", "Confirmaciones y recordatorios a tus clientes, y el Gestor para cambiar tu agenda escribiendo.", "integraciones", "movilEnLaMano"],
+    ["/integraciones", "Integraciones", "Los calendarios y canales con los que trabaja tu recepcionista de IA: Google, Outlook, iCloud y WhatsApp.", "integraciones", "2026-10-20", "calendarioEnPantalla"],
+    ["/integraciones/google-calendar", "Google Calendar", "Reserva en tu Google Calendar con permisos mínimos y respeta lo que ya tienes apuntado.", "integraciones", "2026-10-20", "calendarioEnOrdenador"],
+    ["/integraciones/outlook", "Outlook", "Conecta tu calendario de Outlook o Microsoft 365 y elige en cuál entran las citas.", "integraciones", "2026-10-20", "portatilEnMesa"],
+    ["/integraciones/icloud", "Calendario de Apple (iCloud)", "Con tu Apple ID y una contraseña de aplicación, las citas entran en el calendario de tu iPhone.", "integraciones", "2026-10-20", "calendarioEnMovil"],
+    ["/integraciones/whatsapp", "WhatsApp", "Confirmaciones y recordatorios a tus clientes, y el Gestor para cambiar tu agenda escribiendo.", "integraciones", "2026-10-20", "movilEnLaMano"],
     // Desvío por operador: datos de la ayuda oficial de cada uno (consultada el 2026-10-20).
-    ["/desvio-de-llamadas", "Desvío de llamadas", "Cómo desviar a tu recepcionista de IA las llamadas que no coges, operador por operador, en móvil y en fijo.", "desvio", "hablandoPorTelefono"],
-    ["/desvio-de-llamadas/movistar", "Movistar", "Códigos del móvil y del fijo, el alta de 4 €/mes por tipo en el fijo y cómo no perder el buzón.", "desvio", "movilEnUso"],
-    ["/desvio-de-llamadas/vodafone", "Vodafone", "Códigos del móvil y del fijo, el coste por llamada desviada y a qué destinos deja desviar el fijo.", "desvio", "telefonoFijo"],
-    ["/desvio-de-llamadas/orange", "Orange y Amena", "Segundos de espera configurables y los dos juegos de códigos del fijo según tu cobertura.", "desvio", "movilJuntoAPortatil"],
-    ["/desvio-de-llamadas/yoigo", "Yoigo", "Qué publica Yoigo para el móvil y el fijo, el contestador 633 y el aviso 556.", "desvio", "telefonoEnElSalon"],
-    ["/desvio-de-llamadas/masmovil", "MásMóvil", "Desvío del móvil y del fijo, y por qué desde el fijo a un fijo no gastas minutos.", "desvio", "telefonoFijo"],
-    ["/desvio-de-llamadas/o2", "O2", "Códigos, la app de O2 para comprobarlo y qué hacer si tienes VoLTE o MultiSIM.", "desvio", "movilEnUso"],
-    ["/desvio-de-llamadas/jazztel", "Jazztel", "Códigos del móvil y del fijo, los segundos de espera y el contestador del fijo.", "desvio", "movilJuntoAPortatil"],
-    ["/desvio-de-llamadas/digi", "Digi", "Códigos del móvil y del fijo, y las incompatibilidades: itinerancia y aviso de llamada perdida.", "desvio", "hablandoPorTelefono"],
-    ["/desvio-de-llamadas/pepephone", "Pepephone", "Pepephone no usa códigos: el desvío condicional se elige en Mi Pepephone.", "desvio", "movilEnLaMano"],
-    ["/desvio-de-llamadas/lowi", "Lowi", "Códigos del móvil, la gestión en Mi Lowi y lo que su ayuda dice del coste.", "desvio", "movilEnUso"],
-    ["/desvio-de-llamadas/simyo", "Simyo", "Códigos con segundos de espera de 5 a 30, y por qué Simyo no tiene fijo que desviar.", "desvio", "movilJuntoAPortatil"],
-    ["/desvio-de-llamadas/euskaltel", "Euskaltel", "Códigos del móvil y del fijo, y qué cuesta el desvío según sus tarifas.", "desvio", "telefonoFijo"],
-    ["/desvio-de-llamadas/r-galicia", "R (Galicia)", "Códigos y la app de R para desviar el móvil y el fijo a tu recepcionista.", "desvio", "telefonoEnElSalon"],
-    ["/desvio-de-llamadas/telecable", "Telecable", "Códigos del móvil con segundos de espera y del fijo, y cómo se factura.", "desvio", "hablandoPorTelefono"],
-    ["/desvio-de-llamadas/iphone-y-android", "En iPhone y Android", "Dónde está el desvío en el iPhone, Samsung, Xiaomi y Huawei, y el ajuste del iPhone que se come llamadas.", "desvio", "movilEnLaMano"],
+    ["/desvio-de-llamadas", "Desvío de llamadas", "Cómo desviar a tu recepcionista de IA las llamadas que no coges, operador por operador, en móvil y en fijo.", "desvio", "2026-10-20", "hablandoPorTelefono"],
+    ["/desvio-de-llamadas/movistar", "Movistar", "Códigos del móvil y del fijo, el alta de 4 €/mes por tipo en el fijo y cómo no perder el buzón.", "desvio", "2026-10-20", "movilEnUso"],
+    ["/desvio-de-llamadas/vodafone", "Vodafone", "Códigos del móvil y del fijo, el coste por llamada desviada y a qué destinos deja desviar el fijo.", "desvio", "2026-10-20", "telefonoFijo"],
+    ["/desvio-de-llamadas/orange", "Orange y Amena", "Segundos de espera configurables y los dos juegos de códigos del fijo según tu cobertura.", "desvio", "2026-10-20", "movilJuntoAPortatil"],
+    ["/desvio-de-llamadas/yoigo", "Yoigo", "Qué publica Yoigo para el móvil y el fijo, el contestador 633 y el aviso 556.", "desvio", "2026-10-20", "telefonoEnElSalon"],
+    ["/desvio-de-llamadas/masmovil", "MásMóvil", "Desvío del móvil y del fijo, y por qué desde el fijo a un fijo no gastas minutos.", "desvio", "2026-10-20", "telefonoFijo"],
+    ["/desvio-de-llamadas/o2", "O2", "Códigos, la app de O2 para comprobarlo y qué hacer si tienes VoLTE o MultiSIM.", "desvio", "2026-10-20", "movilEnUso"],
+    ["/desvio-de-llamadas/jazztel", "Jazztel", "Códigos del móvil y del fijo, los segundos de espera y el contestador del fijo.", "desvio", "2026-10-20", "movilJuntoAPortatil"],
+    ["/desvio-de-llamadas/digi", "Digi", "Códigos del móvil y del fijo, y las incompatibilidades: itinerancia y aviso de llamada perdida.", "desvio", "2026-10-20", "hablandoPorTelefono"],
+    ["/desvio-de-llamadas/pepephone", "Pepephone", "Pepephone no usa códigos: el desvío condicional se elige en Mi Pepephone.", "desvio", "2026-10-20", "movilEnLaMano"],
+    ["/desvio-de-llamadas/lowi", "Lowi", "Códigos del móvil, la gestión en Mi Lowi y lo que su ayuda dice del coste.", "desvio", "2026-10-20", "movilEnUso"],
+    ["/desvio-de-llamadas/simyo", "Simyo", "Códigos con segundos de espera de 5 a 30, y por qué Simyo no tiene fijo que desviar.", "desvio", "2026-10-20", "movilJuntoAPortatil"],
+    ["/desvio-de-llamadas/euskaltel", "Euskaltel", "Códigos del móvil y del fijo, y qué cuesta el desvío según sus tarifas.", "desvio", "2026-10-20", "telefonoFijo"],
+    ["/desvio-de-llamadas/r-galicia", "R (Galicia)", "Códigos y la app de R para desviar el móvil y el fijo a tu recepcionista.", "desvio", "2026-10-20", "telefonoEnElSalon"],
+    ["/desvio-de-llamadas/telecable", "Telecable", "Códigos del móvil con segundos de espera y del fijo, y cómo se factura.", "desvio", "2026-10-20", "hablandoPorTelefono"],
+    ["/desvio-de-llamadas/iphone-y-android", "En iPhone y Android", "Dónde está el desvío en el iPhone, Samsung, Xiaomi y Huawei, y el ajuste del iPhone que se come llamadas.", "desvio", "2026-10-20", "movilEnLaMano"],
     // Comparativas: datos publicados por cada proveedor, con fecha (Ley 3/1991, art. 10).
-    ["/comparativa", "Comparativas", "Recepcionista de IA frente a las alternativas: otras IAs, una persona, una secretaria externa o una centralita.", "comparativas", "oficinaConPortatilYTelefono"],
-    ["/comparativa/alhabla-vs-heydiga", "Alhabla vs HeyDiga", "Precio por minuto, idiomas, calendarios y WhatsApp, con los datos que publica cada uno.", "comparativas", "telefonoEnElSalon"],
-    ["/comparativa/alhabla-vs-fonio", "Alhabla vs fonio", "Qué incluye cada uno para un salón o una clínica en España, con los datos que publica cada uno.", "comparativas", "movilJuntoAPortatil"],
-    ["/comparativa/recepcionista-de-ia-vs-recepcionista-humana", "IA frente a una recepcionista en plantilla", "Coste real de una recepcionista según el convenio, qué hace mejor cada una y cuándo conviene combinar.", "comparativas", "mostradorDeRecepcion"],
-    ["/comparativa/recepcionista-de-ia-vs-secretaria-telefonica", "IA frente a una secretaria telefónica externa", "Atención por personas desde un centro de llamadas frente a una IA que reserva en tu agenda.", "comparativas", "auricularesDeAtencion"],
-    ["/comparativa/recepcionista-de-ia-vs-centralita-virtual", "IA frente a una centralita virtual", "El «pulse 1» frente a una conversación que termina en cita: qué resuelve cada uno.", "comparativas", "telefonoDeOficina"],
+    ["/comparativa", "Comparativas", "Recepcionista de IA frente a las alternativas: otras IAs, una persona, una secretaria externa o una centralita.", "comparativas", "2026-10-20", "oficinaConPortatilYTelefono"],
+    ["/comparativa/alhabla-vs-heydiga", "Alhabla vs HeyDiga", "Precio por minuto, idiomas, calendarios y WhatsApp, con los datos que publica cada uno.", "comparativas", "2026-10-20", "telefonoEnElSalon"],
+    ["/comparativa/alhabla-vs-fonio", "Alhabla vs fonio", "Qué incluye cada uno para un salón o una clínica en España, con los datos que publica cada uno.", "comparativas", "2026-10-20", "movilJuntoAPortatil"],
+    ["/comparativa/recepcionista-de-ia-vs-recepcionista-humana", "IA frente a una recepcionista en plantilla", "Coste real de una recepcionista según el convenio, qué hace mejor cada una y cuándo conviene combinar.", "comparativas", "2026-10-20", "mostradorDeRecepcion"],
+    ["/comparativa/recepcionista-de-ia-vs-secretaria-telefonica", "IA frente a una secretaria telefónica externa", "Atención por personas desde un centro de llamadas frente a una IA que reserva en tu agenda.", "comparativas", "2026-10-20", "auricularesDeAtencion"],
+    ["/comparativa/recepcionista-de-ia-vs-centralita-virtual", "IA frente a una centralita virtual", "El «pulse 1» frente a una conversación que termina en cita: qué resuelve cada uno.", "comparativas", "2026-10-20", "telefonoDeOficina"],
     // Herramientas gratis, sin pedir el email.
-    ["/herramientas", "Herramientas gratis", "Calculadora de llamadas perdidas y plantillas para recordatorios, cancelaciones y el teléfono del salón.", "herramientas", "telefonoEnElSalon"],
-    ["/herramientas/calculadora-de-llamadas-perdidas", "Calculadora de llamadas perdidas", "Cuánto dinero se va cada mes por las llamadas que no coges, con tus cifras y el método explicado.", "herramientas", "calculadoraYPapel"],
-    ["/herramientas/plantillas-recordatorio-de-cita", "Plantillas de recordatorio de cita", "Mensajes de WhatsApp y SMS para confirmar, recordar y reprogramar citas, por sector, listos para copiar.", "herramientas", "mensajeEnElMovil"],
-    ["/herramientas/guion-para-atender-el-telefono", "Guion para atender el teléfono", "Qué decir al coger el teléfono del salón, cómo dar un hueco y cómo cerrar la cita sin olvidar nada.", "herramientas", "peluqueraConElMovil"],
-    ["/herramientas/mensajes-de-contestador", "Mensajes de contestador y de fuera de horario", "Textos para el contestador del negocio y la respuesta automática de WhatsApp Business, por sector.", "herramientas", "telefonoDeOficina"],
-    ["/herramientas/politica-de-cancelacion", "Política de cancelación", "Generador de una política de cancelación y ausencias para tu negocio, con ejemplos por sector.", "herramientas", "sillaVacia"],
+    ["/herramientas", "Herramientas gratis", "Calculadora de llamadas perdidas y plantillas para recordatorios, cancelaciones y el teléfono del salón.", "herramientas", "2026-10-20", "telefonoEnElSalon"],
+    ["/herramientas/calculadora-de-llamadas-perdidas", "Calculadora de llamadas perdidas", "Cuánto dinero se va cada mes por las llamadas que no coges, con tus cifras y el método explicado.", "herramientas", "2026-10-20", "calculadoraYPapel"],
+    ["/herramientas/plantillas-recordatorio-de-cita", "Plantillas de recordatorio de cita", "Mensajes de WhatsApp y SMS para confirmar, recordar y reprogramar citas, por sector, listos para copiar.", "herramientas", "2026-10-20", "mensajeEnElMovil"],
+    ["/herramientas/guion-para-atender-el-telefono", "Guion para atender el teléfono", "Qué decir al coger el teléfono del salón, cómo dar un hueco y cómo cerrar la cita sin olvidar nada.", "herramientas", "2026-10-20", "peluqueraConElMovil"],
+    ["/herramientas/mensajes-de-contestador", "Mensajes de contestador y de fuera de horario", "Textos para el contestador del negocio y la respuesta automática de WhatsApp Business, por sector.", "herramientas", "2026-10-20", "telefonoDeOficina"],
+    ["/herramientas/politica-de-cancelacion", "Política de cancelación", "Generador de una política de cancelación y ausencias para tu negocio, con ejemplos por sector.", "herramientas", "2026-10-20", "sillaVacia"],
     // Guías de fondo.
-    ["/guias/ley-y-recepcionista-de-ia", "La ley y la recepcionista de IA", "Aviso de IA, grabación de llamadas, la Ley 10/2025 y los recordatorios por WhatsApp, con el artículo de cada norma.", "guias", "documentosYCarpetas"],
-    ["/glosario", "Glosario", "Desvío condicional, no-show, contraseña de aplicación y el resto de términos que salen al poner una recepcionista de IA.", "guias"],
+    ["/guias/ley-y-recepcionista-de-ia", "La ley y la recepcionista de IA", "Aviso de IA, grabación de llamadas, la Ley 10/2025 y los recordatorios por WhatsApp, con el artículo de cada norma.", "guias", "2026-10-20", "documentosYCarpetas"],
+    ["/glosario", "Glosario", "Desvío condicional, no-show, contraseña de aplicación y el resto de términos que salen al poner una recepcionista de IA.", "guias", "2026-10-20"],
     // Empresa.
-    ["/sobre-alhabla", "Sobre Alhabla", "Quién está detrás, por qué existe Alhabla y lo que nunca hará tu recepcionista.", "empresa"],
-    ["/prensa", "Prensa", "Datos, logotipos, capturas y contacto para periodistas.", "empresa"],
-    ["/novedades", "Novedades", "Lo que ha cambiado en Alhabla mes a mes: funciones nuevas, idiomas y precios.", "empresa"],
+    ["/sobre-alhabla", "Sobre Alhabla", "Quién está detrás, por qué existe Alhabla y lo que nunca hará tu recepcionista.", "empresa", "2026-10-20"],
+    ["/prensa", "Prensa", "Datos, logotipos, capturas y contacto para periodistas.", "empresa", "2026-10-20"],
+    ["/novedades", "Novedades", "Lo que ha cambiado en Alhabla mes a mes: funciones nuevas, idiomas y precios.", "empresa", "2026-10-20"],
   ]),
   {
     ruta: "/blog",
     nombre: "Blog",
     resumen: "Guías para negocios con cita previa: llamadas perdidas, desvío, recordatorios y agenda.",
     seccion: "principal",
-    prioridad: 0.6,
-    frecuencia: "weekly",
   },
   {
     ruta: "/contacto",
     nombre: "Hablar con nosotros",
     resumen: "Formulario y WhatsApp del equipo para resolver dudas antes de contratar.",
     seccion: "empresa",
-    prioridad: 0.5,
-    frecuencia: "yearly",
   },
   {
     ruta: "/legal/aviso-legal",
     nombre: "Aviso legal",
     resumen: "Titular, condiciones de uso y datos de contacto de alhabla.ai.",
     seccion: "legal",
-    prioridad: 0.3,
-    frecuencia: "yearly",
+    // La misma fecha que enseña la página (updatedAt de legal/*/page.tsx).
+    actualizado: "2026-10-20",
   },
   {
     ruta: "/legal/privacidad",
     nombre: "Privacidad",
     resumen: "Qué datos trata Alhabla, con qué proveedores y cómo ejercer tus derechos.",
     seccion: "legal",
-    prioridad: 0.3,
-    frecuencia: "yearly",
+    // La misma fecha que enseña la página (updatedAt de legal/*/page.tsx).
+    actualizado: "2026-10-20",
   },
 ];
 

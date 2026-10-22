@@ -2,7 +2,15 @@ import { describe, expect, it } from "vitest";
 // El mismo serializador que usa Next para /sitemap.xml.
 import { resolveSitemap } from "next/dist/build/webpack/loaders/metadata/resolve-route-data.js";
 import sitemap from "@/app/sitemap";
+import { listarArticulos } from "@/lib/blog";
 import { escaparXml } from "@/lib/seo";
+
+const IMAGEN_NS = "http://www.google.com/schemas/sitemap-image/1.1";
+
+function leerXml() {
+  const xml = resolveSitemap(sitemap());
+  return new DOMParser().parseFromString(xml, "application/xml");
+}
 
 describe("sitemap", () => {
   it("escapa los caracteres reservados de XML", () => {
@@ -11,28 +19,56 @@ describe("sitemap", () => {
     );
   });
 
-  it("sale como XML bien formado aunque las portadas lleven &", () => {
-    const entradas = sitemap();
-    expect(entradas.some((e) => e.images?.length)).toBe(true);
-
-    const xml = resolveSitemap(entradas);
-    const doc = new DOMParser().parseFromString(xml, "application/xml");
+  it("sale como XML bien formado y con imágenes", () => {
+    const doc = leerXml();
     expect(doc.getElementsByTagName("parsererror")).toHaveLength(0);
+    expect(doc.getElementsByTagNameNS(IMAGEN_NS, "loc").length).toBeGreaterThan(0);
+  });
 
-    // Lo que lee Google, ya desescapado, es la URL original con su &.
+  it("solo declara imágenes propias de alhabla.ai, nunca de banco", () => {
     const imagenes = Array.from(
-      doc.getElementsByTagNameNS(
-        "http://www.google.com/schemas/sitemap-image/1.1",
-        "loc"
+      leerXml().getElementsByTagNameNS(IMAGEN_NS, "loc")
+    ).map((n) => n.textContent ?? "");
+    for (const url of imagenes) {
+      expect(url, url).toMatch(/^https:\/\/alhabla\.ai\//);
+    }
+  });
+
+  it("la portada declara las fotos de sector que enseña, no la de compartir", () => {
+    const portada = sitemap().find((e) => e.url === "https://alhabla.ai/");
+    expect(portada?.images).toEqual(
+      ["peluqueria", "barberia", "salon-de-unas", "centro-de-estetica", "fisioterapia"].map(
+        (s) => `https://alhabla.ai/heroes/${s}.jpg`
       )
-    ).map((n) => n.textContent);
-    expect(imagenes.length).toBeGreaterThan(0);
-    expect(imagenes.some((u) => u?.includes("&fit=crop"))).toBe(true);
+    );
+  });
+
+  it("no escribe priority ni changefreq, que Google ignora", () => {
+    const doc = leerXml();
+    expect(doc.getElementsByTagName("priority")).toHaveLength(0);
+    expect(doc.getElementsByTagName("changefreq")).toHaveLength(0);
+  });
+
+  it("lastmod es una fecha AAAA-MM-DD, sin hora inventada", () => {
+    const fechas = Array.from(leerXml().getElementsByTagName("lastmod")).map(
+      (n) => n.textContent
+    );
+    expect(fechas.length).toBeGreaterThan(0);
+    for (const fecha of fechas) expect(fecha).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+
+  it("/blog lleva la fecha de su artículo más reciente", () => {
+    const ultimo = listarArticulos()
+      .map((a) => a.actualizado ?? a.fecha)
+      .sort()
+      .at(-1);
+    const blog = sitemap().find((e) => e.url === "https://alhabla.ai/blog");
+    expect(blog?.lastModified).toBe(ultimo);
   });
 
   it("no lista las páginas sector × ciudad fusionadas y sí la de catalán", () => {
     const urls = sitemap().map((e) => e.url);
     expect(urls.some((u) => /\/(peluqueria|barberia|centro-de-estetica|salon-de-unas|fisioterapia)\/[a-z-]+$/.test(u))).toBe(false);
-    expect(urls).toContain("/recepcionista-ia-en-catalan");
+    expect(urls).toContain("https://alhabla.ai/recepcionista-ia-en-catalan");
   });
 });
