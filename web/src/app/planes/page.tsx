@@ -10,6 +10,8 @@ import { SiteFooter } from "@/components/site-footer";
 import { datosDePrecios, PlanesDetalle, PREGUNTAS_DE_FACTURACION } from "@/components/planes-detalle";
 import { absoluteUrl, buildBreadcrumbStructuredData, buildFaqPageStructuredData, ogImages, siteName, websiteId } from "@/lib/seo";
 import { formatIncludedMinutes, plans, starterPlan, TRIAL_DAYS } from "@/lib/plans";
+import { listarArticulos } from "@/lib/blog";
+import { paginaDe } from "@/lib/paginas";
 
 // Título con la palabra clave y el precio de entrada, que es lo que busca
 // quien llega por «recepcionista ia precio»: «Planes y precios» a secas no
@@ -68,7 +70,34 @@ const benefits = [
   { title: "Minutos claros", description: "Cada plan indica minutos incluidos y coste adicional.", icon: Clock3 },
 ] as const;
 
+/** Para quien compara antes de pagar (2026-10-22): las comparativas solo
+ * recibían 3 enlaces internos y /planes es la página que más las necesita. */
+function antesDeDecidir() {
+  const comparativas = [
+    "/comparativa/alhabla-vs-heydiga",
+    "/comparativa/alhabla-vs-fonio",
+    "/comparativa/recepcionista-de-ia-vs-recepcionista-humana",
+  ].map((ruta) => {
+    const { nombre, resumen } = paginaDe(ruta);
+    return { href: ruta, titulo: nombre, resumen };
+  });
+  const precio = listarArticulos().find((a) => a.slug === "cuanto-cuesta-una-recepcionista-de-ia");
+  return precio
+    ? [
+        {
+          href: `/blog/${precio.slug}`,
+          titulo: precio.titulo,
+          // Resumen propio: el del artículo nombra a más proveedores de los
+          // que comparamos aquí (solo HeyDiga y fonio).
+          resumen: "Lo que cobran las recepcionistas de IA en España y lo que cuesta una persona en plantilla.",
+        },
+        ...comparativas,
+      ]
+    : comparativas;
+}
+
 export default function PlansPage() {
+  const lecturas = antesDeDecidir();
   return (
     <main className="min-h-screen bg-white text-[#0a0a0a]">
       <div className="mx-auto flex min-h-screen max-w-7xl flex-col px-6 py-6 lg:px-8">
@@ -129,6 +158,29 @@ export default function PlansPage() {
             </div>
 
             <PlanesDetalle />
+
+            <section aria-labelledby="antes-de-decidir">
+              <h2 id="antes-de-decidir" className="text-2xl font-bold tracking-tight text-tinta sm:text-3xl">
+                Antes de decidir
+              </h2>
+              <ul className="mt-6 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                {lecturas.map(({ href, titulo, resumen }) => (
+                  <li key={href}>
+                    <Link
+                      href={href}
+                      className="panel landing-card-hover flex h-full flex-col p-5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-morado"
+                    >
+                      <h3 className="font-bold text-tinta">{titulo}</h3>
+                      <p className="mt-2 line-clamp-3 text-sm leading-6 text-muted">{resumen}</p>
+                      <span className="mt-auto inline-flex items-center gap-1 pt-4 text-sm font-semibold text-morado-tinta">
+                        Leer
+                        <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </section>
           </div>
         </section>
       </div>

@@ -224,6 +224,39 @@ export function articulosRelacionados(
   return [...mismoSector, ...resto].slice(0, maximo);
 }
 
+/**
+ * Guías que sirven a cualquier sector, por orden: cómo se pone (el desvío),
+ * los recordatorios, cuánto cuesta y qué hace. Rellenan el bloque de un
+ * sector que tiene menos artículos propios que huecos. El de precios va
+ * tercero (y con tres huecos no llega a salir) mientras su resumen nombre a
+ * proveedores que no comparamos en la web.
+ */
+export const ARTICULOS_PARA_TODOS = [
+  "desvio-de-llamadas-si-no-contesta",
+  "recordatorios-de-citas-por-whatsapp",
+  "cuanto-cuesta-una-recepcionista-de-ia",
+  "que-hace-una-recepcionista-virtual",
+] as const;
+
+/**
+ * Artículos para el bloque «Guías» de la landing de un sector (2026-10-22):
+ * primero los de ese sector, del más reciente al más antiguo, y luego los
+ * generales de ARTICULOS_PARA_TODOS. Hasta entonces las landings no
+ * enlazaban ningún artículo, y Google solo llegaba a la mitad de ellos por
+ * el sitemap.
+ */
+export function articulosParaSector(
+  sector: string,
+  todos: ArticuloMeta[],
+  maximo = 3
+): ArticuloMeta[] {
+  const delSector = todos.filter((a) => a.sector === sector);
+  const generales = ARTICULOS_PARA_TODOS.map((slug) =>
+    todos.find((a) => a.slug === slug)
+  ).filter((a): a is ArticuloMeta => a !== undefined && !delSector.includes(a));
+  return [...delSector, ...generales].slice(0, maximo);
+}
+
 export function fechaLarga(fecha: string): string {
   const [y, m, d] = fecha.split("-").map(Number);
   return new Intl.DateTimeFormat("es-ES", { timeZone: "UTC", day: "numeric", month: "long", year: "numeric" }).format(

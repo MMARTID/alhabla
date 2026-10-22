@@ -10,6 +10,7 @@ import { EnTuNegocioScroll } from "@/components/en-tu-negocio";
 import { LlamadaScroll } from "@/components/llamada-scroll";
 import { TeamRoutingSection } from "@/components/team-routing-section";
 import { GuiaDelSector } from "@/components/sector/guia-sector";
+import { ArticulosDelSector } from "@/components/sector/articulos-del-sector";
 import { OwnerAssistantSection } from "@/components/owner-assistant-section";
 import { WhatsAppBenefitsTable } from "@/components/whatsapp-benefits-table";
 import { RevenueLossCalculator } from "@/components/revenue-loss-calculator";
@@ -239,6 +240,13 @@ export function SiteLanding({ content }: { content?: NicheLandingContent }) {
           </div>
         </div>
       </section>
+
+      {/*
+        Los artículos del sector antes del cierre (2026-10-22): quien ha
+        llegado hasta las preguntas y aún no se decide tiene dónde seguir
+        leyendo, y Google llega a los artículos desde una página indexada.
+      */}
+      <ArticulosDelSector content={content} />
 
       <section className="bg-[#0a0a0a] text-white">
         <Reveal className="mx-auto flex max-w-7xl flex-col items-start gap-6 px-4 py-16 sm:px-6 sm:py-20 lg:flex-row lg:items-center lg:justify-between lg:px-8">
