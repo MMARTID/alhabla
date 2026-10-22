@@ -17,7 +17,7 @@ const geistMono = localFont({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL(siteUrl ?? "https://alhabla.ai"),
+  metadataBase: new URL(siteUrl),
   title: {
     default: defaultTitle,
     template: `%s | ${siteName}`,
