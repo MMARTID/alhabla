@@ -32,9 +32,12 @@ export function PastillaDeSector({ sector }: { sector: NicheSlug }) {
 export function TarjetaDeArticulo({
   articulo,
   destacado = false,
+  encabezado: Encabezado = "h2",
 }: {
   articulo: ArticuloMeta;
   destacado?: boolean;
+  /** h3 cuando la tarjeta va dentro de una sección con su propio h2. */
+  encabezado?: "h2" | "h3";
 }) {
   const sector = esSector(articulo.sector) ? articulo.sector : null;
   const src = articulo.imagen ?? `/heroes/${sector ?? "general"}.jpg`;
@@ -74,13 +77,13 @@ export function TarjetaDeArticulo({
               {articulo.minutosDeLectura} min
             </span>
           </div>
-          <h2
+          <Encabezado
             className={`mt-3 font-bold tracking-tight text-[#0a0a0a] group-hover:text-[#6d28d9] ${
               destacado ? "text-2xl sm:text-3xl" : "text-xl"
             }`}
           >
             {articulo.titulo}
-          </h2>
+          </Encabezado>
           {articulo.resumen ? (
             <p
               className={`mt-3 text-sm leading-6 text-muted ${destacado ? "sm:text-base sm:leading-7" : "line-clamp-3"}`}
