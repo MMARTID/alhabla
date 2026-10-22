@@ -1,14 +1,19 @@
 import type { MetadataRoute } from "next";
-import { listarArticulos, urlAbsolutaDeImagen } from "@/lib/blog";
-import { FOTOS } from "@/lib/fotos";
+import { listarArticulos } from "@/lib/blog";
 import { PAGINAS } from "@/lib/paginas";
 import { absoluteUrl, escaparXml } from "@/lib/seo";
 
-/** Una imagen del registro (ruta local o URL de banco) en absoluto y
- * escapada: Next escribe el XML sin escapar y un `&` suelto de Unsplash
- * deja el sitemap entero ilegible para Google. */
+/** Una imagen propia en absoluto y escapada: Next escribe el XML sin
+ * escapar, y un `&` suelto deja el sitemap entero ilegible para Google. */
 function imagen(src: string) {
-  return escaparXml(src.startsWith("http") ? src : absoluteUrl(src));
+  return escaparXml(absoluteUrl(src));
+}
+
+/** Solo las imágenes de public/: las de banco (Unsplash, Pexels) están en
+ * un dominio que no podemos verificar en Search Console, y Google solo
+ * admite imágenes de otro dominio si lo verificas. */
+function esPropia(src: string) {
+  return src.startsWith("/");
 }
 
 export default function sitemap(): MetadataRoute.Sitemap {
@@ -17,26 +22,31 @@ export default function sitemap(): MetadataRoute.Sitemap {
   // se indexa. Sin páginas sector × ciudad desde el 2026-10-20 (301 a su
   // sector en next.config.mjs).
   //
-  // `lastModified` solo donde hay una fecha real de revisión de fondo
-  // (`actualizado`): un lastmod que siempre es «hoy» hace que Google deje de
-  // fiarse de él. Las imágenes son las que se ven en la página, para Google
-  // Imágenes.
+  // Sin `priority` ni `changefreq`, que Google y Bing ignoran (2026-10-22).
+  // `lastModified` solo con una fecha real de revisión de fondo, y como
+  // AAAA-MM-DD tal cual (Next no la convierte): un lastmod igual en todas,
+  // o con una hora inventada, hace que Google deje de fiarse de él.
+  const articulos = listarArticulos();
+  // /blog cambia cuando cambia su artículo más reciente.
+  const ultimoArticulo = articulos
+    .map((a) => a.actualizado ?? a.fecha)
+    .sort()
+    .at(-1);
+
   return [
-    ...PAGINAS.map((p) => ({
-      url: absoluteUrl(p.ruta),
-      ...(p.actualizado ? { lastModified: new Date(`${p.actualizado}T08:00:00Z`) } : {}),
-      changeFrequency: p.frecuencia,
-      priority: p.prioridad,
-      ...(p.foto || p.imagenes?.length
-        ? { images: [...(p.foto ? [FOTOS[p.foto].src] : []), ...(p.imagenes ?? [])].map(imagen) }
-        : {}),
-    })),
-    ...listarArticulos().map((a) => ({
+    ...PAGINAS.map((p) => {
+      const fecha = p.ruta === "/blog" ? ultimoArticulo : p.actualizado;
+      const imagenes = (p.imagenes ?? []).filter(esPropia);
+      return {
+        url: absoluteUrl(p.ruta),
+        ...(fecha ? { lastModified: fecha } : {}),
+        ...(imagenes.length ? { images: imagenes.map(imagen) } : {}),
+      };
+    }),
+    ...articulos.map((a) => ({
       url: absoluteUrl(`/blog/${a.slug}`),
-      lastModified: new Date(`${a.actualizado ?? a.fecha}T08:00:00Z`),
-      changeFrequency: "monthly" as const,
-      priority: 0.5,
-      ...(a.imagen ? { images: [escaparXml(urlAbsolutaDeImagen(a.imagen))] } : {}),
+      lastModified: a.actualizado ?? a.fecha,
+      ...(a.imagen && esPropia(a.imagen) ? { images: [imagen(a.imagen)] } : {}),
     })),
   ];
 }

@@ -21,6 +21,15 @@ const SECTORES = [
   { href: "/peluqueria-canina", label: "Peluquería canina" },
 ] as const;
 
+/** Lo que hace Alhabla además de contestar (2026-10-22): estas páginas
+ * solo se alcanzaban desde la portada o un sector concreto. */
+const FUNCIONES = [
+  { href: "/agenda-por-whatsapp", label: "El Gestor por WhatsApp" },
+  { href: "/recepcionista-ia-en-catalan", label: "En catalán" },
+  { href: "/recepcionista-ia-en-euskera", label: "En euskera" },
+  { href: "/recepcionista-ia-en-gallego", label: "En gallego" },
+] as const;
+
 /** Los índices de cada sección de guías (lib/paginas.ts): desde ellos se
  * llega a cada página hija en un clic, así que el pie enlaza a todo el
  * sitio sin ser una lista de 60 enlaces. */
@@ -31,9 +40,14 @@ const RECURSOS = [
   { href: "/comparativa", label: "Comparativas" },
   { href: "/guias/ley-y-recepcionista-de-ia", label: "La ley y la IA" },
   { href: "/glosario", label: "Glosario" },
-  { href: "/novedades", label: "Novedades" },
+] as const;
+
+/** La empresa, en la línea de abajo junto a lo legal: siguen enlazadas
+ * desde todo el sitio, pero no compiten con lo que vende. */
+const EMPRESA = [
   { href: "/sobre-alhabla", label: "Sobre Alhabla" },
   { href: "/prensa", label: "Prensa" },
+  { href: "/novedades", label: "Novedades" },
 ] as const;
 
 const enlace = "inline-flex h-11 items-center transition hover:text-white";
@@ -69,6 +83,16 @@ export function SiteFooter() {
           </nav>
         </div>
         <nav
+          aria-label="Funciones"
+          className="flex flex-wrap items-center gap-x-4 border-t border-white/10 pt-4 text-sm font-medium"
+        >
+          {FUNCIONES.map((funcion) => (
+            <Link key={funcion.href} href={funcion.href} className={enlace}>
+              {funcion.label}
+            </Link>
+          ))}
+        </nav>
+        <nav
           aria-label="Guías y recursos"
           className="flex flex-wrap items-center gap-x-4 border-t border-white/10 pt-4 text-sm font-medium"
         >
@@ -87,9 +111,14 @@ export function SiteFooter() {
             </div>
           </div>
           <nav
-            aria-label="Enlaces legales"
+            aria-label="Empresa y enlaces legales"
             className="flex flex-wrap items-center gap-x-4 text-sm font-medium"
           >
+            {EMPRESA.map((pagina) => (
+              <Link key={pagina.href} href={pagina.href} className={enlace}>
+                {pagina.label}
+              </Link>
+            ))}
             <Link href="/legal/privacidad" className={enlace}>
               Privacidad
             </Link>

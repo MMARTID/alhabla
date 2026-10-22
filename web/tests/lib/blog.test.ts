@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  ARTICULOS_PARA_TODOS,
+  articulosParaSector,
   articulosRelacionados,
   esRamaDePrevisualizacion,
   minutosDeLectura,
@@ -53,5 +55,22 @@ describe("blog", () => {
     expect(
       articulosRelacionados(meta("d"), todos, 2).map((a) => a.slug)
     ).toEqual(["a", "b"]);
+  });
+
+  it("guías de un sector: primero las suyas y luego las generales, sin repetir", () => {
+    const [primero, segundo, tercero] = ARTICULOS_PARA_TODOS;
+    const todos = [
+      meta("b1", "barberia", "2026-09-05"),
+      meta(segundo),
+      meta("p1", "peluqueria", "2026-09-04"),
+      meta(primero),
+      meta("b2", "barberia", "2026-09-03"),
+      meta(tercero),
+    ];
+    expect(articulosParaSector("barberia", todos).map((a) => a.slug)).toEqual(["b1", "b2", primero]);
+    expect(articulosParaSector("fisioterapia", todos).map((a) => a.slug)).toEqual([primero, segundo, tercero]);
+    // Un artículo general que además es del sector no sale dos veces.
+    const conSector = [meta(primero, "salon-de-unas"), meta(segundo)];
+    expect(articulosParaSector("salon-de-unas", conSector).map((a) => a.slug)).toEqual([primero, segundo]);
   });
 });

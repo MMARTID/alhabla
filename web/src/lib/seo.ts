@@ -12,7 +12,9 @@ export const PRECIO_MAXIMO = String(Math.max(...plans.map((plan) => plan.price))
 
 const rawSiteUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim();
 
-export const siteUrl = rawSiteUrl ? rawSiteUrl.replace(/\/$/, "") : undefined;
+// Con respaldo (2026-10-22): sin la variable, absoluteUrl() devolvía rutas
+// relativas y el sitemap dejaba de ser válido sin que nada fallara.
+export const siteUrl = (rawSiteUrl || "https://alhabla.ai").replace(/\/$/, "");
 
 export const seoKeywords = [
   // Categoría principal: «de IA», no «virtual» (decisión del 2026-10-20).
@@ -29,10 +31,6 @@ export const seoKeywords = [
 ];
 
 export function absoluteUrl(path = "/") {
-  if (!siteUrl) {
-    return path;
-  }
-
   return new URL(path, siteUrl).toString();
 }
 

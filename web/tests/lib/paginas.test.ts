@@ -60,13 +60,28 @@ describe("registro de páginas indexables", () => {
     }
   });
 
-  it("el sitemap lista todas las páginas del registro y sus fotos", () => {
+  it("el sitemap lista todas las páginas del registro y sus imágenes propias", () => {
     const entradas = sitemap();
-    const urls = entradas.map((e) => new URL(e.url, "https://alhabla.ai").pathname);
+    const urls = entradas.map((e) => new URL(e.url).pathname);
     for (const { ruta } of PAGINAS) expect(urls).toContain(ruta);
-    const conFoto = PAGINAS.filter((p) => p.foto).length;
-    const entradasConImagen = entradas.filter((e) => e.images?.length).length;
-    expect(entradasConImagen).toBeGreaterThanOrEqual(conFoto);
+    for (const p of PAGINAS.filter((pagina) => pagina.imagenes?.length)) {
+      const entrada = entradas.find((e) => new URL(e.url).pathname === p.ruta);
+      expect(entrada?.images, p.ruta).toHaveLength(p.imagenes!.length);
+    }
+  });
+
+  it("cada página lleva su fecha de revisión en AAAA-MM-DD", () => {
+    for (const p of PAGINAS) {
+      // /blog la toma de su último artículo y /contacto no tiene fecha de fondo.
+      if (p.ruta === "/blog" || p.ruta === "/contacto") continue;
+      expect(p.actualizado, p.ruta).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    }
+  });
+
+  it("las imágenes del registro son propias (rutas bajo public/)", () => {
+    for (const p of PAGINAS) {
+      for (const src of p.imagenes ?? []) expect(src, p.ruta).toMatch(/^\//);
+    }
   });
 });
 
