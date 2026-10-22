@@ -142,6 +142,18 @@ describe("EnTuNegocioScroll", () => {
     expect(seccion().style.marginTop).toBe("");
   });
 
+  it("lleva la pantalla de bloqueo del relevo dentro de la pantalla HTML del portátil", () => {
+    render(<EnTuNegocioScroll />);
+
+    // La hora y el aviso de WhatsApp de la cita nueva, sobre el panel: es el
+    // negro del corte con el teléfono y lo que se lee mientras la cámara se
+    // aleja (ver lib/transicion-bolsillo-negocio.ts).
+    const bloqueo = seccion().querySelector(".mx > .mx-bloqueo");
+    expect(bloqueo).not.toBeNull();
+    expect(bloqueo?.querySelector('[data-bloqueo="reloj"]')).not.toBeNull();
+    expect(bloqueo?.textContent).toContain("Ver agenda de hoy");
+  });
+
   it("acredita el modelo 3D con autor, origen y licencia (CC BY 4.0)", () => {
     render(<EnTuNegocioScroll />);
 

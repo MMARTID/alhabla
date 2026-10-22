@@ -2,12 +2,11 @@ import { BLOQUEO_VH } from "@/lib/transicion-bolsillo-negocio";
 
 /**
  * Anima la pantalla de bloqueo (`components/pantalla-bloqueo.tsx`) para un
- * punto del relevo (`vh`, ver `vhRelevoDesdeBolsillo` /
- * `vhRelevoDesdeNegocio`): la hora y el aviso aparecen en su tramo de
- * `BLOQUEO_VH`, el aviso bajando un poco, como llega una notificación en un
- * Mac. Es la misma función para las dos copias de la pantalla, así que van
- * siempre a la par. Solo toca opacidad y transform: el hueco de cada pieza
- * está reservado desde el principio y nada se recoloca al aparecer.
+ * punto del relevo (`vh`, ver `vhDesdeElCruce`): la hora y el aviso
+ * aparecen en su tramo de `BLOQUEO_VH`, el aviso bajando un poco, como llega
+ * una notificación en un Mac. Solo toca opacidad y transform: el hueco de
+ * cada pieza está reservado desde el principio y nada se recoloca al
+ * aparecer.
  */
 export function pintarBloqueo(raiz: HTMLElement, vh: number) {
   const reloj = raiz.querySelector<HTMLElement>('[data-bloqueo="reloj"]');
@@ -30,8 +29,9 @@ export function pintarBloqueo(raiz: HTMLElement, vh: number) {
 }
 
 /**
- * Cuánto se ha desbloqueado ya la pantalla (0–1) en un punto del relevo: la
- * pantalla de bloqueo se desvanece y deja ver el panel.
+ * Cuánto se ha desbloqueado ya la pantalla (0–1) en un punto del relevo
+ * (`vh`, como arriba): la pantalla de bloqueo se desvanece y deja ver el
+ * panel.
  */
 export function desbloqueo(vh: number): number {
   const [a, b] = BLOQUEO_VH.desbloqueo;

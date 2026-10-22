@@ -2,16 +2,13 @@ import { describe, it, expect, afterEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 
 import { LlamadaScroll } from "@/components/llamada-scroll";
-import {
-  ALTO_BOLSILLO_VH,
-  leerTelefono,
-} from "@/lib/transicion-bolsillo-negocio";
+import { ALTO_BOLSILLO_VH } from "@/lib/transicion-bolsillo-negocio";
 
 /**
- * «En tu bolsillo» acaba tumbando el teléfono para «En tu negocio», que la
- * solapa: la sección mide lo que dice `lib/transicion-bolsillo-negocio.ts` y
- * publica dónde deja el teléfono para que la escena 3D ponga encima la
- * pantalla del portátil.
+ * «En tu bolsillo» acaba tumbando el teléfono y zambulléndolo en la cámara
+ * para «En tu negocio», que la solapa: la sección mide lo que dice
+ * `lib/transicion-bolsillo-negocio.ts`, y lo que se ve en el relevo es solo
+ * el teléfono (la pantalla de bloqueo del portátil es de «En tu negocio»).
  */
 describe("LlamadaScroll", () => {
   afterEach(() => {
@@ -26,19 +23,22 @@ describe("LlamadaScroll", () => {
     expect(
       screen.getByRole("heading", { level: 2, name: "En tu bolsillo" })
     ).toBeInTheDocument();
-    expect(
-      screen.getAllByRole("button", { name: /^Ir al paso/ })
-    ).toHaveLength(3);
+    expect(screen.getAllByRole("button", { name: /^Ir al paso/ })).toHaveLength(
+      3
+    );
   });
 
-  it("publica dónde queda el teléfono tumbado al montar y lo retira al desmontar", () => {
-    const { unmount } = render(<LlamadaScroll />);
+  it("no pinta la pantalla de bloqueo del portátil: en el relevo solo está el teléfono, que se apaga", () => {
+    render(<LlamadaScroll />);
 
-    // En jsdom no hay layout: en un escenario sin medidas el teléfono
-    // tumbado no tiene ancho, pero está publicado.
-    expect(leerTelefono()).toMatchObject({ y: 0, ancho: 0, alto: 0 });
-
-    unmount();
-    expect(leerTelefono()).toBeNull();
+    const seccion = document.getElementById("como-funciona") as HTMLElement;
+    // Hasta el 2026-10-22 llevaba una copia dentro de un rectángulo negro.
+    expect(seccion.querySelector("[data-bloqueo]")).toBeNull();
+    expect(seccion.textContent).not.toContain("Ver agenda de hoy");
+    // El marco del teléfono y la capa que apaga su pantalla, para el negro.
+    expect(
+      seccion.querySelector('img[src="/telefono/frente.svg"]')
+    ).not.toBeNull();
+    expect(seccion.querySelector('[class*="apagada"]')).not.toBeNull();
   });
 });

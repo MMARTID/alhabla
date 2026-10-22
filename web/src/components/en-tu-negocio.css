@@ -266,12 +266,14 @@
   }
 }
 /* ── Pantalla del portátil (HTML proyectado sobre la tapa) ── */
-/* La pantalla de bloqueo del relevo, por encima del panel: la escena la
-   desvanece al desbloquear. En la pantalla HTML, --u es 1px. */
+/* La pantalla de bloqueo del relevo, por encima del panel y del brillo del
+   cristal (.mx::after): en el corte tiene que ser negro puro, como la
+   pantalla del teléfono que releva. La escena la desvanece al desbloquear.
+   En la pantalla HTML, --u es 1px. */
 .ng-seccion .mx-bloqueo {
   position: absolute;
   inset: 0;
-  z-index: 20;
+  z-index: 21;
 }
 .ng-seccion .mx {
   position: absolute;

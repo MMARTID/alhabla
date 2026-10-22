@@ -1,17 +1,15 @@
 /*
  * Pantalla de bloqueo del portátil (pantalla-bloqueo.tsx). Dos unidades:
  *
- * - `--u`: 1/1200 del ancho de la pantalla en la que se pinta. La pone quien
- *   la contiene: en el rectángulo negro de «En tu bolsillo», su ancho/1200;
- *   en la pantalla HTML del portátil no se pone y vale 1px (esa pantalla
- *   mide 1200px y la escala la proyección).
+ * - `--u`: 1/1200 del ancho de la pantalla en la que se pinta. En la
+ *   pantalla HTML del portátil no se pone y vale 1px (esa pantalla mide
+ *   1200px y la escala la proyección); quien la pinte en otro sitio la pone.
  * - `--min`: 1px de la pantalla real, para los mínimos legibles. En el
  *   portátil, la escena pone `--escala` (lo que mide la pantalla proyectada
  *   / 1200), así que `1px / escala` vuelve a ser 1px en pantalla.
  *
  * Cada medida es `max(mínimo legible, tamaño proporcional)`: en escritorio
  * manda la proporción (la pantalla de un Mac a escala) y en móvil, el mínimo.
- * Las dos copias resuelven lo mismo, así que coinciden al píxel en el relevo.
  */
 
 .bloqueo {
@@ -24,8 +22,8 @@
   pointer-events: none;
 }
 
-/* Centrado en la pantalla: mientras el negro se estira (y cambia de alto)
-   el bloque sigue en medio, y al final coincide con el del portátil. */
+/* Centrado en la pantalla: mientras la cámara se aleja y la pantalla
+   encoge, el bloque sigue en medio. */
 .contenido {
   position: absolute;
   top: 50%;
