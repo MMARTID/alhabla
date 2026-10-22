@@ -16,6 +16,7 @@ import { GestorSimulacionSection } from "@/components/gestor-simulacion";
 import { PuntosFuertesSection } from "@/components/puntos-fuertes-section";
 import { WhatsAppClientesSection } from "@/components/whatsapp-clientes-section";
 import { generalOwnerAssistant, nicheLinks } from "@/lib/niche-landings";
+import { GUION_GESTOR_GENERAL } from "@/lib/gestor-guiones";
 import { HOME_QUICK_FAQS } from "@/lib/home-faqs";
 import { formatExtraMinute, formatIncludedMinutes, plans, TRIAL_REASSURANCE } from "@/lib/plans";
 import { AvisoDeFundador, PrecioDePlan } from "@/components/precio-de-plan";
@@ -393,8 +394,9 @@ export function MainLanding() {
 
       {/* El Gestor en acción (2026-09-30): el WhatsApp del dueño en el
           teléfono y su panel en el portátil, reaccionando a cada cambio.
-          Las landings de nicho siguen con `OwnerAssistantSection`. */}
-      <GestorSimulacionSection data={generalOwnerAssistant} />
+          Aquí con el guion general; cada landing de sector monta la misma
+          simulación con el suyo (lib/gestor-guiones.ts). */}
+      <GestorSimulacionSection data={generalOwnerAssistant} guion={GUION_GESTOR_GENERAL} />
 
       <EnMarchaSection />
 

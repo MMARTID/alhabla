@@ -5,9 +5,17 @@
  * «En tu bolsillo») y su panel en el portátil 3D (el mismo modelo de «En tu
  * negocio», con la pantalla HTML proyectada sobre la tapa). Dentro del
  * teléfono las medidas van en cqw de la pantalla para que escalen con él.
+ *
+ * El acento (--acento, --acento-suave, --acento-tinta) es el morado en la
+ * portada y el color del sector en su landing; se usa fuera de las dos
+ * pantallas (situaciones, progreso, chips). Dentro del portátil el panel
+ * sigue con el morado de la app, porque es la app.
  */
 
 .seccion {
+  --acento: #8b5cf6;
+  --acento-suave: #f3eeff;
+  --acento-tinta: #6d28d9;
   padding: 4rem 0;
   border-bottom: 1px solid #e5e5e5;
 }
@@ -15,6 +23,17 @@
 .cabecera {
   display: grid;
   gap: 2rem;
+}
+
+.badgeSector {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0.75rem;
+  border-radius: 99px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  box-shadow: inset 0 0 0 1px var(--tw-ring-color, transparent);
 }
 
 .titulo {
@@ -64,12 +83,12 @@
 }
 
 .situacion:focus-visible {
-  outline: 2px solid #8b5cf6;
+  outline: 2px solid var(--acento);
   outline-offset: 3px;
 }
 
 .situacion[aria-pressed="true"] {
-  border-color: #c4b5fd;
+  border-color: color-mix(in srgb, var(--acento) 45%, #fff);
   background: #fafafa;
 }
 
@@ -82,7 +101,7 @@
 }
 
 .situacion[aria-pressed="true"] .situacionNumero {
-  color: #6d28d9;
+  color: var(--acento-tinta);
 }
 
 .situacionTitulo {
@@ -126,7 +145,7 @@
   right: 0;
   bottom: 0;
   height: 3px;
-  background: #ede9fe;
+  background: var(--acento-suave);
   opacity: 0;
   transition: opacity 200ms ease;
 }
@@ -138,10 +157,63 @@
 .progreso > span {
   display: block;
   height: 100%;
-  background: #8b5cf6;
+  background: var(--acento);
   transform-origin: left;
   transform: scaleX(var(--p, 0));
-  transition: transform 450ms linear;
+  transition: transform 300ms linear;
+}
+
+/* Pausa y repetición, bajo las situaciones. */
+.controles {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.control {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  height: 2rem;
+  padding: 0 0.75rem;
+  border-radius: 10px;
+  border: 1px solid #e5e5e5;
+  background: #fff;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #27272a;
+  transition:
+    border-color 200ms ease,
+    background-color 200ms ease;
+}
+
+.control:hover {
+  border-color: #d4d4d8;
+  background: #fafafa;
+}
+
+.control:focus-visible {
+  outline: 2px solid var(--acento);
+  outline-offset: 2px;
+}
+
+.control[aria-pressed="true"] {
+  border-color: color-mix(in srgb, var(--acento) 45%, #fff);
+  background: var(--acento-suave);
+  color: var(--acento-tinta);
+}
+
+.control svg {
+  width: 0.8125rem;
+  height: 0.8125rem;
+}
+
+.pista {
+  display: none;
+  font-size: 0.75rem;
+  color: #a1a1aa;
 }
 
 /* ── Escenario: el portátil detrás, el teléfono delante ─────────── */
@@ -240,13 +312,41 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* Los hechos del panel, para móvil (donde no se ve el portátil). */
+/* Con el ratón encima (o en pausa), el teléfono lo dice. */
+.enPausa {
+  position: absolute;
+  left: 50%;
+  bottom: -2.75rem;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.3rem 0.7rem;
+  border-radius: 99px;
+  background: #0a0a0a;
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+  transform: translateX(-50%);
+  animation: entra 220ms ease both;
+}
+
+.enPausa svg {
+  width: 0.75rem;
+  height: 0.75rem;
+}
+
+/* Los hechos del panel, para móvil (donde no se ve el portátil): uno por
+   línea y con el sitio guardado para los que puede llegar a tener una
+   situación (--filas), para que la página no salte cada vez que aterriza
+   un cambio. */
 .hechos {
   display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
+  flex-direction: column;
+  align-items: center;
   gap: 0.5rem;
-  min-height: 2rem;
+  min-height: calc(var(--filas, 3) * 2.125rem + (var(--filas, 3) - 1) * 0.5rem);
   margin-top: 2rem;
 }
 
@@ -273,6 +373,21 @@
   font-size: 0.9375rem;
   line-height: 1.5rem;
   color: #52525b;
+}
+
+.masInfo {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  margin-top: 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #0a0a0a;
+  text-underline-offset: 4px;
+}
+
+.masInfo:hover {
+  text-decoration: underline;
 }
 
 /* Crédito que exige la licencia CC BY 4.0 del modelo: solo donde se ve. */
@@ -334,11 +449,25 @@
     margin: 0;
   }
 
+  .enPausa {
+    left: auto;
+    right: 0;
+    bottom: auto;
+    top: -2.25rem;
+    transform: none;
+  }
+
   .hechos {
     display: none;
   }
 
   .credito {
+    display: block;
+  }
+}
+
+@media (min-width: 1024px) and (hover: hover) {
+  .pista {
     display: block;
   }
 }
@@ -428,6 +557,13 @@
   border-top-left-radius: 0.8cqw;
 }
 
+/* Un «Hecho:» es una acción ya ejecutada: lleva una marca verde al lado. */
+.burbujaGestor[data-hecho] {
+  box-shadow:
+    inset 0.8cqw 0 0 #25d366,
+    0 0.3cqw 0.5cqw rgba(11, 20, 26, 0.08);
+}
+
 .burbujaDueno {
   align-self: flex-end;
   background: #d9fdd3;
@@ -470,8 +606,9 @@
 }
 
 .boton[data-pulsado] {
-  background: #f3eeff;
-  color: #6d28d9;
+  background: var(--acento-suave);
+  color: var(--acento-tinta);
+  animation: pulsa 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .boton[data-descartado] {
@@ -516,22 +653,43 @@
   padding: 2.4cqw 4cqw 8cqw;
 }
 
+/* La caja de escribir: el dueño teclea ahí en tiempo real, con su cursor;
+   crece a dos o tres líneas como la de WhatsApp. */
 .waCaja {
   flex: 1;
+  min-width: 0;
   padding: 2.6cqw 4cqw;
-  border-radius: 99px;
+  border-radius: 5cqw;
   background: #fff;
   font-size: 3.8cqw;
+  line-height: 1.3;
   color: #8696a0;
+  overflow-wrap: anywhere;
+}
+
+.waCaja[data-borrador] {
+  color: #111b21;
+}
+
+.waCaja[data-borrador]::after {
+  content: "";
+  display: inline-block;
+  width: 0.4cqw;
+  height: 3.8cqw;
+  margin-left: 0.4cqw;
+  vertical-align: -0.6cqw;
+  background: var(--acento);
+  animation: cursor 900ms steps(2, start) infinite;
 }
 
 .waMicro {
   display: grid;
   place-items: center;
+  flex-shrink: 0;
   width: 10cqw;
   height: 10cqw;
   border-radius: 50%;
-  background: #8b5cf6;
+  background: var(--acento);
 }
 
 .waMicro svg {
@@ -576,7 +734,9 @@
   top: calc(50% - 388px * var(--k, 0.5));
   transform: scale(var(--k, 0.5));
   border-radius: 18px;
-  box-shadow: 0 30px 60px -24px rgba(10, 10, 10, 0.35), 0 0 0 1px #e5e5e5;
+  box-shadow:
+    0 30px 60px -24px rgba(10, 10, 10, 0.35),
+    0 0 0 1px #e5e5e5;
 }
 
 .menu {
@@ -665,6 +825,7 @@
   border-radius: 10px;
   font-weight: 500;
   color: #27272a;
+  transition: background-color 300ms ease;
 }
 
 .item svg {
@@ -784,38 +945,76 @@
 }
 
 /* Aviso del panel: el cambio que acaba de entrar desde WhatsApp. */
+/* El aviso «desde WhatsApp»: la notificación que dice qué acaba de cambiar
+   y de dónde viene. Más grande que una de macOS a propósito: la pantalla se
+   proyecta a la mitad de su tamaño sobre la tapa y tiene que leerse. */
 .aviso {
   position: absolute;
-  right: 30px;
-  top: 22px;
+  right: 26px;
+  top: 18px;
   z-index: 5;
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 10px 14px 10px 12px;
-  border-radius: 14px;
+  gap: 14px;
+  max-width: 540px;
+  padding: 13px 22px 13px 13px;
+  border-radius: 16px;
   background: #0a0a0a;
   color: #fff;
-  box-shadow: 0 18px 40px -16px rgba(10, 10, 10, 0.5);
+  box-shadow: 0 22px 44px -16px rgba(10, 10, 10, 0.55);
   animation: avisoEntra 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-.aviso svg {
-  width: 18px;
-  height: 18px;
+.avisoIcono {
+  display: grid;
+  place-items: center;
   flex-shrink: 0;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  background: #1f3d2a;
+  color: #25d366;
+}
+
+.avisoIcono svg {
+  width: 22px;
+  height: 22px;
 }
 
 .aviso b {
   display: block;
-  font-size: 13.5px;
-  font-weight: 600;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.25;
 }
 
 .aviso small {
   display: block;
-  font-size: 12px;
+  margin-top: 2px;
+  font-size: 14.5px;
   color: #a1a1aa;
+}
+
+/* El destello cuando aterriza un cambio: el área de trabajo se enciende un
+   instante con el acento (un borde y una luz desde el aviso) y se apaga.
+   Es el «efecto» del botón que se acaba de pulsar en el teléfono; a la
+   escala de la tapa, un tinte suave no se veía. Va con el acento de la
+   landing, como el aro: es la simulación la que señala, no la app (que
+   sigue en morado), y en una página de sector no compite otro color. */
+.destello {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  background: radial-gradient(
+    70% 55% at 78% 8%,
+    color-mix(in srgb, var(--acento) 30%, transparent),
+    transparent 70%
+  );
+  box-shadow:
+    inset 0 0 0 4px color-mix(in srgb, var(--acento) 60%, transparent),
+    inset 0 0 90px color-mix(in srgb, var(--acento) 22%, transparent);
+  pointer-events: none;
+  animation: destella 1100ms ease-out both;
 }
 
 /* 1 · Agenda del día por profesional */
@@ -854,6 +1053,13 @@
   font-size: 14.5px;
   font-weight: 700;
   transition: background-color 300ms ease;
+}
+
+.columnaCab .chip {
+  height: 22px;
+  padding: 0 8px;
+  font-size: 11px;
+  animation: entraCita 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .columnaCab[data-ausente] {
@@ -937,7 +1143,9 @@
    atienda. */
 .cita[data-huerfana] {
   background: #fff;
-  box-shadow: inset 3px 0 0 #9f7a15, 0 0 0 1px #e5e5e5;
+  box-shadow:
+    inset 3px 0 0 #9f7a15,
+    0 0 0 1px #e5e5e5;
 }
 
 .cita[data-huerfana] small {
@@ -949,8 +1157,42 @@
   transform: translateX(14px);
 }
 
+/* Movida a otro día: aquí queda su hueco, tachado, con el destino. El aro
+   (no el destello, que se queda en opacidad 0 y la borraba) marca el
+   cambio. */
+.cita[data-fuera] {
+  background: #fff;
+  color: #71717a;
+  box-shadow:
+    inset 3px 0 0 #d4d4d8,
+    0 0 0 1px #e5e5e5;
+  animation: aro 1200ms ease-out both;
+}
+
+.cita[data-fuera] b,
+.cita[data-fuera] small {
+  color: #a1a1aa;
+  text-decoration: line-through;
+}
+
+.destino {
+  position: absolute;
+  right: 7px;
+  bottom: 7px;
+  padding: 2px 7px;
+  border-radius: 99px;
+  background: #f3eeff;
+  font-size: 11px;
+  font-weight: 700;
+  color: #6d28d9;
+  text-decoration: none;
+  animation: entraCita 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
 .cita[data-entra] {
-  animation: entraCita 480ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation:
+    entraCita 480ms cubic-bezier(0.22, 1, 0.36, 1) both,
+    aro 1200ms ease-out both;
 }
 
 .etiquetaWa {
@@ -974,7 +1216,7 @@
   height: 10px;
 }
 
-/* 2 y 3 · «Tu agente»: disponibilidad y catálogo */
+/* 2 · «Tu agente»: disponibilidad, catálogo e información del negocio */
 
 .seccionPanel {
   margin-top: 18px;
@@ -1057,7 +1299,9 @@
 .especial[data-nuevo] {
   border-color: #c4b5fd;
   background: #faf7ff;
-  animation: entraCita 480ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation:
+    entraCita 480ms cubic-bezier(0.22, 1, 0.36, 1) both,
+    aro 1200ms ease-out both;
 }
 
 .especial b {
@@ -1119,7 +1363,7 @@
 
 .servicioFila {
   display: grid;
-  grid-template-columns: 1fr 100px 110px 90px;
+  grid-template-columns: 1fr 130px 130px 90px;
   align-items: center;
   gap: 12px;
   padding: 10px 8px;
@@ -1135,6 +1379,13 @@
 
 .servicioFila[data-cambiado] {
   background: #faf7ff;
+}
+
+.servicioFila[data-nuevo] {
+  background: #faf7ff;
+  animation:
+    entraCita 480ms cubic-bezier(0.22, 1, 0.36, 1) both,
+    aro 1200ms ease-out both;
 }
 
 .servicioFila b {
@@ -1159,24 +1410,92 @@
   font-variant-numeric: tabular-nums;
 }
 
-.precioViejo {
+.valorViejo {
   margin-right: 6px;
   font-size: 12px;
   font-weight: 500;
   color: #a1a1aa;
 }
 
-.precioNuevo {
+.valorNuevo {
   display: inline-block;
   padding: 2px 9px;
   border-radius: 99px;
   background: #f3eeff;
   color: #6d28d9;
-  animation: entraCita 480ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  font-weight: 700;
+  animation:
+    entraCita 480ms cubic-bezier(0.22, 1, 0.36, 1) both,
+    aro 1200ms ease-out both;
 }
 
 .servicioFila .chip {
   justify-self: end;
+}
+
+/* La información del negocio: frases cortas, la nueva resaltada. */
+.informacion {
+  margin-top: 10px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid #e5e5e5;
+  background: #fafafa;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.linea {
+  padding: 3px 0;
+}
+
+.linea[data-nueva] {
+  margin: 4px -8px 0;
+  padding: 5px 8px;
+  border-radius: 8px;
+  background: #f3eeff;
+  color: #4c1d95;
+  font-weight: 600;
+  animation:
+    entraCita 480ms cubic-bezier(0.22, 1, 0.36, 1) both,
+    aro 1200ms ease-out both;
+}
+
+/* 3 · El panel de inicio: las cifras de la semana */
+
+.cifras {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.cifra {
+  padding: 18px 20px;
+  transition:
+    background-color 400ms ease,
+    box-shadow 400ms ease;
+}
+
+.cifra small {
+  display: block;
+  font-size: 12.5px;
+  color: #52525b;
+}
+
+.cifra b {
+  display: block;
+  margin-top: 6px;
+  font-size: 34px;
+  font-weight: 900;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.cifra[data-resalta] {
+  background: #faf7ff;
+  border-color: #c4b5fd;
+  animation: aro 1200ms ease-out both;
 }
 
 /* ── Animaciones ────────────────────────────────────────────────── */
@@ -1217,6 +1536,57 @@
   }
 }
 
+/* El aro del acento que se expande y se apaga sobre lo que acaba de
+   cambiar en el panel: lo que hay que mirar. Va en `outline` y no en
+   `box-shadow`: las citas y las filas llevan su propia sombra (la barra de
+   color de la izquierda) y la animación, al quedarse en su último
+   fotograma, se la comía. */
+@keyframes aro {
+  from {
+    outline: 3px solid color-mix(in srgb, var(--acento) 65%, transparent);
+    outline-offset: 0;
+  }
+
+  to {
+    outline: 3px solid transparent;
+    outline-offset: 18px;
+  }
+}
+
+@keyframes destella {
+  from {
+    opacity: 1;
+  }
+
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes pulsa {
+  0% {
+    transform: scale(1);
+  }
+
+  40% {
+    transform: scale(0.95);
+  }
+
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes cursor {
+  from {
+    opacity: 1;
+  }
+
+  to {
+    opacity: 0;
+  }
+}
+
 @keyframes punto {
   0%,
   60%,
@@ -1234,20 +1604,36 @@
 @media (prefers-reduced-motion: reduce) {
   .burbuja,
   .botones,
+  .boton[data-pulsado],
   .escribiendo,
   .escribiendo i,
   .hecho,
   .aviso,
+  .enPausa,
+  .columnaCab .chip,
   .cita[data-entra],
+  .cita[data-fuera],
+  .destino,
   .etiquetaWa,
   .especial[data-nuevo],
-  .precioNuevo {
+  .servicioFila[data-nuevo],
+  .valorNuevo,
+  .linea[data-nueva],
+  .cifra[data-resalta],
+  .waCaja[data-borrador]::after {
     animation: none;
   }
 
   .situacionTexto,
   .progreso > span,
-  .cita {
+  .cita,
+  .item,
+  .cifra {
     transition: none;
+  }
+
+  /* Sin animación, el destello se quedaría encendido encima del panel. */
+  .destello {
+    display: none;
   }
 }

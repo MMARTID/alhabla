@@ -10,7 +10,7 @@ import { EnTuNegocioScroll } from "@/components/en-tu-negocio";
 import { LlamadaScroll } from "@/components/llamada-scroll";
 import { TeamRoutingSection } from "@/components/team-routing-section";
 import { GuiaDelSector } from "@/components/sector/guia-sector";
-import { OwnerAssistantSection } from "@/components/owner-assistant-section";
+import { GestorSimulacionSection } from "@/components/gestor-simulacion";
 import { WhatsAppBenefitsTable } from "@/components/whatsapp-benefits-table";
 import { RevenueLossCalculator } from "@/components/revenue-loss-calculator";
 import { Reveal } from "@/components/scroll-reveal";
@@ -18,6 +18,7 @@ import { formatIncludedMinutes, plans, TRIAL_REASSURANCE } from "@/lib/plans";
 import { AvisoDeFundador, PrecioDePlan } from "@/components/precio-de-plan";
 import { type NicheLandingContent } from "@/lib/niche-landings";
 import { GUIONES_SECTOR } from "@/lib/relato-guiones";
+import { GUIONES_GESTOR } from "@/lib/gestor-guiones";
 import { MainLanding } from "@/components/main-landing";
 
 function buildPlansHref(niche?: string) {
@@ -99,8 +100,16 @@ export function SiteLanding({ content }: { content?: NicheLandingContent }) {
         El Gestor después del reparto y de la guía: el visitante ya ha visto
         que la agenda reparte sola por profesional, y ahora ve que además
         puede hablarle por WhatsApp cuando algo cambia (una baja, un cierre).
+        Desde el 2026-10-22 es la misma simulación que la portada (el
+        WhatsApp del dueño en el iPhone y el panel en el portátil), con el
+        guion del sector (lib/gestor-guiones.ts) y su color.
       */}
-      <OwnerAssistantSection data={content.ownerAssistant} accent={content.accent} masInfoHref="/agenda-por-whatsapp" />
+      <GestorSimulacionSection
+        data={content.ownerAssistant}
+        guion={GUIONES_GESTOR[content.slug]}
+        accent={content.accent}
+        masInfoHref="/agenda-por-whatsapp"
+      />
 
       <WhatsAppBenefitsTable accent={content.accent} titulo={content.whatsappClientes.titulo} filas={content.whatsappClientes.filas} />
 
