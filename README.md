@@ -221,10 +221,16 @@ graph TD
 | Ruta | Qué es |
 |---|---|
 | `/` | Landing |
-| `/peluqueria`, `/barberia`, `/centro-de-estetica`, `/salon-de-unas`, `/fisioterapia` | Landings por sector |
+| `/peluqueria`, `/barberia`, `/centro-de-estetica`, `/salon-de-unas`, `/fisioterapia`, `/peluqueria-canina`, `/pestanas-y-cejas`, `/spa-y-masajes` | Landings por sector (las antiguas `/<sector>/<ciudad>` redirigen aquí con 301) |
 | `/planes` | Planes y calculadora de ROI |
-| `/recepcionista-ia-en-catalan` | Atención en catalán, euskera y gallego |
+| `/recepcionista-ia-en-catalan`, `/recepcionista-ia-en-euskera`, `/recepcionista-ia-en-gallego` | Atención en las lenguas cooficiales |
 | `/agenda-por-whatsapp` | El Gestor: el dueño gestiona la agenda por WhatsApp |
+| `/comparativa`, `/comparativa/*` | Alhabla frente a fonio y HeyDiga, y la recepcionista de IA frente a centralita, secretaria y persona |
+| `/desvio-de-llamadas`, `/desvio-de-llamadas/<operador>` | Códigos de desvío por operador (e `iphone-y-android`) |
+| `/integraciones`, `/integraciones/*` | Google Calendar, Outlook, iCloud y WhatsApp |
+| `/herramientas`, `/herramientas/*` | Calculadora de llamadas perdidas, guion, mensajes de contestador, plantillas de recordatorio y política de cancelación |
+| `/guias/ley-y-recepcionista-de-ia`, `/glosario` | Guía legal y glosario |
+| `/sobre-alhabla`, `/prensa`, `/novedades`, `/contacto` | Empresa, prensa, novedades del producto y contacto |
 | `/blog`, `/blog/[slug]`, `/blog/rss.xml` | Artículos (MDX en `web/content/blog`) |
 | `/keystatic`, `/vista-previa/[slug]` | Editor del blog (Keystatic) y vista previa de un borrador |
 | `/legal/aviso-legal`, `/legal/privacidad` | Legales |
