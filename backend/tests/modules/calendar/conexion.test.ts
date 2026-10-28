@@ -15,6 +15,7 @@ import {
   guardarConexionDeCalendario,
   marcadaComoConectada,
   marcarCalendarioDesconectado,
+  nuncaConectoCalendario,
   origenDeCalendario,
   persistirCredencialesRotadas,
   resolverConexionDeCalendario,
@@ -463,6 +464,61 @@ describe("predicados de conexión (las cuatro semánticas actuales)", () => {
     );
     expect(usaCalendarioExterno(conCalendario)).toBe(true);
     expect(usaCalendarioExterno(sinCalendario)).toBe(false);
+  });
+});
+
+describe("nuncaConectoCalendario", () => {
+  it("sin ninguna fila: nunca ha conectado un calendario", () => {
+    expect(nuncaConectoCalendario(negocioConConexiones("google", []))).toBe(
+      true
+    );
+    // Sin proveedor elegido, igual.
+    expect(nuncaConectoCalendario(negocioConConexiones(null, []))).toBe(true);
+  });
+
+  it("con credenciales (operativas o no) no es «nunca»", () => {
+    expect(
+      nuncaConectoCalendario(
+        negocioConConexiones("google", [filaDeConexion("google")])
+      )
+    ).toBe(false);
+    expect(
+      nuncaConectoCalendario(
+        negocioConConexiones("google", [
+          filaDeConexion("google", { connected: false }),
+        ])
+      )
+    ).toBe(false);
+  });
+
+  it("revocada (sin credenciales, con disconnectedAt y lastError) es caducada, no «nunca»", () => {
+    expect(
+      nuncaConectoCalendario(
+        negocioConConexiones("google", [
+          filaDeConexion("google", {
+            refreshToken: null,
+            connected: false,
+            disconnectedAt: new Date("2026-10-01T10:00:00Z"),
+            lastError: "invalid_grant",
+          }),
+        ])
+      )
+    ).toBe(false);
+  });
+
+  it("una conexión de otro proveedor cuenta: el negocio sí conectó un calendario", () => {
+    expect(
+      nuncaConectoCalendario(
+        negocioConConexiones("google", [filaDeConexion("outlook")])
+      )
+    ).toBe(false);
+  });
+
+  it("sin las filas cargadas (caché antigua) no se sabe: false, como caducada", () => {
+    expect(
+      nuncaConectoCalendario({ id: "biz_1", calendarProvider: "google" })
+    ).toBe(false);
+    expect(nuncaConectoCalendario(null)).toBe(false);
   });
 });
 

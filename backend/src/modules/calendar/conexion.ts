@@ -194,6 +194,25 @@ export const usaCalendarioExterno = (c: ConexionResuelta): boolean =>
 /** onboarding/routes.ts: solo el flag. */
 export const marcadaComoConectada = (c: ConexionResuelta): boolean =>
   c.marcadaConectada === true;
+/** voiceTools (executeBookAppointment): el negocio NUNCA ha conectado un
+ * calendario, frente a una conexión caducada o revocada. Las filas no se
+ * borran nunca: al revocar se quedan sin credenciales pero con
+ * `disconnectedAt` y `lastError`, así que «nunca» es que ninguna fila haya
+ * tenido credenciales ni se haya desconectado. Sin las filas cargadas
+ * (`calendarConnections` ausente: caché de voz antigua) no se puede saber y
+ * devuelve false, para que se trate como caducada, como hasta ahora. */
+export function nuncaConectoCalendario(
+  business: FilaDeConexionDeCalendario | null | undefined
+): boolean {
+  const filas = business?.calendarConnections;
+  if (!Array.isArray(filas)) return false;
+  return filas.every(
+    (fila) =>
+      (fila.credentials === null || fila.credentials === undefined) &&
+      !fila.disconnectedAt &&
+      !fila.lastError
+  );
+}
 /** calendarOriginForBusiness de voiceTools y el job. */
 export const origenDeCalendario = (
   c: ConexionResuelta

@@ -310,6 +310,10 @@ function seccionReserva(contexto: ContextoDelPrompt): Parrafos {
         : "la confirmación"
     } por WhatsApp a este número (en el chat de WhatsApp, pregunta solo si lo reservas). Un sí claro confirma las dos cosas (smsConsent true). Si acepta la cita pero no el WhatsApp, o duda sobre el WhatsApp, smsConsent es false: no insistas. Si no queda claro si acepta la cita, pregunta solo eso. Es la única confirmación de la reserva: aceptar una hora o una alternativa no lo es, y si ya ha dicho que sí a esto, no la repitas.`,
     "4. Reserva. Con su sí, usa book_appointment con su nombre en clientName (nunca vacío: si aún no lo tienes, pídelo antes) y el availabilityToken de la opción aceptada. Da la cita por hecha solo si devuelve éxito; si te pide un dato (nombre o teléfono), pídeselo y vuelve a llamarla; si falla por otra cosa, explícalo en una frase y escala.",
+    // Hallazgo 7 de la auditoría del 28-10: una segunda reserva en la misma
+    // llamada sustituía a la primera en silencio. El backend la rechaza con
+    // YA_HAY_CITA_EN_ESTA_LLAMADA; esto es para que no la prometa antes.
+    "Solo puedes cerrar una cita por llamada. Si en esta llamada ya has reservado una y pide otra (para otra persona u otro servicio), no compruebes ni prometas nada: dile que en esta llamada solo puedes dejarle una cita y que, para la otra, vuelva a llamar al terminar (en el chat de WhatsApp, que llame al negocio). Si lo que quiere es cambiar la hora o el servicio de la que acabas de reservar, es un cambio: comprueba la hora nueva con check_availability pasando en replacesBookingId el bookingId que devolvió book_appointment.",
     // Se dice «de Alhabla», no «de un contacto llamado Alhabla Reservas»: el
     // nombre visible sigue en revisión en Meta y el cliente puede ver solo
     // el número. `mensajeCliente` lo devuelve book_appointment solo cuando
