@@ -26,7 +26,8 @@ import {
 import { acquireLock, releaseLock } from "../../lib/bookingLock.js";
 import {
   featuresParaLaApp,
-  getPlanLimits,
+  haTenidoSuscripcion,
+  maxProfesionalesDelNegocio,
   resolvePlanId,
 } from "../../lib/planFeatures.js";
 import { appUrl } from "../../lib/urls.js";
@@ -149,7 +150,6 @@ export async function getBillingSummary(businessId: string) {
   // gating (aviso de minutos, límite de profesionales, features bloqueadas)
   // sin duplicar la tabla de planFeatures.ts.
   const effectivePlanId = resolvePlanId(business);
-  const planLimits = getPlanLimits(effectivePlanId);
   const activeProfessionals = await prisma.professional.count({
     where: { businessId, active: true, deletedAt: null },
   });
@@ -170,7 +170,8 @@ export async function getBillingSummary(businessId: string) {
     precioDeFundador: isFounderPriceId(business.stripePriceId),
     consumedMinutes,
     effectivePlanId,
-    maxProfessionals: planLimits.maxProfessionals,
+    // Sin suscripción no hay límite (bookings/service.ts aplica el mismo).
+    maxProfessionals: maxProfesionalesDelNegocio(business),
     activeProfessionals,
     planFeatures: featuresParaLaApp(effectivePlanId),
   };
@@ -285,6 +286,34 @@ export class SuscripcionVivaError extends Error {
   }
 }
 
+/**
+ * Días de prueba del checkout: 7 la primera vez y ninguno si el negocio ya
+ * tuvo una suscripción (cancelar y volver a contratar daba otros 7 días
+ * gratis cada vez; hallazgo 20 de
+ * docs/auditorias/2026-10-28-auditoria-de-producto.md). Primero mira la
+ * base de datos (`stripeSubscriptionId` y `subscriptionStatus` no se borran
+ * al cancelar) y, si no hay rastro, pregunta a Stripe por el cliente: cubre
+ * una suscripción cuyo webhook nunca llegó a aplicarse. Si Stripe falla, el
+ * error sube y el checkout responde 503, como con cualquier otra llamada a
+ * Stripe de esta función: mejor reintentar que regalar la prueba.
+ */
+async function diasDePruebaDelCheckout(
+  negocio: {
+    stripeSubscriptionId: string | null;
+    subscriptionStatus: SubscriptionStatus | null;
+  },
+  customerId: string,
+  stripe: Stripe
+): Promise<number> {
+  if (haTenidoSuscripcion(negocio)) return 0;
+  const anteriores = await stripe.subscriptions.list({
+    customer: customerId,
+    status: "all",
+    limit: 1,
+  });
+  return anteriores.data.length > 0 ? 0 : CHECKOUT_TRIAL_DAYS;
+}
+
 export async function createCheckoutSession(input: {
   businessId: string;
   userId: string;
@@ -306,7 +335,7 @@ export async function createCheckoutSession(input: {
   try {
   const existingBusiness = await prisma.business.findUnique({
     where: { id: input.businessId },
-    select: { subscriptionStatus: true },
+    select: { subscriptionStatus: true, stripeSubscriptionId: true },
   });
   // Solo se abre un checkout cuando no queda ninguna suscripción viva. Con
   // PAST_DUE, UNPAID, PAUSED o INCOMPLETE la suscripción sigue existiendo en
@@ -320,6 +349,14 @@ export async function createCheckoutSession(input: {
 
   const stripe = getStripeClient();
   const customerId = await getOrCreateCustomer(input.businessId, input.userId);
+  const diasDePrueba = await diasDePruebaDelCheckout(
+    {
+      stripeSubscriptionId: existingBusiness?.stripeSubscriptionId ?? null,
+      subscriptionStatus: estado,
+    },
+    customerId,
+    stripe
+  );
 
   // Antes de completar el primer checkout, abrirlo en dos pestañas (o
   // pulsar "suscribirme" dos veces seguidas) creaba dos sesiones
@@ -338,8 +375,14 @@ export async function createCheckoutSession(input: {
   const subscriptionSessions = openSessions.data.filter(
     (existing) => existing.mode === "subscription"
   );
+  // Y con la misma prueba: una sesión abierta antes de que el negocio
+  // tuviera suscripción lleva los 7 días. Las creadas antes de que
+  // existiera `diasDePrueba` en los metadatos los llevaban todas.
   const reusableSession = subscriptionSessions.find(
-    (existing) => existing.metadata?.planId === input.planId
+    (existing) =>
+      existing.metadata?.planId === input.planId &&
+      (existing.metadata?.diasDePrueba ?? String(CHECKOUT_TRIAL_DAYS)) ===
+        String(diasDePrueba)
   );
   if (reusableSession?.client_secret) {
     return { clientSecret: reusableSession.client_secret };
@@ -361,7 +404,11 @@ export async function createCheckoutSession(input: {
   console.log(
     `[Billing] Checkout de ${input.businessId} para plan ${input.planId}: ${
       usedFounderPrice ? "precio de fundador" : "precio vigente"
-    } (${priceId})`
+    } (${priceId}), ${
+      diasDePrueba > 0
+        ? `${diasDePrueba} días de prueba`
+        : "sin prueba (ya tuvo una suscripción)"
+    }`
   );
 
   const usagePriceId = getUsagePriceId(input.planId);
@@ -395,9 +442,11 @@ export async function createCheckoutSession(input: {
       businessId: input.businessId,
       planId: input.planId,
       founderPrice: String(usedFounderPrice),
+      diasDePrueba: String(diasDePrueba),
     },
     subscription_data: {
-      trial_period_days: CHECKOUT_TRIAL_DAYS,
+      // Sin prueba se omite: Stripe exige al menos 1 día en trial_period_days.
+      ...(diasDePrueba > 0 ? { trial_period_days: diasDePrueba } : {}),
       metadata: {
         businessId: input.businessId,
         planId: input.planId,
