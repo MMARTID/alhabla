@@ -116,7 +116,7 @@ export function AgendaMovil({ business }: { business: Business }) {
     <div>
       <CabeceraMovil
         titulo="Agenda"
-        subtitulo="Las citas que ha reservado tu recepcionista."
+        subtitulo={calendario.alhabla ? "Todas tus citas, en un solo sitio." : "Las citas que ha reservado tu recepcionista."}
         accion={
           <>
             <BotonDeBuscar />
@@ -249,8 +249,9 @@ export function AgendaMovil({ business }: { business: Business }) {
             {indiceAhora === -1 ? <MarcaAhora hora={horaDelNegocio(ahora, timeZone)} /> : null}
           </ol>
           <p className="mt-[18px] text-[13px] leading-[1.55] text-muted">
-            Solo las citas que ha reservado tu recepcionista.
-            {calendario.connected ? ` El resto de tu agenda sigue en ${calendario.label}.` : ""}
+            {calendario.alhabla
+              ? "Esta es tu agenda: aquí están todas las citas. Si apuntas alguna fuera, añádela aquí o bloquea esas horas."
+              : `Solo las citas que ha reservado tu recepcionista.${calendario.connected ? ` El resto de tu agenda sigue en ${calendario.label}.` : ""}`}
           </p>
         </>
       )}

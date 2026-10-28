@@ -95,6 +95,7 @@ const SELECT_NEGOCIO_DEL_GESTOR = {
   // «Dar precios»: si la recepcionista dice los precios del catálogo.
   agentSettings: true,
   calendarProvider: true,
+  modoDeAgenda: true,
   calendarConnections: SELECT_CONEXION_DE_CALENDARIO.calendarConnections,
   services: {
     where: { active: true },
@@ -244,9 +245,19 @@ async function contextoNegocio(businessId: string) {
     business.calendarProvider,
     business.calendarConnections
   );
-  const calendario = conexionOperativa(conexion)
-    ? { conectado: true, proveedor: conexion.provider, estado: "conectado" }
-    : {
+  // `conectado` aquí significa «se puede apuntar»: en la agenda de Alhabla
+  // también, aunque no haya calendario externo (PLAN-AGENDA-ALHABLA.md).
+  // Sin esto el Gestor pedía al dueño que conectara el calendario.
+  const calendario = conexion.agendaPropia
+    ? {
+        conectado: true,
+        proveedor: "alhabla",
+        estado:
+          "agenda de Alhabla: las citas se guardan solo en Alhabla, sin calendario externo; lo que el negocio apunte fuera no se ve aquí",
+      }
+    : conexionOperativa(conexion)
+      ? { conectado: true, proveedor: conexion.provider, estado: "conectado" }
+      : {
         conectado: false,
         proveedor: activo?.provider ?? null,
         // «a medias»: Outlook/Apple con la cuenta enlazada pero sin

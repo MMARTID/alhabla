@@ -80,6 +80,13 @@ model Business {
   // Calendario: la conexión vive en CalendarConnection (una fila por
   // proveedor); esto es solo el puntero al proveedor activo.
   calendarProvider String?
+  // Dónde se reservan las citas (PLAN-AGENDA-ALHABLA.md): `sin_elegir` (sin
+  // calendario: la recepcionista toma nota pero no reserva), `alhabla`
+  // (solo en nuestra base de datos; lo elige el dueño) o `externo` (Google,
+  // Outlook o iCloud; se pone al conectar un calendario). El modo se elige,
+  // no se deduce: una conexión caducada nunca pasa el negocio a `alhabla`.
+  // Ver lib/modoDeAgenda.ts.
+  modoDeAgenda String @default("sin_elegir")
 
   // Marca de la última semana resumida por email. Cloud Scheduler entrega al
   // menos una vez, así que el job reclama la semana con un updateMany

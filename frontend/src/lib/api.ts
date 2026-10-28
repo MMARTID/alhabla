@@ -414,6 +414,14 @@ export async function selectCalendar(calendarId: string) {
   return data;
 }
 
+/** Dónde reserva el negocio (PLAN-AGENDA-ALHABLA.md): la agenda de Alhabla o
+ * el calendario conectado. A `externo` solo se vuelve con una conexión
+ * operativa (409 `CALENDAR_NOT_OPERATIVE` si no la hay). */
+export async function cambiarModoDeAgenda(modo: "alhabla" | "externo") {
+  const { data } = await api.patch<Business>("/business/me/agenda/modo", { modo });
+  return data;
+}
+
 /** Ausencias del equipo que se solapan con [desde, hasta) (instantes ISO,
  * como mucho 120 días). */
 export async function getAusencias(desde: string, hasta: string) {

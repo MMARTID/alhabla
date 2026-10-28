@@ -42,7 +42,8 @@ import {
 import {
   codigoDeCalendarioNoOperativo,
   conexionConfirmada,
-  conexionOperativa,
+  origenExternoDeLaCita,
+  puedeReservar,
   marcarCalendarioDesconectado,
   origenDeCalendario,
   resolverConexionDeCalendario,
@@ -343,7 +344,9 @@ async function getCachedVoiceConfig(
       // calendario roto se descarta para releer de BD. Best-effort: como
       // todo borrado de voice_config, pasa por invalidarCacheDeVoz, que
       // nunca lanza.
-      if (conexionConfirmada(resolverConexionDeCalendario(parsed))) {
+      // En la agenda de Alhabla no hay conexión que confirmar: la entrada vale.
+      const conexionCacheada = resolverConexionDeCalendario(parsed);
+      if (conexionCacheada.agendaPropia || conexionConfirmada(conexionCacheada)) {
         return parsed;
       }
 
@@ -606,7 +609,7 @@ async function executeCheckAvailability(
     // comprobaba solo contra Postgres, el cliente oía «sí, hay hueco» y la
     // reserva fallaba después (PLAN-AGENDA-ALHABLA.md, fase 0).
     const conexionParaDisponibilidad = resolverConexionDeCalendario(business);
-    if (!conexionOperativa(conexionParaDisponibilidad)) {
+    if (!puedeReservar(conexionParaDisponibilidad)) {
       const code = codigoDeCalendarioNoOperativo(
         business,
         conexionParaDisponibilidad
@@ -1801,7 +1804,7 @@ async function executeBookAppointment(
     }
 
     const conexion = resolverConexionDeCalendario(business);
-    const hasCalendarConnection = conexionOperativa(conexion);
+    const hasCalendarConnection = puedeReservar(conexion);
 
     // Resuelto aquí arriba, antes de cualquier punto de fallo, para no
     // repetir la misma consulta a Call en cada uno de los tres sitios que
@@ -2231,8 +2234,7 @@ async function executeBookAppointment(
               smsConsent,
               createdVia: canalDeLaTool(callId),
               externalEventId: (result as { id?: string })?.id ?? undefined,
-              externalCalendarProvider: conexion.provider,
-              externalCalendarId: conexion.calendarId,
+              ...origenExternoDeLaCita(conexion),
             },
             update: {
               programedAt: new Date(startDateTime),
@@ -2243,8 +2245,7 @@ async function executeBookAppointment(
               clientPhone: clientPhone || undefined,
               smsConsent,
               externalEventId: (result as { id?: string })?.id ?? undefined,
-              externalCalendarProvider: conexion.provider,
-              externalCalendarId: conexion.calendarId,
+              ...origenExternoDeLaCita(conexion),
               // Cancelar y volver a reservar en la misma llamada reactiva la
               // fila: sin esto quedaba cancelada con la hora nueva y el job
               // de confirmación la descartaba (RESERVA_CANCELADA).

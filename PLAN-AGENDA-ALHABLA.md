@@ -1,6 +1,6 @@
 # Plan: Agenda de Alhabla (reservar sin calendario externo)
 
-Estado: **en curso** (28-10-2026; fase 0 hecha). Origen:
+Estado: **en curso** (28-10-2026; fases 0 y 1 hechas). Origen:
 `docs/auditorias/2026-10-28-auditoria-de-producto.md` (hallazgo 2 y §3). Revisado contra el código el
 28-10 (PR de la fase 0): las correcciones van marcadas con **[rev]**.
 
@@ -86,7 +86,22 @@ resto a `sin_elegir`.
   caducado).
 - **Sin efecto en la demo de la landing:** sus assistants `alhabla-demo-*` no tienen tools.
 
-### Fase 1: el modo «Agenda de Alhabla» (5–7 días) **[rev: antes 3–4]**
+### Fase 1: el modo «Agenda de Alhabla» — HECHA (28-10)
+
+**Cómo quedó (resumen de la PR):** la regla vive en la conexión resuelta. `resolverConexionDeCalendario`
+marca `agendaPropia` cuando `modoDeAgenda = "alhabla"` y no se fuerza proveedor, y entonces deja
+`credentials` a null: la conexión externa que quede se ignora para leer ocupación y crear eventos sin
+tocar `usaCalendarioExterno` ni `getBusyIntervals`. `puedeReservar(c) = c.agendaPropia ||
+conexionOperativa(c)` sustituye a `conexionOperativa` en voz, Gestor, lista de espera y reintento.
+`calendarService.bookAppointment` devuelve `{ id: null }` con `agendaPropia` antes de exigir conexión,
+así que los cinco caminos siguen llamándolo y escriben el `Booking` sin evento;
+`origenExternoDeLaCita(c)` pone `externalCalendarProvider`/`Id` a null. `cambiarModoDeAgenda` +
+`PATCH /business/me/agenda/modo`; `guardarConexionDeCalendario` pasa a `externo` al conectar; el
+contexto del Gestor, el checklist de onboarding y la caché de voz entienden el modo. En la app,
+`getCalendarState` expone `mode`, `alhabla` y `bookable`, y es `bookable` lo que decide «Mover»,
+las tarjetas de aviso y el estado operativo; `/agente › Calendario` elige el modo con confirmación y el
+alta tiene la cuarta tarjeta. **Pendiente de esta fase:** tests de integración contra Postgres y
+la prueba de extremo a extremo en dev tras el despliegue (la migración la aplica el deploy).
 
 **Datos**
 - Migración aditiva: `Business.modoDeAgenda String @default("sin_elegir")`, con el relleno descrito

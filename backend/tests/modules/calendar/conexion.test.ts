@@ -8,6 +8,7 @@ import {
 import {
   actualizarCalendarioDeConexion,
   camposDeCalendarioParaElPanel,
+  cambiarModoDeAgenda,
   codigoDeCalendarioNoOperativo,
   conCallbackDeRotacion,
   conexionConfirmada,
@@ -18,6 +19,8 @@ import {
   marcarCalendarioDesconectado,
   nuncaConectoCalendario,
   origenDeCalendario,
+  origenExternoDeLaCita,
+  puedeReservar,
   persistirCredencialesRotadas,
   resolverConexionDeCalendario,
   SELECT_CONEXION_DE_CALENDARIO,
@@ -37,6 +40,7 @@ import {
 vi.mock("../../../src/lib/prisma.js", () => ({
   prisma: {
     business: {
+      findUnique: vi.fn(),
       update: vi.fn(),
     },
     calendarConnection: {
@@ -67,6 +71,7 @@ describe("SELECT_CONEXION_DE_CALENDARIO", () => {
       "calendarConnections",
       "calendarProvider",
       "id",
+      "modoDeAgenda",
     ]);
     expect(
       Object.keys(
@@ -372,6 +377,7 @@ describe("resolverConexionDeCalendario", () => {
       businessId: null,
       calendarIdConfigurado: null,
       marcadaConectada: null,
+      agendaPropia: false,
     });
   });
 });
@@ -657,6 +663,7 @@ describe("guardarConexionDeCalendario", () => {
       include: { calendarConnections: expect.any(Object) },
       data: {
         calendarProvider: "google",
+        modoDeAgenda: "externo",
         calendarConnections: {
           upsert: {
             where: where("google"),
@@ -1109,5 +1116,120 @@ describe("nuncaConectoCalendario y codigoDeCalendarioNoOperativo", () => {
         resolverConexionDeCalendario(caducado)
       )
     ).toBe("OUTLOOK_CALENDAR_RECONNECT_REQUIRED");
+  });
+});
+
+// PLAN-AGENDA-ALHABLA.md, fase 1: el modo de agenda.
+describe("agenda de Alhabla: resolver, puedeReservar y origen externo", () => {
+  const conGoogle = (modoDeAgenda: string | null) => ({
+    ...negocioConConexiones("google", [
+      filaDeConexion("google", { refreshToken: "refresh_token" }),
+    ]),
+    modoDeAgenda,
+  });
+
+  it("en modo alhabla la conexión se ignora: sin credenciales, agendaPropia y se puede reservar", () => {
+    const c = resolverConexionDeCalendario(conGoogle("alhabla"));
+    expect(c.agendaPropia).toBe(true);
+    expect(c.credentials).toBeNull();
+    expect(conexionOperativa(c)).toBe(false);
+    expect(usaCalendarioExterno(c)).toBe(false);
+    expect(puedeReservar(c)).toBe(true);
+    expect(origenExternoDeLaCita(c)).toEqual({
+      externalCalendarProvider: null,
+      externalCalendarId: null,
+    });
+  });
+
+  it("con el proveedor forzado (cancelar una cita antigua) la conexión real sigue ahí", () => {
+    const c = resolverConexionDeCalendario(conGoogle("alhabla"), {
+      provider: "google",
+    });
+    expect(c.agendaPropia).toBe(false);
+    expect(c.credentials).not.toBeNull();
+    expect(conexionOperativa(c)).toBe(true);
+  });
+
+  it("en externo (o sin modo) manda la conexión: operativa reserva, caducada no", () => {
+    const operativa = resolverConexionDeCalendario(conGoogle("externo"));
+    expect(operativa.agendaPropia).toBe(false);
+    expect(puedeReservar(operativa)).toBe(true);
+    expect(origenExternoDeLaCita(operativa)).toEqual({
+      externalCalendarProvider: "google",
+      externalCalendarId: "primary",
+    });
+
+    const caducada = resolverConexionDeCalendario({
+      ...negocioConConexiones("google", [
+        filaDeConexion("google", { refreshToken: null, connected: false }),
+      ]),
+      modoDeAgenda: "externo",
+    });
+    expect(puedeReservar(caducada)).toBe(false);
+
+    const sinModo = resolverConexionDeCalendario(negocioConConexiones("google", []));
+    expect(sinModo.agendaPropia).toBe(false);
+    expect(puedeReservar(sinModo)).toBe(false);
+  });
+});
+
+describe("cambiarModoDeAgenda", () => {
+  const mockedBusinessFindUnique = vi.mocked(prisma.business.findUnique);
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    reiniciarAlmacenEnMemoria();
+    mockedBusinessUpdate.mockResolvedValue({
+      id: "biz_1",
+      modoDeAgenda: "alhabla",
+      calendarConnections: [],
+    } as never);
+  });
+
+  it("a alhabla se pasa siempre, se guarda y se invalida la caché de voz", async () => {
+    await almacenEnMemoria.guardarClave("voice_config:biz_1", "{}", 60_000);
+    almacenEnMemoria.borrarClave.mockClear();
+
+    const r = await cambiarModoDeAgenda("biz_1", "alhabla");
+
+    expect(r.ok).toBe(true);
+    expect(mockedBusinessFindUnique).not.toHaveBeenCalled();
+    expect(mockedBusinessUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "biz_1" },
+        data: { modoDeAgenda: "alhabla" },
+      })
+    );
+    expect(almacenEnMemoria.borrarClave).toHaveBeenCalledWith("voice_config:biz_1");
+  });
+
+  it("a externo solo con una conexión operativa; si no, 409 y no se escribe nada", async () => {
+    mockedBusinessFindUnique.mockResolvedValue(
+      negocioConConexiones("google", [
+        filaDeConexion("google", { refreshToken: null, connected: false }),
+      ]) as never
+    );
+
+    const r = await cambiarModoDeAgenda("biz_1", "externo");
+
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.code).toBe("CALENDAR_NOT_OPERATIVE");
+    expect(mockedBusinessUpdate).not.toHaveBeenCalled();
+  });
+
+  it("a externo con la conexión operativa, aunque el negocio esté en alhabla (la mira con el proveedor forzado)", async () => {
+    mockedBusinessFindUnique.mockResolvedValue({
+      ...negocioConConexiones("google", [
+        filaDeConexion("google", { refreshToken: "refresh_token" }),
+      ]),
+      modoDeAgenda: "alhabla",
+    } as never);
+
+    const r = await cambiarModoDeAgenda("biz_1", "externo");
+
+    expect(r.ok).toBe(true);
+    expect(mockedBusinessUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { modoDeAgenda: "externo" } })
+    );
   });
 });

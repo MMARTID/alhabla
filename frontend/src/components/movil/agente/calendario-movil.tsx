@@ -3,10 +3,10 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
-import { ArrowUpRight, Check, CircleCheckBig } from "lucide-react";
+import { ArrowUpRight, CalendarDays, Check, CircleCheckBig } from "lucide-react";
 import { SiApple, SiGooglecalendar } from "@icons-pack/react-simple-icons";
-import { getCalendarList, getGoogleCalendarAuthUrl, getMicrosoftCalendarAuthUrl, selectCalendar } from "@/lib/api";
-import { getCalendarState, providerFromReconnectCode } from "@/lib/calendar-state";
+import { cambiarModoDeAgenda, getCalendarList, getGoogleCalendarAuthUrl, getMicrosoftCalendarAuthUrl, selectCalendar } from "@/lib/api";
+import { getCalendarState, NOMBRE_AGENDA_DE_ALHABLA, providerFromReconnectCode } from "@/lib/calendar-state";
 import type { Business, CalendarProviderId } from "@/lib/types";
 import { AppleCalendarConnect } from "@/components/apple-calendar-connect";
 import { AvisoFlotante, useAviso } from "@/components/aviso-flotante";
@@ -32,6 +32,35 @@ export function CalendarioMovil({ business }: { business: Business }) {
   const [selector, setSelector] = useState(false);
   const [formularioApple, setFormularioApple] = useState(false);
   const conectado = estado.connected && !reconectar;
+  // Modo de agenda (PLAN-AGENDA-ALHABLA.md): elegir la agenda de Alhabla pide
+  // una confirmación en línea, porque desde ese momento la recepcionista solo
+  // ve lo que hay en Alhabla. `verExternos` abre las tarjetas de proveedor
+  // desde el modo alhabla: conectar uno pasa el negocio a `externo` solo.
+  const [confirmarAlhabla, setConfirmarAlhabla] = useState(false);
+  const [verExternos, setVerExternos] = useState(false);
+  const cambiarModo = useMutation({
+    mutationFn: cambiarModoDeAgenda,
+    onSuccess: async (negocio, modo) => {
+      queryClient.setQueryData(["my-business"], negocio);
+      await queryClient.invalidateQueries({ queryKey: ["onboarding-state"] });
+      setConfirmarAlhabla(false);
+      setVerExternos(false);
+      avisar(
+        modo === "alhabla"
+          ? "Tu recepcionista reserva ya en la agenda de Alhabla."
+          : "Tu recepcionista vuelve a reservar en tu calendario."
+      );
+    },
+    onError: (error) => {
+      const codigo = axios.isAxiosError(error) ? error.response?.data?.code : undefined;
+      avisar(
+        codigo === "CALENDAR_NOT_OPERATIVE"
+          ? "Para volver a tu calendario primero tienes que conectarlo."
+          : "No se pudo cambiar el modo de agenda.",
+        "error"
+      );
+    },
+  });
 
   const calendarios = useQuery({
     queryKey: ["calendar-list"],
@@ -109,7 +138,23 @@ export function CalendarioMovil({ business }: { business: Business }) {
           </p>
         ) : null}
 
-        {conectado ? (
+        {estado.alhabla && !verExternos ? (
+          <>
+            <div className="flex items-center gap-3 rounded-[20px] border border-exito-borde bg-exito-fondo px-4 py-3.5">
+              <CircleCheckBig className="h-6 w-6 shrink-0 text-exito" aria-hidden="true" />
+              <div className="min-w-0">
+                <p className="text-[15px] font-bold text-exito">{NOMBRE_AGENDA_DE_ALHABLA} activa</p>
+                <p className="text-[13px] text-exito">Las citas se guardan solo en Alhabla, sin calendario externo.</p>
+              </div>
+            </div>
+            <p className="px-1 text-sm leading-6 text-muted">
+              Tu recepcionista solo ve las citas que hay en Alhabla. Si apuntas citas en otro sitio, añádelas aquí o bloquea esas horas para que no las ofrezca.
+            </p>
+            <button type="button" onClick={() => setVerExternos(true)} className="btn-secondary w-full">
+              Usar un calendario externo
+            </button>
+          </>
+        ) : conectado ? (
           <>
             <div className="flex items-center gap-3 rounded-[20px] border border-exito-borde bg-exito-fondo px-4 py-3.5">
               <CircleCheckBig className="h-6 w-6 shrink-0 text-exito" aria-hidden="true" />
@@ -178,9 +223,31 @@ export function CalendarioMovil({ business }: { business: Business }) {
                 })}
               </div>
             ) : null}
+            <ElegirAgendaDeAlhabla
+              variante="boton"
+              confirmando={confirmarAlhabla}
+              pendiente={cambiarModo.isPending}
+              onPedir={() => setConfirmarAlhabla(true)}
+              onCancelar={() => setConfirmarAlhabla(false)}
+              onConfirmar={() => cambiarModo.mutate("alhabla")}
+            />
           </>
         ) : (
           <>
+            {estado.alhabla ? (
+              <button type="button" onClick={() => setVerExternos(false)} className="btn-secondary w-full">
+                Volver a la agenda de Alhabla
+              </button>
+            ) : (
+              <ElegirAgendaDeAlhabla
+                variante="tarjeta"
+                confirmando={confirmarAlhabla}
+                pendiente={cambiarModo.isPending}
+                onPedir={() => setConfirmarAlhabla(true)}
+                onCancelar={() => setConfirmarAlhabla(false)}
+                onConfirmar={() => cambiarModo.mutate("alhabla")}
+              />
+            )}
             <TarjetaDeProveedor
               icono={<SiGooglecalendar className="h-[18px] w-[18px] shrink-0" color="#4285F4" />}
               titulo="Conecta Google Calendar"
@@ -259,5 +326,63 @@ function TarjetaDeProveedor({
         <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
       </span>
     </button>
+  );
+}
+
+/**
+ * Elegir la agenda de Alhabla (PLAN-AGENDA-ALHABLA.md, decisión D1/D6) con
+ * una confirmación en línea: desde ese momento la recepcionista solo ve las
+ * citas que hay en Alhabla, y el dueño tiene que saberlo antes de pulsar.
+ * Como tarjeta (sin calendario conectado) o como botón discreto (con uno).
+ */
+function ElegirAgendaDeAlhabla({
+  variante,
+  confirmando,
+  pendiente,
+  onPedir,
+  onCancelar,
+  onConfirmar,
+}: {
+  variante: "tarjeta" | "boton";
+  confirmando: boolean;
+  pendiente: boolean;
+  onPedir: () => void;
+  onCancelar: () => void;
+  onConfirmar: () => void;
+}) {
+  if (confirmando) {
+    return (
+      <div className="space-y-3 rounded-[20px] border border-aviso-borde bg-aviso-fondo px-4 py-3.5" role="group" aria-label="Confirmar la agenda de Alhabla">
+        <p className="text-[15px] font-bold text-tinta">¿Reservar solo en la agenda de Alhabla?</p>
+        <p className="text-sm leading-6 text-tinta-2">
+          Tu recepcionista solo verá las citas que haya en Alhabla. Si apuntas citas en otro sitio (una libreta, otro programa), tendrás que añadirlas aquí o bloquear esas horas; si no, podría dar una hora que ya tienes ocupada.
+        </p>
+        <div className="flex gap-2">
+          <button type="button" onClick={onConfirmar} disabled={pendiente} className="btn-primary flex-1">
+            {pendiente ? "Guardando…" : "Sí, usar la agenda de Alhabla"}
+          </button>
+          <button type="button" onClick={onCancelar} disabled={pendiente} className="btn-secondary flex-1">
+            Cancelar
+          </button>
+        </div>
+      </div>
+    );
+  }
+  if (variante === "boton") {
+    return (
+      <button type="button" onClick={onPedir} className="btn-secondary w-full">
+        Reservar solo en la agenda de Alhabla
+      </button>
+    );
+  }
+  return (
+    <TarjetaDeProveedor
+      icono={<CalendarDays className="h-[18px] w-[18px] shrink-0 text-morado" aria-hidden="true" />}
+      titulo={`Usar la ${NOMBRE_AGENDA_DE_ALHABLA}`}
+      texto="Sin conectar ningún calendario: tu recepcionista reserva aquí y tú ves y apuntas las citas en el panel o por WhatsApp."
+      accion="Elegir"
+      disabled={false}
+      onClick={onPedir}
+    />
   );
 }

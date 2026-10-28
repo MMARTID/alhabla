@@ -72,8 +72,33 @@ describe("buildOperationalStatus — recepcionista sin calendario", () => {
     expect(item?.value).toBe("Atiende, pero no reserva");
     expect(item?.tone).toBe("warning");
     expect(item?.action).toMatchObject({
-      label: "Conectar agenda",
+      label: "Elegir agenda",
       href: "/agente?section=calendar-section",
+    });
+  });
+
+  // PLAN-AGENDA-ALHABLA.md: en la agenda de Alhabla se reserva sin calendario.
+  it("en la agenda de Alhabla atiende y reserva, y la tarjeta Agenda lo dice", () => {
+    const business = {
+      id: "biz1",
+      name: "Peluquería Ana",
+      active: true,
+      subscriptionStatus: "ACTIVE",
+      callsSuspendedAt: null,
+      activeCalendar: null,
+      modoDeAgenda: "alhabla",
+    } as Business;
+    const items = buildOperationalStatus({
+      business,
+      agentActive: true,
+      phone: undefined,
+      forwardingStatus: null,
+    });
+
+    expect(items.find((item) => item.key === "agent")?.value).toBe("Atendiendo llamadas");
+    expect(items.find((item) => item.key === "calendar")).toMatchObject({
+      value: "Agenda de Alhabla",
+      tone: "ok",
     });
   });
 

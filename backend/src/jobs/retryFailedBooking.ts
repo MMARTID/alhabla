@@ -3,7 +3,8 @@ import { enqueueEmailJob, enqueueRetryBookingJob } from "../lib/cloudTasks.js";
 import { buildCalendarIdempotencyKey } from "../lib/calendarIdempotency.js";
 import { calendarService } from "../modules/calendar/service.js";
 import {
-  conexionOperativa,
+  origenExternoDeLaCita,
+  puedeReservar,
   marcarCalendarioDesconectado,
   origenDeCalendario,
   resolverConexionDeCalendario,
@@ -290,7 +291,7 @@ export async function processRetryFailedBookingJob(
 
   const conexion = resolverConexionDeCalendario(business);
 
-  if (!conexionOperativa(conexion)) {
+  if (!puedeReservar(conexion)) {
     // El negocio sigue sin reconectar el calendario (ver esperarAlCalendario).
     await esperarAlCalendario(data.attempt, cita);
     return;
@@ -579,8 +580,7 @@ export async function processRetryFailedBookingJob(
           smsConsent,
           createdVia,
           externalEventId: (result as { id?: string })?.id ?? undefined,
-          externalCalendarProvider: conexion.provider,
-          externalCalendarId: conexion.calendarId,
+          ...origenExternoDeLaCita(conexion),
         },
         update: {
           programedAt: startDate,
@@ -591,8 +591,7 @@ export async function processRetryFailedBookingJob(
           clientPhone: effectiveClientPhone,
           smsConsent,
           externalEventId: (result as { id?: string })?.id ?? undefined,
-          externalCalendarProvider: conexion.provider,
-          externalCalendarId: conexion.calendarId,
+          ...origenExternoDeLaCita(conexion),
           // Reservar de nuevo tras una cancelación reactiva la fila.
           isCancelled: false,
           cancelledAt: null,

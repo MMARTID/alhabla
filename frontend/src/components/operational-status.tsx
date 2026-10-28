@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { getCalendarState } from "@/lib/calendar-state";
+import { getCalendarState, NOMBRE_AGENDA_DE_ALHABLA } from "@/lib/calendar-state";
 import {
   AlertTriangle,
   Bot,
@@ -77,12 +77,13 @@ export function buildOperationalStatus({
       ? { key: "agent", label: "Recepcionista", icon: Bot, value: "No contesta: sin plan activo", tone: "error", action: { label: "Elegir plan", href: "/ajustes/facturacion" } }
       : !business.active || !agentActive
         ? { key: "agent", label: "Recepcionista", icon: Bot, value: "Inactiva", tone: "warning", action: { label: "Revisar agente", href: "/agente?section=agent-settings" } }
-        : !calendarConnected
-          // Sin calendario operativo la recepcionista contesta, toma nota de
-          // la petición y avisa al dueño, pero no da hora ni reserva
-          // (voiceTools: check_availability y book_appointment). Decir
-          // «Atendiendo llamadas» a secas escondía esa diferencia.
-          ? { key: "agent", label: "Recepcionista", icon: Bot, value: "Atiende, pero no reserva", tone: "warning", action: { label: calendarExpired ? "Reconectar agenda" : "Conectar agenda", href: "/agente?section=calendar-section" } }
+        : !calendarState.bookable
+          // Sin agenda donde reservar (ni la de Alhabla ni un calendario
+          // operativo) la recepcionista contesta, toma nota de la petición y
+          // avisa al dueño, pero no da hora ni reserva (voiceTools:
+          // check_availability y book_appointment). Decir «Atendiendo
+          // llamadas» a secas escondía esa diferencia.
+          ? { key: "agent", label: "Recepcionista", icon: Bot, value: "Atiende, pero no reserva", tone: "warning", action: { label: calendarExpired ? "Reconectar agenda" : "Elegir agenda", href: "/agente?section=calendar-section" } }
           : { key: "agent", label: "Recepcionista", icon: Bot, value: "Atendiendo llamadas", tone: "ok" };
 
   const phoneItem: OperationalStatusItem = phone?.status === "active" && phone.phoneNumber
@@ -103,7 +104,9 @@ export function buildOperationalStatus({
         ? { key: "forwarding", label: "Desvío de llamadas", icon: PhoneForwarded, value: NO_COMPROBADO, tone: "unknown" }
         : { key: "forwarding", label: "Desvío de llamadas", icon: PhoneForwarded, value: "Esperando al número", tone: "waiting" };
 
-  const calendar: OperationalStatusItem = calendarConnected
+  const calendar: OperationalStatusItem = calendarState.alhabla
+    ? { key: "calendar", label: "Agenda", icon: CalendarDays, value: NOMBRE_AGENDA_DE_ALHABLA, tone: "ok" }
+    : calendarConnected
     ? { key: "calendar", label: "Agenda", icon: CalendarDays, value: calendarState.label, tone: "ok" }
     : calendarExpired
       ? { key: "calendar", label: "Agenda", icon: CalendarDays, value: "Conexión caducada", tone: "error", action: { label: "Reconectar", href: "/agente?section=calendar-section" } }

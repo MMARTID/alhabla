@@ -29,7 +29,8 @@ import {
 } from "../calendar/borradoDeEvento.js";
 import {
   SELECT_CONEXION_DE_CALENDARIO,
-  conexionOperativa,
+  origenExternoDeLaCita,
+  puedeReservar,
   marcarCalendarioDesconectado,
   origenDeCalendario,
   resolverConexionDeCalendario,
@@ -384,7 +385,7 @@ async function negocioParaReservar(
     };
   }
   const conexion = resolverConexionDeCalendario(business);
-  if (!conexionOperativa(conexion)) {
+  if (!puedeReservar(conexion)) {
     // Nunca se reserva a ciegas (auditoría de septiembre): sin calendario
     // operativo, la cita se hace desde el panel cuando esté conectado.
     return {
@@ -721,8 +722,7 @@ const anadirCita: AccionDelGestor<AnadirCita> = {
               smsConsent: false,
               createdVia: "owner_chat",
               externalEventId: eventoCreado ?? undefined,
-              externalCalendarProvider: conexion.provider,
-              externalCalendarId: conexion.calendarId,
+              ...origenExternoDeLaCita(conexion),
             },
             update: {
               programedAt: start,
@@ -732,8 +732,7 @@ const anadirCita: AccionDelGestor<AnadirCita> = {
               clientName,
               clientPhone: params.telefono ?? null,
               externalEventId: eventoCreado ?? undefined,
-              externalCalendarProvider: conexion.provider,
-              externalCalendarId: conexion.calendarId,
+              ...origenExternoDeLaCita(conexion),
               isCancelled: false,
               cancelledAt: null,
               cancelledBy: null,
@@ -1073,8 +1072,7 @@ export async function moverReserva(input: {
           programedAt: start,
           professionalId: asignado?.id ?? null,
           externalEventId: eventoNuevo ?? null,
-          externalCalendarProvider: conexion.provider,
-          externalCalendarId: conexion.calendarId,
+          ...origenExternoDeLaCita(conexion),
           // El cliente aún no ha visto la hora nueva.
           confirmedByClientAt: null,
         },
