@@ -51,9 +51,9 @@ export default function IntegracionesPage() {
             "No hay integración directa con esos programas. Si sincronizan tus citas con Google Calendar, Outlook o iCloud, la recepcionista las ve como horas ocupadas y no te monta dos citas a la vez. Las citas que reserva Alhabla entran en tu calendario, no en esos programas.",
         },
         {
-          question: "¿Qué pasa si se desconecta el calendario?",
+          question: "¿Qué pasa si no tengo el calendario conectado o se desconecta?",
           answer:
-            "Si tu proveedor deja de aceptar el permiso (por ejemplo, porque cambiaste la contraseña), te avisamos por WhatsApp y el panel te pide reconectar. Mientras tanto la recepcionista no da horas que no puede comprobar: prefiere no reservar a reservar a ciegas.",
+            "La recepcionista sigue atendiendo las llamadas, pero no reserva: toma nota de lo que pide el cliente para que se lo confirmes tú. Si tu proveedor deja de aceptar el permiso (por ejemplo, porque cambiaste la contraseña), te avisamos por WhatsApp y el panel te pide reconectar. Puedes conectar Google, Outlook o iCloud en cualquier momento desde el panel.",
         },
         {
           question: "¿Hace falta un técnico para conectarlo?",
