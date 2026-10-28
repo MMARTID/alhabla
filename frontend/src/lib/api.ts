@@ -24,6 +24,7 @@ import type {
   ForwardingCheck,
   PaginaDeLlamadas,
   ResultadoDeCita,
+  ResultadoDeNuevaCita,
   ResultadosDeBusqueda,
   PhoneNumberInfo,
   PlanId,
@@ -222,6 +223,58 @@ export async function moverCita(
 export async function cancelarCita(id: string) {
   const { data } = await api.post<ResultadoDeCita>(
     `/business/me/bookings/${encodeURIComponent(id)}/cancelar`
+  );
+  return data;
+}
+
+/** «Nueva cita» desde la agenda (PLAN-AGENDA-ALHABLA.md, fase 2): la misma
+ * acción que «añadir_cita» del Gestor. Con `soloComprobar` solo valida el
+ * hueco. `fechaHora` en hora del negocio. */
+export async function crearCita(cuerpo: {
+  cliente: string;
+  telefono?: string;
+  fechaHora: string;
+  servicios: string[];
+  profesionalId?: string;
+  duracionMinutos?: number;
+  soloComprobar?: boolean;
+}) {
+  const { data } = await api.post<ResultadoDeNuevaCita | { ok: true; descripcion: string }>(
+    "/business/me/bookings",
+    cuerpo
+  );
+  return data;
+}
+
+/** «Bloquear horas» de un día desde la agenda («bloquear_franja» del Gestor). */
+export async function bloquearHoras(cuerpo: {
+  fecha: string;
+  desde: string;
+  hasta: string;
+  motivo?: string;
+  soloComprobar?: boolean;
+}) {
+  const { data } = await api.post<{ ok: true; mensaje?: string; descripcion?: string }>(
+    "/business/me/bloqueos",
+    cuerpo
+  );
+  return data;
+}
+
+/** «Marcar ausencia» de alguien del equipo desde la agenda («marcar_ausencia»
+ * del Gestor). Sin horas, el día entero. */
+export async function marcarAusencia(cuerpo: {
+  profesionalId: string;
+  desde: string;
+  hasta?: string;
+  horaInicio?: string;
+  horaFin?: string;
+  motivo?: string;
+  soloComprobar?: boolean;
+}) {
+  const { data } = await api.post<{ ok: true; mensaje?: string; descripcion?: string }>(
+    "/business/me/absences",
+    cuerpo
   );
   return data;
 }

@@ -825,6 +825,13 @@ export type AusenciaDelEquipo = {
   createdVia: string | null;
 };
 
+/** Lo que vuelve al apuntar una cita desde la agenda («Nueva cita»). */
+export type ResultadoDeNuevaCita = {
+  ok: true;
+  mensaje: string;
+  cita: { id: string; programedAt: string; professional: { id: string; name: string } | null } | null;
+};
+
 /** Lo que vuelve al mover o cancelar una cita desde la agenda. */
 export type ResultadoDeCita = {
   ok: true;

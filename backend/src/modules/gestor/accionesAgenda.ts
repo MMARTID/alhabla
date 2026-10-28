@@ -701,7 +701,10 @@ const anadirCita: AccionDelGestor<AnadirCita> = {
               endedAt: now,
               durationSecs: 0,
               costCents: 0,
-              summary: "Cita apuntada por el dueño desde el chat del asistente",
+              summary:
+                meta.origen === "panel"
+                  ? "Cita apuntada por el dueño desde la agenda del panel"
+                  : "Cita apuntada por el dueño desde el chat del asistente",
             },
             update: {},
             select: { id: true },
@@ -720,7 +723,9 @@ const anadirCita: AccionDelGestor<AnadirCita> = {
               // El dueño decide después si se le avisa («¿Le mando la
               // confirmación?»): hasta entonces no hay consentimiento.
               smsConsent: false,
-              createdVia: "owner_chat",
+              // «Nueva cita» del panel (PLAN-AGENDA-ALHABLA.md, fase 2) o el
+              // Gestor por WhatsApp: misma acción, distinto origen.
+              createdVia: meta.origen === "panel" ? "owner_panel" : "owner_chat",
               externalEventId: eventoCreado ?? undefined,
               ...origenExternoDeLaCita(conexion),
             },
@@ -779,7 +784,7 @@ const anadirCita: AccionDelGestor<AnadirCita> = {
       const con = asignado ? ` con ${asignado.name}` : "";
       return {
         ok: true,
-        mensaje: `Hecho: ${clientName} queda apuntado el ${cuando}, ${listar(serviceNames)}${con}. Ya está en tu calendario.`,
+        mensaje: `Hecho: ${clientName} queda apuntado el ${cuando}, ${listar(serviceNames)}${con}. ${conexion.agendaPropia ? "Ya está en tu agenda." : "Ya está en tu calendario."}`,
         nota: `Cita ${bookingId} creada: ${clientName}, ${cuando}, ${listar(serviceNames)}${con}${params.telefono ? `, móvil ${params.telefono}` : ", sin móvil"}.`,
         siguiente: params.telefono
           ? {

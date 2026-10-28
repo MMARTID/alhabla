@@ -221,7 +221,10 @@ export function DetalleDeCita({
 
 /** Las horas de un día en pasos de 15 minutos dentro de sus tramos
  * abiertos, sin pasarse del cierre con la duración de la cita. */
-function horasPosibles(horario: BusinessSchedule | null, dia: string, duracion: number) {
+/** Horas de inicio posibles (pasos de 15 min dentro del horario del día) para
+ * una cita de `duracion`. Sin horario conocido, de 8:00 a 21:00. La usan
+ * mover (aquí) y «Nueva cita» (components/agenda/nueva-cita.tsx). */
+export function horasPosibles(horario: BusinessSchedule | null, dia: string, duracion: number) {
   const tramos = tramosDelDia(horario, dia);
   if (tramos === null) {
     return Array.from({ length: (21 - 8) * 4 }, (_, indice) => horaDeMinutos(8 * 60 + indice * 15));

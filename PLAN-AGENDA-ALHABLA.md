@@ -1,6 +1,6 @@
 # Plan: Agenda de Alhabla (reservar sin calendario externo)
 
-Estado: **en curso** (28-10-2026; fases 0 y 1 hechas). Origen:
+Estado: **en curso** (28-10-2026; fases 0, 1 y 2 hechas). Origen:
 `docs/auditorias/2026-10-28-auditoria-de-producto.md` (hallazgo 2 y §3). Revisado contra el código el
 28-10 (PR de la fase 0): las correcciones van marcadas con **[rev]**.
 
@@ -193,7 +193,18 @@ la prueba de extremo a extremo en dev tras el despliegue (la migración la aplic
   - un negocio `externo` con el calendario caducado sigue sin reservar;
   - un negocio `alhabla` nunca llama a un adaptador de calendario.
 
-### Fase 2: crear desde el panel (2–3 días; «Nueva cita» y «Bloquear» entran en el MVP)
+### Fase 2: crear desde el panel — HECHA (28-10), incluida la ausencia
+
+**Cómo quedó (resumen de la PR):** tres rutas en `bookings/citasDelPanel.ts` que reutilizan las
+acciones del Gestor con `meta.origen = "panel"` (`MetaDeEjecucion` en `gestor/acciones.ts`):
+`POST /business/me/bookings` → `añadir_cita` (la Call sintética lleva el mismo prefijo que la del
+Gestor y la cita `createdVia: "owner_panel"`), `POST /business/me/bloqueos` → `bloquear_franja` y
+`POST /business/me/absences` → `marcar_ausencia`; todas con `soloComprobar`. En la app, un formulario
+compartido (`components/agenda/nueva-cita.tsx`) con tres pestañas (Nueva cita, Bloquear horas,
+Ausencia) que abre el botón «Nueva cita» de la agenda de escritorio (diálogo) y el «+» de la móvil
+(hoja inferior), solo cuando `bookable`; el hueco se comprueba antes de dejar apuntar, como al mover.
+**Fuera de esta entrega:** crear pulsando un hueco vacío de la cuadrícula (la columna del día no
+expone el clic en el fondo; queda como mejora) y el aviso al cliente desde «Nueva cita» (D4).
 
 Sin «Nueva cita», el modo `alhabla` acaba en dobles reservas: el dueño necesita apuntar lo que entra
 por otros canales.
