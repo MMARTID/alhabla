@@ -255,7 +255,9 @@ export function AgendaEscritorio({ business }: { business: Business }) {
                 </span>
                 <span className="flex-1" />
                 <span>
-                  Solo las citas reservadas con Alhabla.{calendario.connected ? ` El resto sigue en ${calendario.label}.` : ""}
+                  {calendario.alhabla
+                    ? "Esta es tu agenda: aquí están todas las citas."
+                    : `Solo las citas reservadas con Alhabla.${calendario.connected ? ` El resto sigue en ${calendario.label}.` : ""}`}
                 </span>
               </>
             )}
@@ -277,7 +279,7 @@ export function AgendaEscritorio({ business }: { business: Business }) {
               onAbrir={abrir}
               onElegirDia={(destino) => actualizar({ dia: destino === hoy ? null : destino, vista: "dia" })}
               onSoltar={
-                calendario.connected
+                calendario.bookable
                   ? (cita, destino, minuto) => {
                       if (destino < hoy || (destino === hoy && minuto <= minutosDelDia(ahora, timeZone))) {
                         avisar("Esa hora ya ha pasado: elige un hueco de hoy en adelante.", "error");

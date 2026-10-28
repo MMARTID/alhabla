@@ -6,7 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { BookOpenText, Bot, CalendarClock, CalendarDays, Layers, ScissorsLineDashed, UserRoundCheck } from "lucide-react";
 import { getBookingSettings, getCatalogoDeIdiomas } from "@/lib/api";
 import { ajustePorSeccion } from "@/lib/agent-configuration";
-import { getCalendarState } from "@/lib/calendar-state";
+import { getCalendarState, NOMBRE_AGENDA_DE_ALHABLA } from "@/lib/calendar-state";
 import { resumenDeHorario } from "@/lib/horario";
 import type { Business } from "@/lib/types";
 import { DEFAULT_AGENT_SETTINGS } from "@/lib/agent-settings";
@@ -117,13 +117,15 @@ export function AgenteMovil({ business }: { business: Business }) {
           icono={CalendarDays}
           titulo="Calendario"
           resumen={
-            calendario.connected
-              ? `${calendario.label}${calendario.accountEmail ? ` · ${calendario.accountEmail}` : ""}`
-              : calendario.expired
-                ? "Conexión caducada"
-                : "Sin conectar"
+            calendario.alhabla
+              ? NOMBRE_AGENDA_DE_ALHABLA
+              : calendario.connected
+                ? `${calendario.label}${calendario.accountEmail ? ` · ${calendario.accountEmail}` : ""}`
+                : calendario.expired
+                  ? "Conexión caducada"
+                  : "Sin conectar"
           }
-          pendiente={!calendario.connected}
+          pendiente={!calendario.bookable}
         />
         <FilaDeAjuste
           href="/agente/informacion"
