@@ -3,8 +3,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { CalendarDays, CalendarOff, CalendarRange, Check, ChevronLeft, ChevronRight, ExternalLink, LoaderCircle, Phone, TriangleAlert } from "lucide-react";
+import { CalendarDays, CalendarOff, CalendarRange, Check, ChevronLeft, ChevronRight, ExternalLink, LoaderCircle, Phone, Plus, TriangleAlert } from "lucide-react";
 import { getAgenda, getBookingSettings, moverCita } from "@/lib/api";
+import { FormularioDeCreacion } from "@/components/agenda/nueva-cita";
 import { textoDeAusenciaEnElDia, tramoDeAusenciaEnElDia } from "@/lib/ausencias";
 import { formatPhoneLocal, formatPrice } from "@/lib/format";
 import {
@@ -152,6 +153,9 @@ export function AgendaEscritorio({ business }: { business: Business }) {
   }, [citaId, actualizar]);
 
   const [soltada, setSoltada] = useState<{ cita: AgendaBooking; dia: string; minuto: number } | null>(null);
+  // «Nueva cita» / «Bloquear horas» / «Ausencia» (PLAN-AGENDA-ALHABLA.md,
+  // fase 2): el diálogo abre en el día que se está mirando.
+  const [creando, setCreando] = useState(false);
   const abrir = (cita: AgendaBooking) => actualizar({ cita: cita.id === citaId ? null : cita.id });
 
   const mover = (cita: AgendaBooking, datos: { fechaHora: string; profesionalId?: string }) =>
@@ -208,6 +212,12 @@ export function AgendaEscritorio({ business }: { business: Business }) {
           etiqueta="Cómo ver la agenda"
         />
         <span className="flex-1" />
+        {calendario.bookable ? (
+          <button type="button" onClick={() => setCreando(true)} className="btn-primary h-9 shrink-0 px-3.5 text-sm">
+            <Plus className="h-4 w-4" aria-hidden="true" />
+            Nueva cita
+          </button>
+        ) : null}
         {profesionales.length > 1 ? (
           <div className="flex flex-wrap items-center gap-1.5" role="radiogroup" aria-label="Profesional">
             {[{ id: null, name: "Todos" }, ...profesionales].map((profesional) => {
@@ -329,6 +339,25 @@ export function AgendaEscritorio({ business }: { business: Business }) {
           />
         ) : null}
       </div>
+
+      <Dialogo abierto={creando} onCerrar={() => setCreando(false)} titulo="Apuntar en la agenda" ancho="lg">
+        {creando ? (
+          <FormularioDeCreacion
+            timeZone={timeZone}
+            ahora={ahora}
+            horario={horario}
+            profesionales={ajustes.data?.professionals ?? []}
+            servicios={ajustes.data?.services ?? []}
+            inicial={{ dia, profesionalId: profesionalId ?? undefined }}
+            onCancelar={() => setCreando(false)}
+            onHecho={(hecho) => {
+              setCreando(false);
+              avisar(hecho.mensaje);
+              actualizar({ dia: hecho.dia === hoy ? null : hecho.dia, cita: hecho.citaId ?? null });
+            }}
+          />
+        ) : null}
+      </Dialogo>
 
       {soltada ? (
         <ConfirmarMovimiento

@@ -24,6 +24,7 @@ import type {
   ForwardingCheck,
   PaginaDeLlamadas,
   ResultadoDeCita,
+  ResultadoDeNuevaCita,
   ResultadosDeBusqueda,
   PhoneNumberInfo,
   PlanId,
@@ -226,6 +227,58 @@ export async function cancelarCita(id: string) {
   return data;
 }
 
+/** «Nueva cita» desde la agenda (PLAN-AGENDA-ALHABLA.md, fase 2): la misma
+ * acción que «añadir_cita» del Gestor. Con `soloComprobar` solo valida el
+ * hueco. `fechaHora` en hora del negocio. */
+export async function crearCita(cuerpo: {
+  cliente: string;
+  telefono?: string;
+  fechaHora: string;
+  servicios: string[];
+  profesionalId?: string;
+  duracionMinutos?: number;
+  soloComprobar?: boolean;
+}) {
+  const { data } = await api.post<ResultadoDeNuevaCita | { ok: true; descripcion: string }>(
+    "/business/me/bookings",
+    cuerpo
+  );
+  return data;
+}
+
+/** «Bloquear horas» de un día desde la agenda («bloquear_franja» del Gestor). */
+export async function bloquearHoras(cuerpo: {
+  fecha: string;
+  desde: string;
+  hasta: string;
+  motivo?: string;
+  soloComprobar?: boolean;
+}) {
+  const { data } = await api.post<{ ok: true; mensaje?: string; descripcion?: string }>(
+    "/business/me/bloqueos",
+    cuerpo
+  );
+  return data;
+}
+
+/** «Marcar ausencia» de alguien del equipo desde la agenda («marcar_ausencia»
+ * del Gestor). Sin horas, el día entero. */
+export async function marcarAusencia(cuerpo: {
+  profesionalId: string;
+  desde: string;
+  hasta?: string;
+  horaInicio?: string;
+  horaFin?: string;
+  motivo?: string;
+  soloComprobar?: boolean;
+}) {
+  const { data } = await api.post<{ ok: true; mensaje?: string; descripcion?: string }>(
+    "/business/me/absences",
+    cuerpo
+  );
+  return data;
+}
+
 /** «Avisar por WhatsApp» del cambio o la cancelación de una cita. */
 export async function avisarClienteDeCita(id: string, tipo: "cambio" | "cancelacion") {
   const { data } = await api.post<{ ok: true; mensaje: string }>(
@@ -419,6 +472,26 @@ export async function selectCalendar(calendarId: string) {
  * operativa (409 `CALENDAR_NOT_OPERATIVE` si no la hay). */
 export async function cambiarModoDeAgenda(modo: "alhabla" | "externo") {
   const { data } = await api.patch<Business>("/business/me/agenda/modo", { modo });
+  return data;
+}
+
+/** Feed iCal de solo lectura de la agenda (PLAN-AGENDA-ALHABLA.md, fase 3):
+ * si está activo y sus enlaces (https para copiar, webcal para el iPhone). */
+export type FeedDeAgenda = { activo: boolean; url: string | null; webcal: string | null };
+
+export async function getFeedDeAgenda() {
+  const { data } = await api.get<FeedDeAgenda>("/business/me/agenda/feed");
+  return data;
+}
+
+/** Activa el enlace (o lo cambia con `renovar`: el anterior deja de valer). */
+export async function activarFeedDeAgenda(renovar = false) {
+  const { data } = await api.post<FeedDeAgenda>("/business/me/agenda/feed", { renovar });
+  return data;
+}
+
+export async function desactivarFeedDeAgenda() {
+  const { data } = await api.delete<FeedDeAgenda>("/business/me/agenda/feed");
   return data;
 }
 

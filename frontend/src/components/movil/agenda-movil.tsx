@@ -1,11 +1,14 @@
 "use client";
 
-import { Fragment } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { CalendarDays, ChevronLeft, ChevronRight, ExternalLink, Phone, Users } from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight, ExternalLink, Phone, Plus, Users } from "lucide-react";
 import { getAgenda, getBookingSettings } from "@/lib/api";
+import { horarioDelNegocio } from "@/lib/agenda-escritorio";
 import { getCalendarState } from "@/lib/calendar-state";
+import { FormularioDeCreacion } from "@/components/agenda/nueva-cita";
+import { HojaInferior } from "@/components/movil/hoja-inferior";
 import { formatPhoneLocal, formatPrice } from "@/lib/format";
 import {
   INICIALES_DE_DIA,
@@ -65,6 +68,10 @@ export function AgendaMovil({ business }: { business: Business }) {
   const ahora = useAhora();
   const hoy = claveDeDia(ahora, timeZone);
   const { aviso, avisar, cerrar } = useAviso();
+  // «Nueva cita» / «Bloquear horas» / «Ausencia» (PLAN-AGENDA-ALHABLA.md,
+  // fase 2) en una hoja, abierta en el día que se está mirando.
+  const [creando, setCreando] = useState(false);
+  const horario = useMemo(() => horarioDelNegocio(business.schedule), [business.schedule]);
 
   // El día elegido vive en la URL (?dia=): «Ver en la agenda» desde una
   // llamada abre directamente ese día, y atrás vuelve al anterior.
@@ -120,6 +127,11 @@ export function AgendaMovil({ business }: { business: Business }) {
         accion={
           <>
             <BotonDeBuscar />
+            {calendario.bookable ? (
+              <button type="button" onClick={() => setCreando(true)} aria-label="Nueva cita" className={CLASES_BOTON_REDONDO}>
+                <Plus className="h-5 w-5" aria-hidden="true" />
+              </button>
+            ) : null}
             {calendario.connected ? (
               <a
                 href={calendario.webUrl}
@@ -256,6 +268,24 @@ export function AgendaMovil({ business }: { business: Business }) {
         </>
       )}
 
+      <HojaInferior abierta={creando} onCerrar={() => setCreando(false)} titulo="Apuntar en la agenda">
+        {creando ? (
+          <FormularioDeCreacion
+            timeZone={timeZone}
+            ahora={ahora}
+            horario={horario}
+            profesionales={ajustes.data?.professionals ?? []}
+            servicios={ajustes.data?.services ?? []}
+            inicial={{ dia: elegido, profesionalId: profesionalId ?? undefined }}
+            onCancelar={() => setCreando(false)}
+            onHecho={(hecho) => {
+              setCreando(false);
+              avisar(hecho.mensaje);
+              actualizar({ dia: hecho.dia === hoy ? null : hecho.dia, cita: hecho.citaId ?? null });
+            }}
+          />
+        ) : null}
+      </HojaInferior>
       <HojaCita
         cita={citaAbierta}
         business={business}
