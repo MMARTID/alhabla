@@ -270,6 +270,30 @@ describe("GET /business/me/onboarding", () => {
     expect(body.isActive).toBe(false);
   });
 
+  // Hallazgo 5 de docs/auditorias/2026-10-28-auditoria-de-producto.md: los
+  // chats de WhatsApp y las acciones del Gestor crean filas Call sintéticas
+  // (voiceProvider «whatsapp») que daban el desvío por activo.
+  it("solo cuenta como prueba del desvío una llamada de voz, no los chats ni el Gestor", async () => {
+    mockedBusinessFindUnique.mockResolvedValue(businessConfigurado());
+    // Solo hay filas sintéticas: la consulta filtrada no encuentra nada.
+    mockedCallFindFirst.mockResolvedValue(null);
+
+    const response = await fastify.inject({
+      method: "GET",
+      url: "/business/me/onboarding",
+    });
+
+    expect(mockedCallFindFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { businessId: "biz_1", voiceProvider: { not: "whatsapp" } },
+      })
+    );
+    const body = response.json();
+    expect(body.steps.forwarding).toBe(false);
+    expect(body.forwarding.status).toBe("ready");
+    expect(body.forwarding.firstCallAt).toBeNull();
+  });
+
   it("acepta la confirmación manual del negocio aunque no haya llamadas todavía", async () => {
     mockedStateUpsert.mockResolvedValue({
       id: "onb_1",

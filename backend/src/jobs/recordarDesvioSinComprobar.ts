@@ -1,6 +1,7 @@
 import { prisma } from "../lib/prisma.js";
 import { errorMessage } from "../lib/logUtils.js";
 import { esLineaDeClientesEspanola } from "../lib/phone.js";
+import { SOLO_LLAMADAS_DE_VOZ } from "../lib/llamadasDeVoz.js";
 import {
   alertarDesvioComprobado,
   alertarDesvioSinComprobar,
@@ -11,10 +12,6 @@ const HORA_MS = 60 * 60 * 1000;
 export const DESDE_HORAS = 24;
 /** …y como muy tarde a las 48 h: pasado eso ya no es «el día 1». */
 export const HASTA_HORAS = 48;
-
-/** `voiceProvider` de las filas Call sintéticas del chat de WhatsApp: no
- * son llamadas y no prueban ningún desvío. */
-const PROVEEDOR_WHATSAPP = "whatsapp";
 
 /** `Business.phone` nace con este prefijo en el registro y lo conserva hasta
  * que el dueño guarda su línea de clientes (auth/routes.ts). */
@@ -98,17 +95,10 @@ export async function recordarDesvioSinComprobarJob(
               },
             },
             // Variante negativa: sin comprobar y sin ninguna llamada real
-            // (las Call sintéticas del chat de WhatsApp no pasan por el
-            // desvío).
+            // (las Call sintéticas del chat de WhatsApp y del Gestor no
+            // pasan por el desvío; lib/llamadasDeVoz.ts).
             {
-              AND: [
-                sinComprobar,
-                {
-                  calls: {
-                    none: { voiceProvider: { not: PROVEEDOR_WHATSAPP } },
-                  },
-                },
-              ],
+              AND: [sinComprobar, { calls: { none: SOLO_LLAMADAS_DE_VOZ } }],
             },
           ],
         },

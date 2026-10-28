@@ -2,6 +2,7 @@
 
 import { FastifyInstance, FastifyRequest } from "fastify";
 import { prisma } from "../../lib/prisma.js";
+import { SOLO_LLAMADAS_DE_VOZ } from "../../lib/llamadasDeVoz.js";
 import { BusinessScheduleSchema } from "../../lib/businessSchedule.js";
 import {
   marcadaComoConectada,
@@ -140,9 +141,11 @@ export async function onboardingRoutes(fastify: FastifyInstance) {
 
         // La primera llamada recibida es la única prueba real de que el
         // desvío está activo: nada en la API de Telnyx dice si el negocio lo
-        // marcó en su terminal.
+        // marcó en su terminal. Solo las de voz: los chats de WhatsApp y las
+        // acciones del Gestor también crean filas Call y no pasan por el
+        // desvío (el mismo filtro que el mensaje del día 1).
         const firstCall = await prisma.call.findFirst({
-          where: { businessId },
+          where: { businessId, ...SOLO_LLAMADAS_DE_VOZ },
           orderBy: { startedAt: "asc" },
           select: { startedAt: true },
         });
