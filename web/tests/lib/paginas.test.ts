@@ -60,11 +60,17 @@ describe("registro de páginas indexables", () => {
     }
   });
 
-  it("el sitemap lista todas las páginas del registro y sus imágenes propias", () => {
+  it("el sitemap lista las páginas del registro (menos las comparativas) y sus imágenes propias", () => {
     const entradas = sitemap();
     const urls = entradas.map((e) => new URL(e.url).pathname);
-    for (const { ruta } of PAGINAS) expect(urls).toContain(ruta);
-    for (const p of PAGINAS.filter((pagina) => pagina.imagenes?.length)) {
+    // Las comparativas siguen en el registro (índice, enlaces) pero salieron
+    // del sitemap el 2026-10-28.
+    const enSitemap = PAGINAS.filter((pagina) => pagina.seccion !== "comparativas");
+    for (const { ruta } of enSitemap) expect(urls).toContain(ruta);
+    for (const { ruta } of PAGINAS.filter((pagina) => pagina.seccion === "comparativas")) {
+      expect(urls).not.toContain(ruta);
+    }
+    for (const p of enSitemap.filter((pagina) => pagina.imagenes?.length)) {
       const entrada = entradas.find((e) => new URL(e.url).pathname === p.ruta);
       expect(entrada?.images, p.ruta).toHaveLength(p.imagenes!.length);
     }

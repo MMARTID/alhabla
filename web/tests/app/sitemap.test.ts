@@ -71,4 +71,8 @@ describe("sitemap", () => {
     expect(urls.some((u) => /\/(peluqueria|barberia|centro-de-estetica|salon-de-unas|fisioterapia)\/[a-z-]+$/.test(u))).toBe(false);
     expect(urls).toContain("https://alhabla.ai/recepcionista-ia-en-catalan");
   });
+
+  it("no lista las comparativas", () => {
+    expect(sitemap().some((e) => e.url.includes("/comparativa"))).toBe(false);
+  });
 });
