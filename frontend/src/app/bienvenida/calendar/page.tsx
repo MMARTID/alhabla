@@ -3,8 +3,9 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PasoDelAlta } from "@/components/paso-del-alta";
-import { CalendarDays, ChevronRight, LoaderCircle } from "lucide-react";
-import { SiGooglecalendar } from "@icons-pack/react-simple-icons";
+import { CalendarDays, ChevronDown, ChevronRight, LoaderCircle } from "lucide-react";
+import { SiApple, SiGooglecalendar } from "@icons-pack/react-simple-icons";
+import { AppleCalendarConnect } from "@/components/apple-calendar-connect";
 import { BetaPill } from "@/components/beta-pill";
 import { MicrosoftLogo } from "@/components/brand-icons";
 import { getGoogleCalendarAuthUrl, getMicrosoftCalendarAuthUrl } from "@/lib/api";
@@ -23,6 +24,9 @@ export default function RegisterBusinessCalendarPage() {
   // al pago, y mientras tanto no se vuelven a ofrecer las opciones de
   // conectar, que parecían decir que no había funcionado.
   const [redirigiendo, setRedirigiendo] = useState(false);
+  // iCloud no sale de la página: Apple ID + contraseña de aplicación en un
+  // formulario que se despliega bajo su tarjeta (el mismo que en /agente).
+  const [formularioApple, setFormularioApple] = useState(false);
 
   useEffect(() => {
     const token =
@@ -161,6 +165,37 @@ export default function RegisterBusinessCalendarPage() {
               <ChevronRight className="h-5 w-5 text-muted" aria-hidden="true" />
             )}
           </button>
+
+          <button
+            type="button"
+            onClick={() => setFormularioApple((actual) => !actual)}
+            disabled={loading !== null}
+            aria-expanded={formularioApple}
+            className="relative flex w-full items-center gap-4 rounded-2xl border border-linea bg-superficie p-5 text-left transition duration-200 hover:border-morado hover:bg-relleno focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-morado focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <BetaPill />
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-linea bg-superficie">
+              <SiApple className="h-6 w-6 text-tinta" color="currentColor" />
+            </div>
+            <div className="flex-1">
+              <p className="font-semibold text-tinta">Apple / iCloud</p>
+              <p className="text-sm text-muted">Si llevas la agenda en el iPhone, conéctala con tu Apple ID y una contraseña de aplicación.</p>
+            </div>
+            {formularioApple ? (
+              <ChevronDown className="h-5 w-5 text-muted" aria-hidden="true" />
+            ) : (
+              <ChevronRight className="h-5 w-5 text-muted" aria-hidden="true" />
+            )}
+          </button>
+          {formularioApple ? (
+            <AppleCalendarConnect
+              onCancel={() => setFormularioApple(false)}
+              onConnected={() => {
+                setRedirigiendo(true);
+                redirectToFinalStep();
+              }}
+            />
+          ) : null}
         </div>
 
         {error && <p role="alert" className="mt-4 text-sm text-error">{error}</p>}
@@ -174,6 +209,13 @@ export default function RegisterBusinessCalendarPage() {
           >
             Configurar calendario después
           </button>
+          {/* Sin calendario la recepcionista contesta y toma nota, pero no da
+              hora ni reserva (voiceTools, fase 0 de PLAN-AGENDA-ALHABLA.md).
+              Quien se lo salte tiene que saberlo antes, no en la primera
+              llamada. */}
+          <p className="text-center text-xs leading-5 text-muted">
+            Sin calendario, tu recepcionista atiende y toma nota de las peticiones, pero no reserva citas. Podrás conectarlo después desde el panel.
+          </p>
         </div>
         </>
         )}

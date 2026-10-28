@@ -28,6 +28,7 @@ import {
   type CredencialesActivas,
   type CredencialesDe,
 } from "../../adapters/calendar/CalendarProvider.js";
+import { codigoDeReconexion } from "../../adapters/calendar/errors.js";
 import type { CalendarOrigin } from "../../lib/availability.js";
 
 /** Lo que hace falta leer de Business para resolver la conexión. Se usa con
@@ -194,6 +195,36 @@ export const usaCalendarioExterno = (c: ConexionResuelta): boolean =>
 /** onboarding/routes.ts: solo el flag. */
 export const marcadaComoConectada = (c: ConexionResuelta): boolean =>
   c.marcadaConectada === true;
+/** El negocio NUNCA ha tenido un calendario conectado: ninguna fila con
+ * credenciales ni rastro de una conexión anterior (desconexión o error).
+ * Distingue «no tienes calendario» de «hay que reconectarlo», que son dos
+ * mensajes distintos para el cliente y para el dueño
+ * (PLAN-AGENDA-ALHABLA.md, fase 0). Una fila de Outlook/Apple a medias
+ * (cuenta enlazada, calendario sin elegir) cuenta como «ya empezó a
+ * conectarlo», porque tiene credenciales. */
+export const nuncaConectoCalendario = (
+  business: FilaDeConexionDeCalendario | null | undefined
+): boolean =>
+  !(business?.calendarConnections ?? []).some(
+    (fila) =>
+      (fila.credentials !== null && fila.credentials !== undefined) ||
+      fila.connected === true ||
+      Boolean(fila.disconnectedAt) ||
+      Boolean(fila.lastError)
+  );
+
+/** Código del fallo de reserva cuando no hay calendario operativo:
+ * `CALENDAR_NOT_CONNECTED` si nunca lo hubo (avisosNegocio.motivoDeFallo lo
+ * traduce a «no tienes ningún calendario conectado») y el de reconexión del
+ * proveedor si lo hubo y caducó. */
+export const codigoDeCalendarioNoOperativo = (
+  business: FilaDeConexionDeCalendario | null | undefined,
+  c: ConexionResuelta
+): string =>
+  nuncaConectoCalendario(business)
+    ? "CALENDAR_NOT_CONNECTED"
+    : codigoDeReconexion(c.provider);
+
 /** calendarOriginForBusiness de voiceTools y el job. */
 export const origenDeCalendario = (
   c: ConexionResuelta

@@ -4278,3 +4278,159 @@ describe("executeVoiceTool — entrada de la caché de voz con el calendario sin
     }
   });
 });
+
+// PLAN-AGENDA-ALHABLA.md, fase 0: sin calendario operativo la recepcionista
+// toma nota en vez de dar hora. Antes check_availability comprobaba solo
+// contra Postgres y decía «sí, hay hueco»; el cliente confirmaba y
+// book_appointment fallaba con «el negocio debe reconectar Google Calendar»
+// aunque el negocio jamás hubiera tenido Google.
+describe("executeVoiceTool — negocio sin calendario operativo (toma nota, no reserva)", () => {
+  const sinCalendario = () => buildBusiness({ calendarConnections: [] });
+  const caducado = () =>
+    buildBusiness({
+      calendarConnections: [
+        filaDeConexion("google", {
+          refreshToken: null,
+          connected: false,
+          disconnectedAt: new Date("2026-10-20T10:00:00Z"),
+          lastError: "invalid_grant",
+        }),
+      ],
+    });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockedCheckBusinessHours.mockReturnValue({ success: true, isOpen: true } as any);
+    mockedServiceFindMany.mockResolvedValue([]);
+    mockedProfessionalFindMany.mockResolvedValue([]);
+    mockedProfessionalFindFirst.mockResolvedValue({
+      id: "professional_123",
+      name: "Ana",
+    } as any);
+    mockedCallFindUnique.mockResolvedValue({
+      id: "call_row_1",
+      fromNumber: "+34600999888",
+      businessId: "business_123",
+    } as any);
+    mockedLeadCreate.mockResolvedValue({ id: "lead_1" } as any);
+    mockedCheckAvailability.mockResolvedValue({
+      available: true,
+      message: "Hay disponibilidad.",
+      capacityUsed: 0,
+      capacityTotal: 1,
+      availableProfessionals: [{ id: "professional_123", name: "Ana" }],
+    } as any);
+  });
+
+  it("check_availability no ofrece hora si el negocio nunca conectó un calendario", async () => {
+    mockedBusinessFindUnique.mockResolvedValue(sinCalendario() as any);
+
+    const result = await executeVoiceTool({
+      businessId: "business_123",
+      toolName: "check_availability",
+      callId: "call_123",
+      params: { startDateTime: "2026-08-25T17:00:00+02:00", durationMinutes: 30 },
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.result.available).toBe(false);
+    expect(result.result.code).toBe("CALENDAR_NOT_CONNECTED");
+    expect(result.result.availabilityToken).toBeUndefined();
+    // La instrucción manda la petición a book_appointment, que es quien la
+    // guarda y avisa al dueño; y no se le nombra el calendario al cliente.
+    expect(result.result.message).toContain("book_appointment");
+    expect(result.result.message).toContain("tomas nota");
+    // Ni se consulta la agenda ni se lee ningún calendario.
+    expect(mockedCheckAvailability).not.toHaveBeenCalled();
+    expect(mockedGetBusyIntervals).not.toHaveBeenCalled();
+  });
+
+  it("check_availability tampoco ofrece hora con el calendario caducado, con el código de reconexión", async () => {
+    mockedBusinessFindUnique.mockResolvedValue(caducado() as any);
+
+    const result = await executeVoiceTool({
+      businessId: "business_123",
+      toolName: "check_availability",
+      callId: "call_123",
+      params: { startDateTime: "2026-08-25T17:00:00+02:00", durationMinutes: 30 },
+    });
+
+    expect(result.result.available).toBe(false);
+    expect(result.result.code).toBe("GOOGLE_CALENDAR_RECONNECT_REQUIRED");
+    expect(mockedCheckAvailability).not.toHaveBeenCalled();
+  });
+
+  it("check_availability sigue ofreciendo hora con el calendario conectado", async () => {
+    mockedBusinessFindUnique.mockResolvedValue(buildBusiness() as any);
+    mockedGetBusyIntervals.mockResolvedValue({
+      intervals: [],
+      calendarAvailabilityKnown: true,
+    } as any);
+
+    const result = await executeVoiceTool({
+      businessId: "business_123",
+      toolName: "check_availability",
+      callId: "call_123",
+      params: { startDateTime: "2026-08-25T17:00:00+02:00", durationMinutes: 30 },
+    });
+
+    expect(result.result.available).toBe(true);
+    expect(result.result.availabilityToken).toEqual(expect.any(String));
+  });
+
+  it("book_appointment guarda la petición con CALENDAR_NOT_CONNECTED y no nombra a Google", async () => {
+    mockedBusinessFindUnique.mockResolvedValue(sinCalendario() as any);
+
+    const result = await executeVoiceTool(
+      buildBookAppointmentInput({ callId: "call_vapi_1" })
+    );
+
+    expect(result.success).toBe(true);
+    expect(result.result.success).toBe(false);
+    expect(result.result.code).toBe("CALENDAR_NOT_CONNECTED");
+    expect(result.result.message).toContain("He tomado nota");
+    expect(result.result.message).not.toMatch(/google|outlook|icloud|reconectar/i);
+    expect(mockedBookAppointment).not.toHaveBeenCalled();
+    expect(mockedBookingUpsert).not.toHaveBeenCalled();
+    // El dueño se entera con el motivo real («no tienes ningún calendario
+    // conectado», avisosNegocio.motivoDeFallo), no con «estaba caducado».
+    expect(mockedLeadCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          type: "pending_booking",
+          data: expect.objectContaining({
+            clientName: "María",
+            failureCode: "CALENDAR_NOT_CONNECTED",
+          }),
+        }),
+      })
+    );
+    expect(avisarCitaPendiente).toHaveBeenCalledWith(
+      expect.objectContaining({
+        businessId: "business_123",
+        failureCode: "CALENDAR_NOT_CONNECTED",
+      })
+    );
+  });
+
+  it("book_appointment con el calendario caducado conserva el código de reconexión del proveedor", async () => {
+    mockedBusinessFindUnique.mockResolvedValue(caducado() as any);
+
+    const result = await executeVoiceTool(
+      buildBookAppointmentInput({ callId: "call_vapi_1" })
+    );
+
+    expect(result.result.success).toBe(false);
+    expect(result.result.code).toBe("GOOGLE_CALENDAR_RECONNECT_REQUIRED");
+    expect(result.result.message).not.toMatch(/google/i);
+    expect(mockedLeadCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          data: expect.objectContaining({
+            failureCode: "GOOGLE_CALENDAR_RECONNECT_REQUIRED",
+          }),
+        }),
+      })
+    );
+  });
+});

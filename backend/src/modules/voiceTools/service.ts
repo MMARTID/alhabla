@@ -40,6 +40,7 @@ import {
   ventanaDeLaCita,
 } from "../calendar/borradoDeEvento.js";
 import {
+  codigoDeCalendarioNoOperativo,
   conexionConfirmada,
   conexionOperativa,
   marcarCalendarioDesconectado,
@@ -281,6 +282,19 @@ type BusinessVoiceConfig = FilaDeConexionDeCalendario & {
 /** Lo que oye el cliente cuando el pago del negocio corta las reservas. */
 const MENSAJE_SERVICIO_SUSPENDIDO =
   "No puedo agendar la cita en este momento. Por favor, contacta con el negocio directamente.";
+
+/** Instrucción para la recepcionista cuando el negocio no tiene calendario
+ * operativo: toma nota en vez de dar hora. La petición tiene que acabar en
+ * book_appointment, que es quien la guarda como pendiente y avisa al dueño;
+ * sin esa llamada no queda rastro. No se nombra a Google ni a ningún
+ * calendario: el cliente no tiene por qué saber cómo trabaja el negocio. */
+const MENSAJE_TOMA_NOTA_SIN_CALENDARIO =
+  "Ahora mismo no puedes confirmar ni ofrecer ninguna hora: el negocio no tiene la agenda disponible para reservar. Di al cliente que tomas nota de su petición y que el negocio se pondrá en contacto para confirmarla. Pídele su nombre y un teléfono de contacto y llama a book_appointment con la fecha y hora que pidió, sin availabilityToken: así la petición le llega al negocio. No propongas otras horas ni menciones Google, Outlook ni ningún calendario.";
+
+/** Lo que oye el cliente cuando no hay calendario operativo y la petición se
+ * guarda como pendiente. Vale para «nunca conectado» y para «caducado». */
+const MENSAJE_PETICION_ANOTADA =
+  "He tomado nota de la petición: el negocio se pondrá en contacto para confirmar la cita. No la des por confirmada ni menciones calendarios.";
 
 async function loadBusinessConfig(
   businessId: string
@@ -585,6 +599,34 @@ async function executeCheckAvailability(
     const delCambio = citaCambiada
       ? { replacesBookingId: citaCambiada.bookingId }
       : {};
+
+    // Sin calendario operativo (nunca conectado, o caducado) book_appointment
+    // va a guardar la petición como pendiente en vez de reservar: no se
+    // ofrece ni se confirma una hora que no se va a poder dar. Antes se
+    // comprobaba solo contra Postgres, el cliente oía «sí, hay hueco» y la
+    // reserva fallaba después (PLAN-AGENDA-ALHABLA.md, fase 0).
+    const conexionParaDisponibilidad = resolverConexionDeCalendario(business);
+    if (!conexionOperativa(conexionParaDisponibilidad)) {
+      const code = codigoDeCalendarioNoOperativo(
+        business,
+        conexionParaDisponibilidad
+      );
+      console.warn(
+        `[VoiceTools] ${callLabel} check_availability sin ofrecer horas: el negocio no tiene calendario operativo (${code})`
+      );
+      return {
+        success: true,
+        result: {
+          available: false,
+          code,
+          message: MENSAJE_TOMA_NOTA_SIN_CALENDARIO,
+          cuando: cuandoParaDecir(
+            startDateTime,
+            business.timezone || "Europe/Madrid"
+          ),
+        },
+      };
+    }
 
     // Si la hora pedida no cabe, la alternativa es la más cercana, antes o
     // después (decisión de producto del 2026-10-10), sin bajar de la
@@ -1817,10 +1859,16 @@ async function executeBookAppointment(
     const replacesBookingId = citaCambiada?.bookingId;
 
     if (!hasCalendarConnection) {
-      const reconnectCode = codigoDeReconexion(conexion.provider);
+      // `CALENDAR_NOT_CONNECTED` si el negocio nunca conectó un calendario;
+      // el código de reconexión del proveedor si lo tuvo y caducó. El aviso
+      // al dueño (avisosNegocio.motivoDeFallo) y el panel los distinguen; al
+      // cliente se le dice lo mismo en los dos casos, sin nombrar a Google.
+      const failureCode = codigoDeCalendarioNoOperativo(business, conexion);
       const providerLabel = DESCRIPTORES_DE_PROVEEDOR[conexion.provider].nombre;
       console.warn(
-        `[VoiceTools] ${callLabel} no puede reservar: ${providerLabel} requiere reconexión`
+        failureCode === "CALENDAR_NOT_CONNECTED"
+          ? `[VoiceTools] ${callLabel} no puede reservar: el negocio no tiene ningún calendario conectado; la petición se guarda como pendiente`
+          : `[VoiceTools] ${callLabel} no puede reservar: ${providerLabel} requiere reconexión; la petición se guarda como pendiente`
       );
       await capturePendingBookingLead({
         resolvedCall: call,
@@ -1833,7 +1881,7 @@ async function executeBookAppointment(
         serviceIds: requestedServiceIds,
         professionalId,
         replacesBookingId,
-        failureCode: reconnectCode,
+        failureCode,
         callLabel,
         smsConsent,
         createdVia: canalDeLaTool(callId),
@@ -1842,8 +1890,8 @@ async function executeBookAppointment(
         success: true,
         result: {
           success: false,
-          code: reconnectCode,
-          message: `El negocio debe reconectar ${providerLabel} antes de agendar citas. He tomado nota de tu solicitud para confirmártela en cuanto se resuelva.`,
+          code: failureCode,
+          message: MENSAJE_PETICION_ANOTADA,
         },
       };
     }

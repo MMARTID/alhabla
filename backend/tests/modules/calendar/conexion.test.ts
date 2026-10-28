@@ -8,6 +8,7 @@ import {
 import {
   actualizarCalendarioDeConexion,
   camposDeCalendarioParaElPanel,
+  codigoDeCalendarioNoOperativo,
   conCallbackDeRotacion,
   conexionConfirmada,
   conexionOperativa,
@@ -15,6 +16,7 @@ import {
   guardarConexionDeCalendario,
   marcadaComoConectada,
   marcarCalendarioDesconectado,
+  nuncaConectoCalendario,
   origenDeCalendario,
   persistirCredencialesRotadas,
   resolverConexionDeCalendario,
@@ -1035,5 +1037,77 @@ describe("camposDeCalendarioParaElPanel / serializarBusiness", () => {
       googleCalendarId: "primary",
       outlookCalendarConnected: false,
     });
+  });
+});
+
+// PLAN-AGENDA-ALHABLA.md, fase 0: «no tienes calendario» y «hay que
+// reconectarlo» son dos mensajes distintos para el cliente y para el dueño.
+describe("nuncaConectoCalendario y codigoDeCalendarioNoOperativo", () => {
+  it("sin filas, o con filas sin credenciales ni rastro de conexión, nunca lo conectó", () => {
+    expect(nuncaConectoCalendario(null)).toBe(true);
+    expect(nuncaConectoCalendario({ calendarProvider: null })).toBe(true);
+    expect(
+      nuncaConectoCalendario(
+        negocioConConexiones("google", [
+          filaDeConexion("google", { refreshToken: null, connected: false }),
+        ])
+      )
+    ).toBe(true);
+  });
+
+  it("una conexión revocada (credenciales a null, con disconnectedAt o lastError) cuenta como «la tuvo»", () => {
+    expect(
+      nuncaConectoCalendario(
+        negocioConConexiones("google", [
+          filaDeConexion("google", {
+            refreshToken: null,
+            connected: false,
+            disconnectedAt: new Date("2026-10-20T10:00:00Z"),
+          }),
+        ])
+      )
+    ).toBe(false);
+    expect(
+      nuncaConectoCalendario(
+        negocioConConexiones("google", [
+          filaDeConexion("google", {
+            refreshToken: null,
+            connected: false,
+            lastError: "invalid_grant",
+          }),
+        ])
+      )
+    ).toBe(false);
+  });
+
+  it("un Outlook a medias (credenciales sin calendario elegido) también cuenta como empezado", () => {
+    expect(
+      nuncaConectoCalendario(
+        negocioConConexiones("outlook", [
+          filaDeConexion("outlook", { calendarId: null, connected: false }),
+        ])
+      )
+    ).toBe(false);
+  });
+
+  it("el código es CALENDAR_NOT_CONNECTED si nunca lo hubo y el de reconexión del proveedor si caducó", () => {
+    const nuevo = negocioConConexiones("google", []);
+    expect(
+      codigoDeCalendarioNoOperativo(nuevo, resolverConexionDeCalendario(nuevo))
+    ).toBe("CALENDAR_NOT_CONNECTED");
+
+    const caducado = negocioConConexiones("outlook", [
+      filaDeConexion("outlook", {
+        refreshToken: null,
+        connected: false,
+        disconnectedAt: new Date("2026-10-20T10:00:00Z"),
+      }),
+    ]);
+    expect(
+      codigoDeCalendarioNoOperativo(
+        caducado,
+        resolverConexionDeCalendario(caducado)
+      )
+    ).toBe("OUTLOOK_CALENDAR_RECONNECT_REQUIRED");
   });
 });

@@ -77,7 +77,13 @@ export function buildOperationalStatus({
       ? { key: "agent", label: "Recepcionista", icon: Bot, value: "No contesta: sin plan activo", tone: "error", action: { label: "Elegir plan", href: "/ajustes/facturacion" } }
       : !business.active || !agentActive
         ? { key: "agent", label: "Recepcionista", icon: Bot, value: "Inactiva", tone: "warning", action: { label: "Revisar agente", href: "/agente?section=agent-settings" } }
-        : { key: "agent", label: "Recepcionista", icon: Bot, value: "Atendiendo llamadas", tone: "ok" };
+        : !calendarConnected
+          // Sin calendario operativo la recepcionista contesta, toma nota de
+          // la petición y avisa al dueño, pero no da hora ni reserva
+          // (voiceTools: check_availability y book_appointment). Decir
+          // «Atendiendo llamadas» a secas escondía esa diferencia.
+          ? { key: "agent", label: "Recepcionista", icon: Bot, value: "Atiende, pero no reserva", tone: "warning", action: { label: calendarExpired ? "Reconectar agenda" : "Conectar agenda", href: "/agente?section=calendar-section" } }
+          : { key: "agent", label: "Recepcionista", icon: Bot, value: "Atendiendo llamadas", tone: "ok" };
 
   const phoneItem: OperationalStatusItem = phone?.status === "active" && phone.phoneNumber
     ? { key: "phone", label: "Tu número", icon: Smartphone, value: formatPhone(phone.phoneNumber) ?? phone.phoneNumber, tone: "ok" }
