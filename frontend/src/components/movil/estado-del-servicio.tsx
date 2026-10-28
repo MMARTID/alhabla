@@ -39,7 +39,11 @@ export function useEstadoDelServicio(business: Business | undefined) {
   });
   const minutos = useMinutesWarning();
 
-  const problemas = operativo.items.filter((item) => item.tone === "error" || item.tone === "warning");
+  // Un mismo asunto contado por dos señales (la recepcionista no reserva
+  // porque falta la agenda) es un solo aviso.
+  const problemas = operativo.items.filter(
+    (item) => (item.tone === "error" || item.tone === "warning") && !item.cubiertoPor
+  );
   const pendientes = pendientesQuery.data ?? [];
   const avisos = problemas.length + (pendientes.length > 0 ? 1 : 0) + (minutos ? 1 : 0);
   const rojo = problemas.some((item) => item.tone === "error") || pendientes.length > 0 || Boolean(minutos?.exhausted);
@@ -250,6 +254,7 @@ function hrefMovil(href: string) {
   const seccion = new URLSearchParams(href.split("?")[1] ?? "").get("section");
   if (href.startsWith("/agente") && seccion === "calendar-section") return "/agente/calendario";
   if (href.startsWith("/agente") && seccion === "agent-settings") return "/agente/comportamiento";
+  if (href.startsWith("/agente") && seccion === "business-hours") return "/agente/horario";
   return href;
 }
 

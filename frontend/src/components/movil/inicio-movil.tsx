@@ -7,6 +7,7 @@ import {
   ArrowDownRight,
   ArrowRight,
   ArrowUpRight,
+  CalendarClock,
   CalendarDays,
   Check,
   ChevronDown,
@@ -19,6 +20,7 @@ import {
 import { dismissOnboarding, getAgenda, getCalls, getStats, resolverCitaPendiente } from "@/lib/api";
 import { AGENT_CONFIGURATION_STEPS } from "@/lib/agent-configuration";
 import { getCalendarState } from "@/lib/calendar-state";
+import { horarioConfigurado } from "@/lib/horario";
 import { formatPhoneLocal, formatPrice } from "@/lib/format";
 import { claveDeDia, diaDeLaSemana, diaLargo, horaDelNegocio, instanteAntesDelDia, numeroDelDia } from "@/lib/fechas-negocio";
 import { enlaceTel, momentoCorto, momentoDeActividad, motivoDeCitaPendiente } from "@/lib/llamadas";
@@ -34,6 +36,7 @@ import { SectionErrorState } from "@/components/section-card";
 import { CabeceraMovil } from "@/components/movil/cabecera-movil";
 import { usePorDevolver } from "@/components/movil/barra-de-pestanas";
 import { ChipDeEstado, HojaEstado, cuandoPedia, useEstadoDelServicio } from "@/components/movil/estado-del-servicio";
+import { DatosPorCompletar } from "@/components/movil/datos-por-completar";
 import { FilaLlamada } from "@/components/movil/fila-llamada";
 import { HojaCita, finDeCita, nombreDeCita } from "@/components/movil/hoja-cita";
 import { HojaLlamada } from "@/components/movil/hoja-llamada";
@@ -58,10 +61,14 @@ function cuentaAtras(minutos: number) {
 export function InicioMovil({
   business,
   avisoDeCalendario,
+  abrirDesvio = 0,
 }: {
   business: Business;
   /** Vuelta de la conexión OAuth del calendario. */
   avisoDeCalendario: { type: "success" | "error"; message: string } | null;
+  /** Cambia cada vez que se llega con `?desvio=abrir` (al volver del pago):
+   * abre los pasos del desvío en cuanto se sabe que falta. */
+  abrirDesvio?: number;
 }) {
   const timeZone = business.timezone || "Europe/Madrid";
   const ahora = useAhora();
@@ -69,6 +76,7 @@ export function InicioMovil({
   const estado = useEstadoDelServicio(business);
   const porDevolver = usePorDevolver(true);
   const calendario = getCalendarState(business);
+  const tieneHorario = horarioConfigurado(business.schedule);
   const { aviso, avisar, cerrar } = useAviso();
 
   const [estadoAbierto, setEstadoAbierto] = useState(false);
@@ -98,7 +106,17 @@ export function InicioMovil({
   const proxima = pendientesDeHoy[0] ?? citas.find((cita) => claveDeDia(cita.programedAt, timeZone) > hoy) ?? null;
   const masTarde = proxima && claveDeDia(proxima.programedAt, timeZone) === hoy ? pendientesDeHoy.slice(1) : [];
   const forwarding = estado.onboardingQuery.data?.forwarding;
+  const desvioPendiente = Boolean(forwarding && forwarding.status !== "done");
   const llamadas = (llamadasQuery.data?.data ?? []).slice(0, 4);
+
+  // Pedido con `?desvio=abrir` y aún sin atender: se abre en cuanto se
+  // sabe que el desvío falta, sin un efecto que lo copie a otro estado.
+  const [desvioAtendido, setDesvioAtendido] = useState(0);
+  const desvioPedido = abrirDesvio > desvioAtendido && desvioPendiente;
+  const cerrarDesvio = () => {
+    setDesvioAbierto(false);
+    setDesvioAtendido(abrirDesvio);
+  };
 
   const subtitulo = [
     diaLargo(hoy),
@@ -176,6 +194,15 @@ export function InicioMovil({
           />
         ) : null}
 
+        {!tieneHorario ? (
+          <TarjetaDeAviso
+            href="/agente/horario"
+            icono={CalendarClock}
+            titulo="Configura tu horario"
+            texto="Sin él, tu recepcionista atiende pero no puede reservar ninguna cita."
+          />
+        ) : null}
+
         {!calendario.connected ? (
           <TarjetaDeAviso
             href="/agente/calendario"
@@ -184,7 +211,7 @@ export function InicioMovil({
             texto={
               calendario.expired
                 ? `La conexión con ${calendario.label} ha caducado: sin ella no se reservan citas.`
-                : "Sin ella, tu recepcionista no puede reservar citas."
+                : "Sin ella, tu recepcionista atiende pero no puede reservar citas."
             }
           />
         ) : null}
@@ -202,6 +229,8 @@ export function InicioMovil({
         )}
 
         {estado.onboardingQuery.data ? <GuiaDeConfiguracion estado={estado.onboardingQuery.data} /> : null}
+
+        <DatosPorCompletar business={business} movil />
       </div>
 
       {masTarde.length > 0 ? (
@@ -277,8 +306,8 @@ export function InicioMovil({
 
       {forwarding ? (
         <HojaInferior
-          abierta={desvioAbierto}
-          onCerrar={() => setDesvioAbierto(false)}
+          abierta={desvioAbierto || desvioPedido}
+          onCerrar={cerrarDesvio}
           titulo="Desvía tu teléfono"
           subtitulo="Es lo último para que tus clientes lleguen a tu recepcionista."
           alta

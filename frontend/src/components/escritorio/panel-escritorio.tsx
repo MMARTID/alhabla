@@ -4,12 +4,13 @@ import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowRight, CalendarDays, LayoutDashboard, PhoneCall } from "lucide-react";
+import { ArrowRight, CalendarClock, CalendarDays, LayoutDashboard, PhoneCall } from "lucide-react";
 import { getAgenda, getCalls, getStats } from "@/lib/api";
 import { formatPhoneLocal, formatPrice } from "@/lib/format";
 import { claveDeDia, diaLargo, horaDelNegocio, instanteAntesDelDia, sumarDias } from "@/lib/fechas-negocio";
 import { horarioDelNegocio, importeDeCitas, rangoDeHoras, tramosDelDia } from "@/lib/agenda-escritorio";
 import { getCalendarState } from "@/lib/calendar-state";
+import { horarioConfigurado } from "@/lib/horario";
 import { momentoCorto, momentoDeActividad } from "@/lib/llamadas";
 import type { AgendaBooking, Business } from "@/lib/types";
 import { useAhora } from "@/hooks/use-es-movil";
@@ -18,6 +19,7 @@ import { CallForwardingCard } from "@/components/call-forwarding-card";
 import { TarjetaDeDesvio } from "@/components/tarjeta-de-desvio";
 import { SectionErrorState } from "@/components/section-card";
 import { useEstadoDelServicio } from "@/components/movil/estado-del-servicio";
+import { DatosPorCompletar } from "@/components/movil/datos-por-completar";
 import { FilaLlamada } from "@/components/movil/fila-llamada";
 import { nombreDeCita, importeDeCita } from "@/components/movil/hoja-cita";
 import {
@@ -57,9 +59,13 @@ function enMinusculaInicial(texto: string) {
 export function PanelEscritorio({
   business,
   avisoDeCalendario,
+  abrirDesvio = 0,
 }: {
   business: Business;
   avisoDeCalendario: { type: "success" | "error"; message: string } | null;
+  /** Cambia cada vez que se llega con `?desvio=abrir` (al volver del pago):
+   * abre los pasos del desvío en cuanto se sabe que falta. */
+  abrirDesvio?: number;
 }) {
   const router = useRouter();
   const timeZone = business.timezone || "Europe/Madrid";
@@ -67,6 +73,7 @@ export function PanelEscritorio({
   const hoy = claveDeDia(ahora, timeZone);
   const estado = useEstadoDelServicio(business);
   const calendario = getCalendarState(business);
+  const tieneHorario = horarioConfigurado(business.schedule);
   const { aviso, avisar, cerrar } = useAviso();
   const [vista, setVista] = useState<Vista>("hoy");
   const [desvioAbierto, setDesvioAbierto] = useState(false);
@@ -106,12 +113,21 @@ export function PanelEscritorio({
 
   const forwarding = estado.onboardingQuery.data?.forwarding;
   const desvioPendiente = Boolean(forwarding && forwarding.status !== "done");
+  // Pedido con `?desvio=abrir` y aún sin atender: se abre en cuanto se
+  // sabe que el desvío falta, sin un efecto que lo copie a otro estado.
+  const [desvioAtendido, setDesvioAtendido] = useState(0);
+  const desvioPedido = abrirDesvio > desvioAtendido && desvioPendiente;
+  const cerrarDesvio = () => {
+    setDesvioAbierto(false);
+    setDesvioAtendido(abrirDesvio);
+  };
   const guiaActiva = Boolean(estado.onboardingQuery.data?.isActive);
   const hayAtencion =
     estado.pendientes.length > 0 ||
     estado.pendientesQuery.isError ||
     estado.onboardingQuery.isError ||
     desvioPendiente ||
+    !tieneHorario ||
     !calendario.connected ||
     guiaActiva;
   const llamadas = (llamadasQuery.data?.data ?? []).slice(0, 5);
@@ -157,6 +173,14 @@ export function PanelEscritorio({
               ) : desvioPendiente && forwarding ? (
                 <TarjetaDeDesvio forwarding={forwarding} onAbrir={() => setDesvioAbierto(true)} />
               ) : null}
+              {!tieneHorario ? (
+                <TarjetaDeAviso
+                  href="/agente?section=business-hours"
+                  icono={CalendarClock}
+                  titulo="Configura tu horario"
+                  texto="Sin él, tu recepcionista atiende pero no puede reservar ninguna cita."
+                />
+              ) : null}
               {!calendario.connected ? (
                 <TarjetaDeAviso
                   href="/agente?section=calendar-section"
@@ -165,7 +189,7 @@ export function PanelEscritorio({
                   texto={
                     calendario.expired
                       ? `La conexión con ${calendario.label} ha caducado: sin ella no se reservan citas.`
-                      : "Sin ella, tu recepcionista no puede reservar citas."
+                      : "Sin ella, tu recepcionista atiende pero no puede reservar citas."
                   }
                 />
               ) : null}
@@ -248,6 +272,7 @@ export function PanelEscritorio({
           </section>
 
           <div className={`space-y-6 xl:col-start-2 ${hayAtencion ? "xl:row-start-2" : "xl:row-start-1"}`}>
+            <DatosPorCompletar business={business} movil={false} />
             {statsQuery.data?.week ? <UltimosSieteDias semana={statsQuery.data.week} className="" /> : null}
             <section>
               <TituloDeSeccion enlace={{ href: "/llamadas", etiqueta: "Ver todas" }} className="mb-1">
@@ -285,8 +310,8 @@ export function PanelEscritorio({
 
       {forwarding ? (
         <Dialogo
-          abierto={desvioAbierto}
-          onCerrar={() => setDesvioAbierto(false)}
+          abierto={desvioAbierto || desvioPedido}
+          onCerrar={cerrarDesvio}
           titulo="Desvía tu teléfono a la recepcionista"
           descripcion="Es lo último para que tus clientes lleguen a ella."
           ancho="lg"

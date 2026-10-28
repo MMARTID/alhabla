@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { getOnboardingState, getPhoneNumberInfo } from "@/lib/api";
 import { formatPhone } from "@/lib/format";
+import { horarioConfigurado } from "@/lib/horario";
 import { suscripcionSinCobro } from "@/lib/suscripcion";
 import type { Business, PhoneNumberInfo } from "@/lib/types";
 
@@ -32,6 +33,12 @@ export type OperationalStatusItem = {
   value: string;
   tone: OperationalTone;
   action?: { label: string; href: string } | { label: string; kind: "retry-phone" };
+  /**
+   * El problema ya lo cuenta otra señal: «Atiende pero no reserva» por la
+   * agenda es el mismo asunto que «Agenda: sin conectar», y el chip diría
+   * «2 avisos» por una sola cosa que arreglar.
+   */
+  cubiertoPor?: OperationalStatusItem["key"];
 };
 
 export const OPERATIONAL_TONE: Record<OperationalTone, { icon: LucideIcon; text: string; dot: string }> = {
@@ -43,6 +50,10 @@ export const OPERATIONAL_TONE: Record<OperationalTone, { icon: LucideIcon; text:
 };
 
 const NO_COMPROBADO = "No se ha podido comprobar";
+
+/** Estado intermedio de la recepcionista: coge el teléfono, informa y toma
+ * recados, pero no puede reservar (sin horario o sin agenda). */
+export const ATIENDE_SIN_RESERVAR = "Atiende pero no reserva";
 
 /**
  * Fuente única para las señales de salud operativa. Las pantallas deciden si
@@ -70,6 +81,34 @@ export function buildOperationalStatus({
   const calendarState = getCalendarState(business);
   const calendarConnected = calendarState.connected;
   const calendarExpired = calendarState.expired;
+  const sinHorario = !horarioConfigurado(business.schedule);
+
+  // Atiende, pero sin horario no hay huecos (BUSINESS_HOURS_NOT_CONFIGURED)
+  // y sin agenda `book_appointment` se corta: decir «Atendiendo llamadas»
+  // escondía que no reserva ni una cita.
+  const sinReservas: OperationalStatusItem | null =
+    sinHorario || !calendarConnected
+      ? {
+          key: "agent",
+          label: "Recepcionista",
+          icon: Bot,
+          value: `${ATIENDE_SIN_RESERVAR}: ${
+            sinHorario
+              ? calendarConnected
+                ? "falta el horario"
+                : "faltan el horario y la agenda"
+              : calendarExpired
+                ? "la agenda se desconectó"
+                : "falta conectar la agenda"
+          }`,
+          tone: "warning",
+          action: sinHorario
+            ? { label: "Configurar horario", href: "/agente?section=business-hours" }
+            : { label: calendarExpired ? "Reconectar" : "Conectar agenda", href: "/agente?section=calendar-section" },
+          // Si solo falta la agenda, el aviso ya lo da la señal «Agenda».
+          cubiertoPor: sinHorario ? undefined : "calendar",
+        }
+      : null;
 
   const agent: OperationalStatusItem = business.callsSuspendedAt
     ? { key: "agent", label: "Recepcionista", icon: Bot, value: "Suspendida por impago", tone: "error", action: { label: "Regularizar el pago", href: "/ajustes/facturacion" } }
@@ -77,7 +116,7 @@ export function buildOperationalStatus({
       ? { key: "agent", label: "Recepcionista", icon: Bot, value: "No contesta: sin plan activo", tone: "error", action: { label: "Elegir plan", href: "/ajustes/facturacion" } }
       : !business.active || !agentActive
         ? { key: "agent", label: "Recepcionista", icon: Bot, value: "Inactiva", tone: "warning", action: { label: "Revisar agente", href: "/agente?section=agent-settings" } }
-        : { key: "agent", label: "Recepcionista", icon: Bot, value: "Atendiendo llamadas", tone: "ok" };
+        : sinReservas ?? { key: "agent", label: "Recepcionista", icon: Bot, value: "Atendiendo llamadas", tone: "ok" };
 
   const phoneItem: OperationalStatusItem = phone?.status === "active" && phone.phoneNumber
     ? { key: "phone", label: "Tu número", icon: Smartphone, value: formatPhone(phone.phoneNumber) ?? phone.phoneNumber, tone: "ok" }
@@ -92,7 +131,7 @@ export function buildOperationalStatus({
   const forwarding: OperationalStatusItem = forwardingStatus === "done"
     ? { key: "forwarding", label: "Desvío de llamadas", icon: PhoneForwarded, value: "Activo", tone: "ok" }
     : forwardingStatus === "ready"
-      ? { key: "forwarding", label: "Desvío de llamadas", icon: PhoneForwarded, value: "Sin activar", tone: "error", action: { label: "Activarlo ahora", href: "/#desvio" } }
+      ? { key: "forwarding", label: "Desvío de llamadas", icon: PhoneForwarded, value: "Sin activar", tone: "error", action: { label: "Activarlo ahora", href: "/?desvio=abrir" } }
       : forwardingUnavailable
         ? { key: "forwarding", label: "Desvío de llamadas", icon: PhoneForwarded, value: NO_COMPROBADO, tone: "unknown" }
         : { key: "forwarding", label: "Desvío de llamadas", icon: PhoneForwarded, value: "Esperando al número", tone: "waiting" };
