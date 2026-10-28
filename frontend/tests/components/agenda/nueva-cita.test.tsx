@@ -34,11 +34,11 @@ const SERVICIOS = [
   { id: "svc_corte", name: "Corte", durationMinutes: 30, priceCents: 1500, active: true },
   { id: "svc_color", name: "Color", durationMinutes: 60, priceCents: 4000, active: true },
   { id: "svc_viejo", name: "Antiguo", durationMinutes: 30, priceCents: null, active: false },
-] as BookingService[];
+] as unknown as BookingService[];
 const PROFESIONALES = [
   { id: "p1", name: "Lucía", active: true, serviceIds: [] },
   { id: "p2", name: "Marcos", active: true, serviceIds: [] },
-] as BookingProfessional[];
+] as unknown as BookingProfessional[];
 
 function montar(extra: Partial<Parameters<typeof FormularioDeCreacion>[0]> = {}) {
   const onHecho = vi.fn();
