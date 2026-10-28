@@ -85,6 +85,9 @@ export function parseTranscriptMessages(value: unknown): TranscriptMessage[] | n
  * tropiezo puntual.
  */
 export function motivoDeCitaPendiente(failureCode: string | null): string {
+  if (failureCode === "CALENDAR_NOT_CONNECTED") {
+    return "No tienes ningún calendario conectado: la recepcionista tomó nota en vez de reservar.";
+  }
   if (failureCode?.includes("RECONNECT_REQUIRED")) {
     return "La conexión con tu agenda estaba caducada en ese momento.";
   }
