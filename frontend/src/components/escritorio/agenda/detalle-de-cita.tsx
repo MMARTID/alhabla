@@ -27,6 +27,8 @@ function mmss(segundos: number | null) {
 /** «Reservada por la recepcionista el 30 sep, en una llamada de 2:14». */
 export function origenDeLaCita(cita: AgendaBooking, timeZone: string) {
   if (cita.createdVia === "owner_chat") return "La apuntaste tú con el gestor.";
+  // «Nueva cita» desde la agenda (PLAN-AGENDA-ALHABLA.md, fase 2).
+  if (cita.createdVia === "owner_panel") return "La apuntaste tú desde la agenda.";
   const fecha = cita.origen?.startedAt ?? cita.createdAt;
   const cuando = fecha
     ? (() => {
