@@ -1,6 +1,7 @@
 # Plan: Agenda de Alhabla (reservar sin calendario externo)
 
-Estado: **en curso** (28-10-2026; fases 0 a 3 hechas, falta la 4). Origen:
+Estado: **MVP hecho** (28-10-2026; fases 0 a 4 en las PRs #364–#368; queda la comprobación de
+extremo a extremo en dev tras el despliegue y los extras de «Después»). Origen:
 `docs/auditorias/2026-10-28-auditoria-de-producto.md` (hallazgo 2 y §3). Revisado contra el código el
 28-10 (PR de la fase 0): las correcciones van marcadas con **[rev]**.
 
@@ -265,7 +266,13 @@ mencionar el feed en la política de privacidad (fase 4).
 - **Límite a explicar:** Google refresca los calendarios suscritos cada varias horas, y no se puede
   forzar.
 
-### Fase 4: textos y web (0,5 día)
+### Fase 4: textos y web — HECHA (28-10)
+
+**Cómo quedó:** planes («Reservas directas en tu calendario de Google, Outlook o iCloud, o en la agenda de
+Alhabla si no usas ninguno», en las dos copias de `plans.ts`), tabla de planes, FAQ de la portada
+(«¿Necesito conectar un calendario?» nueva y la de solapes ampliada), la misma FAQ en `/integraciones` y
+en las cinco landings de sector, párrafo del feed en la política de privacidad, y `AGENTS.md` con la
+sección «Modo de agenda y agenda de Alhabla» y los campos nuevos de `Business`.
 
 - **Planes y portada:** «Reserva en Google, Outlook, iCloud **o en la agenda de Alhabla**»
   (`web/src/lib/plans.ts:35`, `components/planes-detalle.tsx:26`, `lib/home-faqs.ts:30-31`). `plans.ts`
