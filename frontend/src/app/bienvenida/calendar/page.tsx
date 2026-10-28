@@ -3,8 +3,15 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PasoDelAlta } from "@/components/paso-del-alta";
-import { CalendarDays, ChevronRight, LoaderCircle } from "lucide-react";
-import { SiGooglecalendar } from "@icons-pack/react-simple-icons";
+import {
+  CalendarDays,
+  ChevronDown,
+  ChevronRight,
+  LoaderCircle,
+  TriangleAlert,
+} from "lucide-react";
+import { SiApple, SiGooglecalendar } from "@icons-pack/react-simple-icons";
+import { AppleCalendarConnect } from "@/components/apple-calendar-connect";
 import { BetaPill } from "@/components/beta-pill";
 import { MicrosoftLogo } from "@/components/brand-icons";
 import { getGoogleCalendarAuthUrl, getMicrosoftCalendarAuthUrl } from "@/lib/api";
@@ -19,6 +26,9 @@ export default function RegisterBusinessCalendarPage() {
   const [loading, setLoading] = useState<"google" | "outlook" | null>(null);
   const [error, setError] = useState("");
   const [hasPlaceSchedule, setHasPlaceSchedule] = useState(false);
+  // Apple no tiene OAuth: Apple ID y contraseña de aplicación en la misma
+  // página, con el formulario de Agente › Calendario.
+  const [formularioApple, setFormularioApple] = useState(false);
   // Vuelta de Google/Microsoft con el calendario ya conectado: se redirige
   // al pago, y mientras tanto no se vuelven a ofrecer las opciones de
   // conectar, que parecían decir que no había funcionado.
@@ -84,6 +94,14 @@ export default function RegisterBusinessCalendarPage() {
       setLoading(null);
       setError("No se pudo iniciar la conexión. Inténtalo de nuevo.");
     }
+  };
+
+  // Apple se conecta sin salir de la página: al elegir el calendario se sigue
+  // igual que a la vuelta de Google o Microsoft.
+  const alConectarApple = () => {
+    setFormularioApple(false);
+    setRedirigiendo(true);
+    redirectToFinalStep();
   };
 
   useEffect(() => {
@@ -161,15 +179,53 @@ export default function RegisterBusinessCalendarPage() {
               <ChevronRight className="h-5 w-5 text-muted" aria-hidden="true" />
             )}
           </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setError("");
+              setFormularioApple((abierto) => !abierto);
+            }}
+            disabled={loading !== null}
+            aria-expanded={formularioApple}
+            className="relative flex w-full items-center gap-4 rounded-2xl border border-linea bg-superficie p-5 text-left transition duration-200 hover:border-morado hover:bg-relleno focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-morado focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <BetaPill />
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-linea bg-superficie">
+              <SiApple className="h-6 w-6 text-tinta" color="currentColor" />
+            </div>
+            <div className="flex-1">
+              <p className="font-semibold text-tinta">Apple / iCloud</p>
+              <p className="text-sm text-muted">Si llevas la agenda en el iPhone, conéctala con tu Apple ID.</p>
+            </div>
+            {formularioApple ? (
+              <ChevronDown className="h-5 w-5 text-muted" aria-hidden="true" />
+            ) : (
+              <ChevronRight className="h-5 w-5 text-muted" aria-hidden="true" />
+            )}
+          </button>
+          {formularioApple ? (
+            <AppleCalendarConnect
+              onCancel={() => setFormularioApple(false)}
+              onConnected={alConectarApple}
+            />
+          ) : null}
         </div>
 
         {error && <p role="alert" className="mt-4 text-sm text-error">{error}</p>}
 
         <div className="mt-8 space-y-3">
+          <div className="flex items-start gap-3 rounded-2xl border border-aviso-borde bg-aviso-fondo p-4">
+            <TriangleAlert className="mt-0.5 h-5 w-5 shrink-0 text-aviso-icono" aria-hidden="true" />
+            <p id="aviso-sin-calendario" className="text-sm leading-6 text-aviso">
+              {texts.calendar.sinCalendario}
+            </p>
+          </div>
           <button
             type="button"
             onClick={() => redirectToFinalStep()}
             disabled={loading !== null}
+            aria-describedby="aviso-sin-calendario"
             className="btn-secondary w-full"
           >
             Configurar calendario después
