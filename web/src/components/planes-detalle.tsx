@@ -29,7 +29,7 @@ const FILAS: Fila[] = [
   { concepto: "El Gestor por WhatsApp para el dueño", valores: [true, true, true] },
   { concepto: "Si falta alguien: recolocar sus citas y avisar a cada cliente", valores: [true, true, true] },
   { concepto: "Avisos al dueño por WhatsApp, con botones para resolverlos", valores: [true, true, true] },
-  { concepto: "Lista de espera por WhatsApp", valores: [true, true, true] },
+  { concepto: "Lista de espera: aviso por WhatsApp si se libera la hora que pidió el cliente", valores: [true, true, true] },
   { concepto: "Da el precio de tu catálogo (tú eliges cuándo)", valores: [true, true, true] },
   { concepto: "Aviso de IA en la primera frase y grabación solo con permiso", valores: [true, true, true] },
   { concepto: "«Comprobar desvío» con una llamada real", valores: [true, true, true] },

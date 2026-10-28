@@ -361,8 +361,9 @@ export default function PestanasYCejasPage() {
           </p>
           <p>
             Para ese hueco que se libera está la lista de espera. Si una clienta quería una hora que ya estaba cogida
-            —el viernes por la tarde, el sábado por la mañana—, la recepcionista le ofrece avisarla. Si esa hora se
-            anula, se le ofrece primero a quien la pidió antes, por WhatsApp, y se la queda con un botón. Y en el
+            —el viernes por la tarde, el sábado por la mañana—, la recepcionista le ofrece avisarla. Si esa misma hora
+            se libera por una cancelación, se le ofrece primero a quien la pidió antes, por WhatsApp, y se la queda con
+            un botón. Y en el
             aviso de anulación que te llega a ti tienes otro botón para avisar a quien esperaba.
           </p>
           <p>

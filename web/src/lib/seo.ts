@@ -144,7 +144,7 @@ export const landingStructuredData = {
         "Comprueba el hueco en Google Calendar, Outlook o iCloud antes de reservar",
         "Reparto de citas por especialidad de cada profesional",
         "Confirmación de la cita por WhatsApp y recordatorio con botones (Pro y Scale)",
-        "Lista de espera por WhatsApp",
+        "Lista de espera: aviso por WhatsApp si se libera por una cancelación la hora que pidió el cliente",
         "El Gestor: el dueño cambia citas, horario, precios y equipo por WhatsApp, con notas de voz",
         "Ausencias del equipo: recoloca las citas y avisa a cada cliente, con la confirmación del dueño",
         "Castellano y siete idiomas más, y catalán, euskera o gallego según la zona",

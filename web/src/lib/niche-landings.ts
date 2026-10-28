@@ -344,7 +344,7 @@ export const nicheLandings: Record<NicheSlug, NicheLandingContent> = {
         "Al colgar, la confirmación con el servicio, el día, la hora y la estilista: «Corte y color, jueves 17:30, con Marta».",
         "En los planes Pro y Scale, además, le llega un aviso antes de la cita para que el hueco del tinte no se quede vacío por un despiste.",
         "Si no puede venir, contesta al mensaje para cambiar o anular la cita, sin tener que llamar al salón.",
-        "Si la hora que quería estaba cogida, puede pedir que le avisen si se libera, o escribir a la recepcionista para pedir otra.",
+        "Si la hora que quería estaba cogida, puede pedir que le avisen por WhatsApp si se libera; y si ya ha reservado antes en el salón, también puede escribir a la recepcionista para pedir otra.",
       ],
     },
     calculator: {
@@ -537,7 +537,7 @@ export const nicheLandings: Record<NicheSlug, NicheLandingContent> = {
         "Al colgar, la confirmación con el tratamiento, el día, la hora y la esteticista: «Facial con peeling, miércoles 12:00, con Sara».",
         "En Pro y Scale, el recordatorio antes de cada sesión, útil cuando un bono tiene varias citas seguidas.",
         "Para cambiar una sesión o anularla, responde al mensaje: no tiene que llamar mientras estás en cabina.",
-        "Si la hora que quería está ocupada, pide que le avisen si se libera, o escribe a la recepcionista por WhatsApp para buscar otra.",
+        "Si la hora que quería está ocupada, pide que le avisen por WhatsApp si se libera; si ya ha venido antes al centro, también puede escribir a la recepcionista para buscar otra.",
       ],
     },
     calculator: {
@@ -615,7 +615,7 @@ export const nicheLandings: Record<NicheSlug, NicheLandingContent> = {
     benefitsDescription: "Cada extra cambia el tiempo de la cita. Alhabla pregunta lo necesario antes de confirmar.",
     benefits: [
       { title: "Manicura", description: "Reserva clásica, semipermanente, gel o acrílico.", result: "El hueco correcto para cada técnica" },
-      { title: "Retiradas y retoques", description: "Pregunta por el estado previo y añade tiempo cuando corresponde.", result: "Menos retrasos en cadena" },
+      { title: "Retiradas y retoques", description: "Pregunta si hay retirada para reservar el servicio que toca, con la duración que le hayas dado.", result: "Menos retrasos en cadena" },
       { title: "Nail art", description: "Reserva el diseño con su tiempo; lo que describe la clienta queda en la transcripción.", result: "Citas mejor preparadas" },
     ],
     teamRouting: {
@@ -732,7 +732,7 @@ export const nicheLandings: Record<NicheSlug, NicheLandingContent> = {
         "Al colgar le llega la confirmación: «Semipermanente en manos, martes 17:30, con Laura».",
         "En Pro y Scale, además, un recordatorio antes de la cita, para que no se le olvide el relleno.",
         "Para cambiar o anular, le basta con responder al mensaje; no tiene que llamarte en mitad de otra manicura.",
-        "Si la tarde que quería está llena, pide que le avisen si se libera y le llega un WhatsApp; también puede pedir o cambiar cita escribiendo a la recepcionista.",
+        "Si la tarde que quería está llena, pide que le avisen si se libera y le llega un WhatsApp; y si ya es clienta tuya, también puede pedir o cambiar cita escribiendo a la recepcionista.",
       ],
     },
     calculator: {
@@ -924,7 +924,7 @@ export const nicheLandings: Record<NicheSlug, NicheLandingContent> = {
         "La confirmación al colgar, con el servicio, la hora y el barbero que le toca: «Corte y barba, viernes 18:00, con Luis».",
         "Con Pro o Scale, también el recordatorio antes del corte, para que no se le pase.",
         "Si le surge algo, responde al mensaje y cambia o anula su hora sin llamar.",
-        "Si el sábado está lleno, puede apuntarse para que le avisen si se libera su hora, o escribir a la recepcionista por WhatsApp para buscar otra.",
+        "Si el sábado está lleno, puede apuntarse para que le avisen por WhatsApp si se libera su hora; si ya ha reservado antes, también puede escribir a la recepcionista para buscar otra.",
       ],
     },
     calculator: {
@@ -1126,7 +1126,7 @@ export const nicheLandings: Record<NicheSlug, NicheLandingContent> = {
         "Al colgar, la confirmación con el tipo de sesión, el día, la hora y el fisioterapeuta: «Sesión de seguimiento, lunes 9:30, con Pablo».",
         "En Pro y Scale, el recordatorio antes de cada sesión, que en un tratamiento de varias semanas ayuda a no saltarse ninguna.",
         "Si no puede venir, responde al mensaje para cambiar la sesión o anularla, sin llamar a la clínica en plena consulta.",
-        "Si la hora que quería está ocupada, puede pedir que le avisen si se libera, o escribir a la recepcionista para buscar otra.",
+        "Si la hora que quería está ocupada, puede pedir que le avisen por WhatsApp si se libera; si ya ha reservado antes en la clínica, también puede escribir a la recepcionista para buscar otra.",
       ],
     },
     calculator: {
