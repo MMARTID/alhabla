@@ -8,7 +8,7 @@ import { getAgenda, getBookingSettings } from "@/lib/api";
 import { horarioDelNegocio } from "@/lib/agenda-escritorio";
 import { getCalendarState } from "@/lib/calendar-state";
 import { FormularioDeCreacion } from "@/components/agenda/nueva-cita";
-import { HojaInferior } from "@/components/movil/hoja-inferior";
+import { CuerpoDeHoja, HojaInferior } from "@/components/movil/hoja-inferior";
 import { formatPhoneLocal, formatPrice } from "@/lib/format";
 import {
   INICIALES_DE_DIA,
@@ -268,7 +268,8 @@ export function AgendaMovil({ business }: { business: Business }) {
         </>
       )}
 
-      <HojaInferior abierta={creando} onCerrar={() => setCreando(false)} titulo="Apuntar en la agenda">
+      <HojaInferior abierta={creando} onCerrar={() => setCreando(false)} titulo="Apuntar en la agenda" alta>
+        <CuerpoDeHoja className="pb-8">
         {creando ? (
           <FormularioDeCreacion
             timeZone={timeZone}
@@ -285,6 +286,7 @@ export function AgendaMovil({ business }: { business: Business }) {
             }}
           />
         ) : null}
+        </CuerpoDeHoja>
       </HojaInferior>
       <HojaCita
         cita={citaAbierta}
