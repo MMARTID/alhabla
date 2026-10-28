@@ -87,6 +87,11 @@ model Business {
   // no se deduce: una conexión caducada nunca pasa el negocio a `alhabla`.
   // Ver lib/modoDeAgenda.ts.
   modoDeAgenda String @default("sin_elegir")
+  // Feed iCal de solo lectura de la agenda (PLAN-AGENDA-ALHABLA.md, fase 3):
+  // la URL equivale a una contraseña, así que el token es aleatorio, único y
+  // se puede cambiar. Null = feed desactivado. Nunca se serializa al panel
+  // junto al Business: tiene sus propias rutas (modules/agenda/routes.ts).
+  icalToken    String? @unique
 
   // Marca de la última semana resumida por email. Cloud Scheduler entrega al
   // menos una vez, así que el job reclama la semana con un updateMany

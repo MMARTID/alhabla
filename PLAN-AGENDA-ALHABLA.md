@@ -1,6 +1,6 @@
 # Plan: Agenda de Alhabla (reservar sin calendario externo)
 
-Estado: **en curso** (28-10-2026; fases 0, 1 y 2 hechas). Origen:
+Estado: **en curso** (28-10-2026; fases 0 a 3 hechas, falta la 4). Origen:
 `docs/auditorias/2026-10-28-auditoria-de-producto.md` (hallazgo 2 y §3). Revisado contra el código el
 28-10 (PR de la fase 0): las correcciones van marcadas con **[rev]**.
 
@@ -227,7 +227,21 @@ por otros canales.
   - hoja «Nueva cita» en el móvil (`movil/agenda-movil.tsx`).
 - Funciona **en cualquier modo**: en `externo` también escribe el evento en el calendario.
 
-### Fase 3: feed iCal de solo lectura (1,5–2 días)
+### Fase 3: feed iCal de solo lectura — HECHA (28-10)
+
+**Cómo quedó (resumen de la PR):** `Business.icalToken` (32 bytes aleatorios en hex, índice único,
+migración aditiva) y `modules/agenda/routes.ts`: `GET /agenda/:token.ics` público con límite de 30
+peticiones por minuto, busca el negocio solo por el token (404 igual para un token mal formado y para
+uno que no existe), ventana de −30 a +120 días, canceladas de los últimos 30 días con
+`STATUS:CANCELLED`, ausencias como «No está: Laura», `?pro=` filtrado por negocio, cabeceras
+`noindex` y `Cache-Control: private, max-age=300`; y `GET`/`POST`/`DELETE /business/me/agenda/feed`
+para ver, activar o renovar y desactivar el enlace (el token nunca viaja en el Business serializado).
+El generador es `lib/feedIcal.ts` (ical.js, UID estable `cita-<id>@alhabla.ai`, sin teléfonos). En la
+app, el bloque «Ver tu agenda en el móvil» al pie de `/agente › Calendario`
+(`movil/agente/feed-de-agenda.tsx`): activar, copiar, «Añadir al iPhone» (`webcal://`), instrucciones de
+Google, cambiar con confirmación y desactivar, con el aviso de que el enlace equivale a una contraseña.
+**Pendiente:** probar la suscripción real en Google Calendar y en un iPhone tras el despliegue, y
+mencionar el feed en la política de privacidad (fase 4).
 
 - **`Business.icalToken`**, creado al activarlo y que se pueda cambiar.
 - **`GET /agenda/:token.ics`:**

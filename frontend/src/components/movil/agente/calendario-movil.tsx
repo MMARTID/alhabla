@@ -13,6 +13,7 @@ import { AvisoFlotante, useAviso } from "@/components/aviso-flotante";
 import { BetaPill } from "@/components/beta-pill";
 import { MicrosoftLogo } from "@/components/brand-icons";
 import { PantallaDeAjuste } from "@/components/movil/agente/pantalla-de-ajuste";
+import { FeedDeAgenda } from "@/components/movil/agente/feed-de-agenda";
 
 type Mensaje = { type: "success" | "error"; message: string } | null;
 
@@ -281,6 +282,9 @@ export function CalendarioMovil({ business }: { business: Business }) {
             {formularioApple ? <AppleCalendarConnect onCancel={() => setFormularioApple(false)} onConnected={alConectarApple} /> : null}
           </>
         )}
+      </div>
+      <div className="mt-4">
+        <FeedDeAgenda avisar={avisar} />
       </div>
       {aviso ? <AvisoFlotante aviso={aviso} onClose={cerrar} /> : null}
     </PantallaDeAjuste>

@@ -475,6 +475,26 @@ export async function cambiarModoDeAgenda(modo: "alhabla" | "externo") {
   return data;
 }
 
+/** Feed iCal de solo lectura de la agenda (PLAN-AGENDA-ALHABLA.md, fase 3):
+ * si está activo y sus enlaces (https para copiar, webcal para el iPhone). */
+export type FeedDeAgenda = { activo: boolean; url: string | null; webcal: string | null };
+
+export async function getFeedDeAgenda() {
+  const { data } = await api.get<FeedDeAgenda>("/business/me/agenda/feed");
+  return data;
+}
+
+/** Activa el enlace (o lo cambia con `renovar`: el anterior deja de valer). */
+export async function activarFeedDeAgenda(renovar = false) {
+  const { data } = await api.post<FeedDeAgenda>("/business/me/agenda/feed", { renovar });
+  return data;
+}
+
+export async function desactivarFeedDeAgenda() {
+  const { data } = await api.delete<FeedDeAgenda>("/business/me/agenda/feed");
+  return data;
+}
+
 /** Ausencias del equipo que se solapan con [desde, hasta) (instantes ISO,
  * como mucho 120 días). */
 export async function getAusencias(desde: string, hasta: string) {
