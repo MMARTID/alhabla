@@ -478,10 +478,15 @@ checkout PRINCIPAL aunque se lance desde un worktree (`git rev-parse --git-commo
 
 | Herramienta | Qué hace | Barreras |
 |-------------|----------|----------|
+| `diagnostico_mcp` | Comprueba a la vez de qué depende todo lo demás y da el arreglo de lo que falla: copia del MCP al día con `main` (y con qué commit arrancó el proceso), `.env`, sesión de gcloud, `cloud-sql-proxy`, `gh`, Docker, Postgres y backend de dev, backend-sim (y si corre código viejo) y la CLI de Vercel (`mcp/diagnostico.ts`). Lo primero cuando una herramienta falla sin motivo claro | Solo lectura; nunca devuelve tokens ni el valor de una variable |
 | `consultar_bd_dev` | SQL contra `botbook` (Postgres de Docker, `localhost:5433`) | Transacción `READ ONLY` + protocolo extendido (una sola sentencia); se niega si `DATABASE_URL` no es local o lleva `?host=` |
 | `consultar_bd_prod` | SQL contra Cloud SQL `alhabla-db` / `alhabla` por Cloud SQL Auth Proxy (`--gcloud-auth`, lo arranca el MCP) | Rol `alhabla_lectura`: solo `pg_read_all_data`, `default_transaction_read_only`, `statement_timeout` 30 s y `CONNECTION LIMIT 2` (presupuesto de conexiones de Cloud SQL); contraseña en Secret Manager `DB_LECTURA_PASSWORD`. Más la misma transacción READ ONLY |
-| `generar_jwt_dev` | JWT de un usuario de dev (por email o negocio), mismo payload que `createToken` (`tv` = `tokenVersion`) | Solo con el `JWT_SECRET` y la BD de dev |
+| `generar_jwt_dev` | JWT de un usuario de dev (por email o negocio), mismo payload que `createToken` (`tv` = `tokenVersion`) (`mcp/sesionDeDev.ts`) | Solo con el `JWT_SECRET` y la BD de dev |
+| `llamar_api_dev` | Una petición a la API de dev (:3000) o de backend-sim (:3010) con la sesión de un usuario de dev (por email o negocio), sin copiar JWT: estado, ms y respuesta | La ruta resuelta tiene que quedarse en esa base de localhost; JWT de 10 minutos |
+| `entrar_en_app_dev` | Enlace a la app de dev (:3001) ya dentro de un negocio y en la pantalla pedida (`destino`): guarda en `claves_temporales` de dev un pase de un solo uso como el del registro (10 min) y lo canjea `/auth/entrar`, que acepta un `destino` interno (`rutaInterna` de `lib/login-next.ts`) | El JWT nunca va en la URL; un solo uso; solo la BD de dev |
 | `simular_webhook_telnyx` | POST firmado Ed25519 a `/webhooks/telnyx…` de `backend-sim` (:3010). Con `businessId` crea una fila de `calls` NUEVA (`sim-mcp-<uuid>`) y pone `x-alhabla-call-control-id`; para seguir la misma conversación se pasa su `callControlId` (una cita por llamada: `bookings.callId` es único) | Solo localhost y la ruta YA RESUELTA dentro de `/webhooks/telnyx` (un `../` no sale); firma con `TELNYX_PRIVATE_KEY_SIMULACION`, que ningún otro backend acepta |
+| `simular_conversacion` | Varios pasos seguidos sobre la MISMA llamada simulada (canal `voz`) o del Gestor (canal `gestor`: `/webhooks/telnyx/gestor/<tool>` con `x-alhabla-business` y `x-alhabla-role: owner`). `{{nombre}}` en un cuerpo toma el último valor con ese nombre que devolvió un paso anterior (`{{availabilityToken}}`, `{{bookingId}}`); un `book_appointment` sin token ni `startDateTime` toma el del último `check_availability`. Devuelve cada paso, las citas y reservas pendientes que dejó la llamada y los envíos simulados (`mcp/conversacionSimulada.ts`) | Las de `simular_webhook_telnyx`; máximo 20 pasos |
+| `backend_sim` | De qué carpeta, rama y commit corre backend-sim y cuántos commits de backend va por detrás de `main`; `levantar` sin rama lo pone en el último main (las herramientas, actualizadas antes) y con rama o nº de PR en `~/.alhabla-sim` (worktree detached solo para él, sin `node_modules`: usa los de la imagen); `reiniciar` (schema nuevo), `reconstruir` (dependencias nuevas; `levantar` lo hace solo si cambia el lock) y `parar`. Al levantar aplica las migraciones de ese código a la BD de dev (`mcp/backendSim.ts`) | Solo ramas ya subidas a origin; no toca `~/.alhabla-sim` si tiene cambios a mano |
 | `borrar_llamadas_simuladas` | Borra las `sim-mcp-…` (de un negocio o de todas) para que no salgan en el historial del panel | Conserva y devuelve las que tienen una cita viva con evento en el calendario: borrarla dejaría el evento huérfano |
 | `describir_tabla` | Tablas de dev o prod con su modelo de Prisma y filas aproximadas; con `tabla` (nombre real o modelo: `Booking`), columnas con tipo/NULL/defecto, índices y claves foráneas (`mcp/esquema.ts`) | Las mismas que `consultar_bd_*`; en prod, consultas una tras otra (el rol de lectura admite 2 conexiones) |
 | `ver_logs_prod` | Cloud Logging de `alhabla-api` en orden: busca a la vez en `textPayload` (`console.*`) y `jsonPayload.msg`/`err.message` (Fastify), quita «incoming request»/«request completed»; `soloErrores` mira stderr y el nivel de pino (`console.error` no trae `severity`). Devuelve el filtro usado (`mcp/logsDeProd.ts`) | Solo lectura con las credenciales de gcloud del Mac; fechas validadas antes de entrar al filtro y textos escapados |
@@ -494,6 +499,23 @@ checkout PRINCIPAL aunque se lance desde un worktree (`git rev-parse --git-commo
 | `ver_assistant_telnyx` | GET del assistant (por id o por el agente del negocio, dev o prod): modelo, saludo, tools con URL y timeout, voz, transcripción, variables, nodos del flujo, grabación; `buscar` dice dónde aparece un texto en toda la configuración (`mcp/telnyx.ts`) | Solo GET; la clave (dev: `.env`; prod: Secret Manager `TELNYX_API_KEY`) nunca sale en la respuesta |
 | `ver_conversacion_telnyx` | Mensajes en orden con las tools llamadas y lo que devolvieron, por `conversationId`, por llamada (`calls.providerConversationId`), la del Gestor (`businesses.ownerConversationId`) o la del chat de un cliente (`client_conversations`) | Igual; lee hasta 1.000 mensajes (los más recientes) |
 | `lanzar_job_prod` | `gcloud scheduler jobs run` de `telnyx-reconciler`, `cleanup-zombie-calls` o `retry-stuck-recordings`, espera su intento (hasta 2 min) y devuelve resultado y logs (`mcp/jobsDeProd.ts`) | Lista cerrada: no lanza los que mandan correos o WhatsApp, borran grabaciones, suspenden cuentas ni reportan a Stripe |
+
+`listar_tools_voz` saca las tools de la recepcionista (`buildTelnyxVoiceTools`) y, con `canal: "gestor"`,
+las del Gestor (`buildGestorTools`); los avisos de cuerpo valen para las dos.
+
+**Al día solo (desde 2026-10-29).** El MCP y backend-sim corren el código de la copia fija
+`~/.alhabla-mcp`, que hasta entonces solo se ponía en `main` al iniciar sesión en el Mac: tras seis días
+sin reiniciarlo, una prueba E2E corrió contra código viejo sin que nada avisara. Ahora
+`scripts/dev/entorno.sh herramientas` (con cerrojo; `npm ci` si cambió el lock y, si backend-sim corre
+de ahí, lo recrea o reconstruye y aplica las migraciones) se lanza al arrancar cada proceso del MCP
+(sesión nueva), en `ver_en_dev` y cada 15 minutos desde el panel, que sale para que launchd lo relance
+con el código nuevo. El proceso del MCP de una sesión ya abierta no se recarga: `diagnostico_mcp` dice
+con qué commit arrancó. `ALHABLA_HERRAMIENTAS_FIJAS=1` o el fichero
+`~/Library/Caches/alhabla-dev/herramientas-fijas` lo desactivan (para probar una rama de las
+herramientas). `simular_webhook_telnyx` y `simular_conversacion` avisan si backend-sim corre código
+de backend por detrás de `main`, de una rama o de un worktree de sesión. Los fallos de sesión de
+gcloud (`Reauthentication failed`, `invalid_grant`…) devuelven el arreglo:
+`gcloud auth login admin@alhabla.ai` en una terminal del Mac (contraseña de la cuenta de Google).
 
 Las tools simuladas se ejecutan de verdad: `book_appointment` reserva en el calendario real del
 negocio de dev. Lo que **no** sale desde `backend-sim` son los WhatsApp, SMS y correos:
