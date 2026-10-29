@@ -24,7 +24,7 @@ const HORARIO: BusinessSchedule = {
     sunday: { enabled: false, intervals: [] },
   },
 };
-const CALENDARIO = { connected: true, label: "Google Calendar", shortLabel: "Google", webUrl: "https://calendar.google.com" } as CalendarState;
+const CALENDARIO = { connected: true, bookable: true, alhabla: false, mode: "externo", label: "Google Calendar", shortLabel: "Google", webUrl: "https://calendar.google.com" } as CalendarState;
 
 function cita(extra: Partial<AgendaBooking> = {}): AgendaBooking {
   return {

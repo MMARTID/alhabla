@@ -4312,6 +4312,300 @@ describe("executeVoiceTool — entrada de la caché de voz con el calendario sin
   });
 });
 
+// PLAN-AGENDA-ALHABLA.md, fase 0: sin calendario operativo la recepcionista
+// toma nota en vez de dar hora. Antes check_availability comprobaba solo
+// contra Postgres y decía «sí, hay hueco»; el cliente confirmaba y
+// book_appointment fallaba con «el negocio debe reconectar Google Calendar»
+// aunque el negocio jamás hubiera tenido Google.
+describe("executeVoiceTool — negocio sin calendario operativo (toma nota, no reserva)", () => {
+  const sinCalendario = () => buildBusiness({ calendarConnections: [] });
+  const caducado = () =>
+    buildBusiness({
+      calendarConnections: [
+        filaDeConexion("google", {
+          refreshToken: null,
+          connected: false,
+          disconnectedAt: new Date("2026-10-20T10:00:00Z"),
+          lastError: "invalid_grant",
+        }),
+      ],
+    });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockedCheckBusinessHours.mockReturnValue({ success: true, isOpen: true } as any);
+    mockedServiceFindMany.mockResolvedValue([]);
+    mockedProfessionalFindMany.mockResolvedValue([]);
+    mockedProfessionalFindFirst.mockResolvedValue({
+      id: "professional_123",
+      name: "Ana",
+    } as any);
+    mockedCallFindUnique.mockResolvedValue({
+      id: "call_row_1",
+      fromNumber: "+34600999888",
+      businessId: "business_123",
+    } as any);
+    mockedLeadCreate.mockResolvedValue({ id: "lead_1" } as any);
+    mockedCheckAvailability.mockResolvedValue({
+      available: true,
+      message: "Hay disponibilidad.",
+      capacityUsed: 0,
+      capacityTotal: 1,
+      availableProfessionals: [{ id: "professional_123", name: "Ana" }],
+    } as any);
+  });
+
+  it("check_availability no ofrece hora si el negocio nunca conectó un calendario", async () => {
+    mockedBusinessFindUnique.mockResolvedValue(sinCalendario() as any);
+
+    const result = await executeVoiceTool({
+      businessId: "business_123",
+      toolName: "check_availability",
+      callId: "call_123",
+      params: { startDateTime: "2026-08-25T17:00:00+02:00", durationMinutes: 30 },
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.result.available).toBe(false);
+    expect(result.result.code).toBe("CALENDAR_NOT_CONNECTED");
+    expect(result.result.availabilityToken).toBeUndefined();
+    // La instrucción manda la petición a book_appointment, que es quien la
+    // guarda y avisa al dueño; y no se le nombra el calendario al cliente.
+    expect(result.result.message).toContain("book_appointment");
+    expect(result.result.message).toContain("tomas nota");
+    // Ni se consulta la agenda ni se lee ningún calendario.
+    expect(mockedCheckAvailability).not.toHaveBeenCalled();
+    expect(mockedGetBusyIntervals).not.toHaveBeenCalled();
+  });
+
+  it("check_availability tampoco ofrece hora con el calendario caducado, con el código de reconexión", async () => {
+    mockedBusinessFindUnique.mockResolvedValue(caducado() as any);
+
+    const result = await executeVoiceTool({
+      businessId: "business_123",
+      toolName: "check_availability",
+      callId: "call_123",
+      params: { startDateTime: "2026-08-25T17:00:00+02:00", durationMinutes: 30 },
+    });
+
+    expect(result.result.available).toBe(false);
+    expect(result.result.code).toBe("GOOGLE_CALENDAR_RECONNECT_REQUIRED");
+    expect(mockedCheckAvailability).not.toHaveBeenCalled();
+  });
+
+  it("check_availability sigue ofreciendo hora con el calendario conectado", async () => {
+    mockedBusinessFindUnique.mockResolvedValue(buildBusiness() as any);
+    mockedGetBusyIntervals.mockResolvedValue({
+      intervals: [],
+      calendarAvailabilityKnown: true,
+    } as any);
+
+    const result = await executeVoiceTool({
+      businessId: "business_123",
+      toolName: "check_availability",
+      callId: "call_123",
+      params: { startDateTime: "2026-08-25T17:00:00+02:00", durationMinutes: 30 },
+    });
+
+    expect(result.result.available).toBe(true);
+    expect(result.result.availabilityToken).toEqual(expect.any(String));
+  });
+
+  it("book_appointment guarda la petición con CALENDAR_NOT_CONNECTED y no nombra a Google", async () => {
+    mockedBusinessFindUnique.mockResolvedValue(sinCalendario() as any);
+
+    const result = await executeVoiceTool(
+      buildBookAppointmentInput({ callId: "call_vapi_1" })
+    );
+
+    expect(result.success).toBe(true);
+    expect(result.result.success).toBe(false);
+    expect(result.result.code).toBe("CALENDAR_NOT_CONNECTED");
+    expect(result.result.message).toContain("He tomado nota");
+    expect(result.result.message).not.toMatch(/google|outlook|icloud|reconectar/i);
+    expect(mockedBookAppointment).not.toHaveBeenCalled();
+    expect(mockedBookingUpsert).not.toHaveBeenCalled();
+    // El dueño se entera con el motivo real («no tienes ningún calendario
+    // conectado», avisosNegocio.motivoDeFallo), no con «estaba caducado».
+    expect(mockedLeadCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          type: "pending_booking",
+          data: expect.objectContaining({
+            clientName: "María",
+            failureCode: "CALENDAR_NOT_CONNECTED",
+          }),
+        }),
+      })
+    );
+    expect(avisarCitaPendiente).toHaveBeenCalledWith(
+      expect.objectContaining({
+        businessId: "business_123",
+        failureCode: "CALENDAR_NOT_CONNECTED",
+      })
+    );
+  });
+
+  it("book_appointment con el calendario caducado conserva el código de reconexión del proveedor", async () => {
+    mockedBusinessFindUnique.mockResolvedValue(caducado() as any);
+
+    const result = await executeVoiceTool(
+      buildBookAppointmentInput({ callId: "call_vapi_1" })
+    );
+
+    expect(result.result.success).toBe(false);
+    expect(result.result.code).toBe("GOOGLE_CALENDAR_RECONNECT_REQUIRED");
+    expect(result.result.message).not.toMatch(/google/i);
+    expect(mockedLeadCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          data: expect.objectContaining({
+            failureCode: "GOOGLE_CALENDAR_RECONNECT_REQUIRED",
+          }),
+        }),
+      })
+    );
+  });
+});
+
+// PLAN-AGENDA-ALHABLA.md, fase 1: en la agenda de Alhabla se reserva sin
+// calendario externo. La conexión que pudiera quedar de antes se ignora.
+describe("executeVoiceTool — agenda de Alhabla (modoDeAgenda = alhabla)", () => {
+  const enAlhabla = (overrides: Record<string, unknown> = {}) =>
+    buildBusiness({ modoDeAgenda: "alhabla", calendarConnections: [], ...overrides });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockedCheckBusinessHours.mockReturnValue({ success: true, isOpen: true } as any);
+    mockedServiceFindMany.mockResolvedValue([]);
+    mockedProfessionalFindMany.mockResolvedValue([]);
+    mockedProfessionalFindFirst.mockResolvedValue({
+      id: "professional_123",
+      name: "Ana",
+    } as any);
+    mockedCallFindUnique.mockResolvedValue({
+      id: "call_row_1",
+      fromNumber: "+34600999888",
+      businessId: "business_123",
+    } as any);
+    mockedBookingFindUnique.mockResolvedValue(null);
+    mockedBookingUpsert.mockResolvedValue({ id: "booking_1" } as any);
+    mockedLeadCreate.mockResolvedValue({ id: "lead_1" } as any);
+    // Sin conexión, el servicio real devuelve «sin leer»; el mock imita eso.
+    mockedGetBusyIntervals.mockResolvedValue({
+      intervals: [],
+      calendarAvailabilityKnown: false,
+    } as any);
+    // El servicio real responde sin evento en la agenda propia.
+    mockedBookAppointment.mockResolvedValue({ id: null, htmlLink: null } as any);
+    mockedCheckAvailability.mockResolvedValue({
+      available: true,
+      message: "Hay disponibilidad.",
+      capacityUsed: 0,
+      capacityTotal: 1,
+      availableProfessionals: [{ id: "professional_123", name: "Ana" }],
+    } as any);
+  });
+
+  it("check_availability ofrece hora sin ningún calendario", async () => {
+    mockedBusinessFindUnique.mockResolvedValue(enAlhabla() as any);
+
+    const result = await executeVoiceTool({
+      businessId: "business_123",
+      toolName: "check_availability",
+      callId: "call_123",
+      params: { startDateTime: "2026-08-25T17:00:00+02:00", durationMinutes: 30 },
+    });
+
+    expect(result.result.available).toBe(true);
+    expect(result.result.availabilityToken).toEqual(expect.any(String));
+    // La disponibilidad se calcula solo con lo que hay en Alhabla.
+    expect(mockedCheckAvailability).toHaveBeenCalledWith(
+      expect.objectContaining({ calendarAvailabilityKnown: false })
+    );
+  });
+
+  it("book_appointment guarda la cita en Alhabla, sin evento ni calendario externo", async () => {
+    mockedBusinessFindUnique.mockResolvedValue(enAlhabla() as any);
+
+    const result = await executeVoiceTool(
+      buildBookAppointmentInput({ callId: "call_vapi_1" })
+    );
+
+    expect(result.success).toBe(true);
+    expect(result.result.success).toBe(true);
+    expect(mockedLeadCreate).not.toHaveBeenCalled();
+    // El servicio se llama con la conexión marcada como agenda propia (es él
+    // quien devuelve «sin evento») y la fila no apunta a ningún calendario.
+    expect(mockedBookAppointment).toHaveBeenCalledWith(
+      expect.objectContaining({
+        conexion: expect.objectContaining({ agendaPropia: true, credentials: null }),
+      })
+    );
+    expect(mockedBookingUpsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({
+          clientName: "María",
+          externalEventId: undefined,
+          externalCalendarProvider: null,
+          externalCalendarId: null,
+        }),
+      })
+    );
+  });
+
+  it("la conexión caducada que quedó de antes no bloquea ni se consulta", async () => {
+    mockedBusinessFindUnique.mockResolvedValue(
+      enAlhabla({
+        calendarConnections: [
+          filaDeConexion("google", {
+            refreshToken: "token_viejo",
+            connected: false,
+            disconnectedAt: new Date("2026-10-20T10:00:00Z"),
+            lastError: "invalid_grant",
+          }),
+        ],
+      }) as any
+    );
+
+    const result = await executeVoiceTool(
+      buildBookAppointmentInput({ callId: "call_vapi_1" })
+    );
+
+    expect(result.result.success).toBe(true);
+    expect(mockedLeadCreate).not.toHaveBeenCalled();
+    expect(mockedBookAppointment).toHaveBeenCalledWith(
+      expect.objectContaining({
+        conexion: expect.objectContaining({ agendaPropia: true, credentials: null }),
+      })
+    );
+  });
+
+  it("un negocio externo con el calendario caducado sigue sin reservar (regresión)", async () => {
+    mockedBusinessFindUnique.mockResolvedValue(
+      buildBusiness({
+        modoDeAgenda: "externo",
+        calendarConnections: [
+          filaDeConexion("google", {
+            refreshToken: null,
+            connected: false,
+            disconnectedAt: new Date("2026-10-20T10:00:00Z"),
+          }),
+        ],
+      }) as any
+    );
+
+    const result = await executeVoiceTool(
+      buildBookAppointmentInput({ callId: "call_vapi_1" })
+    );
+
+    expect(result.result.success).toBe(false);
+    expect(result.result.code).toBe("GOOGLE_CALENDAR_RECONNECT_REQUIRED");
+    expect(mockedBookAppointment).not.toHaveBeenCalled();
+    expect(mockedLeadCreate).toHaveBeenCalled();
+  });
+});
+
 // Hallazgo 7 de la auditoría del 28-10: Booking.callId es único y el upsert
 // de book_appointment sustituía en silencio la cita ya reservada en la
 // llamada. Ahora una segunda cita se rechaza; cambiar la hora de la misma
@@ -4646,32 +4940,60 @@ describe("executeVoiceTool book_appointment — una cita por llamada", () => {
   });
 });
 
-// Hallazgo 2 de la auditoría del 28-10 (fase 0 de PLAN-AGENDA-ALHABLA.md):
-// sin calendario nunca conectado, el cliente oía «El negocio debe reconectar
-// Google Calendar» y el dueño recibía «tu calendario estaba caducado».
-describe("executeVoiceTool book_appointment — sin calendario conectado", () => {
+// La misma regla en la agenda de Alhabla (PLAN-AGENDA-ALHABLA.md, fase 1):
+// la cita vive solo en Postgres, sin evento externo que crear ni borrar.
+describe("executeVoiceTool book_appointment — una cita por llamada en la agenda de Alhabla", () => {
   const inicio = "2026-11-20T17:30:00+01:00";
+  const reservaDeLaLlamada = {
+    id: "booking_1",
+    externalEventId: null,
+    externalCalendarProvider: null,
+    externalCalendarId: null,
+    programedAt: new Date("2026-11-20T10:00:00+01:00"),
+    durationMinutes: 30,
+    isCancelled: false,
+    cancelledAt: null,
+    clientName: "Lucía",
+  };
 
   beforeEach(() => {
     vi.clearAllMocks();
     clearWhatsappEnv();
+    mockedBusinessFindUnique.mockResolvedValue(
+      buildBusiness({ modoDeAgenda: "alhabla", calendarConnections: [] }) as any
+    );
     mockedCheckBusinessHours.mockReturnValue({
       success: true,
       isOpen: true,
     } as any);
-    mockedProfessionalFindFirst.mockResolvedValue(null);
+    // calendarService está mockeado: en la agenda de Alhabla el real
+    // devuelve esto, sin evento.
+    mockedBookAppointment.mockResolvedValue({ id: null, htmlLink: null } as any);
+    mockedProfessionalFindFirst.mockResolvedValue({
+      id: "professional_123",
+      name: "Ana",
+    } as any);
     mockedServiceFindMany.mockResolvedValue([]);
+    mockedCheckAvailability.mockResolvedValue({
+      available: true,
+      message: "",
+      capacityUsed: 0,
+      capacityTotal: 1,
+      availableProfessionals: [{ id: "professional_123", name: "Ana" }],
+    } as any);
     mockedCallFindUnique.mockResolvedValue({
       id: "call_row_1",
       fromNumber: "+34600999888",
       businessId: "business_123",
       startedAt: new Date(),
     } as any);
-    mockedBookingFindUnique.mockResolvedValue(null);
+    mockedBookingFindUnique.mockResolvedValue(reservaDeLaLlamada as any);
+    mockedBookingFindFirst.mockResolvedValue(null);
+    mockedBookingUpsert.mockResolvedValue({ id: "booking_1" } as any);
     mockedLeadCreate.mockResolvedValue({ id: "lead_1" } as any);
   });
 
-  function reservar() {
+  function reservarSinToken(params: Record<string, unknown> = {}) {
     return executeVoiceTool({
       businessId: "business_123",
       toolName: "book_appointment",
@@ -4681,109 +5003,89 @@ describe("executeVoiceTool book_appointment — sin calendario conectado", () =>
         startDateTime: inicio,
         durationMinutes: 30,
         smsConsent: true,
+        ...params,
       },
     });
   }
 
-  it("si el negocio nunca conectó un calendario: CALENDAR_NOT_CONNECTED, mensaje neutro y aviso al dueño de «no tienes calendario»", async () => {
-    mockedBusinessFindUnique.mockResolvedValue(
-      buildBusiness({ name: "Peluquería Lola", calendarConnections: [] }) as any
-    );
-    const avisos = vi
-      .spyOn(console, "warn")
-      .mockImplementation(() => undefined);
+  it("una segunda cita se rechaza igual que con calendario externo", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
 
-    const result = await reservar();
+    const result = await reservarSinToken({ clientName: "Marta" });
 
     expect(result.result).toMatchObject({
       success: false,
-      code: "CALENDAR_NOT_CONNECTED",
+      code: "YA_HAY_CITA_EN_ESTA_LLAMADA",
+      bookingId: "booking_1",
     });
-    const mensaje = result.result!.message as string;
-    expect(mensaje).toContain("He tomado nota de tu petición");
-    expect(mensaje).toContain("te confirmará la cita");
-    expect(mensaje).not.toMatch(/google|reconect|calendar/i);
-    // La petición queda guardada con el código que el aviso traduce a «no
-    // tienes ningún calendario conectado» (motivoDeFallo).
-    expect(mockedLeadCreate).toHaveBeenCalledWith(
+    expect(mockedBookingUpsert).not.toHaveBeenCalled();
+    expect(mockedLeadCreate).not.toHaveBeenCalled();
+  });
+
+  it("cambiar la hora de la cita de esta llamada la mueve en Postgres, sin evento que borrar", async () => {
+    mockedBookingFindFirst.mockResolvedValue({
+      id: "booking_1",
+      callId: "call_row_1",
+      clientPhone: null,
+      externalEventId: null,
+      call: { fromNumber: "+34600999888" },
+    } as any);
+
+    const { result: comprobacion } = await executeVoiceTool({
+      businessId: "business_123",
+      toolName: "check_availability",
+      callId: "call_1",
+      params: {
+        startDateTime: inicio,
+        durationMinutes: 30,
+        replacesBookingId: "booking_1",
+      },
+    });
+    expect(comprobacion!.available).toBe(true);
+    const result = await executeVoiceTool({
+      businessId: "business_123",
+      toolName: "book_appointment",
+      callId: "call_1",
+      params: {
+        clientName: "Lucía",
+        availabilityToken: comprobacion!.availabilityToken,
+      },
+    });
+
+    expect(result.result).toMatchObject({
+      success: true,
+      bookingId: "booking_1",
+    });
+    expect(mockedBookingUpsert).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({
-          type: "pending_booking",
-          data: expect.objectContaining({
-            failureCode: "CALENDAR_NOT_CONNECTED",
-          }),
+        where: { callId: "call_row_1" },
+        update: expect.objectContaining({
+          externalCalendarProvider: null,
+          externalCalendarId: null,
         }),
       })
     );
-    expect(vi.mocked(avisarCitaPendiente)).toHaveBeenCalledWith(
-      expect.objectContaining({ failureCode: "CALENDAR_NOT_CONNECTED" })
-    );
-    expect(mockedBookAppointment).not.toHaveBeenCalled();
-    expect(avisos).toHaveBeenCalledWith(
-      expect.stringContaining(
-        "el negocio business_123 no tiene ningún calendario conectado"
-      )
-    );
-    avisos.mockRestore();
+    expect(mockedCancelAppointment).not.toHaveBeenCalled();
+    expect(mockedCancelarReserva).not.toHaveBeenCalled();
   });
 
-  it("si no se pudo guardar la petición, no promete que le confirmarán: da el teléfono del negocio", async () => {
-    mockedBusinessFindUnique.mockResolvedValue(
-      buildBusiness({ calendarConnections: [] }) as any
-    );
-    mockedLeadCreate.mockRejectedValue(new Error("BD caída"));
-    vi.spyOn(console, "warn").mockImplementation(() => undefined);
-    vi.spyOn(console, "error").mockImplementation(() => undefined);
+  it("el reintento exacto (sin evento externo, no hay atajo) reescribe la misma fila y no crea otra cita", async () => {
+    mockedBookingFindUnique.mockResolvedValue({
+      ...reservaDeLaLlamada,
+      programedAt: new Date(
+        normalizeVoiceToolDateTime(inicio, "Europe/Madrid")
+      ),
+    } as any);
 
-    const result = await reservar();
-
-    expect(result.result).toMatchObject({ code: "CALENDAR_NOT_CONNECTED" });
-    expect(result.result!.message).not.toContain("He tomado nota");
-    expect(result.result!.message).toContain("+34600111222");
-  });
-
-  it("con la conexión caducada (revocada) no cambia nada: código de reconexión del proveedor y aviso de caducada", async () => {
-    mockedBusinessFindUnique.mockResolvedValue(
-      buildBusiness({
-        calendarConnections: [
-          filaDeConexion("google", {
-            refreshToken: null,
-            connected: false,
-            disconnectedAt: new Date("2026-10-01T10:00:00Z"),
-            lastError: "invalid_grant",
-          }),
-        ],
-      }) as any
-    );
-    vi.spyOn(console, "warn").mockImplementation(() => undefined);
-
-    const result = await reservar();
+    const result = await reservarSinToken();
 
     expect(result.result).toMatchObject({
-      success: false,
-      code: "GOOGLE_CALENDAR_RECONNECT_REQUIRED",
-      message:
-        "El negocio debe reconectar Google Calendar antes de agendar citas. He tomado nota de tu solicitud para confirmártela en cuanto se resuelva.",
+      success: true,
+      bookingId: "booking_1",
     });
-    expect(vi.mocked(avisarCitaPendiente)).toHaveBeenCalledWith(
-      expect.objectContaining({
-        failureCode: "GOOGLE_CALENDAR_RECONNECT_REQUIRED",
-      })
+    expect(mockedBookingUpsert).toHaveBeenCalledTimes(1);
+    expect(mockedBookingUpsert).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { callId: "call_row_1" } })
     );
-  });
-
-  it("con credenciales pero marcada como desconectada sigue siendo reconexión", async () => {
-    mockedBusinessFindUnique.mockResolvedValue(
-      buildBusiness({
-        calendarConnections: [filaDeConexion("google", { connected: false })],
-      }) as any
-    );
-    vi.spyOn(console, "warn").mockImplementation(() => undefined);
-
-    const result = await reservar();
-
-    expect(result.result).toMatchObject({
-      code: "GOOGLE_CALENDAR_RECONNECT_REQUIRED",
-    });
   });
 });

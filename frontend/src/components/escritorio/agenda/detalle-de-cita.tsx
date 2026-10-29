@@ -27,6 +27,8 @@ function mmss(segundos: number | null) {
 /** «Reservada por la recepcionista el 30 sep, en una llamada de 2:14». */
 export function origenDeLaCita(cita: AgendaBooking, timeZone: string) {
   if (cita.createdVia === "owner_chat") return "La apuntaste tú con el gestor.";
+  // «Nueva cita» desde la agenda (PLAN-AGENDA-ALHABLA.md, fase 2).
+  if (cita.createdVia === "owner_panel") return "La apuntaste tú desde la agenda.";
   const fecha = cita.origen?.startedAt ?? cita.createdAt;
   const cuando = fecha
     ? (() => {
@@ -157,7 +159,7 @@ export function DetalleDeCita({
               <button
                 type="button"
                 onClick={() => setMoviendoFormulario(true)}
-                disabled={!calendario.connected}
+                disabled={!calendario.bookable}
                 className="btn-secondary h-10 flex-1 px-3"
               >
                 <CalendarClock className="h-4 w-4" aria-hidden="true" />
@@ -173,8 +175,8 @@ export function DetalleDeCita({
               </button>
             </div>
           )}
-          {!calendario.connected ? (
-            <p className="mt-2 text-xs leading-5 text-muted">Para mover citas desde aquí, conecta tu calendario.</p>
+          {!calendario.bookable ? (
+            <p className="mt-2 text-xs leading-5 text-muted">Para mover citas desde aquí, elige la agenda de Alhabla o conecta tu calendario.</p>
           ) : null}
         </div>
       ) : null}
@@ -221,7 +223,10 @@ export function DetalleDeCita({
 
 /** Las horas de un día en pasos de 15 minutos dentro de sus tramos
  * abiertos, sin pasarse del cierre con la duración de la cita. */
-function horasPosibles(horario: BusinessSchedule | null, dia: string, duracion: number) {
+/** Horas de inicio posibles (pasos de 15 min dentro del horario del día) para
+ * una cita de `duracion`. Sin horario conocido, de 8:00 a 21:00. La usan
+ * mover (aquí) y «Nueva cita» (components/agenda/nueva-cita.tsx). */
+export function horasPosibles(horario: BusinessSchedule | null, dia: string, duracion: number) {
   const tramos = tramosDelDia(horario, dia);
   if (tramos === null) {
     return Array.from({ length: (21 - 8) * 4 }, (_, indice) => horaDeMinutos(8 * 60 + indice * 15));
