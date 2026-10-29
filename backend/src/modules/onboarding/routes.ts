@@ -9,6 +9,7 @@ import {
   resolverConexionDeCalendario,
   SELECT_CONEXION_DE_CALENDARIO,
 } from "../calendar/conexion.js";
+import { reservaEnAlhabla } from "../../lib/modoDeAgenda.js";
 import {
   estadoWhatsappDelDueno,
   type EstadoWhatsappDueno,
@@ -190,10 +191,12 @@ export async function onboardingRoutes(fastify: FastifyInstance) {
           services: business.services.length > 0,
           professionals: business.professionals.length > 0,
           // Solo el flag del proveedor activo, sin mirar el token (semántica
-          // histórica de este paso del onboarding).
-          calendar: marcadaComoConectada(
-            resolverConexionDeCalendario(business)
-          ),
+          // histórica de este paso del onboarding). En la agenda de Alhabla
+          // el paso está hecho sin calendario (PLAN-AGENDA-ALHABLA.md): si
+          // no, el checklist no terminaba nunca.
+          calendar:
+            reservaEnAlhabla(business) ||
+            marcadaComoConectada(resolverConexionDeCalendario(business)),
           whatsapp: whatsappStatus === "activo" || whatsappStatus === "baja",
           forwarding: forwardingDone,
         };

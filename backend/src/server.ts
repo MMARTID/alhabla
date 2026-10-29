@@ -14,6 +14,7 @@ import { internalJobsRoutes } from "./modules/internal/routes.js";
 import { authRoutes } from "./modules/auth/routes.js";
 import { businessesRoutes } from "./modules/businesses/routes.js";
 import { citasDelPanelRoutes } from "./modules/bookings/citasDelPanel.js";
+import { agendaFeedRoutes } from "./modules/agenda/routes.js";
 import { busquedaRoutes } from "./modules/busqueda/routes.js";
 import { placesRoutes } from "./modules/places/routes.js";
 import { agentsRoutes } from "./modules/agents/routes.js";
@@ -225,6 +226,7 @@ async function start() {
     fastify.register(authRoutes, { prefix: '/auth' });
     fastify.register(businessesRoutes);
     fastify.register(citasDelPanelRoutes);
+    fastify.register(agendaFeedRoutes);
     fastify.register(busquedaRoutes);
     fastify.register(placesRoutes);
     fastify.register(agentsRoutes);

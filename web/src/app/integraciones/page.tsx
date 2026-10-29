@@ -36,6 +36,11 @@ export default function IntegracionesPage() {
       }
       faqs={[
         {
+          question: "¿Necesito conectar un calendario?",
+          answer:
+            "No. Si llevas la agenda en Google Calendar, Outlook o iCloud, conéctalo y las citas entran ahí. Si no usas ninguno, elige la agenda de Alhabla: la recepcionista reserva en ella, tú la ves en el panel, apuntas lo que te entra por otros canales (en el panel o por WhatsApp al Gestor) y puedes suscribirte a ella desde el calendario del móvil con un enlace de solo lectura.",
+        },
+        {
           question: "¿Puedo conectar más de un calendario a la vez?",
           answer:
             "Se conecta una cuenta y, dentro de ella, eliges el calendario donde entran las citas. Si cambias de idea, desde el panel cambias de calendario o de proveedor sin perder la configuración de servicios y profesionales.",
@@ -53,7 +58,7 @@ export default function IntegracionesPage() {
         {
           question: "¿Qué pasa si se desconecta el calendario?",
           answer:
-            "Si tu proveedor deja de aceptar el permiso (por ejemplo, porque cambiaste la contraseña), te avisamos por WhatsApp y el panel te pide reconectar. Mientras tanto la recepcionista no da horas que no puede comprobar: prefiere no reservar a reservar a ciegas.",
+            "Si tu proveedor deja de aceptar el permiso (por ejemplo, porque cambiaste la contraseña), te avisamos por WhatsApp y el panel te pide reconectar. Mientras tanto la recepcionista sigue atendiendo, pero no da horas que no puede comprobar: toma nota de la petición, con el nombre y el teléfono del cliente, y te la pasa para que la confirmes tú. Lo mismo ocurre si todavía no has conectado ningún calendario.",
         },
         {
           question: "¿Hace falta un técnico para conectarlo?",

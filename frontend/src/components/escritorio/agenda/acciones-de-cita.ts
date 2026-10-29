@@ -23,9 +23,10 @@ export type AvisoPendiente = {
   cliente: string | null;
 };
 
-/** Todo lo que pinta una cita: tras moverla o cancelarla, la agenda, el
- * Panel y el resumen se vuelven a pedir. */
-function invalidarAgenda(queryClient: ReturnType<typeof useQueryClient>) {
+/** Todo lo que pinta una cita: tras moverla, cancelarla o apuntar una nueva,
+ * la agenda, el Panel y el resumen se vuelven a pedir. La exporta para el
+ * formulario de «Nueva cita» (components/agenda/nueva-cita.tsx). */
+export function invalidarAgenda(queryClient: ReturnType<typeof useQueryClient>) {
   return Promise.all([
     queryClient.invalidateQueries({ queryKey: ["agenda-escritorio"] }),
     queryClient.invalidateQueries({ queryKey: ["agenda-panel"] }),
