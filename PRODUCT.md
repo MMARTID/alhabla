@@ -45,8 +45,9 @@ Existe porque en estos sectores **llamada perdida = cita perdida = ingreso perdi
 no tiene ni recepcionista ni forma de contestar mientras trabaja.
 
 El éxito se mide en citas que antes se caían y ahora entran, no en minutos hablados ni en
-conversaciones mantenidas. De ahí que el producto lleve calculadora de pérdida de ingresos
-(`RevenueLossCalculator`) y precios argumentados por ROI en `/planes`.
+conversaciones mantenidas. De ahí que la web lleve una calculadora de llamadas perdidas
+(`/herramientas/calculadora-de-llamadas-perdidas`, `web/src/components/herramientas/`) y precios
+argumentados por ROI en `/planes`.
 
 ### Visión del fundador (29-10-2026)
 
@@ -86,12 +87,13 @@ Lo que un producto vecino no podría copiar honestamente:
   responde, la cita queda pendiente, el dueño recibe un WhatsApp con botones («La apunté yo»,
   «Reintentar», «Reconectar») y se reintenta cada 6 h durante 48 h: nunca se reserva a ciegas. La
   agenda del negocio es la fuente de verdad, no una promesa que luego hay que repasar a mano.
-- **Vertical, no constructor genérico de agentes.** Cinco nichos españoles concretos con
-  plantillas de servicios, instrucciones por sector y textos de onboarding propios
-  (`backend/src/lib/businessType.ts`, `web/src/lib/niche-landings.ts`). Una peluquería y una
-  clínica de fisioterapia no leen ni configuran lo mismo. La web tiene además página para
-  pestañas y cejas, spa y masajes y peluquería canina, que en el backend son «otros» (servicios
-  genéricos en el alta).
+- **Vertical, no constructor genérico de agentes.** Cinco nichos españoles con plantillas de
+  servicios, instrucciones por sector y textos de onboarding propios
+  (`backend/src/lib/businessType.ts`). Una peluquería y una clínica de fisioterapia no leen ni
+  configuran lo mismo. La web tiene ocho landings de sector (`web/src/lib/sectores/`, un
+  fichero por oficio, con sus guiones en `lib/relato-guiones.ts` y `lib/gestor-guiones.ts`):
+  las cinco y pestañas y cejas, spa y masajes y peluquería canina, que en el backend son «otros»
+  (servicios genéricos en el alta).
 - **Reparto por especialidad, no cola ciega.** Cada profesional tiene un nivel por servicio
   (especialista / lo hace / no sugerir). El agente recomienda al especialista una vez y reserva
   igualmente si el cliente insiste; nunca dice que alguien «no se le da bien».
@@ -176,7 +178,7 @@ a Telnyx.
 - **Herramientas que el negocio ya tiene:** Google Calendar, Outlook o Apple/iCloud como agenda,
   su número de teléfono actual, y el teléfono como canal principal de reserva.
 - **Evaluación antes de comprar:** demo de voz pública en el navegador (requiere micrófono y
-  WebRTC, vía Telnyx) y la calculadora de pérdida de ingresos.
+  WebRTC, vía Telnyx) y la calculadora de llamadas perdidas.
 - **Comercial:** prueba de 7 días y suscripción Stripe, precios sin IVA (desde el 2026-10-16).
   `inicio` 59 € + IVA/mes (200 min, 0,30 €/min extra), `pro` 139 € + IVA/mes (600 min, 0,25 €/min
   extra, plan destacado), `scale` 269 € + IVA/mes (1.500 min, 0,20 €/min extra). Precio de fundador
@@ -283,11 +285,11 @@ Gestor» (solo en código), «agenda real», «competitividad», «productividad
 
 **Lo que existe y es real**
 
-- Más de quince estadísticas de sector con fuente citada en
-  `web/src/lib/niche-landings.ts` — El Confidencial Digital, Estética Magazine, Zenoti,
-  STANPA / El Periódico, Doctoralia, safina.ai, heilo.io, entre otras.
-- Citas textuales de profesionales del sector recogidas en prensa: Excelsior Barber Studio
-  (Diario de Mallorca), David Aranda de Estetical (Crónica Global), Estetical (Facebook).
+- Más de quince estadísticas de sector con fuente citada (El Confidencial Digital, Estética
+  Magazine, Zenoti, STANPA / El Periódico, Doctoralia, safina.ai, heilo.io, entre otras) y citas
+  textuales de profesionales recogidas en prensa (Excelsior Barber Studio en Diario de Mallorca,
+  David Aranda de Estetical en Crónica Global). Salieron de la web el 29-10-2026 con las landings
+  cortas; siguen en el historial (`git show 34d2573:web/src/lib/niche-landings.ts`).
   **Hablan del problema, no de Alhabla.** No son testimonios de cliente y no deben presentarse
   como tales.
 - Producto funcional y demostrable: demo de voz pública en el navegador.
