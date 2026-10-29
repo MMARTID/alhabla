@@ -67,3 +67,21 @@ export function errorDeTramos(dia: ScheduleDay): string | null {
   }
   return null;
 }
+
+/**
+ * Si la recepcionista tiene un horario con el que reservar. El backend solo
+ * acepta la forma estructurada (`version: 1` y los siete días; ver
+ * `checkBusinessHours` en backend/src/lib/businessSchedule.ts) y, sin ella,
+ * no ofrece ni un hueco (`BUSINESS_HOURS_NOT_CONFIGURED`). Una semana con
+ * todos los días cerrados tampoco deja reservar nada. El registro crea el
+ * negocio con `schedule: {}` y el alta sin ficha de Google no lo pide.
+ */
+export function horarioConfigurado(valor: unknown): boolean {
+  if (!valor || typeof valor !== "object") return false;
+  const { version, week } = valor as { version?: unknown; week?: unknown };
+  if (version !== 1 || !week || typeof week !== "object") return false;
+  const semana = week as Partial<Record<WeekDay, Partial<ScheduleDay> | null>>;
+  const dias = DIAS_DEL_HORARIO.map(({ key }) => semana[key]);
+  if (dias.some((dia) => !dia || typeof dia !== "object")) return false;
+  return dias.some((dia) => dia?.enabled === true && Array.isArray(dia.intervals) && dia.intervals.length > 0);
+}

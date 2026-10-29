@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { errorDeTramos, resumenDeHorario } from "@/lib/horario";
+import { errorDeTramos, horarioConfigurado, resumenDeHorario } from "@/lib/horario";
 import type { BusinessSchedule, ScheduleDay } from "@/lib/types";
 
 const abierto = (...tramos: [string, string][]): ScheduleDay => ({
@@ -61,5 +61,29 @@ describe("errorDeTramos", () => {
     expect(errorDeTramos(abierto(["14:00", "09:00"]))).toBe("El cierre debe ser posterior a la apertura.");
     expect(errorDeTramos(abierto(["16:00", "20:00"], ["09:00", "17:00"]))).toBe("Los tramos no pueden solaparse.");
     expect(errorDeTramos(abierto(["16:00", "20:00"], ["09:00", "14:00"]))).toBeNull();
+  });
+});
+
+describe("horarioConfigurado", () => {
+  it("el `{}` del registro no es un horario", () => {
+    expect(horarioConfigurado({})).toBe(false);
+    expect(horarioConfigurado(null)).toBe(false);
+    expect(horarioConfigurado(undefined)).toBe(false);
+  });
+
+  it("sin la forma estructurada (versión y los siete días) tampoco", () => {
+    const completo = horario({ monday: abierto(["09:00", "14:00"]) });
+    const semana: Partial<BusinessSchedule["week"]> = { ...completo.week };
+    delete semana.sunday;
+    expect(horarioConfigurado({ version: 1, week: semana })).toBe(false);
+    expect(horarioConfigurado({ ...completo, version: 2 })).toBe(false);
+  });
+
+  it("con todos los días cerrados no hay dónde reservar", () => {
+    expect(horarioConfigurado(horario({}))).toBe(false);
+  });
+
+  it("con un día abierto, sí", () => {
+    expect(horarioConfigurado(horario({ friday: abierto(["09:00", "14:00"]) }))).toBe(true);
   });
 });

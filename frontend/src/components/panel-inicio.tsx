@@ -18,6 +18,10 @@ function DashboardContent() {
   const esMovil = useEsMovil();
 
   const [calendarStatus, setCalendarStatus] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  // `?desvio=abrir` (el botón de después del pago): abre los pasos del
+  // desvío. Un contador y no un booleano para que volver a pedirlo los abra
+  // otra vez aunque se hubieran cerrado.
+  const [abrirDesvio, setAbrirDesvio] = useState(0);
 
   useEffect(() => {
     if (hasToken === false) {
@@ -42,6 +46,11 @@ function DashboardContent() {
 
     if (searchParams.get("outlook_success")) {
       setCalendarStatus({ type: "success", message: "Outlook Calendar está conectado correctamente." });
+      router.replace("/");
+    }
+
+    if (searchParams.get("desvio") === "abrir") {
+      setAbrirDesvio((actual) => actual + 1);
       router.replace("/");
     }
   }, [hasToken, router, searchParams]);
@@ -79,10 +88,10 @@ function DashboardContent() {
   }
 
   if (esMovil) {
-    return <InicioMovil business={business} avisoDeCalendario={calendarStatus} />;
+    return <InicioMovil business={business} avisoDeCalendario={calendarStatus} abrirDesvio={abrirDesvio} />;
   }
 
-  return <PanelEscritorio business={business} avisoDeCalendario={calendarStatus} />;
+  return <PanelEscritorio business={business} avisoDeCalendario={calendarStatus} abrirDesvio={abrirDesvio} />;
 }
 
 export function PanelInicio() {

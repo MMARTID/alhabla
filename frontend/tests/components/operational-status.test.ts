@@ -11,13 +11,29 @@ const CALENDARIO_CONECTADO: ActiveCalendar = {
   lastError: null,
 };
 
-function recepcionista(cambios: Partial<Business>) {
+const abierto = { enabled: true, intervals: [{ start: "09:00", end: "14:00" }] };
+const cerrado = { enabled: false, intervals: [] };
+const HORARIO = {
+  version: 1,
+  week: {
+    monday: abierto,
+    tuesday: abierto,
+    wednesday: abierto,
+    thursday: abierto,
+    friday: abierto,
+    saturday: cerrado,
+    sunday: cerrado,
+  },
+  exceptions: [],
+};
+function senales(cambios: Partial<Business>) {
   const business = {
     id: "biz1",
     name: "Peluquería Ana",
     active: true,
     subscriptionStatus: "ACTIVE",
     callsSuspendedAt: null,
+    schedule: HORARIO,
     activeCalendar: CALENDARIO_CONECTADO,
     ...cambios,
   } as Business;
@@ -26,7 +42,11 @@ function recepcionista(cambios: Partial<Business>) {
     agentActive: true,
     phone: undefined,
     forwardingStatus: null,
-  }).find((item) => item.key === "agent");
+  });
+}
+
+function recepcionista(cambios: Partial<Business>) {
+  return senales(cambios).find((item) => item.key === "agent");
 }
 
 describe("buildOperationalStatus — recepcionista y suscripción", () => {
@@ -66,34 +86,30 @@ describe("buildOperationalStatus — recepcionista y suscripción", () => {
 // (voiceTools: check_availability y book_appointment). «Atendiendo llamadas»
 // a secas escondía que el negocio no estaba recibiendo citas.
 describe("buildOperationalStatus — recepcionista sin calendario", () => {
-  it("sin ningún calendario conectado dice que atiende pero no reserva, y manda a conectarlo", () => {
-    const item = recepcionista({ activeCalendar: null });
+  it("sin ningún calendario conectado dice que atiende pero no reserva, y manda a elegir agenda", () => {
+    const items = senales({ activeCalendar: null });
+    const item = items.find((señal) => señal.key === "agent");
 
-    expect(item?.value).toBe("Atiende, pero no reserva");
+    expect(item?.value).toBe("Atiende, pero no reserva: falta elegir dónde reservar");
     expect(item?.tone).toBe("warning");
     expect(item?.action).toMatchObject({
       label: "Elegir agenda",
       href: "/agente?section=calendar-section",
     });
+    // El aviso ya lo da la señal «Agenda»: el chip no lo cuenta dos veces.
+    expect(item?.cubiertoPor).toBe("calendar");
+    expect(items.find((señal) => señal.key === "calendar")?.tone).toBe("warning");
+  });
+
+  it("en modo calendario externo sin conectar, pide conectarlo", () => {
+    expect(
+      recepcionista({ activeCalendar: null, modoDeAgenda: "externo" })?.value
+    ).toBe("Atiende, pero no reserva: falta conectar el calendario");
   });
 
   // PLAN-AGENDA-ALHABLA.md: en la agenda de Alhabla se reserva sin calendario.
   it("en la agenda de Alhabla atiende y reserva, y la tarjeta Agenda lo dice", () => {
-    const business = {
-      id: "biz1",
-      name: "Peluquería Ana",
-      active: true,
-      subscriptionStatus: "ACTIVE",
-      callsSuspendedAt: null,
-      activeCalendar: null,
-      modoDeAgenda: "alhabla",
-    } as Business;
-    const items = buildOperationalStatus({
-      business,
-      agentActive: true,
-      phone: undefined,
-      forwardingStatus: null,
-    });
+    const items = senales({ activeCalendar: null, modoDeAgenda: "alhabla" });
 
     expect(items.find((item) => item.key === "agent")?.value).toBe("Atendiendo llamadas");
     expect(items.find((item) => item.key === "calendar")).toMatchObject({
@@ -112,7 +128,7 @@ describe("buildOperationalStatus — recepcionista sin calendario", () => {
       },
     });
 
-    expect(item?.value).toBe("Atiende, pero no reserva");
+    expect(item?.value).toBe("Atiende, pero no reserva: el calendario se desconectó");
     expect(item?.action).toMatchObject({ label: "Reconectar agenda" });
   });
 
@@ -122,6 +138,46 @@ describe("buildOperationalStatus — recepcionista sin calendario", () => {
     ).toBe("No contesta: sin plan activo");
     expect(recepcionista({ activeCalendar: null, active: false })?.value).toBe(
       "Inactiva"
+    );
+  });
+});
+
+describe("buildOperationalStatus — recepcionista sin horario", () => {
+  it("sin horario (el `{}` del registro) no dice «Atendiendo llamadas»", () => {
+    const item = recepcionista({ schedule: {} });
+
+    expect(item?.value).toBe("Atiende, pero no reserva: falta el horario");
+    expect(item?.tone).toBe("warning");
+    expect(item?.action).toMatchObject({ href: "/agente?section=business-hours" });
+    // Ninguna otra señal habla del horario: este aviso cuenta.
+    expect(item?.cubiertoPor).toBeUndefined();
+  });
+
+  it("con todos los días cerrados tampoco reserva", () => {
+    const item = recepcionista({
+      schedule: { ...HORARIO, week: { ...HORARIO.week, monday: cerrado, tuesday: cerrado, wednesday: cerrado, thursday: cerrado, friday: cerrado } },
+    });
+
+    expect(item?.value).toBe("Atiende, pero no reserva: falta el horario");
+  });
+
+  // La agenda de Alhabla también necesita el horario para ofrecer huecos.
+  it("en la agenda de Alhabla sin horario tampoco reserva", () => {
+    expect(
+      recepcionista({ schedule: {}, activeCalendar: null, modoDeAgenda: "alhabla" })?.value
+    ).toBe("Atiende, pero no reserva: falta el horario");
+  });
+
+  it("sin horario ni agenda, nombra las dos y manda primero al horario", () => {
+    const item = recepcionista({ schedule: {}, activeCalendar: null });
+
+    expect(item?.value).toBe("Atiende, pero no reserva: faltan el horario y la agenda");
+    expect(item?.action).toMatchObject({ href: "/agente?section=business-hours" });
+  });
+
+  it("la suspensión por impago manda sobre la falta de horario", () => {
+    expect(recepcionista({ schedule: {}, callsSuspendedAt: "2026-10-01T00:00:00Z" })?.value).toBe(
+      "Suspendida por impago"
     );
   });
 });
