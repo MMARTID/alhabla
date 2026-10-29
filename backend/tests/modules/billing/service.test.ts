@@ -580,6 +580,22 @@ describe("getBillingSummary", () => {
     expect(result?.planId).toBe("inicio");
     expect(result?.precioDeFundador).toBe(true);
   });
+
+  it("el límite de profesionales: el del plan con suscripción y ninguno antes del checkout", async () => {
+    mockedCallAggregate.mockResolvedValue({ _sum: { durationSecs: 0 } } as any);
+
+    mockedBusinessFindUnique.mockResolvedValue(buildBusiness() as any);
+    expect((await getBillingSummary(businessId))?.maxProfessionals).toBe(3);
+
+    mockedBusinessFindUnique.mockResolvedValue(
+      buildBusiness({
+        stripeSubscriptionId: null,
+        stripePriceId: null,
+        subscriptionStatus: null,
+      }) as any
+    );
+    expect((await getBillingSummary(businessId))?.maxProfessionals).toBeNull();
+  });
 });
 
 describe("createCheckoutSession", () => {
@@ -690,7 +706,11 @@ describe("createCheckoutSession", () => {
 
   it("crea sesión de checkout con cliente y trial", async () => {
     mockedBusinessFindUnique.mockResolvedValue(
-      buildBusiness({ subscriptionStatus: null, stripeCustomerId: null }) as any
+      buildBusiness({
+        subscriptionStatus: null,
+        stripeSubscriptionId: null,
+        stripeCustomerId: null,
+      }) as any
     );
     const sessionsCreate = vi.fn().mockResolvedValue({
       id: "cs_test_1",
@@ -698,8 +718,10 @@ describe("createCheckoutSession", () => {
     });
     const sessionsList = vi.fn().mockResolvedValue({ data: [] });
     const customersCreate = vi.fn().mockResolvedValue({ id: customerId });
+    const subscriptionsList = vi.fn().mockResolvedValue({ data: [] });
     mockedGetStripeClient.mockReturnValue({
       customers: { create: customersCreate },
+      subscriptions: { list: subscriptionsList },
       checkout: { sessions: { create: sessionsCreate, list: sessionsList, expire: vi.fn() } },
     } as any);
 
@@ -717,11 +739,121 @@ describe("createCheckoutSession", () => {
           { price: priceId, quantity: 1 },
           { price: "price_test_extra_inicio" },
         ],
+        metadata: expect.objectContaining({ diasDePrueba: "7" }),
         subscription_data: expect.objectContaining({
           trial_period_days: 7,
         }),
       })
     );
+    // Sin rastro en la base de datos, se pregunta a Stripe por el cliente.
+    expect(subscriptionsList).toHaveBeenCalledWith({
+      customer: customerId,
+      status: "all",
+      limit: 1,
+    });
+  });
+
+  // Hallazgo 20 de docs/auditorias/2026-10-28-auditoria-de-producto.md:
+  // cancelar y volver a contratar daba otros 7 días gratis cada vez.
+  it("sin días de prueba si el negocio ya tuvo una suscripción (cancelada)", async () => {
+    mockedBusinessFindUnique.mockResolvedValue(
+      buildBusiness({ subscriptionStatus: "CANCELED" }) as any
+    );
+    const sessionsCreate = vi.fn().mockResolvedValue({
+      id: "cs_test_2",
+      client_secret: "secret_sin_prueba",
+    });
+    const subscriptionsList = vi.fn();
+    mockedGetStripeClient.mockReturnValue({
+      customers: { create: vi.fn() },
+      subscriptions: { list: subscriptionsList },
+      checkout: {
+        sessions: {
+          create: sessionsCreate,
+          list: vi.fn().mockResolvedValue({ data: [] }),
+          expire: vi.fn(),
+        },
+      },
+    } as any);
+
+    const result = await createCheckoutSession({
+      businessId,
+      userId: "user_123",
+      planId: "inicio",
+    });
+
+    expect(result.clientSecret).toBe("secret_sin_prueba");
+    const params = sessionsCreate.mock.calls[0][0];
+    expect(params.subscription_data).not.toHaveProperty("trial_period_days");
+    expect(params.metadata.diasDePrueba).toBe("0");
+    // La base de datos ya lo dice: no hace falta preguntar a Stripe.
+    expect(subscriptionsList).not.toHaveBeenCalled();
+  });
+
+  it("sin días de prueba si Stripe tiene una suscripción anterior del cliente que la base de datos no conoce", async () => {
+    mockedBusinessFindUnique.mockResolvedValue(
+      buildBusiness({ subscriptionStatus: null, stripeSubscriptionId: null }) as any
+    );
+    const sessionsCreate = vi.fn().mockResolvedValue({
+      id: "cs_test_3",
+      client_secret: "secret_sin_prueba",
+    });
+    mockedGetStripeClient.mockReturnValue({
+      customers: { create: vi.fn() },
+      subscriptions: {
+        list: vi
+          .fn()
+          .mockResolvedValue({ data: [{ id: "sub_antigua", status: "canceled" }] }),
+      },
+      checkout: {
+        sessions: {
+          create: sessionsCreate,
+          list: vi.fn().mockResolvedValue({ data: [] }),
+          expire: vi.fn(),
+        },
+      },
+    } as any);
+
+    await createCheckoutSession({ businessId, userId: "user_123", planId: "inicio" });
+
+    expect(sessionsCreate.mock.calls[0][0].subscription_data).not.toHaveProperty(
+      "trial_period_days"
+    );
+  });
+
+  it("sin prueba no reutiliza una sesión abierta que llevaba los 7 días: la caduca y abre otra", async () => {
+    mockedBusinessFindUnique.mockResolvedValue(
+      buildBusiness({ subscriptionStatus: "CANCELED" }) as any
+    );
+    const sessionsCreate = vi.fn().mockResolvedValue({ client_secret: "secret_nueva" });
+    const expire = vi.fn().mockResolvedValue({});
+    mockedGetStripeClient.mockReturnValue({
+      customers: { create: vi.fn() },
+      subscriptions: { list: vi.fn() },
+      checkout: {
+        sessions: {
+          create: sessionsCreate,
+          list: vi.fn().mockResolvedValue({
+            data: [
+              // Anterior a los metadatos de la prueba: llevaba los 7 días.
+              { id: "cs_vieja", mode: "subscription", client_secret: "secret_vieja", metadata: { planId: "inicio" } },
+              { id: "cs_con_prueba", mode: "subscription", client_secret: "secret_con_prueba", metadata: { planId: "inicio", diasDePrueba: "7" } },
+            ],
+          }),
+          expire,
+        },
+      },
+    } as any);
+
+    const result = await createCheckoutSession({
+      businessId,
+      userId: "user_123",
+      planId: "inicio",
+    });
+
+    expect(result.clientSecret).toBe("secret_nueva");
+    expect(expire).toHaveBeenCalledWith("cs_vieja");
+    expect(expire).toHaveBeenCalledWith("cs_con_prueba");
   });
 
   // Los precios incluyen el IVA (aviso legal) y Stripe Tax lo desglosa en
@@ -763,7 +895,11 @@ describe("createCheckoutSession", () => {
 
   it("reutiliza una sesión de checkout ya abierta en vez de crear otra (hallazgo #10 de la auditoría)", async () => {
     mockedBusinessFindUnique.mockResolvedValue(
-      buildBusiness({ subscriptionStatus: null, stripeCustomerId: customerId }) as any
+      buildBusiness({
+        subscriptionStatus: null,
+        stripeSubscriptionId: null,
+        stripeCustomerId: customerId,
+      }) as any
     );
     const sessionsCreate = vi.fn();
     const sessionsList = vi.fn().mockResolvedValue({
@@ -774,6 +910,7 @@ describe("createCheckoutSession", () => {
     });
     mockedGetStripeClient.mockReturnValue({
       customers: { create: vi.fn() },
+      subscriptions: { list: vi.fn().mockResolvedValue({ data: [] }) },
       checkout: { sessions: { create: sessionsCreate, list: sessionsList, expire: vi.fn() } },
     } as any);
 

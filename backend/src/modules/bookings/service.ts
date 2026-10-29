@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { syncAgentToTelnyx } from "../../lib/telnyxAgentSync.js";
 import {
-  getPlanLimits,
+  maxProfesionalesDelNegocio,
   PlanLimitError,
   resolvePlanId,
 } from "../../lib/planFeatures.js";
@@ -259,13 +259,20 @@ async function ensureProfessionalSlotAvailable(
 ) {
   const business = await client.business.findUnique({
     where: { id: businessId },
-    select: { plan: true, stripePriceId: true },
+    select: {
+      plan: true,
+      stripePriceId: true,
+      stripeSubscriptionId: true,
+      subscriptionStatus: true,
+    },
   });
   if (!business) return;
 
-  const planId = resolvePlanId(business);
-  const { maxProfessionals } = getPlanLimits(planId);
+  // Sin suscripción (el alta, antes del checkout) no hay límite: ver
+  // maxProfesionalesDelNegocio.
+  const maxProfessionals = maxProfesionalesDelNegocio(business);
   if (maxProfessionals === null) return;
+  const planId = resolvePlanId(business);
 
   const activeCount = await client.professional.count({
     where: { businessId, active: true, deletedAt: null },
