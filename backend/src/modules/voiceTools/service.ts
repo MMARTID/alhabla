@@ -582,7 +582,8 @@ async function executeCheckAvailability(
       citaCambiada = await citaQueSeCambia(
         business.id,
         replacesBookingId,
-        call?.fromNumber
+        call?.fromNumber,
+        call?.id
       );
       if (!citaCambiada) {
         console.warn(
@@ -1086,14 +1087,17 @@ function esCitaDeQuienLlama(
  * La cita que el cliente quiere cambiar (`replacesBookingId`), si es suya,
  * sigue activa y no ha pasado; null si no. Mismo criterio que
  * cancel_appointment: nunca se fía de que el LLM solo pase ids de citas
- * propias.
+ * propias. La que se reservó en esta misma llamada (`conversacionId`, el id
+ * de la fila Call) es suya aunque llame con número oculto: es la vía para
+ * cambiarle la hora sin chocar con YA_HAY_CITA_EN_ESTA_LLAMADA.
  */
 async function citaQueSeCambia(
   businessId: string,
   bookingId: string,
-  callerNumber: string | null | undefined
+  callerNumber: string | null | undefined,
+  conversacionId?: string | null
 ): Promise<ReservaExcluida | null> {
-  if (!callerNumber) return null;
+  if (!callerNumber && !conversacionId) return null;
   const booking = await prisma.booking.findFirst({
     where: {
       id: bookingId,
@@ -1103,13 +1107,86 @@ async function citaQueSeCambia(
     },
     select: {
       id: true,
+      callId: true,
       clientPhone: true,
       externalEventId: true,
       call: { select: { fromNumber: true } },
     },
   });
-  if (!booking || !esCitaDeQuienLlama(booking, callerNumber)) return null;
+  if (!booking) return null;
+  const deEstaConversacion =
+    !!conversacionId && booking.callId === conversacionId;
+  if (!deEstaConversacion && !esCitaDeQuienLlama(booking, callerNumber)) {
+    return null;
+  }
   return { bookingId: booking.id, externalEventId: booking.externalEventId };
+}
+
+/**
+ * Una sola cita por llamada (hallazgo 7 de la auditoría del 28-10):
+ * `Booking.callId` es único y el upsert de book_appointment sustituía en
+ * silencio la cita ya reservada («y otra para mi hija»: el cliente oía dos
+ * confirmaciones y solo quedaba la última). Hay otra cita si la llamada ya
+ * tiene una reserva activa y lo que se pide no es cambiar ESA cita
+ * (replacesBookingId con su id) ni repetir exactamente la misma reserva (el
+ * reintento del tool call, que se resuelve sin crear nada). Misma hora y
+ * duración con otro nombre no es un reintento: es «y otra para mi hija a la
+ * misma hora», que antes se daba por reservada sin crear nada.
+ */
+function esOtraCitaEnLaMismaLlamada(
+  reservaDeLaLlamada: {
+    id: string;
+    isCancelled: boolean;
+    programedAt: Date;
+    durationMinutes: number;
+    clientName: string | null;
+  } | null,
+  citaCambiada: ReservaExcluida | null,
+  peticion: {
+    startDateTime: string;
+    durationMinutes: number;
+    clientName: string | undefined;
+  }
+): boolean {
+  if (!reservaDeLaLlamada || reservaDeLaLlamada.isCancelled) return false;
+  if (citaCambiada?.bookingId === reservaDeLaLlamada.id) return false;
+  const normalizar = (nombre: string) =>
+    nombre.trim().replace(/\s+/g, " ").toLocaleLowerCase("es");
+  const otroNombre =
+    !!reservaDeLaLlamada.clientName &&
+    !!peticion.clientName &&
+    normalizar(reservaDeLaLlamada.clientName) !==
+      normalizar(peticion.clientName);
+  const mismaReserva =
+    reservaDeLaLlamada.programedAt.getTime() ===
+      new Date(peticion.startDateTime).getTime() &&
+    reservaDeLaLlamada.durationMinutes === peticion.durationMinutes &&
+    !otroNombre;
+  return !mismaReserva;
+}
+
+/** Lo que oye el modelo cuando la llamada ya tiene su cita. Lleva el
+ * bookingId para que, si lo que quería era cambiar esa cita, sepa cómo. */
+function resultadoYaHayCita(
+  bookingId: string,
+  canal: "voice" | "client_chat",
+  telefonoDelNegocio: string | null
+): ResultadoDeTool {
+  const otraVia =
+    canal === "client_chat"
+      ? telefonoDelNegocio && isValidE164Phone(telefonoDelNegocio)
+        ? `que llame al negocio al ${telefonoDelNegocio}`
+        : "que llame al negocio"
+      : "que vuelva a llamar cuando termine esta llamada";
+  return {
+    success: true,
+    result: {
+      success: false,
+      code: "YA_HAY_CITA_EN_ESTA_LLAMADA",
+      bookingId,
+      message: `Esta ${canal === "client_chat" ? "conversación" : "llamada"} ya tiene una cita reservada y solo se puede cerrar una cita por ${canal === "client_chat" ? "conversación" : "llamada"}: no se ha reservado nada nuevo y la cita que ya tenía sigue igual. Si lo que quiere es cambiar la hora o el servicio de esa cita, vuelve a comprobar con check_availability pasando replacesBookingId = ${bookingId} y reserva con ese availabilityToken. Si es otra cita (para otra persona u otro servicio), dile que desde aquí no puedes reservarle una segunda y ${otraVia} para pedirla.`,
+    },
+  };
 }
 
 /**
@@ -1851,7 +1928,8 @@ async function executeBookAppointment(
       ? await citaQueSeCambia(
           business.id,
           draft.replacesBookingId,
-          call?.fromNumber
+          call?.fromNumber,
+          call?.id
         )
       : null;
     if (draft?.replacesBookingId && !citaCambiada) {
@@ -1860,6 +1938,41 @@ async function executeBookAppointment(
       );
     }
     const replacesBookingId = citaCambiada?.bookingId;
+
+    // Una sola cita por llamada. Se mira aquí, antes de los caminos que
+    // guardan la petición como pendiente (sin calendario, cerrojo ocupado):
+    // el reintento en segundo plano la descartaría en silencio porque la
+    // llamada ya tiene reserva. Dentro del cerrojo se vuelve a mirar con la
+    // lectura que manda (reservaPrevia).
+    const reservaDeLaLlamada = call
+      ? await prisma.booking.findUnique({
+          where: { callId: call.id },
+          select: {
+            id: true,
+            isCancelled: true,
+            programedAt: true,
+            durationMinutes: true,
+            clientName: true,
+          },
+        })
+      : null;
+    if (
+      reservaDeLaLlamada &&
+      esOtraCitaEnLaMismaLlamada(reservaDeLaLlamada, citaCambiada, {
+        startDateTime,
+        durationMinutes: effectiveDuration,
+        clientName,
+      })
+    ) {
+      console.warn(
+        `[VoiceTools] ${callLabel} pidió otra cita, pero la llamada ya tiene la reserva ${reservaDeLaLlamada.id} (negocio ${business.id}); no se sustituye`
+      );
+      return resultadoYaHayCita(
+        reservaDeLaLlamada.id,
+        canalDeLaTool(callId),
+        telefonoParaClientes(business)
+      );
+    }
 
     if (!hasCalendarConnection) {
       // `CALENDAR_NOT_CONNECTED` si el negocio nunca conectó un calendario;
@@ -2024,9 +2137,29 @@ async function executeBookAppointment(
               durationMinutes: true,
               isCancelled: true,
               cancelledAt: true,
+              clientName: true,
             },
           })
         : null;
+      // Segunda mirada, ya con el cerrojo: otra reserva de esta misma
+      // llamada pudo entrar entre la primera comprobación y aquí.
+      if (
+        reservaPrevia &&
+        esOtraCitaEnLaMismaLlamada(reservaPrevia, citaCambiada, {
+          startDateTime,
+          durationMinutes: effectiveDuration,
+          clientName,
+        })
+      ) {
+        console.warn(
+          `[VoiceTools] ${callLabel} pidió otra cita, pero la llamada ya tiene la reserva ${reservaPrevia.id} (negocio ${business.id}); no se sustituye`
+        );
+        return resultadoYaHayCita(
+          reservaPrevia.id,
+          canalDeLaTool(callId),
+          telefonoParaClientes(business)
+        );
+      }
       const reservaQueSeSustituye =
         reservaPrevia && !reservaPrevia.isCancelled
           ? {
@@ -2144,9 +2277,9 @@ async function executeBookAppointment(
       // externo creado para esta misma fecha/duración exactas (Telnyx
       // reintentando el tool call tras un timeout, por ejemplo), no se crea
       // un segundo evento — se confirma reutilizando el que ya existe. Una
-      // fecha/duración distinta sigue tratándose como un cambio de opinión
-      // legítimo del cliente (nueva reserva sobre la misma llamada), no
-      // como un reintento.
+      // fecha/duración distinta solo llega hasta aquí si es un cambio
+      // explícito de esa cita (replacesBookingId con su id); si no, ya se
+      // ha respondido YA_HAY_CITA_EN_ESTA_LLAMADA.
       if (call) {
         const existingBooking = reservaPrevia;
         // Una reserva cancelada en esta misma llamada NO es un reintento: su
@@ -2179,6 +2312,7 @@ async function executeBookAppointment(
             result: {
               success: true,
               message: "Cita agendada correctamente.",
+              bookingId: existingBooking.id,
               cuando: cuandoParaDecir(startDateTime, business.timezone || "Europe/Madrid"),
               professionalId: resolvedProfessionalId,
               professionalName: nombreParaElCliente(resolvedProfessionalName),
@@ -2310,8 +2444,9 @@ async function executeBookAppointment(
           }
         }
 
-        // El cliente cambió de hora dentro de la misma llamada: la reserva
-        // anterior se sobrescribe en la base de datos, pero su evento seguía
+        // El cliente cambió de hora dentro de la misma llamada (cambio
+        // explícito, con replacesBookingId = la reserva de esta llamada): la
+        // reserva anterior se sobrescribe en la base de datos, pero su evento seguía
         // vivo en el calendario del negocio. Además de duplicar la cita a
         // ojos del dueño, ese evento huérfano bloqueaba ese hueco para
         // siempre, porque ya no quedaba ninguna reserva local que lo
@@ -2462,6 +2597,9 @@ async function executeBookAppointment(
                   ? "La cita nueva queda reservada, pero no he podido anular la anterior: anúlala con cancel_appointment."
                   : "Cita agendada correctamente.",
             ...(citaAnterior ? { citaAnterior } : {}),
+            // Para cambiarle la hora en esta misma llamada
+            // (replacesBookingId en check_availability).
+            ...(reservaGuardadaId ? { bookingId: reservaGuardadaId } : {}),
             cuando: cuandoParaDecir(startDateTime, business.timezone || "Europe/Madrid"),
             eventLink: (result as { htmlLink?: string })?.htmlLink,
             professionalId: resolvedProfessionalId,

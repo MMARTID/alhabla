@@ -148,6 +148,11 @@ describe("helpers de formato", () => {
       "la conexión con tu calendario estaba caducada"
     );
     expect(motivoDeFallo("lo que sea")).toBe("tu calendario no respondió");
+    // El que escribe voiceTools cuando el negocio nunca conectó calendario
+    // (hallazgo 2 de la auditoría del 28-10): no es una conexión caducada.
+    expect(motivoDeFallo("CALENDAR_NOT_CONNECTED")).toBe(
+      "no tienes ningún calendario conectado"
+    );
     // El código que escribe voiceTools de verdad (codigoDeReconexion): antes
     // caía en «no respondió».
     for (const codigo of [

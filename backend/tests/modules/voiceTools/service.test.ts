@@ -1829,8 +1829,9 @@ describe("executeVoiceTool book_appointment — consentimiento SMS al cliente", 
       fromNumber: "+34600999888",
       businessId: "business_123",
     } as any);
-    // Sin externalEventId: la comprobación de idempotencia no se dispara.
-    mockedBookingFindUnique.mockResolvedValue({ id: "booking_1" } as any);
+    // La llamada aún no tiene reserva: con una activa, una hora distinta
+    // sería otra cita (YA_HAY_CITA_EN_ESTA_LLAMADA).
+    mockedBookingFindUnique.mockResolvedValue(null);
     // El id de la reserva sale del propio upsert (antes se releía).
     mockedBookingUpsert.mockResolvedValue({ id: "booking_1" } as any);
     mockedEnqueueSmsJob.mockResolvedValue(undefined);
@@ -2392,7 +2393,7 @@ describe("executeVoiceTool book_appointment — confirmación al cliente por Wha
     );
   });
 
-  it("cambiar de hora en la misma llamada borra el evento de la reserva previa buscándolo en su hora PREVIA y registra lo que pasó", async () => {
+  it("cambiar de hora en la misma llamada (replacesBookingId con su bookingId) borra el evento de la reserva previa buscándolo en su hora PREVIA y registra lo que pasó", async () => {
     const horaPrevia = new Date(Date.now() + 24 * 60 * 60_000);
     mockedBookingFindUnique.mockResolvedValue({
       id: "booking_1",
@@ -2403,6 +2404,14 @@ describe("executeVoiceTool book_appointment — confirmación al cliente por Wha
       durationMinutes: 45,
       isCancelled: false,
       cancelledAt: null,
+    } as any);
+    // La reserva de esta llamada, para citaQueSeCambia.
+    mockedBookingFindFirst.mockResolvedValue({
+      id: "booking_1",
+      callId: "call_row_1",
+      clientPhone: null,
+      externalEventId: "evt_1",
+      call: { fromNumber: "+34600999888" },
     } as any);
     mockedBookAppointment.mockResolvedValue({
       id: "evt_2",
@@ -2416,9 +2425,33 @@ describe("executeVoiceTool book_appointment — confirmación al cliente por Wha
       .spyOn(console, "warn")
       .mockImplementation(() => undefined);
 
-    const result = await reservar();
+    const { result: comprobacion } = await executeVoiceTool({
+      businessId: "business_123",
+      toolName: "check_availability",
+      callId: "call_vapi_1",
+      params: {
+        startDateTime: farFutureStart,
+        durationMinutes: 30,
+        replacesBookingId: "booking_1",
+      },
+    });
+    const result = await executeVoiceTool(
+      buildBookAppointmentInput({
+        callId: "call_vapi_1",
+        params: {
+          clientName: "María",
+          availabilityToken: comprobacion!.availabilityToken,
+          smsConsent: true,
+        },
+      })
+    );
 
     expect(result.result.success).toBe(true);
+    // La misma fila se mueve: no se anula nada aparte.
+    expect(mockedCancelarReserva).not.toHaveBeenCalled();
+    expect(mockedBookingUpsert).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { callId: "call_row_1" } })
+    );
     expect(mockedCancelAppointment).toHaveBeenCalledTimes(1);
     expect(mockedCancelAppointment).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -4570,5 +4603,489 @@ describe("executeVoiceTool — agenda de Alhabla (modoDeAgenda = alhabla)", () =
     expect(result.result.code).toBe("GOOGLE_CALENDAR_RECONNECT_REQUIRED");
     expect(mockedBookAppointment).not.toHaveBeenCalled();
     expect(mockedLeadCreate).toHaveBeenCalled();
+  });
+});
+
+// Hallazgo 7 de la auditoría del 28-10: Booking.callId es único y el upsert
+// de book_appointment sustituía en silencio la cita ya reservada en la
+// llamada. Ahora una segunda cita se rechaza; cambiar la hora de la misma
+// cita sigue siendo posible, de forma explícita (replacesBookingId).
+describe("executeVoiceTool book_appointment — una cita por llamada", () => {
+  const inicio = "2026-11-20T17:30:00+01:00";
+  const horaReservada = new Date("2026-11-20T10:00:00+01:00");
+  const reservaDeLaLlamada = {
+    id: "booking_1",
+    externalEventId: "evt_1",
+    externalCalendarProvider: "google",
+    externalCalendarId: "primary",
+    programedAt: horaReservada,
+    durationMinutes: 30,
+    isCancelled: false,
+    cancelledAt: null,
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    clearWhatsappEnv();
+    mockedBusinessFindUnique.mockResolvedValue(buildBusiness() as any);
+    mockedCheckBusinessHours.mockReturnValue({
+      success: true,
+      isOpen: true,
+    } as any);
+    mockedBookAppointment.mockResolvedValue({ id: "evt_2" } as any);
+    mockedGetBusyIntervals.mockResolvedValue({
+      intervals: [],
+      calendarAvailabilityKnown: true,
+    } as any);
+    mockedProfessionalFindFirst.mockResolvedValue({
+      id: "professional_123",
+      name: "Ana",
+    } as any);
+    mockedServiceFindMany.mockResolvedValue([]);
+    mockedCheckAvailability.mockResolvedValue({
+      available: true,
+      message: "",
+      capacityUsed: 0,
+      capacityTotal: 1,
+      availableProfessionals: [{ id: "professional_123", name: "Ana" }],
+    } as any);
+    mockedCallFindUnique.mockResolvedValue({
+      id: "call_row_1",
+      fromNumber: "+34600999888",
+      businessId: "business_123",
+      startedAt: new Date(),
+    } as any);
+    mockedBookingFindUnique.mockResolvedValue(reservaDeLaLlamada as any);
+    mockedBookingFindFirst.mockResolvedValue(null);
+    mockedBookingUpsert.mockResolvedValue({ id: "booking_1" } as any);
+    mockedCancelAppointment.mockResolvedValue({ resultado: "borrado" } as any);
+    mockedLeadCreate.mockResolvedValue({ id: "lead_1" } as any);
+  });
+
+  function reservarSinToken(callId = "call_1", startDateTime = inicio) {
+    return executeVoiceTool({
+      businessId: "business_123",
+      toolName: "book_appointment",
+      callId,
+      params: {
+        clientName: "Lucía",
+        startDateTime,
+        durationMinutes: 30,
+        smsConsent: true,
+      },
+    });
+  }
+
+  it("una segunda cita en la misma llamada se rechaza con YA_HAY_CITA_EN_ESTA_LLAMADA y la primera no se toca", async () => {
+    const avisos = vi
+      .spyOn(console, "warn")
+      .mockImplementation(() => undefined);
+
+    const result = await reservarSinToken();
+
+    expect(result.result).toMatchObject({
+      success: false,
+      code: "YA_HAY_CITA_EN_ESTA_LLAMADA",
+      bookingId: "booking_1",
+    });
+    const mensaje = result.result!.message as string;
+    expect(mensaje).toContain("una cita por llamada");
+    expect(mensaje).toContain("replacesBookingId = booking_1");
+    expect(mensaje).toContain("vuelva a llamar");
+    // Ni evento nuevo, ni upsert, ni borrado del evento de la primera, ni
+    // cita pendiente que el reintento descartaría en silencio.
+    expect(mockedBookAppointment).not.toHaveBeenCalled();
+    expect(mockedBookingUpsert).not.toHaveBeenCalled();
+    expect(mockedCancelAppointment).not.toHaveBeenCalled();
+    expect(mockedLeadCreate).not.toHaveBeenCalled();
+    // Se mira antes de pedir el cerrojo.
+    expect(vi.mocked(adquirirCerrojoDeReserva)).not.toHaveBeenCalled();
+    expect(avisos).toHaveBeenCalledWith(
+      expect.stringContaining(
+        "pidió otra cita, pero la llamada ya tiene la reserva booking_1 (negocio business_123)"
+      )
+    );
+    avisos.mockRestore();
+  });
+
+  it("también sin calendario conectado: gana YA_HAY_CITA y no se guarda una cita pendiente", async () => {
+    mockedBusinessFindUnique.mockResolvedValue(
+      buildBusiness({ calendarConnections: [] }) as any
+    );
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+    const result = await reservarSinToken();
+
+    expect(result.result).toMatchObject({
+      code: "YA_HAY_CITA_EN_ESTA_LLAMADA",
+    });
+    expect(mockedLeadCreate).not.toHaveBeenCalled();
+  });
+
+  it("desde el chat de WhatsApp el mensaje manda llamar al negocio, con su teléfono", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+    const result = await reservarSinToken("whatsapp:chat:conv_1");
+
+    expect(result.result).toMatchObject({
+      code: "YA_HAY_CITA_EN_ESTA_LLAMADA",
+    });
+    expect(result.result!.message).toContain(
+      "que llame al negocio al +34600111222"
+    );
+  });
+
+  it("con hideOwnerNumberFromClients el chat no da el teléfono del dueño", async () => {
+    mockedBusinessFindUnique.mockResolvedValue(
+      buildBusiness({ hideOwnerNumberFromClients: true }) as any
+    );
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+    const result = await reservarSinToken("whatsapp:chat:conv_1");
+
+    expect(result.result!.message).toContain("que llame al negocio");
+    expect(result.result!.message).not.toContain("+34600111222");
+  });
+
+  it("cambiar otra cita (replacesBookingId de otra llamada) con la de esta ya reservada tampoco la sustituye", async () => {
+    mockedBookingFindFirst.mockResolvedValue({
+      id: "booking_vieja",
+      callId: "call_row_antigua",
+      clientPhone: null,
+      externalEventId: "evt_viejo",
+      call: { fromNumber: "+34600999888" },
+    } as any);
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+    const { result: comprobacion } = await executeVoiceTool({
+      businessId: "business_123",
+      toolName: "check_availability",
+      callId: "call_1",
+      params: {
+        startDateTime: inicio,
+        durationMinutes: 30,
+        replacesBookingId: "booking_vieja",
+      },
+    });
+    const result = await executeVoiceTool({
+      businessId: "business_123",
+      toolName: "book_appointment",
+      callId: "call_1",
+      params: {
+        clientName: "Lucía",
+        availabilityToken: comprobacion!.availabilityToken,
+      },
+    });
+
+    expect(result.result).toMatchObject({
+      code: "YA_HAY_CITA_EN_ESTA_LLAMADA",
+      bookingId: "booking_1",
+    });
+    expect(mockedBookingUpsert).not.toHaveBeenCalled();
+    expect(mockedCancelarReserva).not.toHaveBeenCalled();
+  });
+
+  it("cambiar la hora de la cita de esta llamada (replacesBookingId = su bookingId) la mueve, aunque llame con número oculto", async () => {
+    mockedCallFindUnique.mockResolvedValue({
+      id: "call_row_1",
+      fromNumber: "anonymous",
+      businessId: "business_123",
+      startedAt: new Date(),
+    } as any);
+    // Con número oculto la titularidad por teléfono no vale: vale que sea
+    // la reserva de esta misma llamada.
+    mockedBookingFindFirst.mockResolvedValue({
+      id: "booking_1",
+      callId: "call_row_1",
+      clientPhone: "+34611222333",
+      externalEventId: "evt_1",
+      call: { fromNumber: "anonymous" },
+    } as any);
+
+    const { result: comprobacion } = await executeVoiceTool({
+      businessId: "business_123",
+      toolName: "check_availability",
+      callId: "call_1",
+      params: {
+        startDateTime: inicio,
+        durationMinutes: 30,
+        replacesBookingId: "booking_1",
+      },
+    });
+    expect(comprobacion!.available).toBe(true);
+    const result = await executeVoiceTool({
+      businessId: "business_123",
+      toolName: "book_appointment",
+      callId: "call_1",
+      params: {
+        clientName: "Lucía",
+        clientPhone: "+34611222333",
+        availabilityToken: comprobacion!.availabilityToken,
+      },
+    });
+
+    expect(result.result).toMatchObject({
+      success: true,
+      bookingId: "booking_1",
+    });
+    expect(mockedBookingUpsert).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { callId: "call_row_1" } })
+    );
+    // La misma fila se mueve: nada que anular aparte, y el evento de la
+    // hora anterior se borra.
+    expect(mockedCancelarReserva).not.toHaveBeenCalled();
+    expect(mockedCancelAppointment).toHaveBeenCalledWith(
+      expect.objectContaining({ eventId: "evt_1" })
+    );
+  });
+
+  it("el reintento exacto del tool call (misma hora y duración) sigue respondiendo éxito sin crear nada", async () => {
+    mockedBookingFindUnique.mockResolvedValue({
+      ...reservaDeLaLlamada,
+      programedAt: new Date(
+        normalizeVoiceToolDateTime(inicio, "Europe/Madrid")
+      ),
+    } as any);
+
+    const result = await reservarSinToken();
+
+    expect(result.result).toMatchObject({
+      success: true,
+      bookingId: "booking_1",
+    });
+    expect(mockedBookAppointment).not.toHaveBeenCalled();
+    expect(mockedBookingUpsert).not.toHaveBeenCalled();
+  });
+
+  it("misma hora y duración con el mismo nombre (otra forma de escribirlo) es el reintento: éxito sin crear nada", async () => {
+    mockedBookingFindUnique.mockResolvedValue({
+      ...reservaDeLaLlamada,
+      clientName: "lucía ",
+      programedAt: new Date(
+        normalizeVoiceToolDateTime(inicio, "Europe/Madrid")
+      ),
+    } as any);
+
+    const result = await reservarSinToken();
+
+    expect(result.result).toMatchObject({ success: true });
+    expect(mockedBookAppointment).not.toHaveBeenCalled();
+  });
+
+  it("misma hora y duración pero a otro nombre («y otra para mi hija a la misma hora») es otra cita: YA_HAY_CITA, no un falso éxito", async () => {
+    mockedBookingFindUnique.mockResolvedValue({
+      ...reservaDeLaLlamada,
+      clientName: "Marta",
+      programedAt: new Date(
+        normalizeVoiceToolDateTime(inicio, "Europe/Madrid")
+      ),
+    } as any);
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+    const result = await reservarSinToken();
+
+    expect(result.result).toMatchObject({
+      success: false,
+      code: "YA_HAY_CITA_EN_ESTA_LLAMADA",
+    });
+    expect(mockedBookAppointment).not.toHaveBeenCalled();
+    expect(mockedBookingUpsert).not.toHaveBeenCalled();
+  });
+
+  it("si la cita de la llamada se canceló, se puede volver a reservar (reactiva la fila)", async () => {
+    mockedBookingFindUnique.mockResolvedValue({
+      ...reservaDeLaLlamada,
+      isCancelled: true,
+      cancelledAt: new Date(),
+    } as any);
+
+    const result = await reservarSinToken();
+
+    expect(result.result).toMatchObject({ success: true });
+    expect(mockedBookingUpsert).toHaveBeenCalledTimes(1);
+  });
+
+  it("la primera cita de la llamada devuelve su bookingId", async () => {
+    mockedBookingFindUnique.mockResolvedValue(null);
+
+    const result = await reservarSinToken();
+
+    expect(result.result).toMatchObject({
+      success: true,
+      bookingId: "booking_1",
+    });
+  });
+
+  it("si otra reserva de la llamada entra mientras espera el cerrojo, la segunda mirada la rechaza igual", async () => {
+    // Primera lectura (antes del cerrojo): sin reserva; segunda (dentro):
+    // ya está la que entró entre medias.
+    mockedBookingFindUnique
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(reservaDeLaLlamada as any);
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+    const result = await reservarSinToken();
+
+    expect(result.result).toMatchObject({
+      code: "YA_HAY_CITA_EN_ESTA_LLAMADA",
+      bookingId: "booking_1",
+    });
+    expect(mockedBookAppointment).not.toHaveBeenCalled();
+    expect(mockedBookingUpsert).not.toHaveBeenCalled();
+    // El cerrojo se suelta.
+    expect(vi.mocked(releaseBookingLock)).toHaveBeenCalledWith(
+      "business_123",
+      "token"
+    );
+  });
+});
+
+// La misma regla en la agenda de Alhabla (PLAN-AGENDA-ALHABLA.md, fase 1):
+// la cita vive solo en Postgres, sin evento externo que crear ni borrar.
+describe("executeVoiceTool book_appointment — una cita por llamada en la agenda de Alhabla", () => {
+  const inicio = "2026-11-20T17:30:00+01:00";
+  const reservaDeLaLlamada = {
+    id: "booking_1",
+    externalEventId: null,
+    externalCalendarProvider: null,
+    externalCalendarId: null,
+    programedAt: new Date("2026-11-20T10:00:00+01:00"),
+    durationMinutes: 30,
+    isCancelled: false,
+    cancelledAt: null,
+    clientName: "Lucía",
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    clearWhatsappEnv();
+    mockedBusinessFindUnique.mockResolvedValue(
+      buildBusiness({ modoDeAgenda: "alhabla", calendarConnections: [] }) as any
+    );
+    mockedCheckBusinessHours.mockReturnValue({
+      success: true,
+      isOpen: true,
+    } as any);
+    // calendarService está mockeado: en la agenda de Alhabla el real
+    // devuelve esto, sin evento.
+    mockedBookAppointment.mockResolvedValue({ id: null, htmlLink: null } as any);
+    mockedProfessionalFindFirst.mockResolvedValue({
+      id: "professional_123",
+      name: "Ana",
+    } as any);
+    mockedServiceFindMany.mockResolvedValue([]);
+    mockedCheckAvailability.mockResolvedValue({
+      available: true,
+      message: "",
+      capacityUsed: 0,
+      capacityTotal: 1,
+      availableProfessionals: [{ id: "professional_123", name: "Ana" }],
+    } as any);
+    mockedCallFindUnique.mockResolvedValue({
+      id: "call_row_1",
+      fromNumber: "+34600999888",
+      businessId: "business_123",
+      startedAt: new Date(),
+    } as any);
+    mockedBookingFindUnique.mockResolvedValue(reservaDeLaLlamada as any);
+    mockedBookingFindFirst.mockResolvedValue(null);
+    mockedBookingUpsert.mockResolvedValue({ id: "booking_1" } as any);
+    mockedLeadCreate.mockResolvedValue({ id: "lead_1" } as any);
+  });
+
+  function reservarSinToken(params: Record<string, unknown> = {}) {
+    return executeVoiceTool({
+      businessId: "business_123",
+      toolName: "book_appointment",
+      callId: "call_1",
+      params: {
+        clientName: "Lucía",
+        startDateTime: inicio,
+        durationMinutes: 30,
+        smsConsent: true,
+        ...params,
+      },
+    });
+  }
+
+  it("una segunda cita se rechaza igual que con calendario externo", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+    const result = await reservarSinToken({ clientName: "Marta" });
+
+    expect(result.result).toMatchObject({
+      success: false,
+      code: "YA_HAY_CITA_EN_ESTA_LLAMADA",
+      bookingId: "booking_1",
+    });
+    expect(mockedBookingUpsert).not.toHaveBeenCalled();
+    expect(mockedLeadCreate).not.toHaveBeenCalled();
+  });
+
+  it("cambiar la hora de la cita de esta llamada la mueve en Postgres, sin evento que borrar", async () => {
+    mockedBookingFindFirst.mockResolvedValue({
+      id: "booking_1",
+      callId: "call_row_1",
+      clientPhone: null,
+      externalEventId: null,
+      call: { fromNumber: "+34600999888" },
+    } as any);
+
+    const { result: comprobacion } = await executeVoiceTool({
+      businessId: "business_123",
+      toolName: "check_availability",
+      callId: "call_1",
+      params: {
+        startDateTime: inicio,
+        durationMinutes: 30,
+        replacesBookingId: "booking_1",
+      },
+    });
+    expect(comprobacion!.available).toBe(true);
+    const result = await executeVoiceTool({
+      businessId: "business_123",
+      toolName: "book_appointment",
+      callId: "call_1",
+      params: {
+        clientName: "Lucía",
+        availabilityToken: comprobacion!.availabilityToken,
+      },
+    });
+
+    expect(result.result).toMatchObject({
+      success: true,
+      bookingId: "booking_1",
+    });
+    expect(mockedBookingUpsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { callId: "call_row_1" },
+        update: expect.objectContaining({
+          externalCalendarProvider: null,
+          externalCalendarId: null,
+        }),
+      })
+    );
+    expect(mockedCancelAppointment).not.toHaveBeenCalled();
+    expect(mockedCancelarReserva).not.toHaveBeenCalled();
+  });
+
+  it("el reintento exacto (sin evento externo, no hay atajo) reescribe la misma fila y no crea otra cita", async () => {
+    mockedBookingFindUnique.mockResolvedValue({
+      ...reservaDeLaLlamada,
+      programedAt: new Date(
+        normalizeVoiceToolDateTime(inicio, "Europe/Madrid")
+      ),
+    } as any);
+
+    const result = await reservarSinToken();
+
+    expect(result.result).toMatchObject({
+      success: true,
+      bookingId: "booking_1",
+    });
+    expect(mockedBookingUpsert).toHaveBeenCalledTimes(1);
+    expect(mockedBookingUpsert).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { callId: "call_row_1" } })
+    );
   });
 });

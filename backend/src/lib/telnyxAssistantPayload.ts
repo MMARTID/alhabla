@@ -231,7 +231,7 @@ export function buildTelnyxVoiceTools(
         replacesBookingId: {
           type: "string",
           description:
-            "Solo para cambiar una cita que ya tiene: el bookingId que devolvió find_my_appointment. Su hora no cuenta como ocupada y, al reservar con el token de esta comprobación, el sistema anula la cita antigua (solo si la nueva queda reservada).",
+            "Solo para cambiar una cita que ya tiene: el bookingId que devolvió find_my_appointment, o el que devolvió book_appointment si es la cita reservada en esta misma llamada. Su hora no cuenta como ocupada y, al reservar con el token de esta comprobación, el sistema anula la cita antigua (solo si la nueva queda reservada).",
         },
       },
       required: ["startDateTime", "durationMinutes"],
@@ -239,7 +239,7 @@ export function buildTelnyxVoiceTools(
     {
       name: "book_appointment",
       description:
-        "Agenda una cita en el calendario activo. Úsala solo tras confirmación explícita y con el availabilityToken de check_availability. Si la comprobación se hizo con replacesBookingId, la cita antigua se anula al reservar la nueva.",
+        "Agenda una cita en el calendario activo. Úsala solo tras confirmación explícita y con el availabilityToken de check_availability. Si la comprobación se hizo con replacesBookingId, la cita antigua se anula al reservar la nueva. Solo se puede reservar una cita por llamada: devuelve su bookingId, y si después el cliente quiere cambiarle la hora o el servicio, comprueba con check_availability pasando ese bookingId en replacesBookingId. Una segunda cita (otra persona u otro servicio) responde YA_HAY_CITA_EN_ESTA_LLAMADA y no se reserva.",
       properties: {
         clientName: {
           type: "string",
