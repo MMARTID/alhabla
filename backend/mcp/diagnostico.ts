@@ -189,10 +189,13 @@ export async function diagnosticarMcp({
           "commitsDeBackendDetrasDeMain" in estado
             ? (estado.commitsDeBackendDetrasDeMain ?? 0)
             : 0;
-        const desde =
-          "tipoDeCarpeta" in estado
-            ? `${estado.tipoDeCarpeta} (${estado.rama ?? "?"}, ${estado.commit})`
-            : "?";
+        const desde = !("tipoDeCarpeta" in estado)
+          ? "?"
+          : estado.tipoDeCarpeta === "herramientas"
+            ? `main de ~/.alhabla-mcp (${estado.commit})`
+            : estado.tipoDeCarpeta === "rama"
+              ? `la rama ${estado.rama ?? "?"} en ~/.alhabla-sim (${estado.commit})`
+              : `${estado.carpeta} (${estado.commit}), un worktree de sesión`;
         if (detras > 0 && "tipoDeCarpeta" in estado && estado.tipoDeCarpeta === "herramientas") {
           throw new Error(`corre ${desde}, ${detras} commits de backend por detrás de main`);
         }

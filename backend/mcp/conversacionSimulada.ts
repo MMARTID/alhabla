@@ -191,11 +191,13 @@ export async function simularConversacion({
   };
 }
 
+// Las fechas de Prisma son `timestamp` sin zona guardado en UTC: primero se
+// dice que es UTC y luego se pasa a la hora del negocio.
 async function comoQuedoLaLlamada(urlDeBdDeDev: string, callId: string) {
   const [citas, pendientes] = await Promise.all([
     ejecutarSoloLectura(
       urlDeBdDeDev,
-      `SELECT b.id, b."clientName", to_char(b."programedAt" AT TIME ZONE coalesce(n.timezone, 'Europe/Madrid'), 'YYYY-MM-DD HH24:MI') AS "horaLocal",
+      `SELECT b.id, b."clientName", to_char((b."programedAt" AT TIME ZONE 'UTC') AT TIME ZONE coalesce(n.timezone, 'Europe/Madrid'), 'YYYY-MM-DD HH24:MI') AS "horaLocal",
               b."durationMinutes", b."isCancelled", b."externalEventId" IS NOT NULL AS "enCalendario",
               b."createdVia"
          FROM bookings b
