@@ -450,7 +450,7 @@ exports[`payloads de asistentes (instantáneas) > assistant de la recepcionista,
               "type": "string",
             },
             "replacesBookingId": {
-              "description": "Solo para cambiar una cita que ya tiene: el bookingId que devolvió find_my_appointment. Su hora no cuenta como ocupada y, al reservar con el token de esta comprobación, el sistema anula la cita antigua (solo si la nueva queda reservada).",
+              "description": "Solo para cambiar una cita que ya tiene: el bookingId que devolvió find_my_appointment, o el que devolvió book_appointment si es la cita reservada en esta misma llamada. Su hora no cuenta como ocupada y, al reservar con el token de esta comprobación, el sistema anula la cita antigua (solo si la nueva queda reservada).",
               "type": "string",
             },
             "serviceIds": {
@@ -516,7 +516,7 @@ exports[`payloads de asistentes (instantáneas) > assistant de la recepcionista,
           ],
           "type": "object",
         },
-        "description": "Agenda una cita en el calendario activo. Úsala solo tras confirmación explícita y con el availabilityToken de check_availability. Si la comprobación se hizo con replacesBookingId, la cita antigua se anula al reservar la nueva.",
+        "description": "Agenda una cita en el calendario activo. Úsala solo tras confirmación explícita y con el availabilityToken de check_availability. Si la comprobación se hizo con replacesBookingId, la cita antigua se anula al reservar la nueva. Solo se puede reservar una cita por llamada: devuelve su bookingId, y si después el cliente quiere cambiarle la hora o el servicio, comprueba con check_availability pasando ese bookingId en replacesBookingId. Una segunda cita (otra persona u otro servicio) responde YA_HAY_CITA_EN_ESTA_LLAMADA y no se reserva.",
         "headers": [
           {
             "name": "X-Alhabla-Call-Control-Id",
@@ -1227,7 +1227,7 @@ Si te escriben en catalán, gallego, euskera o inglés, responde en ese idioma; 
 exports[`payloads de asistentes (instantáneas) > el JSON enviado es idéntico byte a byte (hash) 1`] = `
 {
   "gestor": "b0aaf40e739c058eab2e382b88d3c7f9ef84b85567426cb593fee00e465500de",
-  "recepcionista": "d46b39517ef62dbf3bb875d18d8a611513e70b11a1e87498c79739967cc2caf5",
+  "recepcionista": "07aa1616968b7a14412d7f0681df3ef94134707afbb69ba93dcc955928b7f207",
 }
 `;
 
@@ -1271,7 +1271,7 @@ exports[`payloads de asistentes (instantáneas) > tools de voz de la recepcionis
         "type": "string",
       },
       "replacesBookingId": {
-        "description": "Solo para cambiar una cita que ya tiene: el bookingId que devolvió find_my_appointment. Su hora no cuenta como ocupada y, al reservar con el token de esta comprobación, el sistema anula la cita antigua (solo si la nueva queda reservada).",
+        "description": "Solo para cambiar una cita que ya tiene: el bookingId que devolvió find_my_appointment, o el que devolvió book_appointment si es la cita reservada en esta misma llamada. Su hora no cuenta como ocupada y, al reservar con el token de esta comprobación, el sistema anula la cita antigua (solo si la nueva queda reservada).",
         "type": "string",
       },
       "serviceIds": {
@@ -1294,7 +1294,7 @@ exports[`payloads de asistentes (instantáneas) > tools de voz de la recepcionis
     "url": "https://api.alhabla.test/webhooks/telnyx/tools/check_availability",
   },
   {
-    "description": "Agenda una cita en el calendario activo. Úsala solo tras confirmación explícita y con el availabilityToken de check_availability. Si la comprobación se hizo con replacesBookingId, la cita antigua se anula al reservar la nueva.",
+    "description": "Agenda una cita en el calendario activo. Úsala solo tras confirmación explícita y con el availabilityToken de check_availability. Si la comprobación se hizo con replacesBookingId, la cita antigua se anula al reservar la nueva. Solo se puede reservar una cita por llamada: devuelve su bookingId, y si después el cliente quiere cambiarle la hora o el servicio, comprueba con check_availability pasando ese bookingId en replacesBookingId. Una segunda cita (otra persona u otro servicio) responde YA_HAY_CITA_EN_ESTA_LLAMADA y no se reserva.",
     "headers": [
       {
         "name": "X-Alhabla-Call-Control-Id",
