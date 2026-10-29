@@ -14,13 +14,16 @@ const REGISTRATION_NICHE_KEY = "alhabla_registration_niche";
 
 // En desarrollo React monta los efectos dos veces: el segundo canje del mismo
 // pase llegaba cuando el primero ya lo había gastado y la página decía «ya se
-// ha usado». Un solo canje por pase en cada carga de la página.
-const canjes = new Map<string, Promise<string>>();
+// ha usado». Mientras un canje está en curso, el mismo pase lo reutiliza; al
+// terminar se suelta (el resultado no se guarda).
+const canjesEnCurso = new Map<string, Promise<string>>();
 function canjearUnaVez(pase: string): Promise<string> {
-  let canje = canjes.get(pase);
+  let canje = canjesEnCurso.get(pase);
   if (!canje) {
     canje = redeemPass(pase);
-    canjes.set(pase, canje);
+    canjesEnCurso.set(pase, canje);
+    const soltar = () => canjesEnCurso.delete(pase);
+    canje.then(soltar, soltar);
   }
   return canje;
 }
