@@ -28,7 +28,11 @@ export const HOME_QUICK_FAQS = [
   },
   {
     question: "¿Puede reservar encima de una cita que ya tengo?",
-    answer: "No. Comprueba tu calendario antes de ofrecer una hora.",
+    answer: "No. Comprueba tu calendario antes de ofrecer una hora. Y si no usas ninguno, reserva en la agenda de Alhabla: ahí ve lo que ha reservado y lo que tú apuntes desde el panel o por WhatsApp.",
+  },
+  {
+    question: "¿Necesito conectar un calendario?",
+    answer: "No. Puedes conectar Google Calendar, Outlook o iCloud para que las citas entren donde ya miras tu agenda, o usar la agenda de Alhabla sin conectar nada: la ves en el panel, la apuntas por WhatsApp y te la suscribes en el calendario del móvil con un enlace de solo lectura.",
   },
   {
     question: "¿Puedo escuchar lo que ha hablado con mis clientes?",

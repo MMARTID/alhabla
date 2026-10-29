@@ -361,6 +361,7 @@ export const nicheLandings: Record<NicheSlug, NicheLandingContent> = {
     planesTitulo: "Lo que cuesta en tu peluquería, plan a plan.",
     faqsTitulo: "Lo que preguntan las peluquerías antes de probar.",
     faqs: [
+      { question: "¿Necesito conectar un calendario?", answer: "No. Si llevas la agenda en Google Calendar, Outlook o iCloud, conéctalo y las citas entran ahí. Si no usas ninguno, elige la agenda de Alhabla: la recepcionista reserva en ella, tú la ves en el panel, apuntas lo que te entra por otros canales y te la suscribes en el calendario del móvil con un enlace de solo lectura." },
       { question: "¿Sabe la diferencia entre un corte y unas mechas?", answer: "Sí, porque la diferencia la pones tú: cada servicio tiene su nombre, su duración y, si quieres, su precio. Con eso reserva el hueco que necesita cada trabajo y sabe a qué estilista dárselo." },
       { question: "¿Qué hace si una clienta pide una valoración de color?", answer: "Si tienes un servicio de valoración, lo reserva como cualquier otro. Si no, no se inventa un diagnóstico del pelo: toma el recado con nombre, teléfono y motivo, y lo recibes por WhatsApp para llamarla tú." },
       { question: "¿Contesta cuando estamos todas con clientas?", answer: "Contesta las llamadas que tú no coges: con el desvío condicional de tu operador, si el teléfono suena y nadie lo atiende, salta a la recepcionista. Funciona igual a mediodía, por la noche y en festivos." },
@@ -554,6 +555,7 @@ export const nicheLandings: Record<NicheSlug, NicheLandingContent> = {
     planesTitulo: "Planes para tu centro de estética.",
     faqsTitulo: "Dudas frecuentes de los centros de estética.",
     faqs: [
+      { question: "¿Necesito conectar un calendario?", answer: "No. Si llevas la agenda en Google Calendar, Outlook o iCloud, conéctalo y las citas entran ahí. Si no usas ninguno, elige la agenda de Alhabla: la recepcionista reserva en ella, tú la ves en el panel, apuntas lo que te entra por otros canales y te la suscribes en el calendario del móvil con un enlace de solo lectura." },
       { question: "¿Puede aconsejar a una clienta qué tratamiento le conviene?", answer: "No. Explica lo que hayas escrito sobre cada tratamiento (en qué consiste, duración, precio), pero no recomienda según la piel ni el cuerpo de nadie. Si la clienta necesita consejo, ofrece que la llaméis y toma el recado." },
       { question: "¿Sabe cuántas sesiones le quedan a una clienta en su bono?", answer: "No: no ve bonos ni cobra. Reserva la siguiente sesión con la duración del tratamiento y, si la clienta pregunta por su saldo, toma el recado para que se lo digas tú." },
       { question: "¿Reserva con la esteticista que lleva a cada clienta?", answer: "Sí, si la clienta la nombra. Si no nombra a nadie, la cita va a quien hayas marcado como especialista en ese tratamiento y, entre dos iguales, a la que tenga el día más libre." },
@@ -749,6 +751,7 @@ export const nicheLandings: Record<NicheSlug, NicheLandingContent> = {
     planesTitulo: "Tres planes para tu salón de uñas.",
     faqsTitulo: "Preguntas de los salones de uñas.",
     faqs: [
+      { question: "¿Necesito conectar un calendario?", answer: "No. Si llevas la agenda en Google Calendar, Outlook o iCloud, conéctalo y las citas entran ahí. Si no usas ninguno, elige la agenda de Alhabla: la recepcionista reserva en ella, tú la ves en el panel, apuntas lo que te entra por otros canales y te la suscribes en el calendario del móvil con un enlace de solo lectura." },
       { question: "¿Pregunta si la clienta trae algo puesto?", answer: "Sí: pregunta si es una aplicación nueva, un mantenimiento o una retirada cuando eso cambia el servicio. Si el servicio ya está claro, no repasa todos los acabados posibles." },
       { question: "¿Diferencia una manicura sencilla de un nail art?", answer: "Sí, si los tienes como servicios distintos, cada uno con su tiempo. La recepcionista reserva el que pide la clienta y no inventa técnicas que no estén en tu carta." },
       { question: "¿Puedo elegir quién se lleva el acrílico?", answer: "Sí. En la ficha de cada técnica marcas si es especialista, si lo hace o si prefieres reservarle ese servicio solo cuando la piden. La recepcionista reparte las citas siguiendo esas marcas y nunca le cuenta a la clienta cómo las tienes." },
@@ -941,6 +944,7 @@ export const nicheLandings: Record<NicheSlug, NicheLandingContent> = {
     planesTitulo: "Lo que cuesta para tu barbería, mes a mes.",
     faqsTitulo: "Dudas habituales de las barberías.",
     faqs: [
+      { question: "¿Necesito conectar un calendario?", answer: "No. Si llevas la agenda en Google Calendar, Outlook o iCloud, conéctalo y las citas entran ahí. Si no usas ninguno, elige la agenda de Alhabla: la recepcionista reserva en ella, tú la ves en el panel, apuntas lo que te entra por otros canales y te la suscribes en el calendario del móvil con un enlace de solo lectura." },
       { question: "¿Reserva con el barbero que pide el cliente?", answer: "Sí. Si el cliente dice un nombre, la cita va con ese barbero. Si él no tiene hueco, le ofrece otra hora con él o la misma hora con otro, y decide el cliente. Si no pide a nadie, va a tu especialista en ese servicio." },
       { question: "¿Bloquea más tiempo para corte y barba que para un corte?", answer: "Bloquea la suma de lo que dure cada servicio en tu catálogo. Si el corte son 30 minutos y la barba 20, un corte con barba reservado como dos servicios ocupa 50; si lo tienes como pack con su propia duración, ocupa la del pack." },
       { question: "¿Vale para un cliente que quiere cortarse hoy mismo?", answer: "Sí. Mira los huecos que quedan hoy en tu calendario y ofrece el primero en el que cabe el servicio entero." },
@@ -1143,6 +1147,7 @@ export const nicheLandings: Record<NicheSlug, NicheLandingContent> = {
     planesTitulo: "Planes para tu clínica de fisioterapia.",
     faqsTitulo: "Preguntas de fisioterapeutas antes de empezar.",
     faqs: [
+      { question: "¿Necesito conectar un calendario?", answer: "No. Si llevas la agenda en Google Calendar, Outlook o iCloud, conéctalo y las citas entran ahí. Si no usas ninguno, elige la agenda de Alhabla: la recepcionista reserva en ella, tú la ves en el panel, apuntas lo que te entra por otros canales y te la suscribes en el calendario del móvil con un enlace de solo lectura." },
       { question: "¿Organiza primeras visitas y seguimientos por separado?", answer: "Sí. Das de alta cada tipo de sesión con su duración y la recepcionista reserva el que corresponde, con el fisioterapeuta que hayas marcado como especialista en él." },
       { question: "¿Hace diagnósticos o da ejercicios?", answer: "Nunca. Pregunta el motivo de la visita en términos generales para reservar bien, no pide historial clínico y no da pautas. Si alguien describe una urgencia, le indica que contacte con emergencias o con un profesional sanitario." },
       { question: "¿Mantiene al paciente con su fisioterapeuta?", answer: "Sí. Si el paciente nombra a su fisioterapeuta, reserva con él; si no tiene hueco, le propone otro día con él o una alternativa, y elige el paciente." },

@@ -81,6 +81,14 @@ vi.mock("../../../src/modules/calendar/conexion.js", () => ({
     marcadaConectada: true,
   })),
   conexionOperativa: vi.fn(() => true),
+  // PLAN-AGENDA-ALHABLA.md: la decisión de reservar es puedeReservar (agenda de
+  // Alhabla o conexión operativa); el origen externo de la cita, el del
+  // calendario conectado.
+  puedeReservar: vi.fn(() => true),
+  origenExternoDeLaCita: vi.fn(() => ({
+    externalCalendarProvider: "google",
+    externalCalendarId: "primary",
+  })),
   usaCalendarioExterno: vi.fn(() => true),
   origenDeCalendario: vi.fn(() => ({
     provider: "google",
@@ -351,7 +359,7 @@ describe("añadir_cita", () => {
       ).motivo
     ).toContain("cerrado");
     const conexion = await import("../../../src/modules/calendar/conexion.js");
-    vi.mocked(conexion.conexionOperativa).mockReturnValueOnce(false);
+    vi.mocked(conexion.puedeReservar).mockReturnValueOnce(false);
     expect(
       (
         await comprobar("añadir_cita", {

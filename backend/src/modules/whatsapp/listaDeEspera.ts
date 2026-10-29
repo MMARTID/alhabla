@@ -9,7 +9,8 @@ import {
   ventanaDeLaCita,
 } from "../calendar/borradoDeEvento.js";
 import {
-  conexionOperativa,
+  origenExternoDeLaCita,
+  puedeReservar,
   marcarCalendarioDesconectado,
   origenDeCalendario,
   resolverConexionDeCalendario,
@@ -638,7 +639,7 @@ export async function reservarDesdeListaDeEspera(input: {
     return { estado: "error" };
   }
   const conexion = resolverConexionDeCalendario(business);
-  if (!conexionOperativa(conexion)) {
+  if (!puedeReservar(conexion)) {
     console.warn(
       `[WhatsApp] ${etiqueta}: el negocio ${businessId} no tiene calendario operativo (${conexion.provider}); no se reserva a ciegas`
     );
@@ -804,8 +805,7 @@ export async function reservarDesdeListaDeEspera(input: {
             smsConsent: true,
             createdVia: "whatsapp_lista_espera",
             externalEventId: eventoCreado ?? undefined,
-            externalCalendarProvider: conexion.provider,
-            externalCalendarId: conexion.calendarId,
+            ...origenExternoDeLaCita(conexion),
           },
           update: {
             programedAt: startDate,
@@ -815,8 +815,7 @@ export async function reservarDesdeListaDeEspera(input: {
             clientName,
             clientPhone: from,
             externalEventId: eventoCreado ?? undefined,
-            externalCalendarProvider: conexion.provider,
-            externalCalendarId: conexion.calendarId,
+            ...origenExternoDeLaCita(conexion),
             isCancelled: false,
             cancelledAt: null,
             cancelledBy: null,

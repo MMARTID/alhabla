@@ -36,6 +36,11 @@ export default function IntegracionesPage() {
       }
       faqs={[
         {
+          question: "¿Necesito conectar un calendario?",
+          answer:
+            "No. Si llevas la agenda en Google Calendar, Outlook o iCloud, conéctalo y las citas entran ahí. Si no usas ninguno, elige la agenda de Alhabla: la recepcionista reserva en ella, tú la ves en el panel, apuntas lo que te entra por otros canales (en el panel o por WhatsApp al Gestor) y puedes suscribirte a ella desde el calendario del móvil con un enlace de solo lectura.",
+        },
+        {
           question: "¿Puedo conectar más de un calendario a la vez?",
           answer:
             "Se conecta una cuenta y, dentro de ella, eliges el calendario donde entran las citas. Si cambias de idea, desde el panel cambias de calendario o de proveedor sin perder la configuración de servicios y profesionales.",
@@ -53,7 +58,7 @@ export default function IntegracionesPage() {
         {
           question: "¿Qué pasa si no tengo el calendario conectado o se desconecta?",
           answer:
-            "La recepcionista sigue atendiendo las llamadas, pero no reserva: toma nota de lo que pide el cliente para que se lo confirmes tú. Si tu proveedor deja de aceptar el permiso (por ejemplo, porque cambiaste la contraseña), te avisamos por WhatsApp y el panel te pide reconectar. Puedes conectar Google, Outlook o iCloud en cualquier momento desde el panel.",
+            "Si tu proveedor deja de aceptar el permiso (por ejemplo, porque cambiaste la contraseña), te avisamos por WhatsApp y el panel te pide reconectar. Mientras tanto la recepcionista sigue atendiendo, pero no da horas que no puede comprobar: toma nota de la petición, con el nombre y el teléfono del cliente, y te la pasa para que la confirmes tú. Lo mismo ocurre si no has conectado ningún calendario ni has elegido la agenda de Alhabla. En cualquier momento puedes conectar Google, Outlook o iCloud, o pasarte a la agenda de Alhabla, desde el panel.",
         },
         {
           question: "¿Hace falta un técnico para conectarlo?",

@@ -934,6 +934,7 @@ describe("CalendarService.selectGoogleCalendar", () => {
       include: { calendarConnections: expect.any(Object) },
       data: {
         calendarProvider: "google",
+        modoDeAgenda: "externo",
         calendarConnections: {
           upsert: {
             where: {
@@ -2001,3 +2002,33 @@ describe("CalendarService.conectarConCredenciales (CalDAV)", () => {
   });
 });
 
+
+// PLAN-AGENDA-ALHABLA.md, fase 1: en la agenda de Alhabla no hay evento que
+// crear, y la conexión que quede de antes no se toca.
+describe("CalendarService.bookAppointment — agenda de Alhabla", () => {
+  it("devuelve «sin evento» sin llamar a ningún proveedor, aunque haya credenciales guardadas", async () => {
+    const insertMock = vi.fn();
+    mockedGoogleCalendar.mockReturnValue({
+      events: { insert: insertMock, list: vi.fn() },
+    } as any);
+    const conexion = resolverConexionDeCalendario({
+      calendarProvider: "google",
+      modoDeAgenda: "alhabla",
+      calendarConnections: [
+        filaDeConexion("google", { refreshToken: "refresh_token_123" }),
+      ],
+    });
+    expect(conexion.agendaPropia).toBe(true);
+
+    const result = await calendarService.bookAppointment({
+      clientName: "María",
+      startDateTime: "2026-08-10T10:00:00Z",
+      durationMinutes: 60,
+      conexion,
+    });
+
+    expect(result).toEqual({ id: null, htmlLink: null });
+    expect(insertMock).not.toHaveBeenCalled();
+    expect(mockedGoogleCalendar).not.toHaveBeenCalled();
+  });
+});
