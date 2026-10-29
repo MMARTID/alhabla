@@ -98,7 +98,21 @@ describe("PanelEscritorio", () => {
 
     const tarjeta = await screen.findByRole("link", { name: /Configura tu horario/ });
     expect(tarjeta).toHaveAttribute("href", "/agente?section=business-hours");
-    expect(tarjeta).toHaveTextContent("atiende pero no puede reservar ninguna cita");
+    expect(tarjeta).toHaveTextContent("tu recepcionista toma nota, pero no reserva citas");
+  });
+
+  // PLAN-AGENDA-ALHABLA.md: en la agenda de Alhabla se reserva sin calendario
+  // externo, pero el horario hace falta igual.
+  it("en la agenda de Alhabla no pide calendario, pero sí el horario si falta", async () => {
+    conCliente(
+      <PanelEscritorio
+        business={{ ...negocio, schedule: {}, activeCalendar: null, modoDeAgenda: "alhabla" }}
+        avisoDeCalendario={null}
+      />
+    );
+
+    expect(await screen.findByRole("link", { name: /Configura tu horario/ })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Elige dónde reservar/ })).not.toBeInTheDocument();
   });
 
   it("enlaza a Profesionales si alguno sigue con el nombre del alta", async () => {

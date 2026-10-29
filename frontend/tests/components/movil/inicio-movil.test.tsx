@@ -184,11 +184,11 @@ describe("InicioMovil", () => {
     const chip = await screen.findByRole("button", { name: "Estado del servicio: 2 avisos" });
     await userEvent.click(chip);
     const hoja = await screen.findByRole("dialog", { name: "Estado del servicio" });
-    expect(within(hoja).getByText("Atiende pero no reserva: falta el horario")).toBeInTheDocument();
+    expect(within(hoja).getByText("Atiende, pero no reserva: falta el horario")).toBeInTheDocument();
     expect(within(hoja).getByRole("link", { name: "Configurar horario" })).toHaveAttribute("href", "/agente/horario");
   });
 
-  it("sin agenda, «Atiende pero no reserva» no suma un segundo aviso", async () => {
+  it("sin agenda, «Atiende, pero no reserva» no suma un segundo aviso", async () => {
     conCliente(
       <InicioMovil
         business={{ ...negocio, activeCalendar: { ...negocio.activeCalendar!, connected: false } }}
@@ -200,7 +200,20 @@ describe("InicioMovil", () => {
     const chip = await screen.findByRole("button", { name: "Estado del servicio: 2 avisos" });
     await userEvent.click(chip);
     const hoja = await screen.findByRole("dialog", { name: "Estado del servicio" });
-    expect(within(hoja).getByText("Atiende pero no reserva: falta conectar la agenda")).toBeInTheDocument();
+    expect(within(hoja).getByText("Atiende, pero no reserva: falta elegir dónde reservar")).toBeInTheDocument();
+  });
+
+  it("en la agenda de Alhabla, sin calendario externo, atiende y reserva", async () => {
+    conCliente(
+      <InicioMovil business={{ ...negocio, activeCalendar: null, modoDeAgenda: "alhabla" }} avisoDeCalendario={null} />
+    );
+
+    // Solo la cita sin reservar: ni la agenda ni la recepcionista avisan.
+    const chip = await screen.findByRole("button", { name: "Estado del servicio: 1 aviso" });
+    expect(screen.queryByRole("link", { name: /Elige dónde reservar/ })).not.toBeInTheDocument();
+    await userEvent.click(chip);
+    const hoja = await screen.findByRole("dialog", { name: "Estado del servicio" });
+    expect(within(hoja).getByText("Atendiendo llamadas")).toBeInTheDocument();
   });
 
   it("avisa de los profesionales con el nombre del alta y de los servicios sin precio", async () => {

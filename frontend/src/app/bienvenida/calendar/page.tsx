@@ -3,11 +3,12 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PasoDelAlta } from "@/components/paso-del-alta";
-import { CalendarDays, ChevronRight, LoaderCircle } from "lucide-react";
-import { SiGooglecalendar } from "@icons-pack/react-simple-icons";
+import { CalendarDays, ChevronDown, ChevronRight, LoaderCircle } from "lucide-react";
+import { SiApple, SiGooglecalendar } from "@icons-pack/react-simple-icons";
+import { AppleCalendarConnect } from "@/components/apple-calendar-connect";
 import { BetaPill } from "@/components/beta-pill";
 import { MicrosoftLogo } from "@/components/brand-icons";
-import { getGoogleCalendarAuthUrl, getMicrosoftCalendarAuthUrl } from "@/lib/api";
+import { cambiarModoDeAgenda, getGoogleCalendarAuthUrl, getMicrosoftCalendarAuthUrl } from "@/lib/api";
 import { consumePendingPlan, isPlanId } from "@/lib/billing-navigation";
 import { saveRegistrationNextStep } from "@/lib/registration-next-step";
 import { BUSINESS_TYPE_ONBOARDING_TEXTS, isBusinessType } from "@/lib/business-type";
@@ -16,13 +17,16 @@ import type { BusinessType } from "@/lib/types";
 export default function RegisterBusinessCalendarPage() {
   const router = useRouter();
   const [businessType, setBusinessType] = useState<BusinessType>("other");
-  const [loading, setLoading] = useState<"google" | "outlook" | null>(null);
+  const [loading, setLoading] = useState<"google" | "outlook" | "alhabla" | null>(null);
   const [error, setError] = useState("");
   const [hasPlaceSchedule, setHasPlaceSchedule] = useState(false);
   // Vuelta de Google/Microsoft con el calendario ya conectado: se redirige
   // al pago, y mientras tanto no se vuelven a ofrecer las opciones de
   // conectar, que parecían decir que no había funcionado.
   const [redirigiendo, setRedirigiendo] = useState(false);
+  // iCloud no sale de la página: Apple ID + contraseña de aplicación en un
+  // formulario que se despliega bajo su tarjeta (el mismo que en /agente).
+  const [formularioApple, setFormularioApple] = useState(false);
 
   useEffect(() => {
     const token =
@@ -86,6 +90,21 @@ export default function RegisterBusinessCalendarPage() {
     }
   };
 
+  // Agenda de Alhabla (PLAN-AGENDA-ALHABLA.md, D1): la cuarta tarjeta del
+  // paso. Se ofrece aquí, que es donde se abandonaba el alta sin calendario.
+  const elegirAgendaDeAlhabla = async () => {
+    setLoading("alhabla");
+    setError("");
+    try {
+      await cambiarModoDeAgenda("alhabla");
+      setRedirigiendo(true);
+      redirectToFinalStep();
+    } catch {
+      setLoading(null);
+      setError("No se pudo activar la agenda de Alhabla. Inténtalo de nuevo.");
+    }
+  };
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get("completed") === "true") {
@@ -116,7 +135,7 @@ export default function RegisterBusinessCalendarPage() {
         {redirigiendo ? (
           <p role="status" className="mt-8 flex items-center justify-center gap-2 rounded-2xl border border-exito-borde bg-exito-fondo px-4 py-4 text-sm font-medium text-exito">
             <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />
-            Calendario conectado. Te llevamos al siguiente paso…
+            {loading === "alhabla" ? "Agenda de Alhabla activada." : "Calendario conectado."} Te llevamos al siguiente paso…
           </p>
         ) : (
         <>
@@ -161,6 +180,57 @@ export default function RegisterBusinessCalendarPage() {
               <ChevronRight className="h-5 w-5 text-muted" aria-hidden="true" />
             )}
           </button>
+
+          <button
+            type="button"
+            onClick={() => setFormularioApple((actual) => !actual)}
+            disabled={loading !== null}
+            aria-expanded={formularioApple}
+            className="relative flex w-full items-center gap-4 rounded-2xl border border-linea bg-superficie p-5 text-left transition duration-200 hover:border-morado hover:bg-relleno focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-morado focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <BetaPill />
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-linea bg-superficie">
+              <SiApple className="h-6 w-6 text-tinta" color="currentColor" />
+            </div>
+            <div className="flex-1">
+              <p className="font-semibold text-tinta">Apple / iCloud</p>
+              <p className="text-sm text-muted">Si llevas la agenda en el iPhone, conéctala con tu Apple ID y una contraseña de aplicación.</p>
+            </div>
+            {formularioApple ? (
+              <ChevronDown className="h-5 w-5 text-muted" aria-hidden="true" />
+            ) : (
+              <ChevronRight className="h-5 w-5 text-muted" aria-hidden="true" />
+            )}
+          </button>
+          {formularioApple ? (
+            <AppleCalendarConnect
+              onCancel={() => setFormularioApple(false)}
+              onConnected={() => {
+                setRedirigiendo(true);
+                redirectToFinalStep();
+              }}
+            />
+          ) : null}
+
+          <button
+            type="button"
+            onClick={() => void elegirAgendaDeAlhabla()}
+            disabled={loading !== null}
+            className="flex w-full items-center gap-4 rounded-2xl border border-linea bg-superficie p-5 text-left transition duration-200 hover:border-morado hover:bg-relleno focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-morado focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-lavado text-morado">
+              <CalendarDays className="h-6 w-6" aria-hidden="true" />
+            </div>
+            <div className="flex-1">
+              <p className="font-semibold text-tinta">Usar la agenda de Alhabla</p>
+              <p className="text-sm text-muted">Sin conectar nada: tu recepcionista reserva aquí y tú ves y apuntas las citas en el panel o por WhatsApp. Solo verá las citas que haya en Alhabla.</p>
+            </div>
+            {loading === "alhabla" ? (
+              <LoaderCircle className="h-5 w-5 animate-spin text-muted" aria-label="Activando" />
+            ) : (
+              <ChevronRight className="h-5 w-5 text-muted" aria-hidden="true" />
+            )}
+          </button>
         </div>
 
         {error && <p role="alert" className="mt-4 text-sm text-error">{error}</p>}
@@ -174,6 +244,13 @@ export default function RegisterBusinessCalendarPage() {
           >
             Configurar calendario después
           </button>
+          {/* Sin calendario la recepcionista contesta y toma nota, pero no da
+              hora ni reserva (voiceTools, fase 0 de PLAN-AGENDA-ALHABLA.md).
+              Quien se lo salte tiene que saberlo antes, no en la primera
+              llamada. */}
+          <p className="text-center text-xs leading-5 text-muted">
+            Sin calendario, tu recepcionista atiende y toma nota de las peticiones, pero no reserva citas. Podrás conectarlo después desde el panel.
+          </p>
         </div>
         </>
         )}

@@ -4,6 +4,7 @@ import { prisma } from "../../lib/prisma.js";
 import { invalidarCacheDeVoz } from "../../lib/voiceConfigCache.js";
 import {
   actualizarCalendarioDeConexion,
+  cambiarModoDeAgenda,
   INCLUDE_CONEXIONES,
   serializarBusiness,
 } from "../calendar/conexion.js";
@@ -76,6 +77,12 @@ const VistaPreviaDeIdiomasSchema = z.object({
   voiceGender: z.enum(GENEROS_DE_VOZ).default("femenina"),
   // Una voz que no es del catálogo se ignora: atiende la de su género.
   voz: z.string().max(200).optional(),
+});
+
+/** Cuerpo de PATCH /business/me/agenda/modo. `sin_elegir` no se elige: es
+ * el estado de quien aún no ha decidido. */
+const ModoDeAgendaSchema = z.object({
+  modo: z.enum(["alhabla", "externo"]),
 });
 
 const UpdateBusinessSchema = z.object({
@@ -459,6 +466,44 @@ export async function businessesRoutes(fastify: FastifyInstance) {
         }
         fastify.log.error({ err: error }, "[Business] Failed to preview languages");
         return reply.status(500).send({ error: "Failed to preview languages" });
+      }
+    }
+  );
+
+  // Modo de agenda (PLAN-AGENDA-ALHABLA.md): dónde reserva el negocio. El
+  // paso a `externo` al conectar un calendario es automático
+  // (guardarConexionDeCalendario); aquí el dueño elige `alhabla` o vuelve a
+  // `externo` si su calendario sigue operativo.
+  fastify.patch<{ Body: z.infer<typeof ModoDeAgendaSchema> }>(
+    "/business/me/agenda/modo",
+    { preValidation: [fastify.authenticate] },
+    async (
+      request: FastifyRequest<{ Body: z.infer<typeof ModoDeAgendaSchema> }>,
+      reply
+    ) => {
+      try {
+        const { modo } = ModoDeAgendaSchema.parse(request.body);
+        const resultado = await cambiarModoDeAgenda(
+          request.user!.businessId,
+          modo
+        );
+        if (!resultado.ok) {
+          return reply
+            .status(409)
+            .send({ error: resultado.motivo, code: resultado.code });
+        }
+        return reply.send(serializarBusiness(resultado.business));
+      } catch (error) {
+        if (error instanceof z.ZodError) {
+          return reply.status(400).send({ error: error.errors });
+        }
+        fastify.log.error(
+          { err: error },
+          "[Business] No se pudo cambiar el modo de agenda"
+        );
+        return reply
+          .status(500)
+          .send({ error: "No se pudo cambiar el modo de agenda" });
       }
     }
   );

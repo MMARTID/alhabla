@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { getCalendarState } from "@/lib/calendar-state";
+import { getCalendarState, NOMBRE_AGENDA_DE_ALHABLA } from "@/lib/calendar-state";
 import {
   AlertTriangle,
   Bot,
@@ -34,7 +34,7 @@ export type OperationalStatusItem = {
   tone: OperationalTone;
   action?: { label: string; href: string } | { label: string; kind: "retry-phone" };
   /**
-   * El problema ya lo cuenta otra señal: «Atiende pero no reserva» por la
+   * El problema ya lo cuenta otra señal: «Atiende, pero no reserva» por la
    * agenda es el mismo asunto que «Agenda: sin conectar», y el chip diría
    * «2 avisos» por una sola cosa que arreglar.
    */
@@ -52,8 +52,9 @@ export const OPERATIONAL_TONE: Record<OperationalTone, { icon: LucideIcon; text:
 const NO_COMPROBADO = "No se ha podido comprobar";
 
 /** Estado intermedio de la recepcionista: coge el teléfono, informa y toma
- * recados, pero no puede reservar (sin horario o sin agenda). */
-export const ATIENDE_SIN_RESERVAR = "Atiende pero no reserva";
+ * recados, pero no puede reservar (sin horario, o sin agenda de Alhabla ni
+ * calendario conectado). */
+export const ATIENDE_SIN_RESERVAR = "Atiende, pero no reserva";
 
 /**
  * Fuente única para las señales de salud operativa. Las pantallas deciden si
@@ -83,28 +84,32 @@ export function buildOperationalStatus({
   const calendarExpired = calendarState.expired;
   const sinHorario = !horarioConfigurado(business.schedule);
 
-  // Atiende, pero sin horario no hay huecos (BUSINESS_HOURS_NOT_CONFIGURED)
-  // y sin agenda `book_appointment` se corta: decir «Atendiendo llamadas»
-  // escondía que no reserva ni una cita.
+  const sinAgenda = !calendarState.bookable;
+
+  // Sin horario no hay huecos (BUSINESS_HOURS_NOT_CONFIGURED), tampoco en la
+  // agenda de Alhabla; sin agenda donde reservar (ni la de Alhabla ni un
+  // calendario operativo) la recepcionista contesta, toma nota de la
+  // petición y avisa al dueño, pero no da hora ni reserva (voiceTools:
+  // check_availability y book_appointment). Decir «Atendiendo llamadas» a
+  // secas escondía esa diferencia.
+  const causaDeLaAgenda = calendarExpired
+    ? "el calendario se desconectó"
+    : calendarState.mode === "externo"
+      ? "falta conectar el calendario"
+      : "falta elegir dónde reservar";
   const sinReservas: OperationalStatusItem | null =
-    sinHorario || !calendarConnected
+    sinHorario || sinAgenda
       ? {
           key: "agent",
           label: "Recepcionista",
           icon: Bot,
           value: `${ATIENDE_SIN_RESERVAR}: ${
-            sinHorario
-              ? calendarConnected
-                ? "falta el horario"
-                : "faltan el horario y la agenda"
-              : calendarExpired
-                ? "la agenda se desconectó"
-                : "falta conectar la agenda"
+            sinHorario ? (sinAgenda ? "faltan el horario y la agenda" : "falta el horario") : causaDeLaAgenda
           }`,
           tone: "warning",
           action: sinHorario
             ? { label: "Configurar horario", href: "/agente?section=business-hours" }
-            : { label: calendarExpired ? "Reconectar" : "Conectar agenda", href: "/agente?section=calendar-section" },
+            : { label: calendarExpired ? "Reconectar agenda" : "Elegir agenda", href: "/agente?section=calendar-section" },
           // Si solo falta la agenda, el aviso ya lo da la señal «Agenda».
           cubiertoPor: sinHorario ? undefined : "calendar",
         }
@@ -136,7 +141,9 @@ export function buildOperationalStatus({
         ? { key: "forwarding", label: "Desvío de llamadas", icon: PhoneForwarded, value: NO_COMPROBADO, tone: "unknown" }
         : { key: "forwarding", label: "Desvío de llamadas", icon: PhoneForwarded, value: "Esperando al número", tone: "waiting" };
 
-  const calendar: OperationalStatusItem = calendarConnected
+  const calendar: OperationalStatusItem = calendarState.alhabla
+    ? { key: "calendar", label: "Agenda", icon: CalendarDays, value: NOMBRE_AGENDA_DE_ALHABLA, tone: "ok" }
+    : calendarConnected
     ? { key: "calendar", label: "Agenda", icon: CalendarDays, value: calendarState.label, tone: "ok" }
     : calendarExpired
       ? { key: "calendar", label: "Agenda", icon: CalendarDays, value: "Conexión caducada", tone: "error", action: { label: "Reconectar", href: "/agente?section=calendar-section" } }

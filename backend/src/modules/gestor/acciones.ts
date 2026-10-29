@@ -46,9 +46,19 @@ export interface AccionDelGestor<P> {
   ejecutar(
     ctx: ContextoDeAccion,
     params: P,
-    meta: { inboundMessageId: string; accionId: string }
+    meta: MetaDeEjecucion
   ): Promise<ResultadoDeEjecucion>;
 }
+
+/** Quién ejecuta la acción. Por defecto el Gestor (botón «Confirmar» en
+ * WhatsApp); `panel` cuando la lanza el dueño desde la agenda del panel
+ * (bookings/citasDelPanel.ts), que reutiliza las mismas acciones y solo
+ * cambia el origen de la cita (`createdVia`) y las palabras. */
+export type MetaDeEjecucion = {
+  inboundMessageId: string;
+  accionId: string;
+  origen?: "gestor" | "panel";
+};
 
 /** `parametros`, si vienen, son los normalizados (nombres resueltos a ids):
  * se guardan y son los que recibe `ejecutar`, para que el botón actúe sobre

@@ -199,19 +199,19 @@ export function InicioMovil({
             href="/agente/horario"
             icono={CalendarClock}
             titulo="Configura tu horario"
-            texto="Sin él, tu recepcionista atiende pero no puede reservar ninguna cita."
+            texto="Sin él no hay huecos que ofrecer: tu recepcionista toma nota, pero no reserva citas."
           />
         ) : null}
 
-        {!calendario.connected ? (
+        {!calendario.bookable ? (
           <TarjetaDeAviso
             href="/agente/calendario"
             icono={CalendarDays}
-            titulo={calendario.expired ? "Vuelve a conectar tu agenda" : "Conecta tu agenda"}
+            titulo={calendario.expired ? "Vuelve a conectar tu agenda" : "Elige dónde reservar"}
             texto={
               calendario.expired
                 ? `La conexión con ${calendario.label} ha caducado: sin ella no se reservan citas.`
-                : "Sin ella, tu recepcionista atiende pero no puede reservar citas."
+                : "Conecta tu calendario o usa la agenda de Alhabla. Hasta entonces, tu recepcionista toma nota pero no reserva citas."
             }
           />
         ) : null}
