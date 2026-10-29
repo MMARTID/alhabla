@@ -185,9 +185,12 @@ y `WEB_URL` (`backend/src/lib/urls.ts`). Nada de rutas de la otra web escritas a
   el orquestador de voz (Telnyx), despliegue.
   Consúltalo cuando trabajes sobre un subsistema concreto.
 - MCP `alhabla-dev` (`.mcp.json`, `backend/mcp/`): SQL de solo lectura y esquema real en dev y en
-  producción, JWT de dev, webhooks firmados de Telnyx contra el backend local, logs, peticiones,
-  latencias por ruta y estado de producción, salud y traza de las llamadas, resumen de un negocio,
-  assistants y conversaciones de Telnyx (solo GET) y los jobs del Scheduler que se pueden repetir. Úsalo antes que `gcloud`/`curl`/`psql` a mano. Ver `AGENTS.md` § MCP de desarrollo.
+  producción, la API y la app de dev como cualquier negocio (`llamar_api_dev`, `entrar_en_app_dev`),
+  webhooks firmados de Telnyx y conversaciones enteras simuladas (voz y Gestor) contra backend-sim en
+  `main` o en una rama, logs, errores agrupados, peticiones, latencias, colas y estado de producción,
+  salud y traza de las llamadas, resumen de un negocio, assistants y conversaciones de Telnyx (solo GET)
+  y los jobs del Scheduler que se pueden repetir. Si algo falla, `diagnostico_mcp` primero. Úsalo antes
+  que `gcloud`/`curl`/`psql` a mano. Ver `AGENTS.md` § MCP de desarrollo.
 - `.claude-context.md` — resumen de producto, audiencia, tono de marca y problemas
   UI/UX conocidos.
 - `PRODUCT.md` (producto y marca), `DESIGN.md` (sistema de diseño), `CONTRIBUTING.md`

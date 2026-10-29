@@ -11,7 +11,10 @@ import { leerEnviosSimulados } from "../enviosSimulados.js";
 import { estadoDeProd } from "../estadoDeProd.js";
 import { leerLogsDeProd } from "../logsDeProd.js";
 import {
+  DIR_HERRAMIENTAS,
+  HERRAMIENTAS,
   PIEZAS_QUE_SE_REINICIAN,
+  actualizarHerramientas,
   estadoDelEntorno,
   prsAbiertos,
   ramaValida,
@@ -183,4 +186,24 @@ if (
   crearServidorDelPanel().listen(PUERTO, "127.0.0.1", () => {
     console.log(`[Panel] Panel de desarrollo en http://localhost:${PUERTO}`);
   });
+  // Las herramientas al día aunque el Mac no se reinicie en días: si
+  // cambian, el panel sale y launchd (KeepAlive) lo relanza con el código
+  // nuevo. Solo el panel de la carpeta fija, no uno lanzado a mano.
+  if (resolve(HERRAMIENTAS) === resolve(DIR_HERRAMIENTAS)) {
+    setInterval(() => {
+      actualizarHerramientas()
+        .then(({ cambiaron, despues }) => {
+          if (!cambiaron) return;
+          console.log(
+            `[Panel] Herramientas en ${despues?.slice(0, 7)}: se relanza el panel`
+          );
+          process.exit(0);
+        })
+        .catch((error) =>
+          console.error(
+            `[Panel] No se pudieron actualizar las herramientas: ${(error as Error).message}`
+          )
+        );
+    }, 15 * 60_000);
+  }
 }

@@ -1,6 +1,11 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { createServer } from "node:net";
-import { PROYECTO, REGION, leerSecreto as leerSecretoDeGcloud } from "./gcloud.js";
+import {
+  PROYECTO,
+  REGION,
+  explicarFalloDeGcloud,
+  leerSecreto as leerSecretoDeGcloud,
+} from "./gcloud.js";
 
 /**
  * Lectura de la BD de PRODUCCIÓN desde el Mac, con dos barreras:
@@ -72,7 +77,11 @@ async function arrancarProxy(): Promise<number> {
     });
     proceso.on("exit", (codigo) => {
       clearTimeout(plazo);
-      rechazar(new Error(`[MCP] cloud-sql-proxy terminó (código ${codigo}):\n${salida}`));
+      rechazar(
+        new Error(
+          `[MCP] cloud-sql-proxy terminó (código ${codigo}): ${explicarFalloDeGcloud(salida.trim())}`
+        )
+      );
     });
   });
 

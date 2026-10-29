@@ -1,8 +1,15 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import jwt from "jsonwebtoken";
 import { z } from "zod";
-import { avisosDeCuerpo, catalogoDeToolsDeVoz } from "./catalogoDeTools.js";
+import { avisoDeBackendSimViejo, gestionarBackendSim } from "./backendSim.js";
+import {
+  avisosDeCuerpo,
+  catalogoDeToolsDeVoz,
+  catalogoDeToolsDelGestor,
+} from "./catalogoDeTools.js";
+import { conErrores, entorno, mostrarTelefonos } from "./comun.js";
+import { simularConversacion } from "./conversacionSimulada.js";
+import { diagnosticarMcp, recordarCommitAlArrancar } from "./diagnostico.js";
 import { cargarEnv, urlDeBdDeDev, variable } from "./entorno.js";
 import { leerEnviosSimulados } from "./enviosSimulados.js";
 import { describirTabla } from "./esquema.js";
@@ -19,11 +26,22 @@ import {
   crearLlamadaSimulada,
 } from "./llamadasSimuladas.js";
 import { pararProxy, urlDeBdDeProd } from "./prod.js";
+import { registrarHerramientasDeProd } from "./registroDeProd.js";
 import { resumenDeNegocio } from "./resumenDeNegocio.js";
 import { saludDeLlamadas } from "./saludDeLlamadas.js";
 import { ejecutarSoloLectura } from "./sqlDeSoloLectura.js";
 import { urlDeBd, verAssistant, verConversacion } from "./telnyx.js";
-import { estadoDelEntorno, verRamaEnDev } from "./panel/entornoDev.js";
+import {
+  actualizarHerramientasEnSegundoPlano,
+  estadoDelEntorno,
+  verRamaEnDev,
+} from "./panel/entornoDev.js";
+import {
+  buscarUsuarioDeDev,
+  crearEnlaceDeEntradaDeDev,
+  firmarSesionDeDev,
+  llamarApiDeDev,
+} from "./sesionDeDev.js";
 import { trazaDeLlamada } from "./trazaDeLlamada.js";
 import {
   BASE_DEV,
@@ -36,12 +54,21 @@ import {
  * `.mcp.json`). Herramientas:
  *
  * - consultar_bd_dev / consultar_bd_prod: SQL de solo lectura.
+ * - diagnostico_mcp: cada pieza de la que dependen las herramientas, con su
+ *   arreglo (gcloud, Docker, backend-sim, copia del MCP al día…).
  * - generar_jwt_dev: sesión de un usuario de dev para probar rutas con curl.
+ * - llamar_api_dev: una petición a la API de dev como un negocio.
+ * - entrar_en_app_dev: enlace que abre la app de dev con la sesión de un
+ *   negocio (pase de un solo uso, sin JWT en la URL).
  * - simular_webhook_telnyx: peticiones firmadas como las de Telnyx contra el
  *   backend de simulación (webhooks.ts).
+ * - simular_conversacion: varias tools seguidas en la misma llamada simulada
+ *   (o del Gestor), pasando tokens e ids de un paso al siguiente.
+ * - backend_sim: de qué código corre backend-sim; levantarlo en main o en
+ *   una rama, reiniciarlo o pararlo.
  * - borrar_llamadas_simuladas: limpia las llamadas que crean las anteriores.
- * - listar_tools_voz: las tools de voz con sus argumentos, sacadas del código
- *   que las registra en Telnyx.
+ * - listar_tools_voz: las tools de voz (y del Gestor) con sus argumentos,
+ *   sacadas del código que las registra en Telnyx.
  * - ver_envios_simulados: los WhatsApp/SMS/correos que backend-sim no envió.
  * - describir_tabla: tablas, columnas, índices y claves de dev o producción.
  * - ver_logs_prod / ver_peticiones_prod: Cloud Logging de alhabla-api.
@@ -50,7 +77,11 @@ import {
  *   acabaron bien, citas por canal y reservas pendientes por código.
  * - traza_llamada: todo lo que dejó una llamada, con sus logs.
  * - resumen_negocio: la foto de un negocio (o la lista para elegir uno).
- * - estado_prod: revisión, imagen, /health, colas, jobs y último deploy.
+ * - estado_prod: revisión, imagen, /health, colas, jobs, último deploy,
+ *   migraciones de Prisma y último despliegue de las dos webs.
+ * - errores_prod / ver_cola_prod / visitas_web / panorama_plataforma: errores
+ *   agrupados, tareas de Cloud Tasks, visitas a alhabla.ai y las cifras de la
+ *   plataforma (registroDeProd.ts).
  * - ver_assistant_telnyx / ver_conversacion_telnyx: GET a Telnyx AI.
  * - lanzar_job_prod: solo los jobs del Scheduler que se pueden repetir.
  * - estado_dev / ver_en_dev: el entorno de desarrollo fijo
@@ -63,34 +94,6 @@ import {
  */
 
 const servidor = new McpServer({ name: "alhabla-dev", version: "1.0.0" });
-
-function respuesta(datos: unknown) {
-  return {
-    content: [{ type: "text" as const, text: JSON.stringify(datos, null, 2) }],
-  };
-}
-
-function fallo(error: unknown) {
-  return {
-    isError: true,
-    content: [
-      {
-        type: "text" as const,
-        text: error instanceof Error ? error.message : String(error),
-      },
-    ],
-  };
-}
-
-async function conErrores<T>(trabajo: () => Promise<T>) {
-  try {
-    return respuesta(await trabajo());
-  } catch (error) {
-    const mensaje = error instanceof Error ? error.message : String(error);
-    console.error(mensaje.startsWith("[MCP]") ? mensaje : `[MCP] ${mensaje}`);
-    return fallo(error);
-  }
-}
 
 const esquemaDeConsulta = {
   sql: z
@@ -159,37 +162,84 @@ servidor.registerTool(
   },
   ({ email, businessId, expiraEn }) =>
     conErrores(async () => {
-      if (!email && !businessId) {
-        throw new Error("[MCP] Indica email o businessId");
-      }
       const env = cargarEnv();
-      const { filas } = await ejecutarSoloLectura(
-        urlDeBdDeDev(env),
-        `SELECT id, email, "businessId", "tokenVersion"
-           FROM users
-          WHERE ($1::text IS NULL OR email = $1)
-            AND ($2::text IS NULL OR "businessId" = $2)
-          ORDER BY "createdAt"
-          LIMIT 1`,
-        { parametros: [email ?? null, businessId ?? null] }
-      );
-      const usuario = filas[0] as
-        | { id: string; email: string; businessId: string; tokenVersion: number }
-        | undefined;
-      if (!usuario) {
-        throw new Error("[MCP] No hay ningún usuario así en la BD de dev");
-      }
-      // Mismo payload que createToken (modules/auth/routes.ts): `tv` tiene
-      // que coincidir con tokenVersion o plugins/auth.ts lo rechaza.
-      const token = jwt.sign(
-        { id: usuario.id, businessId: usuario.businessId, tv: usuario.tokenVersion },
-        variable(env, "JWT_SECRET"),
-        { expiresIn: (expiraEn ?? "1h") as jwt.SignOptions["expiresIn"] }
-      );
+      const usuario = await buscarUsuarioDeDev(urlDeBdDeDev(env), {
+        email,
+        businessId,
+      });
+      const token = firmarSesionDeDev(env, usuario, expiraEn ?? "1h");
       return {
         usuario: { id: usuario.id, email: usuario.email, businessId: usuario.businessId },
         token,
         ejemplo: `curl -s -H "Authorization: Bearer ${token}" ${BASE_DEV}/business/me`,
+        masComodo:
+          "llamar_api_dev hace la petición directamente; entrar_en_app_dev abre la app con esta sesión.",
+      };
+    })
+);
+
+servidor.registerTool(
+  "llamar_api_dev",
+  {
+    title: "Llamar a la API de dev como un negocio",
+    description:
+      "Una petición HTTP a la API de dev (localhost:3000, el backend del entorno fijo) o de backend-sim (:3010) con la sesión de un usuario de la BD de dev (por email o por negocio: el usuario más antiguo), sin copiar JWT ni montar curl. Devuelve estado, milisegundos y la respuesta (JSON si lo es). Sirve para probar una ruta del panel (GET /business/me, PATCH /booking-settings/…) o reproducir lo que hace la app. sinSesion para rutas públicas.",
+    inputSchema: {
+      metodo: z.enum(["GET", "POST", "PUT", "PATCH", "DELETE"]),
+      ruta: z.string().describe("Ej.: /business/me o /bookings?desde=2026-10-29"),
+      cuerpo: z.unknown().optional().describe("Cuerpo JSON"),
+      email: z.string().optional(),
+      businessId: z.string().optional(),
+      backend: z
+        .enum(["dev", "sim"])
+        .optional()
+        .describe("dev (:3000, por defecto) o sim (:3010)"),
+      sinSesion: z.boolean().optional(),
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false },
+  },
+  ({ metodo, ruta, cuerpo, email, businessId, backend, sinSesion }) =>
+    conErrores(async () => {
+      const env = cargarEnv();
+      return llamarApiDeDev({
+        env,
+        urlDeBdDeDev: urlDeBdDeDev(env),
+        metodo,
+        ruta,
+        cuerpo,
+        email,
+        businessId,
+        backend,
+        sinSesion,
+      });
+    })
+);
+
+servidor.registerTool(
+  "entrar_en_app_dev",
+  {
+    title: "Entrar en la app de dev como un negocio",
+    description:
+      "Un enlace a la app de dev (http://localhost:3001) que abre la sesión de un usuario de la BD de dev (por email o por negocio) y lleva a la pantalla pedida (destino, por defecto el panel «/»). Usa un pase de un solo uso como el del registro (válido 10 minutos, una vez): el JWT no va en la URL. Para dárselo al usuario o abrirlo en el navegador integrado.",
+    inputSchema: {
+      email: z.string().optional(),
+      businessId: z.string().optional(),
+      destino: z
+        .string()
+        .optional()
+        .describe("Ruta de la app: /, /agenda, /llamadas, /ajustes…"),
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false },
+  },
+  ({ email, businessId, destino }) =>
+    conErrores(async () => {
+      const url = urlDeBdDeDev(cargarEnv());
+      const usuario = await buscarUsuarioDeDev(url, { email, businessId });
+      const enlace = await crearEnlaceDeEntradaDeDev(url, usuario, destino);
+      return {
+        usuario: { email: usuario.email, businessId: usuario.businessId },
+        ...enlace,
+        nota: "Un solo uso: si se abre dos veces, pide otro.",
       };
     })
 );
@@ -199,7 +249,7 @@ servidor.registerTool(
   {
     title: "Simular un webhook firmado de Telnyx",
     description:
-      "POST firmado con Ed25519 (clave de simulación local) a una ruta /webhooks/telnyx… del backend de simulación (localhost:3010; se levanta con scripts/backend-sim.sh). Para una tool de voz (ruta /webhooks/telnyx/tools/<tool>, cuerpo = argumentos de la tool) pasa businessId: crea una llamada simulada NUEVA de ese negocio y pone la cabecera x-alhabla-call-control-id. Para seguir la misma conversación (check_availability y luego book_appointment) pasa en callControlId la `llamada` que devolvió la primera: una cita por llamada. La tool se ejecuta de verdad (la cita va al calendario real del negocio), pero backend-sim NO manda WhatsApp, SMS ni correos (ENVIOS_SIMULADOS): solo los registra en su log. Los argumentos de cada tool salen en listar_tools_voz; si al cuerpo le falta alguno obligatorio o sobra uno, la respuesta trae `avisos`. Lo que backend-sim no envió se ve con ver_envios_simulados. Al acabar, borrar_llamadas_simuladas.",
+      "POST firmado con Ed25519 (clave de simulación local) a una ruta /webhooks/telnyx… del backend de simulación (localhost:3010; se levanta con scripts/backend-sim.sh). Para una tool de voz (ruta /webhooks/telnyx/tools/<tool>, cuerpo = argumentos de la tool) pasa businessId: crea una llamada simulada NUEVA de ese negocio y pone la cabecera x-alhabla-call-control-id. Para seguir la misma conversación (check_availability y luego book_appointment) pasa en callControlId la `llamada` que devolvió la primera: una cita por llamada. La tool se ejecuta de verdad (la cita va al calendario real del negocio), pero backend-sim NO manda WhatsApp, SMS ni correos (ENVIOS_SIMULADOS): solo los registra en su log. Los argumentos de cada tool salen en listar_tools_voz; si al cuerpo le falta alguno obligatorio o sobra uno, la respuesta trae `avisos`. Lo que backend-sim no envió se ve con ver_envios_simulados. Al acabar, borrar_llamadas_simuladas. Para varios pasos seguidos es más cómodo simular_conversacion. Las tools del Gestor van a /webhooks/telnyx/gestor/<tool> con cabeceras x-alhabla-business (el negocio) y x-alhabla-role: owner. Si backend-sim corre código viejo o de una rama, la respuesta lo avisa (backend_sim lo arregla).",
     inputSchema: {
       ruta: z
         .string()
@@ -234,6 +284,8 @@ servidor.registerTool(
       });
       // Solo si hay algo que avisar: no ensucia las respuestas buenas.
       const avisos = avisosDeCuerpo(new URL(ruta, "http://x").pathname, cuerpo);
+      const codigoViejo = baseUrl ? null : await avisoDeBackendSimViejo();
+      if (codigoViejo) avisos.push(codigoViejo);
       return avisos.length > 0 ? { ...resultado, avisos } : resultado;
     })
 );
@@ -241,30 +293,110 @@ servidor.registerTool(
 servidor.registerTool(
   "listar_tools_voz",
   {
-    title: "Listar las tools de voz",
+    title: "Listar las tools de voz y del Gestor",
     description:
-      "Las tools que el assistant de Telnyx llama por webhook (get_catalog, check_availability, book_appointment…) con su ruta, sus argumentos, cuáles son obligatorios y un cuerpo de ejemplo. Salen del mismo código que las registra en Telnyx. Úsalo antes de simular_webhook_telnyx para no adivinar los nombres de los argumentos.",
+      "Las tools que los assistants de Telnyx llaman por webhook con su ruta, sus argumentos, cuáles son obligatorios y un cuerpo de ejemplo: las de la recepcionista (canal voz: get_catalog, check_availability, book_appointment…; también las del chat de WhatsApp con clientes) o las del Gestor (canal gestor: el chat del dueño). Salen del mismo código que las registra en Telnyx. Úsalo antes de simular_webhook_telnyx o simular_conversacion para no adivinar los nombres de los argumentos.",
     inputSchema: {
       nombre: z
         .string()
         .optional()
         .describe("Solo esta tool (p. ej. check_availability)"),
+      canal: z
+        .enum(["voz", "gestor"])
+        .optional()
+        .describe("Por defecto voz"),
     },
     annotations: { readOnlyHint: true },
   },
-  ({ nombre }) =>
+  ({ nombre, canal }) =>
     conErrores(async () => {
-      const catalogo = catalogoDeToolsDeVoz();
+      const catalogo =
+        canal === "gestor" ? catalogoDeToolsDelGestor() : catalogoDeToolsDeVoz();
       const tools = nombre
         ? catalogo.filter((tool) => tool.nombre === nombre)
         : catalogo;
       if (nombre && tools.length === 0) {
         throw new Error(
-          `[MCP] No hay ninguna tool de voz «${nombre}»; las hay: ${catalogo.map((tool) => tool.nombre).join(", ")}`
+          `[MCP] No hay ninguna tool «${nombre}» en el canal ${canal ?? "voz"}; las hay: ${catalogo.map((tool) => tool.nombre).join(", ")}`
         );
       }
       return tools;
     })
+);
+
+servidor.registerTool(
+  "simular_conversacion",
+  {
+    title: "Simular una conversación entera",
+    description:
+      "Varias tools seguidas sobre la MISMA llamada simulada (canal voz: crea una llamada de businessId, o sigue callControlId) o del Gestor (canal gestor, con businessId), en orden, contra backend-sim. En el cuerpo de un paso, «{{nombre}}» se sustituye por el último valor con ese nombre que devolvió un paso anterior (p. ej. {{availabilityToken}}, {{bookingId}}, {{professionalId}}); y un book_appointment sin availabilityToken ni startDateTime toma el del último check_availability. Devuelve cada paso (cuerpo enviado, estado, ms, avisos y respuesta), las citas y reservas pendientes que dejó la llamada en la BD de dev y los WhatsApp/SMS/correos que backend-sim no envió. Las citas van al calendario real del negocio: al acabar, cancélalas y borrar_llamadas_simuladas.",
+    inputSchema: {
+      canal: z.enum(["voz", "gestor"]).optional().describe("Por defecto voz"),
+      businessId: z.string().optional(),
+      telefonoCliente: z
+        .string()
+        .optional()
+        .describe("fromNumber de la llamada simulada, en E.164"),
+      callControlId: z
+        .string()
+        .optional()
+        .describe("Sigue esta llamada simulada en vez de crear otra"),
+      pasos: z
+        .array(
+          z.object({
+            tool: z.string().describe("get_catalog, check_availability…"),
+            cuerpo: z.record(z.unknown()).optional(),
+          })
+        )
+        .min(1)
+        .max(20),
+      pararSiFalla: z
+        .boolean()
+        .optional()
+        .describe("Corta en el primer paso con HTTP de error o success:false"),
+    },
+  },
+  (opciones) =>
+    conErrores(async () => {
+      const env = cargarEnv();
+      const resultado = await simularConversacion({
+        ...opciones,
+        urlDeBdDeDev: urlDeBdDeDev(env),
+        clavePrivada: variable(env, "TELNYX_PRIVATE_KEY_SIMULACION"),
+      });
+      const codigoViejo = await avisoDeBackendSimViejo();
+      return codigoViejo ? { aviso: codigoViejo, ...resultado } : resultado;
+    })
+);
+
+servidor.registerTool(
+  "backend_sim",
+  {
+    title: "Gestionar backend-sim",
+    description:
+      "backend-sim (localhost:3010) es el backend contra el que van simular_webhook_telnyx y simular_conversacion, y corre el código de la carpeta desde la que se levantó. estado: de qué carpeta, rama y commit corre y cuántos commits de backend va por detrás de main. levantar: sin rama, en el último main (las herramientas, ~/.alhabla-mcp, puestas antes al día); con rama (o número de PR, ya subida a origin), en ~/.alhabla-sim, para probar la rama antes de fusionarla; aplica las migraciones de ese código a la BD de dev (compartida) y reconstruye la imagen si cambian las dependencias. reiniciar: recrea el contenedor (schema de Prisma nuevo). reconstruir: imagen y node_modules nuevos. parar. Al acabar con una rama, vuelve a levantar sin rama.",
+    inputSchema: {
+      accion: z.enum(["estado", "levantar", "reiniciar", "reconstruir", "parar"]),
+      rama: z
+        .string()
+        .optional()
+        .describe("Con levantar: rama de origin o número de PR; sin ella, main"),
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false },
+  },
+  ({ accion, rama }) => conErrores(() => gestionarBackendSim(accion, rama))
+);
+
+servidor.registerTool(
+  "diagnostico_mcp",
+  {
+    title: "Diagnóstico del MCP",
+    description:
+      "Comprueba a la vez todo aquello de lo que dependen estas herramientas y dice cómo arreglar lo que falla: copia del MCP (~/.alhabla-mcp) al día con main y con qué commit arrancó este proceso, .env de desarrollo, sesión de gcloud (producción), cloud-sql-proxy, gh, Docker, Postgres y backend de dev, backend-sim (y si corre código viejo) y la CLI de Vercel. Úsalo primero cuando una herramienta falle sin motivo claro.",
+    inputSchema: {},
+    annotations: { readOnlyHint: true, openWorldHint: true },
+  },
+  () => conErrores(() => diagnosticarMcp())
 );
 
 servidor.registerTool(
@@ -303,18 +435,6 @@ servidor.registerTool(
   ({ businessId }) =>
     conErrores(() => borrarLlamadasSimuladas(urlDeBdDeDev(cargarEnv()), businessId))
 );
-
-const entorno = z
-  .enum(["dev", "prod"])
-  .describe(
-    "dev: Postgres de Docker y la clave de Telnyx del .env; prod: Cloud SQL y Secret Manager"
-  );
-const mostrarTelefonos = z
-  .boolean()
-  .optional()
-  .describe(
-    "Por defecto los teléfonos +34… salen enmascarados (las 3 últimas cifras)"
-  );
 
 servidor.registerTool(
   "describir_tabla",
@@ -475,7 +595,7 @@ servidor.registerTool(
   {
     title: "Estado de producción",
     description:
-      "Foto de producción: revisión que sirve y su tráfico, imagen (commit), máximo de instancias del servicio y de la plantilla (tiene que ser 11), condiciones que no están bien, /health, tareas por cola de Cloud Tasks, jobs del Scheduler cuyo último intento falló o en pausa, los 3 últimos deploys del backend y si producción sirve el último que salió bien. Para comprobar un merge o un «¿va todo bien?».",
+      "Foto de producción: revisión que sirve y su tráfico, imagen (commit), máximo de instancias del servicio y de la plantilla (tiene que ser 11), condiciones que no están bien, /health, tareas por cola de Cloud Tasks, jobs del Scheduler cuyo último intento falló o en pausa, los 3 últimos deploys del backend y si producción sirve el último que salió bien, las migraciones de Prisma (aplicadas, la última, fallidas o a medias, y las de este checkout que faltan en producción) y el último despliegue de producción de las dos webs de Vercel (app.alhabla.ai y alhabla.ai), con si sirven lo último de main o al menos lo último que toca su carpeta. Para comprobar un merge o un «¿va todo bien?»; el detalle de los errores, con errores_prod.",
     inputSchema: {},
     annotations: { readOnlyHint: true, openWorldHint: true },
   },
@@ -584,6 +704,8 @@ servidor.registerTool(
     })
 );
 
+registrarHerramientasDeProd(servidor);
+
 process.on("exit", pararProxy);
 for (const senal of ["SIGINT", "SIGTERM"] as const) {
   process.on(senal, () => {
@@ -594,3 +716,7 @@ for (const senal of ["SIGINT", "SIGTERM"] as const) {
 
 await servidor.connect(new StdioServerTransport());
 console.error("[MCP] alhabla-dev listo");
+// Lo que este proceso tiene cargado, y la copia fija al día para la próxima
+// sesión (el código nuevo de un proceso ya arrancado no se recarga).
+await recordarCommitAlArrancar();
+actualizarHerramientasEnSegundoPlano();

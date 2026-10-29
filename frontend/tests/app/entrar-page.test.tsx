@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
+import { StrictMode } from "react";
 import { render, screen, waitFor } from "@testing-library/react";
 import EntrarPage from "@/app/auth/entrar/page";
 import { redeemPass } from "@/lib/api";
@@ -52,6 +53,38 @@ describe("EntrarPage (/auth/entrar, llegada desde la web con el pase)", () => {
     await waitFor(() => expect(replace).toHaveBeenCalledWith("/bienvenida"));
     expect(window.localStorage.getItem("alhabla_pending_plan")).toBeNull();
     expect(window.localStorage.getItem("alhabla_registration_niche")).toBeNull();
+    restore();
+  });
+
+  it("en modo estricto (dev) canjea el pase una sola vez y entra", async () => {
+    params.value = new URLSearchParams(`?pase=${PASE}`);
+    mockedRedeem.mockResolvedValue("jwt_9");
+    const { replace, restore } = mockLocation();
+
+    render(
+      <StrictMode>
+        <EntrarPage />
+      </StrictMode>
+    );
+
+    await waitFor(() => expect(replace).toHaveBeenCalledWith("/bienvenida"));
+    expect(mockedRedeem).toHaveBeenCalledTimes(1);
+    expect(window.localStorage.getItem("alhabla_token")).toBe("jwt_9");
+    restore();
+  });
+
+  it("con destino interno va ahí; uno de otra web se ignora", async () => {
+    params.value = new URLSearchParams(`?pase=${PASE}&destino=%2Fagenda`);
+    mockedRedeem.mockResolvedValue("jwt_9");
+    const { replace, restore } = mockLocation();
+    const { unmount } = render(<EntrarPage />);
+    await waitFor(() => expect(replace).toHaveBeenCalledWith("/agenda"));
+    unmount();
+
+    params.value = new URLSearchParams(`?pase=${PASE}&destino=https%3A%2F%2Fmalo.com`);
+    replace.mockClear();
+    render(<EntrarPage />);
+    await waitFor(() => expect(replace).toHaveBeenCalledWith("/bienvenida"));
     restore();
   });
 

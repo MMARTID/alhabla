@@ -12,6 +12,7 @@
 #   scripts/dev/entorno.sh arrancar      # al iniciar sesión (LaunchAgent)
 #   scripts/dev/entorno.sh ver <rama>    # rama de origin, «main» o nº de PR
 #   scripts/dev/entorno.sh estado
+#   scripts/dev/entorno.sh herramientas  # ~/.alhabla-mcp al último main
 #   scripts/dev/entorno.sh parar
 #
 # Lo instala scripts/dev/instalar.sh. Todo va al log
@@ -146,23 +147,74 @@ poner_en() {
   done
 }
 
-# Las herramientas (MCP, este script, el panel) siempre en el último main.
-# ALHABLA_HERRAMIENTAS_FIJAS=1 las deja como están: para probar una rama de
-# las herramientas antes de fusionarla (instalar.sh lo pasa a los agentes).
+# Las herramientas (MCP, este script, el panel, backend-sim) siempre en el
+# último main. No solo al iniciar sesión: también al poner dev en una rama,
+# cada vez que arranca el MCP (sesión nueva) y cada 15 minutos desde el panel
+# (`entorno.sh herramientas`). Hasta el 29-10 solo se hacía al iniciar
+# sesión, y tras seis días sin reiniciar el Mac el MCP y backend-sim corrían
+# código viejo sin avisar.
+# ALHABLA_HERRAMIENTAS_FIJAS=1 o el fichero $ESTADO/herramientas-fijas las
+# dejan como están: para probar una rama de las herramientas antes de
+# fusionarla (instalar.sh pasa la variable a los agentes).
 actualizar_herramientas() {
   [ -e "$HERRAMIENTAS/.git" ] || return 0
   [ "${ALHABLA_HERRAMIENTAS_FIJAS:-}" = "1" ] && return 0
-  local antes
-  antes=$(git -C "$HERRAMIENTAS" rev-parse HEAD:backend/package-lock.json 2>/dev/null)
-  git -C "$HERRAMIENTAS" fetch -q origin 2>>"$LOGS/entorno.log" || return 0
-  if ! git -C "$HERRAMIENTAS" checkout -q --detach origin/main 2>>"$LOGS/entorno.log"; then
-    registro "No se pudo poner $HERRAMIENTAS en main"
+  [ -e "$ESTADO/herramientas-fijas" ] && return 0
+  # Una sola actualización a la vez (el panel, el MCP y el arranque pueden
+  # coincidir); un cerrojo de más de 10 minutos es de un proceso que murió.
+  local cerrojo="$ESTADO/herramientas.lock"
+  if ! mkdir "$cerrojo" 2>/dev/null; then
+    if [ -n "$(find "$cerrojo" -maxdepth 0 -mmin +10 2>/dev/null)" ]; then
+      rm -rf "$cerrojo"
+      mkdir "$cerrojo" 2>/dev/null || return 0
+    else
+      return 0
+    fi
+  fi
+  local antes antes_lock antes_schema despues
+  antes=$(git -C "$HERRAMIENTAS" rev-parse HEAD 2>/dev/null)
+  antes_lock=$(git -C "$HERRAMIENTAS" rev-parse HEAD:backend/package-lock.json 2>/dev/null)
+  antes_schema=$(git -C "$HERRAMIENTAS" rev-parse HEAD:backend/prisma/schema.prisma 2>/dev/null)
+  if ! git -C "$HERRAMIENTAS" fetch -q origin 2>>"$LOGS/entorno.log"; then
+    rmdir "$cerrojo"
     return 0
   fi
-  if [ "$antes" != "$(git -C "$HERRAMIENTAS" rev-parse HEAD:backend/package-lock.json 2>/dev/null)" ]; then
+  if [ "$antes" = "$(git -C "$HERRAMIENTAS" rev-parse origin/main 2>/dev/null)" ]; then
+    rmdir "$cerrojo"
+    return 0
+  fi
+  if ! git -C "$HERRAMIENTAS" checkout -q --detach origin/main 2>>"$LOGS/entorno.log"; then
+    registro "No se pudo poner $HERRAMIENTAS en main"
+    rmdir "$cerrojo"
+    return 0
+  fi
+  despues=$(git -C "$HERRAMIENTAS" rev-parse HEAD)
+  registro "Herramientas en main: ${antes:0:7} → ${despues:0:7}"
+  local cambio_lock=0 cambio_schema=0
+  [ "$antes_lock" != "$(git -C "$HERRAMIENTAS" rev-parse HEAD:backend/package-lock.json 2>/dev/null)" ] && cambio_lock=1
+  [ "$antes_schema" != "$(git -C "$HERRAMIENTAS" rev-parse HEAD:backend/prisma/schema.prisma 2>/dev/null)" ] && cambio_schema=1
+  if [ "$cambio_lock" = 1 ]; then
     registro "Instalando dependencias de las herramientas..."
     (cd "$HERRAMIENTAS/backend" && npm ci --no-audit --no-fund >>"$LOGS/entorno.log" 2>&1)
   fi
+  # backend-sim montado en las herramientas recoge el código nuevo solo (tsx
+  # watch), pero no un cliente de Prisma nuevo ni dependencias nuevas.
+  local montaje
+  montaje=$(docker inspect -f '{{range .Mounts}}{{if eq .Destination "/app"}}{{.Source}}{{end}}{{end}}' alhabla_backend_sim 2>/dev/null)
+  if [ "$montaje" = "$HERRAMIENTAS/backend" ] && [ "$(docker inspect -f '{{.State.Running}}' alhabla_backend_sim 2>/dev/null)" = "true" ]; then
+    if [ "$cambio_lock" = 1 ]; then
+      registro "Reconstruyendo backend-sim (dependencias nuevas)..."
+      (cd "$HERRAMIENTAS" && /bin/sh scripts/backend-sim.sh reconstruir >>"$LOGS/entorno.log" 2>&1)
+    elif [ "$cambio_schema" = 1 ]; then
+      registro "Reiniciando backend-sim (schema de Prisma nuevo)..."
+      (cd "$HERRAMIENTAS" && /bin/sh scripts/backend-sim.sh reiniciar >>"$LOGS/entorno.log" 2>&1)
+    fi
+    if [ "$cambio_schema" = 1 ]; then
+      docker exec alhabla_backend_sim npx prisma migrate deploy >>"$LOGS/entorno.log" 2>&1 \
+        || registro "Las migraciones de main fallaron en la BD de dev: mira $LOGS/entorno.log"
+    fi
+  fi
+  rmdir "$cerrojo"
 }
 
 resolver_rama() {
@@ -208,6 +260,7 @@ case "$accion" in
     [ -n "$pedida" ] || { echo "Uso: $0 ver <rama|main|nº de PR>" >&2; exit 1; }
     rama=$(resolver_rama "$pedida") || { registro "No encuentro el PR $pedida"; exit 1; }
     git -C "$DIR" fetch -q origin || { registro "No se pudo hacer fetch"; exit 1; }
+    actualizar_herramientas
     if ! git -C "$DIR" rev-parse -q --verify "origin/$rama" >/dev/null; then
       registro "La rama $rama no está en origin (¿falta el push?)"
       exit 1
@@ -224,6 +277,9 @@ case "$accion" in
       if curl -sf -o /dev/null --max-time 3 "$url"; then echo "  $nombre: en marcha ($url)"; else echo "  $nombre: parado"; fi
     done
     ;;
+  herramientas)
+    actualizar_herramientas
+    ;;
   parar)
     # launchd los relanzaría: con esta marca, servir.sh se queda esperando.
     # El panel sigue: desde él se vuelve a arrancar.
@@ -235,7 +291,7 @@ case "$accion" in
     registro "Entorno de desarrollo parado (Postgres sigue)"
     ;;
   *)
-    echo "Uso: $0 [arrancar|ver <rama>|estado|parar]" >&2
+    echo "Uso: $0 [arrancar|ver <rama>|estado|herramientas|parar]" >&2
     exit 1
     ;;
 esac

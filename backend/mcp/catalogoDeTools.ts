@@ -1,15 +1,20 @@
+import { buildGestorTools } from "../src/lib/gestorPayload.js";
 import { buildTelnyxVoiceTools } from "../src/lib/telnyxAssistantPayload.js";
 
 /**
- * Catálogo de las tools de voz que el assistant de Telnyx llama por webhook,
- * sacado de la misma función que las registra en Telnyx
- * (`buildTelnyxVoiceTools`): nombres, argumentos y cuáles son obligatorios no
- * se pueden desfasar de lo que el assistant envía de verdad.
+ * Catálogo de las tools que los assistants de Telnyx llaman por webhook,
+ * sacado de las mismas funciones que las registran en Telnyx
+ * (`buildTelnyxVoiceTools` para la recepcionista, de voz y del chat de
+ * WhatsApp con clientes; `buildGestorTools` para el Gestor, el chat del
+ * dueño): nombres, argumentos y cuáles son obligatorios no se pueden
+ * desfasar de lo que el assistant envía de verdad.
  */
+export type CanalDeTool = "voz" | "gestor";
 
 type Propiedad = { type?: string; description?: string } & Record<string, unknown>;
 
 export type ToolDeVoz = {
+  canal: CanalDeTool;
   nombre: string;
   ruta: string;
   descripcion: string;
@@ -25,8 +30,11 @@ const VALOR_DE_EJEMPLO: Record<string, unknown> = {
   array: [],
 };
 
-export function catalogoDeToolsDeVoz(): ToolDeVoz[] {
-  return buildTelnyxVoiceTools("http://localhost").map((tool) => {
+function aCatalogo(
+  canal: CanalDeTool,
+  tools: ReturnType<typeof buildTelnyxVoiceTools>
+): ToolDeVoz[] {
+  return tools.map((tool) => {
     const argumentos = tool.properties as Record<string, Propiedad>;
     const obligatorios = tool.required ?? [];
     const ejemplo: Record<string, unknown> = {};
@@ -38,6 +46,7 @@ export function catalogoDeToolsDeVoz(): ToolDeVoz[] {
       ejemplo.startDateTime = "2026-10-20T10:00:00+02:00";
     }
     return {
+      canal,
       nombre: tool.name,
       ruta: new URL(tool.url).pathname,
       descripcion: tool.description,
@@ -46,6 +55,20 @@ export function catalogoDeToolsDeVoz(): ToolDeVoz[] {
       ejemplo,
     };
   });
+}
+
+export function catalogoDeToolsDeVoz(): ToolDeVoz[] {
+  return aCatalogo("voz", buildTelnyxVoiceTools("http://localhost"));
+}
+
+/** Las del Gestor van a /webhooks/telnyx/gestor/<tool> con las cabeceras
+ * X-Alhabla-Business (el negocio) y X-Alhabla-Role: owner. */
+export function catalogoDeToolsDelGestor(): ToolDeVoz[] {
+  return aCatalogo("gestor", buildGestorTools("http://localhost"));
+}
+
+export function catalogoCompleto(): ToolDeVoz[] {
+  return [...catalogoDeToolsDeVoz(), ...catalogoDeToolsDelGestor()];
 }
 
 /**
@@ -57,7 +80,7 @@ export function catalogoDeToolsDeVoz(): ToolDeVoz[] {
 export function avisosDeCuerpo(
   ruta: string,
   cuerpo: Record<string, unknown>,
-  catalogo: ToolDeVoz[] = catalogoDeToolsDeVoz()
+  catalogo: ToolDeVoz[] = catalogoCompleto()
 ): string[] {
   const tool = catalogo.find((candidata) => candidata.ruta === ruta);
   if (!tool) return [];

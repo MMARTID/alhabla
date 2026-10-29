@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   avisosDeCuerpo,
   catalogoDeToolsDeVoz,
+  catalogoDeToolsDelGestor,
 } from "../../mcp/catalogoDeTools.js";
 
 describe("catalogoDeToolsDeVoz", () => {
@@ -59,5 +60,22 @@ describe("avisosDeCuerpo", () => {
 
   it("calla con rutas que no son tools de voz", () => {
     expect(avisosDeCuerpo("/webhooks/telnyx/call", { lo: "que sea" })).toEqual([]);
+  });
+});
+
+describe("catalogoDeToolsDelGestor", () => {
+  it("lista las tools del Gestor con su ruta propia", () => {
+    const catalogo = catalogoDeToolsDelGestor();
+    expect(catalogo.every((tool) => tool.canal === "gestor")).toBe(true);
+    expect(catalogo.find((tool) => tool.nombre === "contexto_negocio")).toMatchObject({
+      ruta: "/webhooks/telnyx/gestor/contexto_negocio",
+    });
+  });
+
+  it("avisa también de los argumentos de una tool del Gestor", () => {
+    const avisos = avisosDeCuerpo("/webhooks/telnyx/gestor/contexto_negocio", {
+      inventado: 1,
+    });
+    expect(avisos.join(" ")).toContain("«inventado» no es un argumento de contexto_negocio");
   });
 });
