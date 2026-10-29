@@ -3,6 +3,7 @@ import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { AxiosError, type AxiosResponse } from "axios";
 import RegisterBusinessPage from "@/app/bienvenida/page";
+import { DEFAULT_BUSINESS_SCHEDULE } from "@/components/business-hours-editor";
 import {
   getPlaceDetails,
   searchPlaces,
@@ -47,11 +48,13 @@ const NEGOCIO_GUARDADO = {
   ownerWhatsappNumber: "+34600123456",
 } as unknown as Business;
 
-/** Lo que el alta manda del negocio elegido, sin la telefonía. */
+/** Lo que el alta manda del negocio elegido, sin la telefonía. LUGAR no
+ * trae horario de Google: se manda el del editor, que empieza en el horario
+ * por defecto. */
 const DATOS_DEL_LUGAR = {
   name: LUGAR.name,
   businessDetails: `${LUGAR.name}\n${LUGAR.address}`,
-  schedule: LUGAR.schedule,
+  schedule: DEFAULT_BUSINESS_SCHEDULE,
   placeId: LUGAR.placeId,
   address: LUGAR.address,
 };
@@ -107,6 +110,33 @@ function errorHttp(status: number, data: Record<string, unknown>) {
   );
 }
 
+/** Lo que el alta manda del negocio escrito a mano, sin la telefonía. */
+const NOMBRE_A_MANO = "Barbería Paco";
+const DATOS_A_MANO = {
+  name: NOMBRE_A_MANO,
+  schedule: DEFAULT_BUSINESS_SCHEDULE,
+};
+
+/**
+ * «No encontré mi negocio»: abre el formulario a mano (si no está ya),
+ * escribe el nombre y pulsa «Confirmar y continuar».
+ */
+async function seguirSinNegocio(
+  user: ReturnType<typeof userEvent.setup>,
+  nombre = NOMBRE_A_MANO
+) {
+  const abrir = screen.queryByRole("button", {
+    name: /No encontré mi negocio/,
+  });
+  if (abrir) {
+    await user.click(abrir);
+    await user.type(screen.getByLabelText("Nombre del negocio"), nombre);
+  }
+  await user.click(
+    screen.getByRole("button", { name: /Confirmar y continuar/ })
+  );
+}
+
 async function elegirNegocio(
   user: ReturnType<typeof userEvent.setup>,
   lugar: PlaceDetails = LUGAR
@@ -159,19 +189,192 @@ describe("RegisterBusinessPage — móvil con WhatsApp", () => {
     ).toBeInTheDocument();
   });
 
-  it("vacío no bloquea: «No encontré mi negocio» sigue sin llamar a la API", async () => {
+  it("«No encontré mi negocio» pide el nombre y el horario antes de seguir (auditoría 28-10, hallazgo 1)", async () => {
     const user = userEvent.setup();
+    mockedUpdateMyBusiness.mockResolvedValue(NEGOCIO_GUARDADO);
     render(<RegisterBusinessPage />);
 
     await user.click(
       screen.getByRole("button", { name: /No encontré mi negocio/ })
     );
 
+    // El buscador deja paso al formulario: nombre y la semana a la vista.
+    expect(
+      screen.queryByLabelText("Busca tu negocio por nombre o dirección")
+    ).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Nombre del negocio")).toHaveValue("");
+    expect(
+      screen.getByRole("group", { name: "¿Cuándo abres?" })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("switch", { name: "Lunes abierto" })
+    ).toHaveAttribute("aria-checked", "true");
+
+    // Sin nombre no sigue: el negocio se quedaría como «Negocio de <email>».
+    await user.click(
+      screen.getByRole("button", { name: /Confirmar y continuar/ })
+    );
+    expect(
+      await screen.findByText("Escribe el nombre de tu negocio.")
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText("Nombre del negocio")).toHaveAttribute(
+      "aria-invalid",
+      "true"
+    );
     expect(mockedUpdateMyBusiness).not.toHaveBeenCalled();
-    expect(location.getHref()).toBe("/bienvenida/niche");
+    expect(location.getHref()).toBe("http://localhost/bienvenida");
+
+    await user.type(
+      screen.getByLabelText("Nombre del negocio"),
+      NOMBRE_A_MANO
+    );
+    expect(
+      screen.queryByText("Escribe el nombre de tu negocio.")
+    ).not.toBeInTheDocument();
+    await user.click(
+      screen.getByRole("button", { name: /Confirmar y continuar/ })
+    );
+
+    await waitFor(() =>
+      expect(mockedUpdateMyBusiness).toHaveBeenCalledWith(DATOS_A_MANO)
+    );
+    await waitFor(() =>
+      expect(location.getHref()).toBe("/bienvenida/niche")
+    );
   });
 
-  it("un móvil inválido bloquea los dos botones y lo explica", async () => {
+  it("a mano se guarda el horario que se edita, y un tramo imposible bloquea el botón", async () => {
+    const user = userEvent.setup();
+    mockedUpdateMyBusiness.mockResolvedValue(NEGOCIO_GUARDADO);
+    render(<RegisterBusinessPage />);
+
+    await user.click(
+      screen.getByRole("button", { name: /No encontré mi negocio/ })
+    );
+    await user.type(
+      screen.getByLabelText("Nombre del negocio"),
+      NOMBRE_A_MANO
+    );
+
+    // El sábado abre de 9 a 14 al encenderlo.
+    await user.click(screen.getByRole("switch", { name: "Sábado abierto" }));
+    expect(
+      screen.getByLabelText("Sábado, apertura del tramo 1")
+    ).toHaveValue("09:00");
+
+    // Un cierre anterior a la apertura no se puede guardar.
+    const cierreLunes = screen.getByLabelText("Lunes, cierre del tramo 1");
+    await user.clear(cierreLunes);
+    await user.type(cierreLunes, "08:00");
+    expect(
+      screen.getByText("El cierre debe ser posterior a la apertura.")
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /Confirmar y continuar/ })
+    ).toBeDisabled();
+
+    await user.clear(cierreLunes);
+    await user.type(cierreLunes, "14:00");
+    await user.click(
+      screen.getByRole("button", { name: /Confirmar y continuar/ })
+    );
+
+    await waitFor(() =>
+      expect(mockedUpdateMyBusiness).toHaveBeenCalledTimes(1)
+    );
+    expect(mockedUpdateMyBusiness).toHaveBeenCalledWith({
+      name: NOMBRE_A_MANO,
+      schedule: {
+        ...DEFAULT_BUSINESS_SCHEDULE,
+        week: {
+          ...DEFAULT_BUSINESS_SCHEDULE.week,
+          monday: { enabled: true, intervals: [{ start: "09:00", end: "14:00" }] },
+          saturday: { enabled: true, intervals: [{ start: "09:00", end: "14:00" }] },
+        },
+      },
+    });
+  });
+
+  it("lo escrito en el buscador pasa al nombre, y «Volver a buscar» devuelve el buscador", async () => {
+    const user = userEvent.setup();
+    mockedSearchPlaces.mockResolvedValue([]);
+    render(<RegisterBusinessPage />);
+
+    await user.type(
+      screen.getByLabelText("Busca tu negocio por nombre o dirección"),
+      "Barbería Paco"
+    );
+    expect(
+      await screen.findByText(/No encontramos ese negocio/)
+    ).toBeInTheDocument();
+    await user.click(
+      screen.getByRole("button", { name: /No encontré mi negocio/ })
+    );
+
+    expect(screen.getByLabelText("Nombre del negocio")).toHaveValue(
+      "Barbería Paco"
+    );
+
+    await user.click(
+      screen.getByRole("button", { name: /Volver a buscar mi negocio/ })
+    );
+    expect(
+      screen.getByLabelText("Busca tu negocio por nombre o dirección")
+    ).toHaveValue("Barbería Paco");
+    expect(
+      screen.queryByLabelText("Nombre del negocio")
+    ).not.toBeInTheDocument();
+    expect(mockedUpdateMyBusiness).not.toHaveBeenCalled();
+  });
+
+  it("con horario de Google no enseña el editor y manda el de Google", async () => {
+    const user = userEvent.setup();
+    mockedUpdateMyBusiness.mockResolvedValue(NEGOCIO_GUARDADO);
+    const horarioDeGoogle = {
+      ...DEFAULT_BUSINESS_SCHEDULE,
+      week: {
+        ...DEFAULT_BUSINESS_SCHEDULE.week,
+        saturday: { enabled: true, intervals: [{ start: "10:00", end: "13:00" }] },
+      },
+    };
+    render(<RegisterBusinessPage />);
+    await elegirNegocio(user, { ...LUGAR, schedule: horarioDeGoogle });
+
+    expect(screen.getByText("Sábado: 10:00–13:00")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("group", { name: "¿Cuándo abres?" })
+    ).not.toBeInTheDocument();
+
+    await user.click(
+      screen.getByRole("button", { name: /Confirmar y continuar/ })
+    );
+    await waitFor(() =>
+      expect(mockedUpdateMyBusiness).toHaveBeenCalledWith({
+        ...DATOS_DEL_LUGAR,
+        schedule: horarioDeGoogle,
+        ...TELEFONIA_FIJO,
+      })
+    );
+  });
+
+  it("sin horario en la ficha de Google lo pide con el mismo editor", async () => {
+    const user = userEvent.setup();
+    render(<RegisterBusinessPage />);
+    await elegirNegocio(user);
+
+    expect(
+      screen.getByText("Google no tiene tu horario: indícalo abajo.")
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("group", { name: "¿Cuándo abres?" })
+    ).toBeInTheDocument();
+    // El nombre sale de Google: no se pide.
+    expect(
+      screen.queryByLabelText("Nombre del negocio")
+    ).not.toBeInTheDocument();
+  });
+
+  it("un móvil inválido bloquea el botón de seguir y lo explica", async () => {
     const user = userEvent.setup();
     render(<RegisterBusinessPage />);
 
@@ -189,8 +392,16 @@ describe("RegisterBusinessPage — móvil con WhatsApp", () => {
     expect(
       screen.getByRole("button", { name: /Confirmar y continuar/ })
     ).toBeDisabled();
-    expect(
+
+    await user.click(
       screen.getByRole("button", { name: /No encontré mi negocio/ })
+    );
+    await user.type(
+      screen.getByLabelText("Nombre del negocio"),
+      NOMBRE_A_MANO
+    );
+    expect(
+      screen.getByRole("button", { name: /Confirmar y continuar/ })
     ).toBeDisabled();
   });
 
@@ -310,7 +521,7 @@ describe("RegisterBusinessPage — móvil con WhatsApp", () => {
     expect(mockedUpdateMyBusiness).toHaveBeenCalledWith({
       name: "Barbería Sol",
       businessDetails: "Barbería Sol",
-      schedule: LUGAR.schedule,
+      schedule: DEFAULT_BUSINESS_SCHEDULE,
       placeId: "place_2",
       address: null,
       ...TELEFONIA_FIJO,
@@ -344,9 +555,7 @@ describe("RegisterBusinessPage — móvil con WhatsApp", () => {
       screen.getByLabelText("Tu móvil con WhatsApp (opcional)"),
       "600 123 456"
     );
-    await user.click(
-      screen.getByRole("button", { name: /No encontré mi negocio/ })
-    );
+    await seguirSinNegocio(user);
 
     expect(
       await screen.findByText(
@@ -354,6 +563,7 @@ describe("RegisterBusinessPage — móvil con WhatsApp", () => {
       )
     ).toBeInTheDocument();
     expect(mockedUpdateMyBusiness).toHaveBeenCalledWith({
+      ...DATOS_A_MANO,
       ownerWhatsappNumber: "+34600123456",
     });
     expect(mockedSendActivation).not.toHaveBeenCalled();
@@ -373,9 +583,7 @@ describe("RegisterBusinessPage — móvil con WhatsApp", () => {
       screen.getByLabelText("Tu móvil con WhatsApp (opcional)"),
       "600123456"
     );
-    await user.click(
-      screen.getByRole("button", { name: /No encontré mi negocio/ })
-    );
+    await seguirSinNegocio(user);
 
     expect(
       await screen.findByText(
@@ -383,12 +591,13 @@ describe("RegisterBusinessPage — móvil con WhatsApp", () => {
       )
     ).toBeInTheDocument();
     expect(mockedUpdateMyBusiness).toHaveBeenCalledWith({
+      ...DATOS_A_MANO,
       ownerWhatsappNumber: "+34600123456",
     });
     expect(mockedSendActivation).not.toHaveBeenCalled();
     expect(location.getHref()).toBe("http://localhost/bienvenida");
     expect(
-      screen.getByRole("button", { name: /No encontré mi negocio/ })
+      screen.getByRole("button", { name: /Confirmar y continuar/ })
     ).toBeEnabled();
   });
 
@@ -406,9 +615,7 @@ describe("RegisterBusinessPage — móvil con WhatsApp", () => {
       screen.getByLabelText("Tu móvil con WhatsApp (opcional)"),
       "930 453 218"
     );
-    await user.click(
-      screen.getByRole("button", { name: /No encontré mi negocio/ })
-    );
+    await seguirSinNegocio(user);
 
     const campo = screen.getByLabelText("Tu móvil con WhatsApp (opcional)");
     expect(
@@ -599,13 +806,10 @@ describe("RegisterBusinessPage — ¿A qué número te llaman tus clientes?", ()
     expect(
       screen.getByRole("button", { name: /Confirmar y continuar/ })
     ).toBeDisabled();
-    expect(
-      screen.getByRole("button", { name: /No encontré mi negocio/ })
-    ).toBeDisabled();
     expect(mockedUpdateMyBusiness).not.toHaveBeenCalled();
   });
 
-  it("sin negocio elegido, «configurar después» guarda igualmente la línea y su tipo", async () => {
+  it("sin negocio elegido, el escrito a mano se guarda con la línea y su tipo", async () => {
     const user = userEvent.setup();
     mockedUpdateMyBusiness.mockResolvedValue({
       ...NEGOCIO_GUARDADO,
@@ -623,14 +827,13 @@ describe("RegisterBusinessPage — ¿A qué número te llaman tus clientes?", ()
         name: /Mándame los avisos a este mismo móvil/,
       })
     ).toBeChecked();
-    await user.click(
-      screen.getByRole("button", { name: /No encontré mi negocio/ })
-    );
+    await seguirSinNegocio(user);
 
     await waitFor(() =>
       expect(mockedUpdateMyBusiness).toHaveBeenCalledTimes(1)
     );
     expect(mockedUpdateMyBusiness).toHaveBeenCalledWith({
+      ...DATOS_A_MANO,
       phone: "+34600111222",
       customerLineType: "movil_trabajo",
       ownerPhoneIsCustomerLine: true,
@@ -690,9 +893,7 @@ describe("RegisterBusinessPage — ¿A qué número te llaman tus clientes?", ()
       })
     ).toBeChecked();
 
-    await user.click(
-      screen.getByRole("button", { name: /No encontré mi negocio/ })
-    );
+    await seguirSinNegocio(user);
 
     const linea = screen.getByLabelText("Tu móvil");
     expect(
@@ -716,11 +917,10 @@ describe("RegisterBusinessPage — ¿A qué número te llaman tus clientes?", ()
       screen.queryByText(/Escribe el móvil al que te mandamos los avisos/)
     ).not.toBeInTheDocument();
     expect(linea).toHaveAttribute("aria-invalid", "false");
-    await user.click(
-      screen.getByRole("button", { name: /No encontré mi negocio/ })
-    );
+    await seguirSinNegocio(user);
     await waitFor(() =>
       expect(mockedUpdateMyBusiness).toHaveBeenCalledWith({
+        ...DATOS_A_MANO,
         customerLineType: "movil_personal",
         ownerPhoneIsCustomerLine: false,
         hideOwnerNumberFromClients: false,
@@ -748,9 +948,6 @@ describe("RegisterBusinessPage — ¿A qué número te llaman tus clientes?", ()
     expect(linea).toHaveAttribute("aria-invalid", "true");
     expect(
       screen.getByRole("button", { name: /Confirmar y continuar/ })
-    ).toBeDisabled();
-    expect(
-      screen.getByRole("button", { name: /No encontré mi negocio/ })
     ).toBeDisabled();
 
     // Desmarcar la casilla lo desbloquea: el fijo puede ser la línea de
@@ -932,9 +1129,7 @@ describe("RegisterBusinessPage — ¿A qué número te llaman tus clientes?", ()
       screen.queryByLabelText("Tu móvil con WhatsApp (opcional)")
     ).not.toBeInTheDocument();
 
-    await user.click(
-      screen.getByRole("button", { name: /No encontré mi negocio/ })
-    );
+    await seguirSinNegocio(user);
 
     const aviso = await screen.findByText(
       "No se pudo guardar tu móvil. Añádelo más tarde en Ajustes › Teléfono."
@@ -942,9 +1137,7 @@ describe("RegisterBusinessPage — ¿A qué número te llaman tus clientes?", ()
     expect(aviso).toHaveAttribute("aria-live", "polite");
     expect(aviso).not.toHaveClass("sr-only");
     expect(mockedSendActivation).not.toHaveBeenCalled();
-    expect(
-      screen.getByRole("button", { name: /No encontré mi negocio/ })
-    ).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Guardando…" })).toBeDisabled();
     expect(location.getHref()).toBe("http://localhost/bienvenida");
 
     expect(continuar).not.toBeNull();

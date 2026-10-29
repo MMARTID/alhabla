@@ -240,6 +240,7 @@ export default function RegisterBusinessCalendarPage() {
             type="button"
             onClick={() => redirectToFinalStep()}
             disabled={loading !== null}
+            aria-describedby="aviso-sin-calendario"
             className="btn-secondary w-full"
           >
             Configurar calendario después
@@ -247,9 +248,13 @@ export default function RegisterBusinessCalendarPage() {
           {/* Sin calendario la recepcionista contesta y toma nota, pero no da
               hora ni reserva (voiceTools, fase 0 de PLAN-AGENDA-ALHABLA.md).
               Quien se lo salte tiene que saberlo antes, no en la primera
-              llamada. */}
-          <p className="text-center text-xs leading-5 text-muted">
-            Sin calendario, tu recepcionista atiende y toma nota de las peticiones, pero no reserva citas. Podrás conectarlo después desde el panel.
+              llamada. El texto va por sector (business-type.ts) y recuerda
+              las dos salidas: conectar el calendario o la agenda de Alhabla. */}
+          <p
+            id="aviso-sin-calendario"
+            className="text-center text-xs leading-5 text-muted"
+          >
+            {texts.calendar.sinCalendario}
           </p>
         </div>
         </>
