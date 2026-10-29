@@ -418,7 +418,7 @@ describe("conversarConRecepcionista", () => {
     });
 
     expect(cuerpoEnviado()).toBe(
-      "Peluquería Ana, te atiende su asistente de inteligencia artificial.\nMañana a las cinco tengo hueco. ¿Te lo reservo?"
+      "Peluquería Ana, te atiende su recepcionista de IA.\nMañana a las cinco tengo hueco. ¿Te lo reservo?"
     );
   });
 
@@ -434,7 +434,7 @@ describe("conversarConRecepcionista", () => {
     });
 
     expect(cuerpoEnviado()).toBe(
-      "Peluquería Ana, you're speaking with an artificial intelligence assistant.\nMañana a las cinco tengo hueco. ¿Te lo reservo?"
+      "Peluquería Ana, you're speaking with an AI receptionist.\nMañana a las cinco tengo hueco. ¿Te lo reservo?"
     );
     expect(mockedClienteFindUnique).toHaveBeenCalledWith({
       where: {
@@ -454,7 +454,7 @@ describe("conversarConRecepcionista", () => {
       businessId: "biz_1",
       texto: message.text!,
     });
-    expect(cuerpoEnviado()).toMatch(/^Peluquería Ana, te atiende su asistente/);
+    expect(cuerpoEnviado()).toMatch(/^Peluquería Ana, te atiende su recepcionista de IA/);
 
     mockedBizFindUnique.mockResolvedValue({
       ...NEGOCIO,

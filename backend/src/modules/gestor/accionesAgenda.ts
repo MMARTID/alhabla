@@ -836,7 +836,22 @@ const moverCita: AccionDelGestor<MoverCita> = {
     if (start.getTime() < Date.now()) {
       return { ok: false, motivo: "Esa hora ya ha pasado." };
     }
-    if (start.getTime() === cita.programedAt.getTime() && !profesional) {
+    // Quien tenía la cita falta a esa hora y el dueño no ha dicho quién la
+    // hace: se propone a quien mejor hace el servicio de los que están libres
+    // (especialista antes que «lo hace» y, entre iguales, quien tenga menos
+    // citas ese día: el orden de checkAvailability, el mismo de la
+    // recepcionista). Alhabla concilia y el dueño confirma.
+    const ausente =
+      !profesional && cita.professional
+        ? await faltaEnElTramo(
+            ctx.businessId,
+            cita.professional.id,
+            start,
+            cita.durationMinutes
+          )
+        : false;
+    const mismaHora = start.getTime() === cita.programedAt.getTime();
+    if (mismaHora && !profesional && !ausente) {
       return { ok: false, motivo: "La cita ya está a esa hora." };
     }
     const hueco = await comprobarHueco({
@@ -845,19 +860,45 @@ const moverCita: AccionDelGestor<MoverCita> = {
       start,
       durationMinutes: cita.durationMinutes,
       serviceIds: cita.serviceIds,
-      professionalId: profesional?.id ?? cita.professionalId,
+      professionalId: profesional?.id ?? (ausente ? null : cita.professionalId),
       excluir: { bookingId: cita.id, externalEventId: cita.externalEventId },
     });
+    const telefono = telefonoDeLaCita(cita);
+    const movil = telefono
+      ? ` (móvil del cliente: ${telefono}, por si prefieres llamarle antes; la propuesta sigue vigente 24 h)`
+      : "";
+    if (ausente && cita.professional) {
+      const quienFalta = cita.professional.name;
+      const cubre = hueco.ok
+        ? hueco.disponibilidad.availableProfessionals[0]
+        : undefined;
+      if (!hueco.ok || !cubre) {
+        return {
+          ok: false,
+          motivo: `${quienFalta} falta a esa hora y no hay nadie más libre que haga ese servicio.${hueco.ok ? "" : ` ${hueco.motivo}`} Si el dueño quiere que la haga alguien en concreto, propón de nuevo con su nombre en profesional.`,
+        };
+      }
+      const porque = hueco.disponibilidad.specialistIds?.includes(cubre.id)
+        ? `${cubre.name} es especialista en ese servicio`
+        : `${cubre.name} es quien mejor lo hace de los que están libres`;
+      const laCita = await describirCita(cita, ctx.timezone);
+      return {
+        ok: true,
+        descripcion: mismaHora
+          ? `pasar ${laCita} a ${cubre.name}, a la misma hora: ${quienFalta} falta y ${porque}${movil}`
+          : `mover ${laCita} al ${formatearCita(start, ctx.timezone)} con ${cubre.name}: ${quienFalta} falta a esa hora y ${porque}${movil}`,
+        parametros: { ...params, profesional: cubre.id },
+      };
+    }
     if (!hueco.ok) return hueco;
     const asignado =
       profesional ??
       cita.professional ??
       hueco.disponibilidad.availableProfessionals[0] ??
       null;
-    const telefono = telefonoDeLaCita(cita);
     return {
       ok: true,
-      descripcion: `mover ${await describirCita(cita, ctx.timezone)} al ${formatearCita(start, ctx.timezone)}${asignado ? ` con ${asignado.name}` : ""}${telefono ? ` (móvil del cliente: ${telefono}, por si prefieres llamarle antes; la propuesta sigue vigente 24 h)` : ""}`,
+      descripcion: `mover ${await describirCita(cita, ctx.timezone)} al ${formatearCita(start, ctx.timezone)}${asignado ? ` con ${asignado.name}` : ""}${movil}`,
       parametros: {
         ...params,
         ...(profesional ? { profesional: profesional.id } : {}),
@@ -1435,6 +1476,26 @@ async function citasEnElTramo(
   });
 }
 
+/** ¿Tiene esa persona una ausencia que pise [inicio, inicio + duración)? */
+async function faltaEnElTramo(
+  businessId: string,
+  professionalId: string,
+  inicio: Date,
+  duracionMinutos: number
+): Promise<boolean> {
+  const fin = new Date(inicio.getTime() + duracionMinutos * 60_000);
+  const ausencia = await prisma.professionalAbsence.findFirst({
+    where: {
+      businessId,
+      professionalId,
+      startsAt: { lt: fin },
+      endsAt: { gt: inicio },
+    },
+    select: { id: true },
+  });
+  return ausencia !== null;
+}
+
 const marcarAusencia: AccionDelGestor<MarcarAusencia> = {
   schema: MarcarAusenciaParams,
   async comprobar(ctx, params) {
@@ -1508,8 +1569,8 @@ const marcarAusencia: AccionDelGestor<MarcarAusencia> = {
     );
     return {
       ok: true,
-      mensaje: `Hecho: ${r.profesional.name} no está ${describirTramo(params, hasta)}; la recepcionista no le reservará nada ahí.${citas > 0 ? ` Tiene ${citas} cita${citas === 1 ? "" : "s"} en ese tramo: dime si las movemos o las cancelamos.` : ""}`,
-      nota: `Ausencia de ${r.profesional.name} (${r.profesional.id}) ${describirTramo(params, hasta)}${citas > 0 ? `; ${citas} cita(s) afectadas, pregunta al dueño qué hacer con ellas (listar_agenda)` : ""}.`,
+      mensaje: `Hecho: ${r.profesional.name} no está ${describirTramo(params, hasta)}; la recepcionista no le reservará nada ahí.${citas > 0 ? ` Tiene ${citas} cita${citas === 1 ? "" : "s"} en ese tramo: si quieres, te propongo pasar${citas === 1 ? "la" : "las"}, a la misma hora, a quien mejor hace el servicio de los que están libres.` : ""}`,
+      nota: `Ausencia de ${r.profesional.name} (${r.profesional.id}) ${describirTramo(params, hasta)}${citas > 0 ? `; ${citas} cita(s) afectadas: si el dueño quiere, propón pasarlas una a una con mover_cita (misma fechaHora, sin profesional) y, si no, moverlas o cancelarlas (listar_agenda)` : ""}.`,
     };
   },
 };

@@ -57,13 +57,12 @@ export const barberia: SectorLanding = {
   asistente: {
     pregunta: "¿Y si a mediodía falta un barbero?",
     respuesta:
-      "Se lo escribes a tu asistente entre corte y corte. Marca la ausencia, te dice qué citas tenía, las pasa al barbero que tú digas y avisa a cada cliente. Nada se mueve sin tu «Confirmar».",
+      "Se lo escribes a tu asistente entre corte y corte. Marca la ausencia, te dice qué citas tenía y te propone pasarlas al barbero libre que mejor hace cada servicio. Con tu «Confirmar», las mueve y avisa a cada cliente.",
     turnos: ausenciaDe({
       aviso: "Luis se ha ido, le ha surgido algo. Esta tarde no viene",
       profesional: "Luis",
       cuando: "esta tarde",
       motivo: "imprevisto",
-      respuesta: "El corte y barba de las 5, pásaselo a Dani",
       cita: "la cita de Marcos P.",
       servicio: "Corte y barba",
       hora: "17:00",

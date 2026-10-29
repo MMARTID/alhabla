@@ -409,7 +409,7 @@ describe("createTelnyxAssistantForAgent", () => {
     expect(result.eligible).toBe(true);
     const payload = mockedCreateAssistant.mock.calls[0][0];
     expect(payload.greeting).toBe(
-      "Peluquería Ejemplo, te atiende su asistente de inteligencia artificial. ¿En qué te ayudo?"
+      "Peluquería Ejemplo, te atiende su recepcionista de IA. ¿En qué te ayudo?"
     );
     expect(payload.voiceSettings).toMatchObject({
       voice: "Telnyx.Ultra.isabel",

@@ -69,13 +69,12 @@ export const peluqueria: SectorLanding = {
   asistente: {
     pregunta: "¿Y si a mediodía falta una estilista?",
     respuesta:
-      "Se lo dices a tu asistente por WhatsApp. Marca la ausencia, te dice qué citas tenía, las pasa a quien tú digas y avisa a cada clienta. Cada paso, con tu «Confirmar».",
+      "Se lo dices a tu asistente por WhatsApp. Marca la ausencia, te dice qué citas tenía y te propone pasarlas a la estilista libre que mejor hace cada servicio. Cada cambio, y cada aviso a la clienta, con tu «Confirmar».",
     turnos: ausenciaDe({
       aviso: "Ana se ha tenido que ir, una urgencia. Hoy ya no vuelve",
       profesional: "Ana",
       cuando: "esta tarde",
       motivo: "urgencia",
-      respuesta: "Las mechas de las 5, pásaselas a Laura",
       cita: "la cita de Rosa M.",
       servicio: "Mechas",
       hora: "17:00",

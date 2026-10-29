@@ -38,7 +38,7 @@ describe("relato-guiones", () => {
     const r = relato(guion);
     // El saludo real: el nombre del negocio y el aviso de IA (art. 50 RIA).
     expect(r.saludo).toContain(guion.negocio);
-    expect(r.saludo).toContain("inteligencia artificial");
+    expect(r.saludo).toContain("recepcionista de IA");
     // Como la recepcionista real: la duración solo si pasa de 80 minutos;
     // el permiso de grabar, mientras comprueba el hueco; y el resumen y el
     // WhatsApp en un solo turno, sin prometer el recordatorio (Pro y Scale).

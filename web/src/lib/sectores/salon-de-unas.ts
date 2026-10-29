@@ -76,13 +76,12 @@ export const salonDeUnas: SectorLanding = {
   asistente: {
     pregunta: "¿Y si a mediodía falta una técnica?",
     respuesta:
-      "Escríbeselo a tu asistente en la pausa. Marca su ausencia, te enseña qué citas tenía, las mueve a la técnica que tú elijas y avisa a cada clienta. Nada cambia sin tu «Confirmar».",
+      "Escríbeselo a tu asistente en la pausa. Marca su ausencia, te enseña qué citas tenía y te propone moverlas a la técnica libre que mejor las hace. Avisa a cada clienta cuando pulsas «Confirmar».",
     turnos: ausenciaDe({
       aviso: "Laura se va a casa, no se encuentra bien. Esta tarde no vuelve",
       profesional: "Laura",
       cuando: "esta tarde",
       motivo: "enferma",
-      respuesta: "El gel de las cuatro y media, que se lo haga Julia",
       cita: "la cita de Irene C.",
       servicio: "Uñas de gel",
       hora: "16:30",

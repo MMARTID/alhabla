@@ -220,7 +220,7 @@ export default function GuionParaAtenderElTelefonoPage() {
           <Conversacion
             etiqueta="Ejemplo de llamada atendida por la recepcionista de IA"
             turnos={[
-              { quien: "recepcionista", texto: "Peluquería Nerea, te atiende su asistente de inteligencia artificial. ¿En qué te ayudo?" },
+              { quien: "recepcionista", texto: "Peluquería Nerea, te atiende su recepcionista de IA. ¿En qué te ayudo?" },
               { quien: "cliente", texto: "Hola, quería hora para cortarme el pelo con Marta. ¿El viernes a las diez puede ser?" },
               { quien: "recepcionista", texto: "A las diez Marta está ocupada, pero tiene libre a las diez y media. ¿Te viene bien?" },
               { quien: "cliente", texto: "Sí, perfecto. A nombre de Laura Gómez." },

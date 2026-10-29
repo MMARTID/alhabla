@@ -146,7 +146,7 @@ describe("catálogo de idiomas", () => {
 
   it("los saludos de siempre, con el aviso de IA y de grabación, y los nombres de los idiomas siguen byte a byte", () => {
     expect(componerSaludo("es-ES", "Peluquería Ana")).toBe(
-      "Peluquería Ana, te atiende su asistente de inteligencia artificial. ¿En qué te ayudo?"
+      "Peluquería Ana, te atiende su recepcionista de IA. ¿En qué te ayudo?"
     );
     expect(componerSaludo("ca-ES", "Perruqueria Anna")).toBe(
       "Perruqueria Anna, t'atén una intel·ligència artificial. En què et puc ajudar?"
@@ -326,8 +326,8 @@ describe("catálogo de idiomas — voces Ultra y mercado de España", () => {
 // el saludo de quien lo aceptó (lib/contextoDeLlamada.ts).
 describe("catálogo de idiomas — saludos con el aviso de IA", () => {
   const AVISO: Record<CodigoDeIdioma, { ia: string; grabacion: string }> = {
-    "es-ES": { ia: "inteligencia artificial", grabacion: "se graba" },
-    "en-GB": { ia: "artificial intelligence", grabacion: "recorded" },
+    "es-ES": { ia: "recepcionista de ia", grabacion: "se graba" },
+    "en-GB": { ia: "ai receptionist", grabacion: "recorded" },
     "fr-FR": { ia: "intelligence artificielle", grabacion: "enregistré" },
     "ca-ES": { ia: "intel·ligència artificial", grabacion: "s'enregistra" },
     "eu-ES": { ia: "adimen artifizial", grabacion: "grabatu" },
@@ -385,7 +385,7 @@ describe("catálogo de idiomas — saludos con el aviso de IA", () => {
     expect(
       componerSaludoDeLlamada("es-ES", { ...base, primeraSemana: true })
     ).toBe(
-      "Peluquería de prueba, te atiende su nueva asistente de inteligencia artificial. ¿En qué te ayudo?"
+      "Peluquería de prueba, te atiende su nueva recepcionista de IA. ¿En qué te ayudo?"
     );
     expect(
       componerSaludoDeLlamada("es-ES", {
@@ -394,7 +394,7 @@ describe("catálogo de idiomas — saludos con el aviso de IA", () => {
         primeraSemana: true,
       })
     ).toBe(
-      "Peluquería de prueba, te atiende su nuevo asistente de inteligencia artificial. ¿En qué te ayudo?"
+      "Peluquería de prueba, te atiende su nuevo recepcionista de IA. ¿En qué te ayudo?"
     );
     expect(
       componerSaludoDeLlamada("es-ES", {
@@ -405,7 +405,7 @@ describe("catálogo de idiomas — saludos con el aviso de IA", () => {
         grabando: true,
       })
     ).toBe(
-      "Hola, Lucía, soy el asistente de inteligencia artificial de Peluquería de prueba. La llamada se graba; si prefieres que no, dímelo. ¿Quieres repetir Mechas o prefieres algo nuevo?"
+      "Hola, Lucía, soy el recepcionista de IA de Peluquería de prueba. La llamada se graba; si prefieres que no, dímelo. ¿Quieres repetir Mechas o prefieres algo nuevo?"
     );
   });
 });
@@ -430,7 +430,7 @@ describe("catálogo de idiomas — saludo sin un nombre de negocio decible", () 
 
   it.each(PROVISIONALES)("«%s»: el saludo fijo en español no dice el nombre", (nombre) => {
     expect(componerSaludo("es-ES", nombre)).toBe(
-      "Hola, estás hablando con una inteligencia artificial. ¿En qué te ayudo?"
+      "Hola, soy recepcionista de IA. ¿En qué te ayudo?"
     );
   });
 
@@ -464,13 +464,13 @@ describe("catálogo de idiomas — saludo sin un nombre de negocio decible", () 
         cliente: { nombre: "Lucía", servicio: null },
       })
     ).toBe(
-      "Hola, Lucía, estás hablando con una inteligencia artificial. ¿Quieres repetir lo de la última vez o prefieres algo nuevo?"
+      "Hola, Lucía, soy recepcionista de IA. ¿Quieres repetir lo de la última vez o prefieres algo nuevo?"
     );
   });
 
   it("un nombre real con espacios de más se dice limpio", () => {
     expect(componerSaludo("es-ES", "  Peluquería\n  Ana ")).toBe(
-      "Peluquería Ana, te atiende su asistente de inteligencia artificial. ¿En qué te ayudo?"
+      "Peluquería Ana, te atiende su recepcionista de IA. ¿En qué te ayudo?"
     );
   });
 });
@@ -478,7 +478,7 @@ describe("catálogo de idiomas — saludo sin un nombre de negocio decible", () 
 describe("avisoDeIA y mencionaLaIA (chat de WhatsApp)", () => {
   it("el aviso es la presentación del saludo, sin la pregunta", () => {
     expect(avisoDeIA("es-ES", "Peluquería Ana")).toBe(
-      "Peluquería Ana, te atiende su asistente de inteligencia artificial."
+      "Peluquería Ana, te atiende su recepcionista de IA."
     );
     expect(avisoDeIA("ca-ES", "Perruqueria Anna")).toBe(
       "Perruqueria Anna, t'atén una intel·ligència artificial."

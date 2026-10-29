@@ -87,12 +87,14 @@ export type TextoConGenero = string | Readonly<Record<GeneroDeVoz, string>>;
 
 /**
  * Las piezas del saludo de un idioma: `{negocio}`, `{nombre}` y `{servicio}`
- * se sustituyen al componerlo. Todas dicen «inteligencia artificial» con esas
- * palabras: el Reglamento europeo de IA (art. 50, desde el 2-8-2026) pide
- * avisar al principio de cada llamada y «asistente» a secas no basta. Fuera
- * del español se evita el género con giros neutros («una intelligence
- * artificielle»); en español va con el de la voz. Ver
- * lib/contextoDeLlamada.ts.
+ * se sustituyen al componerlo. Todas dicen que es una IA: el Reglamento
+ * europeo de IA (art. 50, desde el 2-8-2026) pide avisar al principio de
+ * cada llamada y «asistente» a secas no basta. En español y en inglés se
+ * presenta como «recepcionista de IA» / «AI receptionist», con la sigla
+ * (decisión del usuario del 2026-10-29: la Ultra la lee como dos letras);
+ * el resto dice «inteligencia artificial» en su idioma y evita el género con
+ * giros neutros («une intelligence artificielle»). En español va con el
+ * género de la voz. Ver lib/contextoDeLlamada.ts.
  */
 export interface PartesDelSaludo {
   /** A quien llama por primera vez o no se conoce. */
@@ -212,19 +214,14 @@ export const IDIOMAS: Record<CodigoDeIdioma, IdiomaDelCatalogo> = {
     nombreEnPrompt: "español de España",
     etiqueta: "Español",
     saludo: {
-      presentacion:
-        "{negocio}, te atiende su asistente de inteligencia artificial.",
+      presentacion: "{negocio}, te atiende su recepcionista de IA.",
       presentacionNueva: {
-        femenina:
-          "{negocio}, te atiende su nueva asistente de inteligencia artificial.",
-        masculina:
-          "{negocio}, te atiende su nuevo asistente de inteligencia artificial.",
+        femenina: "{negocio}, te atiende su nueva recepcionista de IA.",
+        masculina: "{negocio}, te atiende su nuevo recepcionista de IA.",
       },
       presentacionAlCliente: {
-        femenina:
-          "Hola, {nombre}, soy la asistente de inteligencia artificial de {negocio}.",
-        masculina:
-          "Hola, {nombre}, soy el asistente de inteligencia artificial de {negocio}.",
+        femenina: "Hola, {nombre}, soy la recepcionista de IA de {negocio}.",
+        masculina: "Hola, {nombre}, soy el recepcionista de IA de {negocio}.",
       },
       avisoDeGrabacion: "La llamada se graba; si prefieres que no, dímelo.",
       pregunta: "¿En qué te ayudo?",
@@ -232,9 +229,9 @@ export const IDIOMAS: Record<CodigoDeIdioma, IdiomaDelCatalogo> = {
       repetirLoDeLaUltimaVez:
         "¿Quieres repetir lo de la última vez o prefieres algo nuevo?",
       sinNombre: {
-        presentacion: "Hola, estás hablando con una inteligencia artificial.",
-        presentacionAlCliente:
-          "Hola, {nombre}, estás hablando con una inteligencia artificial.",
+        // Sin artículo: este saludo no sabe el género de la voz.
+        presentacion: "Hola, soy recepcionista de IA.",
+        presentacionAlCliente: "Hola, {nombre}, soy recepcionista de IA.",
       },
     },
     transcripcion: { flux: "es", soniox: "es" },
@@ -246,12 +243,11 @@ export const IDIOMAS: Record<CodigoDeIdioma, IdiomaDelCatalogo> = {
     nombreEnPrompt: "inglés",
     etiqueta: "Inglés",
     saludo: {
-      presentacion:
-        "{negocio}, you're speaking with an artificial intelligence assistant.",
+      presentacion: "{negocio}, you're speaking with an AI receptionist.",
       presentacionNueva:
-        "{negocio}, you're speaking with a new artificial intelligence assistant.",
+        "{negocio}, you're speaking with a new AI receptionist.",
       presentacionAlCliente:
-        "Hi {nombre}, this is the artificial intelligence assistant at {negocio}.",
+        "Hi {nombre}, this is the AI receptionist at {negocio}.",
       avisoDeGrabacion:
         "This call is recorded; if you'd rather it wasn't, just tell me.",
       pregunta: "How can I help?",
@@ -259,10 +255,9 @@ export const IDIOMAS: Record<CodigoDeIdioma, IdiomaDelCatalogo> = {
       repetirLoDeLaUltimaVez:
         "Would you like the same as last time, or something new?",
       sinNombre: {
-        presentacion:
-          "Hello, you're speaking with an artificial intelligence assistant.",
+        presentacion: "Hello, you're speaking with an AI receptionist.",
         presentacionAlCliente:
-          "Hi {nombre}, you're speaking with an artificial intelligence assistant.",
+          "Hi {nombre}, you're speaking with an AI receptionist.",
       },
     },
     transcripcion: { flux: "en", soniox: "en" },

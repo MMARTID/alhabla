@@ -81,13 +81,12 @@ export const spaYMasajes: SectorLanding = {
   asistente: {
     pregunta: "¿Y si a mediodía falta una terapeuta?",
     respuesta:
-      "Se lo escribes a tu asistente al salir de cabina. Marca la ausencia, te dice qué citas tenía, las pasa a quien tú elijas y avisa a cada cliente. Sin tu «Confirmar», no se mueve nada.",
+      "Se lo escribes a tu asistente al salir de cabina. Marca la ausencia, te dice qué citas tenía y te propone a la terapeuta libre que mejor hace cada masaje. Sin tu «Confirmar», no se mueve nada.",
     turnos: ausenciaDe({
       aviso: "Irene se encuentra mal y se va a casa. Esta tarde no vuelve",
       profesional: "Irene",
       cuando: "esta tarde",
       motivo: "se encuentra mal",
-      respuesta: "El de piedras de las 6, que lo haga Lucía",
       cita: "la cita de Elena V.",
       servicio: "Masaje con piedras calientes",
       hora: "18:00",

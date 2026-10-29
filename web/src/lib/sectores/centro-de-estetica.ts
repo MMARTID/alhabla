@@ -74,13 +74,12 @@ export const centroDeEstetica: SectorLanding = {
   asistente: {
     pregunta: "¿Y si a mediodía falta una esteticista?",
     respuesta:
-      "Se lo escribes a tu asistente entre una clienta y otra. Ella marca la ausencia, te enseña qué citas tenía, las pasa a la compañera que elijas y avisa a cada clienta. Sin tu «Confirmar», no mueve nada.",
+      "Se lo escribes a tu asistente entre una clienta y otra. Marca la ausencia, te enseña qué citas tenía y te propone a la compañera libre que mejor hace cada tratamiento. Sin tu «Confirmar», no mueve nada.",
     turnos: ausenciaDe({
       aviso: "Sara se ha puesto mala y se va a casa. Esta tarde no vuelve",
       profesional: "Sara",
       cuando: "esta tarde",
       motivo: "enferma",
-      respuesta: "La presoterapia de las 5, que la haga Elena",
       cita: "la cita de Beatriz N.",
       servicio: "Presoterapia",
       hora: "17:00",

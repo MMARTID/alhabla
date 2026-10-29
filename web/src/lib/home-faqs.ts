@@ -13,7 +13,7 @@ export const HOME_QUICK_FAQS = [
   {
     question: "¿Sabe el cliente que habla con una IA?",
     answer:
-      "Sí. Cada llamada empieza con el nombre de tu negocio y «te atiende su asistente de inteligencia artificial», como pide el Reglamento europeo de IA. Y solo se graba si el cliente da permiso.",
+      "Sí. Cada llamada empieza con el nombre de tu negocio y «te atiende su recepcionista de IA», como pide el Reglamento europeo de IA. Y solo se graba si el cliente da permiso.",
   },
   {
     question: "¿Necesito conectar un calendario?",

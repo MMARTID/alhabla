@@ -128,13 +128,12 @@ describe("gestor-guiones", () => {
     }
   });
 
-  it("la ausencia sigue el orden real: ausencia, Hecho, a quién, mover, Hecho, ¿le aviso?, aviso", () => {
+  it("la ausencia sigue el orden real: ausencia, Hecho, sí, pasar a la mejor libre, Hecho, ¿le aviso?, aviso", () => {
     const turnos = ausenciaDe({
       aviso: "Marta está de baja hoy",
       profesional: "Marta",
       cuando: "hoy",
       motivo: "baja",
-      respuesta: "La de las 11, a Lucía",
       cita: "la cita de Carmen R.",
       servicio: "Corte y color",
       hora: "11:00",
@@ -147,9 +146,9 @@ describe("gestor-guiones", () => {
       "¿Confirmas? Marcar a Marta como ausente hoy (baja): la recepcionista no le reservará nada. Ojo: ya tiene 1 cita ahí, que no se mueve sola."
     );
     expect(turnos[2]).toMatchObject({ de: "boton", texto: "Confirmar", hito: "ausente" });
-    expect(textos[3]).toContain("dime si las movemos o las cancelamos");
-    expect(turnos[4].de).toBe("dueno");
-    expect(textos[5]).toBe("¿Confirmas? Mover la cita de Carmen R. de hoy a las 11:00 (Corte y color) con Marta, a la misma hora con Lucía.");
+    expect(textos[3]).toContain("te propongo pasarla, a la misma hora, a quien mejor hace el servicio de los que están libres");
+    expect(turnos[4]).toMatchObject({ de: "dueno", texto: "Sí, pásala" });
+    expect(textos[5]).toBe("¿Confirmas? Pasar la cita de Carmen R. de hoy a las 11:00 (Corte y color) con Marta a Lucía, a la misma hora: Marta falta y Lucía es especialista en ese servicio.");
     expect(turnos[6]).toMatchObject({ de: "boton", hito: "movida" });
     expect(textos[7]).toContain("El calendario ya está al día.");
     expect(turnos[8]).toMatchObject({
@@ -165,7 +164,6 @@ describe("gestor-guiones", () => {
       aviso: "Sara no puede venir hoy",
       profesional: "Sara",
       cuando: "hoy",
-      respuesta: "A Elena",
       cita: "la cita de Inés",
       servicio: "Facial",
       hora: "12:00",
@@ -174,13 +172,27 @@ describe("gestor-guiones", () => {
       telefono: "+34 794 27 93 51",
     });
     expect(sinMotivo[1].texto).toContain("como ausente hoy: la recepcionista");
+    expect(sinMotivo[5].texto).toContain("Elena es especialista en ese servicio");
+    const noEspecialista = ausenciaDe({
+      aviso: "Sara no puede venir hoy",
+      profesional: "Sara",
+      cuando: "hoy",
+      cita: "la cita de Inés",
+      servicio: "Facial",
+      hora: "12:00",
+      otra: "Elena",
+      especialista: false,
+      cliente: "Inés",
+      telefono: "+34 794 27 93 51",
+    });
+    expect(noEspecialista[5].texto).toContain("Elena es quien mejor lo hace de los que están libres");
   });
 
-  it.each(GUIONES)("en %s, la ausencia va en el orden real y el dueño dice a quién antes de mover", (_, guion) => {
+  it.each(GUIONES)("en %s, la ausencia va en el orden real y tu asistente propone a quién antes de mover", (_, guion) => {
     const textos = guion.escenarios[0].turnos.map((t) => t.texto);
     const ausencia = textos.findIndex((t) => t.startsWith("¿Confirmas? Marcar a "));
-    const hecho = textos.findIndex((t) => t.includes("dime si las movemos o las cancelamos"));
-    const mover = textos.findIndex((t) => t.startsWith("¿Confirmas? Mover "));
+    const hecho = textos.findIndex((t) => t.includes("te propongo pasarla"));
+    const mover = textos.findIndex((t) => t.startsWith("¿Confirmas? Pasar "));
     const aviso = textos.findIndex((t) => t.startsWith("¿Le aviso a "));
     expect(ausencia).toBe(1);
     expect(hecho).toBeGreaterThan(ausencia);

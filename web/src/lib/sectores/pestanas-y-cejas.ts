@@ -78,13 +78,12 @@ export const pestanasYCejas: SectorLanding = {
   asistente: {
     pregunta: "¿Y si a mediodía falta una técnica?",
     respuesta:
-      "Se lo escribes a tu asistente entre clienta y clienta. Marca la ausencia, te dice qué citas tenía, las pasa a la técnica que tú digas y avisa a cada clienta. Nada cambia sin tu «Confirmar».",
+      "Se lo escribes a tu asistente entre clienta y clienta. Marca la ausencia, te dice qué citas tenía y te propone a la técnica libre que mejor hace cada servicio. Nada cambia sin tu «Confirmar».",
     turnos: ausenciaDe({
       aviso: "Alba se ha puesto mala y se va a casa. Esta tarde no vuelve",
       profesional: "Alba",
       cuando: "esta tarde",
       motivo: "enferma",
-      respuesta: "El lifting de las 5, pásaselo a Nerea",
       cita: "la cita de Sonia R.",
       servicio: "Lifting de pestañas",
       hora: "17:00",

@@ -244,7 +244,7 @@ describe("vistaPreviaDeIdiomas", () => {
       requiereParaElegirVoz: ELEGIR_ENTRE_29,
       entradilla: HABLA_EN_ESPANOL,
       saludo:
-        "Peluquería Ana, te atiende su asistente de inteligencia artificial. ¿En qué te ayudo?",
+        "Peluquería Ana, te atiende su recepcionista de IA. ¿En qué te ayudo?",
       avisos: [AVISO_SIN_COOFICIALES],
     });
   });

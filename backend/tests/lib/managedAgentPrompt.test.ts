@@ -77,7 +77,7 @@ describe("buildManagedAgentPrompt", () => {
     });
 
     expect(prompt).toContain(
-      "Eres la recepcionista virtual de {{nombre_negocio}} y eres una inteligencia artificial."
+      "Eres la recepcionista de IA de {{nombre_negocio}}: una inteligencia artificial."
     );
     expect(prompt).toContain("corte, barba o ambos");
   });
@@ -96,7 +96,7 @@ describe("buildManagedAgentPrompt", () => {
     });
 
     expect(prompt).toContain(
-      "## Rol\n\nEres la recepcionista virtual de {{nombre_negocio}} y eres una inteligencia artificial. En las llamadas el saludo ya lo dice al descolgar: no lo repitas. Si te preguntan si eres una persona o una máquina, di siempre la verdad.\n\n"
+      "## Rol\n\nEres la recepcionista de IA de {{nombre_negocio}}: una inteligencia artificial. Si te presentas, di «recepcionista de IA», con la sigla. En las llamadas el saludo ya lo dice al descolgar: no lo repitas. Si te preguntan si eres una persona o una máquina, di siempre la verdad.\n\n"
     );
     expect(prompt).not.toContain("No menciones que eres una IA");
   });
