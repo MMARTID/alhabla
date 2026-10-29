@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { getOnboardingState, getPhoneNumberInfo } from "@/lib/api";
 import { formatPhone } from "@/lib/format";
+import { horarioConfigurado } from "@/lib/horario";
 import { suscripcionSinCobro } from "@/lib/suscripcion";
 import type { Business, PhoneNumberInfo } from "@/lib/types";
 
@@ -32,6 +33,12 @@ export type OperationalStatusItem = {
   value: string;
   tone: OperationalTone;
   action?: { label: string; href: string } | { label: string; kind: "retry-phone" };
+  /**
+   * El problema ya lo cuenta otra señal: «Atiende, pero no reserva» por la
+   * agenda es el mismo asunto que «Agenda: sin conectar», y el chip diría
+   * «2 avisos» por una sola cosa que arreglar.
+   */
+  cubiertoPor?: OperationalStatusItem["key"];
 };
 
 export const OPERATIONAL_TONE: Record<OperationalTone, { icon: LucideIcon; text: string; dot: string }> = {
@@ -43,6 +50,11 @@ export const OPERATIONAL_TONE: Record<OperationalTone, { icon: LucideIcon; text:
 };
 
 const NO_COMPROBADO = "No se ha podido comprobar";
+
+/** Estado intermedio de la recepcionista: coge el teléfono, informa y toma
+ * recados, pero no puede reservar (sin horario, o sin agenda de Alhabla ni
+ * calendario conectado). */
+export const ATIENDE_SIN_RESERVAR = "Atiende, pero no reserva";
 
 /**
  * Fuente única para las señales de salud operativa. Las pantallas deciden si
@@ -70,6 +82,38 @@ export function buildOperationalStatus({
   const calendarState = getCalendarState(business);
   const calendarConnected = calendarState.connected;
   const calendarExpired = calendarState.expired;
+  const sinHorario = !horarioConfigurado(business.schedule);
+
+  const sinAgenda = !calendarState.bookable;
+
+  // Sin horario no hay huecos (BUSINESS_HOURS_NOT_CONFIGURED), tampoco en la
+  // agenda de Alhabla; sin agenda donde reservar (ni la de Alhabla ni un
+  // calendario operativo) la recepcionista contesta, toma nota de la
+  // petición y avisa al dueño, pero no da hora ni reserva (voiceTools:
+  // check_availability y book_appointment). Decir «Atendiendo llamadas» a
+  // secas escondía esa diferencia.
+  const causaDeLaAgenda = calendarExpired
+    ? "el calendario se desconectó"
+    : calendarState.mode === "externo"
+      ? "falta conectar el calendario"
+      : "falta elegir dónde reservar";
+  const sinReservas: OperationalStatusItem | null =
+    sinHorario || sinAgenda
+      ? {
+          key: "agent",
+          label: "Recepcionista",
+          icon: Bot,
+          value: `${ATIENDE_SIN_RESERVAR}: ${
+            sinHorario ? (sinAgenda ? "faltan el horario y la agenda" : "falta el horario") : causaDeLaAgenda
+          }`,
+          tone: "warning",
+          action: sinHorario
+            ? { label: "Configurar horario", href: "/agente?section=business-hours" }
+            : { label: calendarExpired ? "Reconectar agenda" : "Elegir agenda", href: "/agente?section=calendar-section" },
+          // Si solo falta la agenda, el aviso ya lo da la señal «Agenda».
+          cubiertoPor: sinHorario ? undefined : "calendar",
+        }
+      : null;
 
   const agent: OperationalStatusItem = business.callsSuspendedAt
     ? { key: "agent", label: "Recepcionista", icon: Bot, value: "Suspendida por impago", tone: "error", action: { label: "Regularizar el pago", href: "/ajustes/facturacion" } }
@@ -77,14 +121,7 @@ export function buildOperationalStatus({
       ? { key: "agent", label: "Recepcionista", icon: Bot, value: "No contesta: sin plan activo", tone: "error", action: { label: "Elegir plan", href: "/ajustes/facturacion" } }
       : !business.active || !agentActive
         ? { key: "agent", label: "Recepcionista", icon: Bot, value: "Inactiva", tone: "warning", action: { label: "Revisar agente", href: "/agente?section=agent-settings" } }
-        : !calendarState.bookable
-          // Sin agenda donde reservar (ni la de Alhabla ni un calendario
-          // operativo) la recepcionista contesta, toma nota de la petición y
-          // avisa al dueño, pero no da hora ni reserva (voiceTools:
-          // check_availability y book_appointment). Decir «Atendiendo
-          // llamadas» a secas escondía esa diferencia.
-          ? { key: "agent", label: "Recepcionista", icon: Bot, value: "Atiende, pero no reserva", tone: "warning", action: { label: calendarExpired ? "Reconectar agenda" : "Elegir agenda", href: "/agente?section=calendar-section" } }
-          : { key: "agent", label: "Recepcionista", icon: Bot, value: "Atendiendo llamadas", tone: "ok" };
+        : sinReservas ?? { key: "agent", label: "Recepcionista", icon: Bot, value: "Atendiendo llamadas", tone: "ok" };
 
   const phoneItem: OperationalStatusItem = phone?.status === "active" && phone.phoneNumber
     ? { key: "phone", label: "Tu número", icon: Smartphone, value: formatPhone(phone.phoneNumber) ?? phone.phoneNumber, tone: "ok" }
@@ -99,7 +136,7 @@ export function buildOperationalStatus({
   const forwarding: OperationalStatusItem = forwardingStatus === "done"
     ? { key: "forwarding", label: "Desvío de llamadas", icon: PhoneForwarded, value: "Activo", tone: "ok" }
     : forwardingStatus === "ready"
-      ? { key: "forwarding", label: "Desvío de llamadas", icon: PhoneForwarded, value: "Sin activar", tone: "error", action: { label: "Activarlo ahora", href: "/#desvio" } }
+      ? { key: "forwarding", label: "Desvío de llamadas", icon: PhoneForwarded, value: "Sin activar", tone: "error", action: { label: "Activarlo ahora", href: "/?desvio=abrir" } }
       : forwardingUnavailable
         ? { key: "forwarding", label: "Desvío de llamadas", icon: PhoneForwarded, value: NO_COMPROBADO, tone: "unknown" }
         : { key: "forwarding", label: "Desvío de llamadas", icon: PhoneForwarded, value: "Esperando al número", tone: "waiting" };

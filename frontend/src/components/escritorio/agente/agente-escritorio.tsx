@@ -14,7 +14,7 @@ import {
 } from "@/lib/agent-configuration";
 import { getCalendarState } from "@/lib/calendar-state";
 import type { Business } from "@/lib/types";
-import { OPERATIONAL_TONE, useOperationalStatus } from "@/components/operational-status";
+import { ATIENDE_SIN_RESERVAR, OPERATIONAL_TONE, useOperationalStatus } from "@/components/operational-status";
 import { isBusinessSchedule } from "@/components/business-hours-editor";
 import { ProveedorDeMarco, type MarcoDeAjuste } from "@/components/marco-de-ajuste";
 import { Insignia } from "@/components/movil/piezas";
@@ -218,6 +218,10 @@ function EstadoDelAgente({ business }: { business: Business }) {
   const { items, isLoading } = useOperationalStatus(business, business.agents?.[0]?.active !== false);
   if (isLoading) return null;
   const atencion = items.filter((item) => item.tone === "error" || item.tone === "warning").length;
+  const recepcionista = items.find((item) => item.key === "agent");
+  if (recepcionista?.value.startsWith(ATIENDE_SIN_RESERVAR)) {
+    return <Insignia tono="aviso">{ATIENDE_SIN_RESERVAR}</Insignia>;
+  }
   return atencion > 0 ? <Insignia tono="aviso">Requiere atención</Insignia> : <Insignia tono="exito">Atendiendo</Insignia>;
 }
 

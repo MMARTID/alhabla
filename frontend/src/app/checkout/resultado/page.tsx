@@ -3,9 +3,85 @@
 import Link from "next/link";
 import { useEffect, useState, use } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { CheckCircle2, CircleAlert, Clock3, RefreshCw } from "lucide-react";
-import { getBillingSummary, reconcileCheckoutSession } from "@/lib/api";
+import { CheckCircle2, CircleAlert, Clock3, Loader2, RefreshCw } from "lucide-react";
+import {
+  getBillingSummary,
+  getOnboardingState,
+  getPhoneNumberInfo,
+  reconcileCheckoutSession,
+} from "@/lib/api";
+import { formatPhone } from "@/lib/format";
+import type { OnboardingState, PhoneNumberInfo } from "@/lib/types";
 import { medirEvento } from "@/components/google-analytics";
+
+/** Los pasos del desvío, abiertos en el panel (panel-inicio.tsx). */
+const HREF_ACTIVAR_DESVIO = "/?desvio=abrir";
+
+/** Sondeos del número tras el pago: cada 5 s durante 5 min como mucho, lo
+ * mismo que la reconciliación de la suscripción. */
+const SONDEO_MS = 5000;
+const MAX_SONDEOS = 60;
+
+type SiguientePaso = {
+  texto: string;
+  href: string;
+  etiqueta: string;
+  /** El número todavía se está comprando o aprobando. */
+  activandoNumero?: boolean;
+};
+
+/**
+ * Qué hacer al volver del pago (hallazgo 11 de la auditoría del 28-10): no
+ * es configurar el agente, que el alta ya dejó listo, sino desviar el
+ * teléfono y comprobarlo con una llamada de prueba. Sin desvío no entra
+ * ninguna llamada.
+ */
+function siguientePaso(
+  phone: PhoneNumberInfo | undefined,
+  onboarding: OnboardingState | undefined
+): SiguientePaso {
+  if (phone?.status === "failed") {
+    return {
+      texto:
+        "Tu plan ya está activo, pero no hemos podido asignarte el número. Desde el panel puedes reintentarlo; si vuelve a fallar, escríbenos a hola@alhabla.ai.",
+      href: "/",
+      etiqueta: "Ir al panel",
+    };
+  }
+
+  const forwarding = onboarding?.forwarding;
+  if (forwarding?.status === "done") {
+    const numero = forwarding.customerLine ?? forwarding.phoneNumber;
+    return {
+      texto: `Tu plan ya está activo y las llamadas ya llegan a tu recepcionista. Haz una llamada de prueba${
+        numero ? ` al ${formatPhone(numero) ?? numero}` : ""
+      } desde otro teléfono para oírla.`,
+      href: "/",
+      etiqueta: "Ir al panel",
+    };
+  }
+
+  const numeroPendiente =
+    forwarding?.status === "waiting_number" ||
+    phone?.status === "pending" ||
+    phone?.status === "purchased";
+  if (numeroPendiente) {
+    return {
+      texto:
+        "Tu plan ya está activo. Estamos activando tu número, que tarda unos minutos. En cuanto esté listo, desvía tu teléfono a la recepcionista y pulsa «Comprobar desvío» para hacer una llamada de prueba.",
+      href: HREF_ACTIVAR_DESVIO,
+      etiqueta: "Ir al panel",
+      activandoNumero: true,
+    };
+  }
+
+  return {
+    texto:
+      "Tu plan ya está activo. Último paso: desvía tu teléfono a la recepcionista y pulsa «Comprobar desvío». Te haremos una llamada de prueba para confirmar que funciona.",
+    href: HREF_ACTIVAR_DESVIO,
+    etiqueta: "Activar el desvío",
+  };
+}
 
 export default function CheckoutResultPage(props: {
   searchParams: Promise<{ session_id?: string }>;
@@ -61,6 +137,30 @@ export default function CheckoutResultPage(props: {
     void queryClient.invalidateQueries({ queryKey: ["billing-summary"] });
   }, [confirmed, queryClient]);
 
+  // Con el plan confirmado, el backend compra el número (billing/service.ts):
+  // se sondea hasta que esté activo o falle para decir el paso correcto.
+  const phoneQuery = useQuery({
+    queryKey: ["phone-number"],
+    queryFn: getPhoneNumberInfo,
+    enabled: confirmed,
+    refetchInterval: (query) => {
+      const status = query.state.data?.status;
+      if (status === "active" || status === "failed") return false;
+      return query.state.dataUpdateCount + query.state.errorUpdateCount >= MAX_SONDEOS ? false : SONDEO_MS;
+    },
+  });
+  const onboardingQuery = useQuery({
+    queryKey: ["onboarding-state"],
+    queryFn: getOnboardingState,
+    enabled: confirmed,
+    refetchInterval: (query) =>
+      query.state.data?.forwarding?.status === "waiting_number" &&
+      query.state.dataUpdateCount + query.state.errorUpdateCount < MAX_SONDEOS
+        ? SONDEO_MS
+        : false,
+  });
+  const paso = siguientePaso(phoneQuery.data, onboardingQuery.data);
+
   const planConfirmado = confirmed ? (data?.planId ?? data?.effectivePlanId ?? null) : null;
   const enPrueba = data?.status === "TRIALING";
 
@@ -99,8 +199,9 @@ export default function CheckoutResultPage(props: {
       ctaParams.set("hasPlaceSchedule", "true");
     }
   }
-  const ctaHref = confirmed ? `/agente?${ctaParams.toString()}` : "/ajustes/facturacion";
-  const ctaLabel = confirmed ? "Configurar mi negocio" : "Ver facturación";
+  const configurarHref = `/agente?${ctaParams.toString()}`;
+  const ctaHref = confirmed ? paso.href : "/ajustes/facturacion";
+  const ctaLabel = confirmed ? paso.etiqueta : "Ver facturación";
 
   return (
     <section className="mx-auto max-w-2xl py-16 text-center">
@@ -118,7 +219,7 @@ export default function CheckoutResultPage(props: {
         </h1>
         <p className="mt-4 leading-7 text-muted">
           {confirmed
-            ? "Tu plan ya está activo. Ahora deja tu negocio configurado para que la recepcionista empiece a atender."
+            ? paso.texto
             : sinRespuesta
               ? "Tu pago puede haberse completado igualmente: lo que ha fallado es la comprobación. Pulsa «Actualizar» para volver a comprobarlo."
               : "Stripe está procesando el pago. En unos segundos activamos tu plan automáticamente."}
@@ -134,6 +235,12 @@ export default function CheckoutResultPage(props: {
           </p>
         ) : null}
         {isLoading ? <p className="mt-4 text-sm text-muted">Consultando estado…</p> : null}
+        {confirmed && paso.activandoNumero ? (
+          <p className="mt-4 inline-flex items-center gap-2 text-sm text-muted">
+            <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+            Activando tu número…
+          </p>
+        ) : null}
         <div className="mt-8 flex flex-wrap justify-center gap-3">
           {confirmed ? null : (
             <button type="button" onClick={() => refetch()} disabled={isFetching} className="btn-secondary">
@@ -144,6 +251,11 @@ export default function CheckoutResultPage(props: {
           <Link href={ctaHref} className="btn-primary">
             {ctaLabel}
           </Link>
+          {confirmed ? (
+            <Link href={configurarHref} className="btn-secondary">
+              Revisar mi negocio
+            </Link>
+          ) : null}
         </div>
       </div>
     </section>
