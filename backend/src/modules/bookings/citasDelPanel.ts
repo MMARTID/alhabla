@@ -7,6 +7,7 @@ import {
   ACCIONES_DE_AGENDA,
   MOTIVO_CALENDARIO_ILEGIBLE,
   MOTIVO_SIN_CALENDARIO,
+  PREFIJO_DE_CALL_DEL_GESTOR,
   instanteLocal,
   moverReserva,
   type FalloAlMover,
@@ -43,7 +44,7 @@ const AvisarBodySchema = z.object({
 });
 
 const TEXTO_SIN_CALENDARIO =
-  "Conecta tu calendario para mover citas desde aquí.";
+  "Para apuntar o mover citas desde aquí, elige la agenda de Alhabla o conecta tu calendario.";
 const TEXTO_CALENDARIO_ILEGIBLE =
   "Ahora mismo no se puede leer tu calendario. Inténtalo en un rato.";
 
@@ -92,6 +93,18 @@ async function zonaDelNegocio(businessId: string): Promise<string> {
     select: { timezone: true },
   });
   return negocio?.timezone || "Europe/Madrid";
+}
+
+/** «Tu calendario ya está al día» solo tiene sentido con calendario externo;
+ * en la agenda de Alhabla (PLAN-AGENDA-ALHABLA.md) la cita vive aquí. */
+async function dondeQuedaLaCita(businessId: string): Promise<string> {
+  const negocio = await prisma.business.findUnique({
+    where: { id: businessId },
+    select: { modoDeAgenda: true },
+  });
+  return negocio?.modoDeAgenda === "alhabla"
+    ? "Tu agenda ya está al día."
+    : "Tu calendario ya está al día.";
 }
 
 /**
@@ -192,7 +205,7 @@ export async function citasDelPanelRoutes(fastify: FastifyInstance) {
         const con = r.asignado ? ` con ${r.asignado.name}` : "";
         return reply.send({
           ok: true,
-          mensaje: `Cita movida al ${formatearCita(r.start, timezone)}${con}. Tu calendario ya está al día.`,
+          mensaje: `Cita movida al ${formatearCita(r.start, timezone)}${con}. ${await dondeQuedaLaCita(businessId)}`,
           cita: {
             id: r.cita.id,
             programedAt: r.start.toISOString(),
@@ -245,7 +258,9 @@ export async function citasDelPanelRoutes(fastify: FastifyInstance) {
           mensaje:
             r.resultado === "ya_cancelada"
               ? "Esa cita ya estaba cancelada."
-              : "Cita cancelada y quitada de tu calendario.",
+              : (await dondeQuedaLaCita(businessId)).startsWith("Tu agenda")
+                ? "Cita cancelada."
+                : "Cita cancelada y quitada de tu calendario.",
           avisoAlCliente:
             r.resultado === "cancelada"
               ? await avisoPosible(businessId, timezone, id, "cancelacion")
@@ -339,4 +354,275 @@ export async function citasDelPanelRoutes(fastify: FastifyInstance) {
       }
     }
   );
+
+  // -------------------------------------------------------------------------
+  // Crear desde el panel (PLAN-AGENDA-ALHABLA.md, fase 2): «Nueva cita»,
+  // «Bloquear horas» y «Marcar ausencia». Son las acciones añadir_cita,
+  // bloquear_franja y marcar_ausencia del Gestor, con `origen: "panel"`:
+  // mismas comprobaciones (hueco bajo el candado, horario, calendario externo
+  // cuando lo hay) y misma Call sintética para la cita, que no cuenta como
+  // llamada. `soloComprobar` valida sin tocar nada (el formulario avisa antes
+  // de pedir confirmación).
+  // -------------------------------------------------------------------------
+
+  fastify.post<{ Body: z.infer<typeof NuevaCitaBodySchema> }>(
+    "/business/me/bookings",
+    { preValidation: [fastify.authenticate] },
+    async (request, reply) => {
+      try {
+        const { soloComprobar, ...body } = NuevaCitaBodySchema.parse(
+          request.body
+        );
+        const businessId = request.user!.businessId;
+        const timezone = await zonaDelNegocio(businessId);
+        const ctx = { businessId, timezone };
+        const accion = ACCIONES_DE_AGENDA.añadir_cita;
+        const params = accion.schema.parse({
+          cliente: body.cliente,
+          ...(body.telefono ? { telefono: body.telefono } : {}),
+          fechaHora: body.fechaHora,
+          servicios: body.servicios,
+          ...(body.profesionalId ? { profesional: body.profesionalId } : {}),
+          ...(body.duracionMinutos
+            ? { duracionMinutos: body.duracionMinutos }
+            : {}),
+        });
+
+        const comprobacion = await accion.comprobar(ctx, params);
+        if (!comprobacion.ok) {
+          return reply
+            .status(409)
+            .send({ ok: false, error: enPalabrasDelPanel(comprobacion.motivo) });
+        }
+        if (soloComprobar) {
+          return reply.send({ ok: true, descripcion: comprobacion.descripcion });
+        }
+
+        const accionId = randomUUID();
+        const r = await accion.ejecutar(ctx, comprobacion.parametros ?? params, {
+          accionId,
+          inboundMessageId: `panel:${accionId}`,
+          origen: "panel",
+        });
+        if (!r.ok) {
+          fastify.log.warn(
+            `[Booking] Nueva cita desde el panel (negocio ${businessId}) rechazada: ${r.nota ?? r.mensaje}`
+          );
+          return reply
+            .status(409)
+            .send({ error: enPalabrasDelPanel(r.mensaje) });
+        }
+        // La acción cuelga la cita de la Call sintética de esta acción.
+        const cita = await prisma.booking.findFirst({
+          where: {
+            call: {
+              businessId,
+              callId: `${PREFIJO_DE_CALL_DEL_GESTOR}${accionId}`,
+            },
+          },
+          select: {
+            id: true,
+            programedAt: true,
+            clientName: true,
+            clientPhone: true,
+            professional: { select: { id: true, name: true } },
+          },
+        });
+        fastify.log.info(
+          `[Booking] Nueva cita ${cita?.id ?? "?"} apuntada desde el panel (negocio ${businessId})`
+        );
+        return reply.status(201).send({
+          ok: true,
+          mensaje: cita
+            ? `Cita apuntada: ${cita.clientName ?? "cliente"} el ${formatearCita(cita.programedAt, timezone)}${cita.professional ? ` con ${cita.professional.name}` : ""}.`
+            : "Cita apuntada.",
+          cita: cita
+            ? {
+                id: cita.id,
+                programedAt: cita.programedAt.toISOString(),
+                professional: cita.professional,
+              }
+            : null,
+          // El aviso al cliente desde «Nueva cita» no se ofrece en el MVP
+          // (decisión D4 del plan): la confirmación solo es posible con un
+          // permiso previo del cliente, que el panel no puede dar por hecho.
+        });
+      } catch (error) {
+        if (error instanceof z.ZodError) {
+          return reply.status(400).send({ error: error.errors });
+        }
+        fastify.log.error(
+          { err: error },
+          "[Booking] No se pudo apuntar la cita desde el panel"
+        );
+        return reply
+          .status(500)
+          .send({ error: "No se ha podido apuntar la cita. Inténtalo en un rato." });
+      }
+    }
+  );
+
+  fastify.post<{ Body: z.infer<typeof BloquearBodySchema> }>(
+    "/business/me/bloqueos",
+    { preValidation: [fastify.authenticate] },
+    async (request, reply) => {
+      try {
+        const { soloComprobar, ...body } = BloquearBodySchema.parse(
+          request.body
+        );
+        const businessId = request.user!.businessId;
+        const timezone = await zonaDelNegocio(businessId);
+        const ctx = { businessId, timezone };
+        const accion = ACCIONES_DE_AGENDA.bloquear_franja;
+        const params = accion.schema.parse(body);
+
+        const comprobacion = await accion.comprobar(ctx, params);
+        if (!comprobacion.ok) {
+          return reply
+            .status(409)
+            .send({ ok: false, error: comprobacion.motivo });
+        }
+        if (soloComprobar) {
+          return reply.send({ ok: true, descripcion: comprobacion.descripcion });
+        }
+
+        const accionId = randomUUID();
+        const r = await accion.ejecutar(ctx, comprobacion.parametros ?? params, {
+          accionId,
+          inboundMessageId: `panel:${accionId}`,
+          origen: "panel",
+        });
+        if (!r.ok) {
+          return reply.status(409).send({ error: r.mensaje });
+        }
+        fastify.log.info(
+          `[Booking] Tramo bloqueado desde el panel (negocio ${businessId}): ${body.fecha} ${body.desde}-${body.hasta}`
+        );
+        return reply.send({
+          ok: true,
+          // El Gestor habla en primera persona («Hecho: …»); aquí vale igual
+          // porque el texto describe el horario que queda y el aviso sobre
+          // las citas ya reservadas.
+          mensaje: r.mensaje.replace(/^Hecho: /, ""),
+        });
+      } catch (error) {
+        if (error instanceof z.ZodError) {
+          return reply.status(400).send({ error: error.errors });
+        }
+        fastify.log.error(
+          { err: error },
+          "[Booking] No se pudo bloquear el tramo desde el panel"
+        );
+        return reply
+          .status(500)
+          .send({ error: "No se ha podido bloquear ese tramo. Inténtalo en un rato." });
+      }
+    }
+  );
+
+  fastify.post<{ Body: z.infer<typeof AusenciaBodySchema> }>(
+    "/business/me/absences",
+    { preValidation: [fastify.authenticate] },
+    async (request, reply) => {
+      try {
+        const { soloComprobar, ...body } = AusenciaBodySchema.parse(
+          request.body
+        );
+        const businessId = request.user!.businessId;
+        const timezone = await zonaDelNegocio(businessId);
+        const ctx = { businessId, timezone };
+        const accion = ACCIONES_DE_AGENDA.marcar_ausencia;
+        const params = accion.schema.parse({
+          profesional: body.profesionalId,
+          desde: body.desde,
+          ...(body.hasta ? { hasta: body.hasta } : {}),
+          ...(body.horaInicio ? { horaInicio: body.horaInicio } : {}),
+          ...(body.horaFin ? { horaFin: body.horaFin } : {}),
+          ...(body.motivo ? { motivo: body.motivo } : {}),
+        });
+
+        const comprobacion = await accion.comprobar(ctx, params);
+        if (!comprobacion.ok) {
+          return reply
+            .status(409)
+            .send({ ok: false, error: comprobacion.motivo });
+        }
+        if (soloComprobar) {
+          return reply.send({ ok: true, descripcion: comprobacion.descripcion });
+        }
+
+        const accionId = randomUUID();
+        const r = await accion.ejecutar(ctx, comprobacion.parametros ?? params, {
+          accionId,
+          inboundMessageId: `panel:${accionId}`,
+          origen: "panel",
+        });
+        if (!r.ok) {
+          return reply.status(409).send({ error: r.mensaje });
+        }
+        fastify.log.info(
+          `[Booking] Ausencia marcada desde el panel (negocio ${businessId}): ${body.profesionalId} ${body.desde}${body.hasta ? `→${body.hasta}` : ""}`
+        );
+        return reply.status(201).send({
+          ok: true,
+          mensaje: r.mensaje.replace(/^Hecho: /, ""),
+        });
+      } catch (error) {
+        if (error instanceof z.ZodError) {
+          return reply.status(400).send({ error: error.errors });
+        }
+        fastify.log.error(
+          { err: error },
+          "[Booking] No se pudo marcar la ausencia desde el panel"
+        );
+        return reply
+          .status(500)
+          .send({ error: "No se ha podido marcar la ausencia. Inténtalo en un rato." });
+      }
+    }
+  );
 }
+
+// Cuerpos de las rutas de creación. Los límites son los de las acciones del
+// Gestor (sus esquemas vuelven a validar); aquí solo se nombran los campos
+// como los manda el formulario del panel.
+const FechaHoraLocalSchema = z
+  .string()
+  .regex(
+    /^\d{4}-\d{2}-\d{2}T([01]\d|2[0-3]):[0-5]\d$/,
+    'Fecha y hora en formato "AAAA-MM-DDTHH:MM"'
+  );
+const FechaSchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Fecha en formato "AAAA-MM-DD"');
+const HoraSchema = z
+  .string()
+  .regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Hora en formato "HH:MM"');
+
+const NuevaCitaBodySchema = z.object({
+  cliente: z.string().trim().min(1).max(80),
+  telefono: z.string().trim().min(1).max(32).optional(),
+  fechaHora: FechaHoraLocalSchema,
+  servicios: z.array(z.string().trim().min(1).max(80)).min(1).max(5),
+  profesionalId: z.string().trim().min(1).max(80).optional(),
+  duracionMinutos: z.number().int().positive().max(24 * 60).optional(),
+  soloComprobar: z.boolean().optional(),
+});
+
+const BloquearBodySchema = z.object({
+  fecha: FechaSchema,
+  desde: HoraSchema,
+  hasta: HoraSchema,
+  motivo: z.string().trim().max(60).optional(),
+  soloComprobar: z.boolean().optional(),
+});
+
+const AusenciaBodySchema = z.object({
+  profesionalId: z.string().trim().min(1).max(80),
+  desde: FechaSchema,
+  hasta: FechaSchema.optional(),
+  horaInicio: HoraSchema.optional(),
+  horaFin: HoraSchema.optional(),
+  motivo: z.string().trim().max(60).optional(),
+  soloComprobar: z.boolean().optional(),
+});

@@ -186,6 +186,14 @@ export default function PrivacidadPage() {
           Solo la usamos para leer y escribir en el calendario que eliges.
         </p>
         <p>
+          Si en lugar de conectar un calendario eliges la agenda de Alhabla, las citas se guardan únicamente en nuestros
+          sistemas. Puedes activar desde el panel un enlace de solo lectura (formato iCal) para verla en el calendario
+          de tu móvil o de Google: ese enlace equivale a una contraseña, incluye el servicio, el nombre del cliente y la
+          persona que atiende, nunca el teléfono, y el proveedor de calendario al que lo añadas (por ejemplo, Google)
+          lo descargará a sus servidores periódicamente. Puedes cambiarlo o desactivarlo cuando quieras desde el panel;
+          desde ese momento el enlace anterior deja de funcionar.
+        </p>
+        <p>
           Los tokens de acceso y renovación, y la contraseña de aplicación de Apple, se almacenan cifrados en reposo.
           Los usamos exclusivamente para prestar la funcionalidad de agenda solicitada por el negocio; no los vendemos,
           usamos para publicidad ni empleamos para entrenar modelos. Puedes revocar el acceso cuando quieras desde los

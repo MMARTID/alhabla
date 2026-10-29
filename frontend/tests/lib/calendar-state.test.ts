@@ -36,7 +36,70 @@ describe("getCalendarState con activeCalendar (contrato nuevo)", () => {
       expired: false,
       accountEmail: "pelu@icloud.com",
       webUrl: "https://www.icloud.com/calendar/",
+      // Sin `modoDeAgenda` en la respuesta: sin elegir, y se reserva porque
+      // hay calendario conectado.
+      mode: "sin_elegir",
+      alhabla: false,
+      bookable: true,
     });
+  });
+
+  // PLAN-AGENDA-ALHABLA.md: en la agenda de Alhabla se reserva sin calendario
+  // externo, y la conexión que quede de antes no cuenta ni como conectada ni
+  // como caducada.
+  it("agenda de Alhabla: se puede reservar sin calendario, y una conexión antigua no cuenta", () => {
+    const sinCalendario = getCalendarState({
+      calendarProvider: null,
+      activeCalendar: null,
+      modoDeAgenda: "alhabla",
+    });
+    expect(sinCalendario).toMatchObject({
+      mode: "alhabla",
+      alhabla: true,
+      bookable: true,
+      connected: false,
+      expired: false,
+    });
+
+    const conConexionCaducada = getCalendarState({
+      calendarProvider: "google",
+      modoDeAgenda: "alhabla",
+      activeCalendar: {
+        provider: "google",
+        connected: false,
+        calendarId: "primary",
+        accountEmail: "pelu@gmail.com",
+        disconnectedAt: "2026-09-18T10:00:00.000Z",
+        lastError: "invalid_grant",
+      },
+    });
+    expect(conConexionCaducada).toMatchObject({
+      alhabla: true,
+      bookable: true,
+      connected: false,
+      expired: false,
+      accountEmail: null,
+    });
+  });
+
+  it("sin elegir y sin calendario no se reserva; en externo manda la conexión", () => {
+    expect(
+      getCalendarState({ calendarProvider: null, activeCalendar: null, modoDeAgenda: "sin_elegir" })
+    ).toMatchObject({ mode: "sin_elegir", bookable: false });
+    expect(
+      getCalendarState({
+        calendarProvider: "google",
+        modoDeAgenda: "externo",
+        activeCalendar: {
+          provider: "google",
+          connected: false,
+          calendarId: "primary",
+          accountEmail: null,
+          disconnectedAt: "2026-09-18T10:00:00.000Z",
+          lastError: null,
+        },
+      })
+    ).toMatchObject({ mode: "externo", bookable: false, expired: true });
   });
 
   it("conexión caducada: connected false y expired true", () => {

@@ -225,6 +225,13 @@ export type Business = {
    * el antiguo y desaparecerán.
    */
   activeCalendar?: ActiveCalendar | null;
+  /**
+   * Dónde reserva el negocio (PLAN-AGENDA-ALHABLA.md): `sin_elegir` (sin
+   * calendario: la recepcionista toma nota pero no reserva), `alhabla` (solo
+   * en Alhabla) o `externo` (Google, Outlook o iCloud). Opcional porque un
+   * backend anterior no lo devuelve; ausente = `sin_elegir`.
+   */
+  modoDeAgenda?: ModoDeAgenda | null;
   subscriptionStatus?: SubscriptionStatus | null;
   /**
    * Fecha en la que se suspendieron las llamadas por impago. Mientras esté
@@ -511,6 +518,9 @@ export type CalendarListItem = {
 };
 
 export type CalendarProviderId = "google" | "outlook" | "caldav";
+
+/** `Business.modoDeAgenda` (backend/src/lib/modoDeAgenda.ts). */
+export type ModoDeAgenda = "sin_elegir" | "alhabla" | "externo";
 
 export type ActiveCalendar = {
   provider: CalendarProviderId;
@@ -813,6 +823,13 @@ export type AusenciaDelEquipo = {
   reason: string | null;
   /** "owner_chat" (el Gestor) | "panel" | null. */
   createdVia: string | null;
+};
+
+/** Lo que vuelve al apuntar una cita desde la agenda («Nueva cita»). */
+export type ResultadoDeNuevaCita = {
+  ok: true;
+  mensaje: string;
+  cita: { id: string; programedAt: string; professional: { id: string; name: string } | null } | null;
 };
 
 /** Lo que vuelve al mover o cancelar una cita desde la agenda. */

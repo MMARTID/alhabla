@@ -23,7 +23,7 @@ const FILAS: Fila[] = [
   { concepto: "Minuto extra sin IVA", valores: [eur(inicio.extraPerMinute), eur(pro.extraPerMinute), eur(scale.extraPerMinute)] },
   { concepto: "Profesionales en la agenda", valores: ["Hasta 3", "Hasta 10", "Sin límite"] },
   { concepto: "Atención 24 horas, todos los días", valores: [true, true, true] },
-  { concepto: "Reserva en Google, Outlook o iCloud", valores: [true, true, true] },
+  { concepto: "Reserva en Google, Outlook, iCloud o en la agenda de Alhabla", valores: [true, true, true] },
   { concepto: "Reparto por especialidad", valores: [true, true, true] },
   { concepto: "Confirmación de la cita por WhatsApp", valores: [true, true, true] },
   { concepto: "El Gestor por WhatsApp para el dueño", valores: [true, true, true] },

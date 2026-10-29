@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import RegisterBusinessCalendarPage from "@/app/bienvenida/calendar/page";
+import { cambiarModoDeAgenda } from "@/lib/api";
 import { BUSINESS_TYPE_ONBOARDING_TEXTS } from "@/lib/business-type";
 import type { Business } from "@/lib/types";
 
@@ -10,9 +11,12 @@ vi.mock("next/navigation", () => ({
 }));
 
 vi.mock("@/lib/api", () => ({
+  cambiarModoDeAgenda: vi.fn(),
   getGoogleCalendarAuthUrl: vi.fn(),
   getMicrosoftCalendarAuthUrl: vi.fn(),
 }));
+
+const mockedCambiarModoDeAgenda = vi.mocked(cambiarModoDeAgenda);
 
 // El formulario de Apple es el mismo de Agente › Calendario y tiene sus
 // propios tests (tests/components/apple-calendar-connect.test.tsx): aquí solo
@@ -67,6 +71,7 @@ describe("RegisterBusinessCalendarPage", () => {
   let location: ReturnType<typeof mockLocation> | undefined;
 
   beforeEach(() => {
+    vi.clearAllMocks();
     window.localStorage.clear();
     window.localStorage.setItem("alhabla_token", "token");
   });
@@ -76,7 +81,7 @@ describe("RegisterBusinessCalendarPage", () => {
     location = undefined;
   });
 
-  it("avisa, con el texto del sector, de que sin calendario no se reservan citas (auditoría 28-10, hallazgo 2)", async () => {
+  it("avisa, con el texto del sector, de que saltarse el paso deja la recepcionista sin reservar (auditoría 28-10, hallazgo 2)", async () => {
     location = mockLocation("?businessType=barberia");
     render(<RegisterBusinessCalendarPage />);
 
@@ -84,7 +89,9 @@ describe("RegisterBusinessCalendarPage", () => {
       BUSINESS_TYPE_ONBOARDING_TEXTS.barberia.calendar.sinCalendario
     );
     expect(aviso).toHaveTextContent(/no reserva cortes ni barbas/);
-    expect(aviso).toHaveTextContent(/Agente › Calendario/);
+    expect(aviso).toHaveTextContent(
+      /conectar tu calendario o activar la agenda de Alhabla .* en Agente › Calendario/
+    );
     expect(
       screen.getByRole("button", { name: "Configurar calendario después" })
     ).toHaveAccessibleDescription(
@@ -92,10 +99,10 @@ describe("RegisterBusinessCalendarPage", () => {
     );
   });
 
-  it("todos los sectores dicen que sin calendario se atiende y se toma nota, pero no se reserva", () => {
+  it("todos los sectores dicen que saltarse el paso toma nota pero no reserva, y las dos salidas", () => {
     for (const textos of Object.values(BUSINESS_TYPE_ONBOARDING_TEXTS)) {
       expect(textos.calendar.sinCalendario).toMatch(
-        /^Sin calendario, tu recepcionista atiende las llamadas y toma nota .*, pero no reserva .+\. Puedes conectarlo cuando quieras desde la app, en Agente › Calendario\.$/
+        /^Si lo dejas para después, tu recepcionista atiende y toma nota de lo que te piden, pero no reserva .+\. Puedes conectar tu calendario o activar la agenda de Alhabla cuando quieras en Agente › Calendario\.$/
       );
     }
   });
@@ -131,5 +138,26 @@ describe("RegisterBusinessCalendarPage", () => {
       screen.getByText("Calendario conectado. Te llevamos al siguiente paso…")
     ).toBeInTheDocument();
     await waitFor(() => expect(location?.getHref()).toBe("/checkout?plan=pro"));
+  });
+
+  it("«Usar la agenda de Alhabla» activa ese modo y sigue al pago", async () => {
+    const user = userEvent.setup();
+    mockedCambiarModoDeAgenda.mockResolvedValue({} as Business);
+    location = mockLocation("?businessType=peluqueria&plan=inicio");
+    render(<RegisterBusinessCalendarPage />);
+
+    await user.click(
+      screen.getByRole("button", { name: /Usar la agenda de Alhabla/ })
+    );
+
+    expect(mockedCambiarModoDeAgenda).toHaveBeenCalledWith("alhabla");
+    expect(
+      await screen.findByText(
+        "Agenda de Alhabla activada. Te llevamos al siguiente paso…"
+      )
+    ).toBeInTheDocument();
+    await waitFor(() =>
+      expect(location?.getHref()).toBe("/checkout?plan=inicio")
+    );
   });
 });
