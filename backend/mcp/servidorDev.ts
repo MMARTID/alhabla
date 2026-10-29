@@ -26,6 +26,7 @@ import {
   crearLlamadaSimulada,
 } from "./llamadasSimuladas.js";
 import { pararProxy, urlDeBdDeProd } from "./prod.js";
+import { registrarHerramientasDeProd } from "./registroDeProd.js";
 import { resumenDeNegocio } from "./resumenDeNegocio.js";
 import { saludDeLlamadas } from "./saludDeLlamadas.js";
 import { ejecutarSoloLectura } from "./sqlDeSoloLectura.js";
@@ -76,7 +77,11 @@ import {
  *   acabaron bien, citas por canal y reservas pendientes por código.
  * - traza_llamada: todo lo que dejó una llamada, con sus logs.
  * - resumen_negocio: la foto de un negocio (o la lista para elegir uno).
- * - estado_prod: revisión, imagen, /health, colas, jobs y último deploy.
+ * - estado_prod: revisión, imagen, /health, colas, jobs, último deploy,
+ *   migraciones de Prisma y último despliegue de las dos webs.
+ * - errores_prod / ver_cola_prod / visitas_web / panorama_plataforma: errores
+ *   agrupados, tareas de Cloud Tasks, visitas a alhabla.ai y las cifras de la
+ *   plataforma (registroDeProd.ts).
  * - ver_assistant_telnyx / ver_conversacion_telnyx: GET a Telnyx AI.
  * - lanzar_job_prod: solo los jobs del Scheduler que se pueden repetir.
  * - estado_dev / ver_en_dev: el entorno de desarrollo fijo
@@ -590,7 +595,7 @@ servidor.registerTool(
   {
     title: "Estado de producción",
     description:
-      "Foto de producción: revisión que sirve y su tráfico, imagen (commit), máximo de instancias del servicio y de la plantilla (tiene que ser 11), condiciones que no están bien, /health, tareas por cola de Cloud Tasks, jobs del Scheduler cuyo último intento falló o en pausa, los 3 últimos deploys del backend y si producción sirve el último que salió bien. Para comprobar un merge o un «¿va todo bien?».",
+      "Foto de producción: revisión que sirve y su tráfico, imagen (commit), máximo de instancias del servicio y de la plantilla (tiene que ser 11), condiciones que no están bien, /health, tareas por cola de Cloud Tasks, jobs del Scheduler cuyo último intento falló o en pausa, los 3 últimos deploys del backend y si producción sirve el último que salió bien, las migraciones de Prisma (aplicadas, la última, fallidas o a medias, y las de este checkout que faltan en producción) y el último despliegue de producción de las dos webs de Vercel (app.alhabla.ai y alhabla.ai), con si sirven lo último de main o al menos lo último que toca su carpeta. Para comprobar un merge o un «¿va todo bien?»; el detalle de los errores, con errores_prod.",
     inputSchema: {},
     annotations: { readOnlyHint: true, openWorldHint: true },
   },
@@ -698,6 +703,8 @@ servidor.registerTool(
       };
     })
 );
+
+registrarHerramientasDeProd(servidor);
 
 process.on("exit", pararProxy);
 for (const senal of ["SIGINT", "SIGTERM"] as const) {

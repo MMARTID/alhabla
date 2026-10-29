@@ -1,8 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
+  despliegueDeWeb,
+  desplieguesDeLasWebs,
   estadoDeProd,
+  frenteAMain,
   resumirJobs,
+  resumirMigraciones,
   resumirServicio,
+  type GhApi,
 } from "../../mcp/estadoDeProd.js";
 import {
   JOBS_QUE_NO,
@@ -134,9 +139,36 @@ describe("estadoDeProd", () => {
         new Response(JSON.stringify({ status: "ok" }), {
           status: 200,
         })) as typeof fetch,
+      consultarBd: async () => ({
+        columnas: [],
+        filas: [
+          {
+            migration_name: "20261028210000_modo_de_agenda",
+            started_at: "2026-10-28T20:58:57Z",
+            finished_at: "2026-10-28T20:58:58Z",
+            rolled_back_at: null,
+          },
+        ],
+        totalFilas: 1,
+        truncado: false,
+      }),
+      migracionesLocales: async () => [
+        "20261028210000_modo_de_agenda",
+        "20261028220000_ical_token",
+      ],
+      ghApiFn: async () => {
+        throw new Error("[MCP] gh api repos/x/commits/main falló: sin red");
+      },
     });
 
     expect(estado.salud).toEqual({ codigo: 200, cuerpo: { status: "ok" } });
+    expect(estado.migraciones).toMatchObject({
+      aplicadas: 1,
+      pendientes: ["20261028220000_ical_token"],
+    });
+    expect(estado.webs).toEqual({
+      error: "[MCP] gh api repos/x/commits/main falló: sin red",
+    });
     expect(estado.colas).toEqual([
       { cola: "send-whatsapp", estado: "RUNNING", tareas: 2 },
     ]);
@@ -144,6 +176,179 @@ describe("estadoDeProd", () => {
       error: "[MCP] gcloud scheduler jobs list falló: sin permiso",
     });
     expect(estado.sirveElUltimoDeployBueno).toBe(true);
+  });
+});
+
+describe("resumirMigraciones", () => {
+  const fila = (
+    migration_name: string,
+    finished_at: string | null,
+    rolled_back_at: string | null = null
+  ) => ({
+    migration_name,
+    started_at: "2026-10-01T00:00:00Z",
+    finished_at,
+    rolled_back_at,
+  });
+
+  it("aplicadas, la última, las fallidas, las revertidas y las que faltan en cada lado", () => {
+    expect(
+      resumirMigraciones(
+        [
+          fila("20260901_inicial", "2026-09-01T10:00:00Z"),
+          // Falló, se marcó como revertida y se volvió a aplicar: está bien.
+          fila("20261001_columna", null, "2026-10-01T10:05:00Z"),
+          fila("20261001_columna", "2026-10-01T10:10:00Z"),
+          fila("20261010_rota", null),
+          fila("20261012_quitada", null, "2026-10-12T10:00:00Z"),
+          fila("20261020_vieja_del_checkout", "2026-10-20T10:00:00Z"),
+        ],
+        [
+          "20260901_inicial",
+          "20261001_columna",
+          "20261010_rota",
+          "20261012_quitada",
+          "20261029_nueva",
+        ]
+      )
+    ).toEqual({
+      aplicadas: 3,
+      ultima: {
+        nombre: "20261020_vieja_del_checkout",
+        aplicada: "2026-10-20T10:00:00Z",
+      },
+      fallidasOAMedias: [
+        { nombre: "20261010_rota", empezada: "2026-10-01T00:00:00Z" },
+      ],
+      revertidasSinVolverAAplicar: ["20261012_quitada"],
+      pendientes: ["20261010_rota", "20261012_quitada", "20261029_nueva"],
+      soloEnProduccion: ["20261020_vieja_del_checkout"],
+    });
+  });
+});
+
+describe("webs de Vercel", () => {
+  const MAIN = "m".repeat(40);
+
+  it("frenteAMain: al día si es main o si ningún commit posterior toca su carpeta", () => {
+    expect(frenteAMain("web", null)).toEqual({
+      esElUltimoDeMain: true,
+      alDia: true,
+    });
+    expect(
+      frenteAMain("web", {
+        ahead_by: 3,
+        archivos: ["backend/src/server.ts", "frontend/src/app/page.tsx"],
+      })
+    ).toEqual({
+      esElUltimoDeMain: false,
+      commitsDeMainDespues: 3,
+      archivosDeSuCarpetaSinDesplegar: 0,
+      alDia: true,
+    });
+    expect(
+      frenteAMain("frontend", {
+        ahead_by: 3,
+        archivos: ["backend/src/server.ts", "frontend/src/app/page.tsx"],
+      })
+    ).toMatchObject({ archivosDeSuCarpetaSinDesplegar: 1, alDia: false });
+  });
+
+  /** gh api falso: responde por ruta y apunta las que se pidieron. */
+  function ghFalso(respuestas: Record<string, unknown>) {
+    const rutas: string[] = [];
+    const ghApiFn: GhApi = async (ruta) => {
+      rutas.push(ruta);
+      const clave = Object.keys(respuestas).find((prefijo) =>
+        ruta.startsWith(prefijo)
+      );
+      if (!clave) throw new Error(`inesperado: ${ruta}`);
+      return JSON.stringify(respuestas[clave]);
+    };
+    return { rutas, ghApiFn };
+  }
+
+  it("el último despliegue de producción; si falló, también el último que salió bien y su comparación con main", async () => {
+    const { rutas, ghApiFn } = ghFalso({
+      "repos/MMARTID/botbook/deployments?environment=Production%20%E2%80%93%20alhabla-web":
+        [
+          { id: 2, sha: "b".repeat(40), created_at: "2026-10-29T01:06:09Z" },
+          { id: 1, sha: "a".repeat(40), created_at: "2026-10-28T21:07:50Z" },
+        ],
+      "repos/MMARTID/botbook/deployments/2/statuses": [
+        { state: "error", created_at: "2026-10-29T01:07:00Z" },
+      ],
+      "repos/MMARTID/botbook/deployments/1/statuses": [
+        {
+          state: "success",
+          created_at: "2026-10-28T21:09:00Z",
+          environment_url: "https://alhabla-x.vercel.app",
+        },
+      ],
+      [`repos/MMARTID/botbook/compare/${"a".repeat(40)}...${MAIN}`]: {
+        ahead_by: 2,
+        archivos: ["web/src/app/page.tsx"],
+      },
+    });
+    const web = await despliegueDeWeb(
+      { proyecto: "alhabla-web", dominio: "alhabla.ai", carpeta: "web" },
+      { sha: MAIN },
+      ghApiFn
+    );
+    expect(web).toEqual({
+      proyecto: "alhabla-web",
+      dominio: "alhabla.ai",
+      ultimoDespliegue: {
+        estado: "error",
+        commit: "b".repeat(40),
+        creado: "2026-10-29T01:06:09Z",
+        actualizado: "2026-10-29T01:07:00Z",
+        url: null,
+      },
+      ultimoQueSalioBien: {
+        estado: "success",
+        commit: "a".repeat(40),
+        creado: "2026-10-28T21:07:50Z",
+        actualizado: "2026-10-28T21:09:00Z",
+        url: "https://alhabla-x.vercel.app",
+      },
+      esElUltimoDeMain: false,
+      commitsDeMainDespues: 2,
+      archivosDeSuCarpetaSinDesplegar: 1,
+      alDia: false,
+    });
+    expect(rutas[0]).toContain("&per_page=5");
+  });
+
+  it("desplieguesDeLasWebs: main y las dos webs, cada una por separado", async () => {
+    const { ghApiFn } = ghFalso({
+      "repos/MMARTID/botbook/commits/main": {
+        sha: MAIN,
+        fecha: "2026-10-29T01:04:00Z",
+      },
+      "repos/MMARTID/botbook/deployments?environment=Production%20%E2%80%93%20alhabla-frontend":
+        [{ id: 7, sha: MAIN, created_at: "2026-10-29T01:05:09Z" }],
+      "repos/MMARTID/botbook/deployments/7/statuses": [
+        { state: "success", created_at: "2026-10-29T01:06:00Z" },
+      ],
+      "repos/MMARTID/botbook/deployments?environment=Production%20%E2%80%93%20alhabla-web":
+        [],
+    });
+    const resultado = await desplieguesDeLasWebs(ghApiFn);
+    expect(resultado.main).toEqual({
+      commit: MAIN,
+      fecha: "2026-10-29T01:04:00Z",
+    });
+    expect(resultado.webs[0]).toMatchObject({
+      proyecto: "alhabla-frontend",
+      esElUltimoDeMain: true,
+      alDia: true,
+    });
+    expect(resultado.webs[1]).toEqual({
+      proyecto: "alhabla-web",
+      dominio: "alhabla.ai",
+      error: "No hay ningún despliegue de producción de Vercel en GitHub",
+    });
   });
 });
 
