@@ -8,8 +8,7 @@ import {
 } from "../../lib/managedAgentPrompt.js";
 import {
   PlanLimitError,
-  getPlanLimits,
-  resolvePlanId,
+  maxProfesionalesDelNegocio,
 } from "../../lib/planFeatures.js";
 import {
   BusinessScheduleSchema,
@@ -615,10 +614,16 @@ async function resolverEspecialidades(
 async function plazasLibres(businessId: string): Promise<number | null> {
   const business = await prisma.business.findUnique({
     where: { id: businessId },
-    select: { plan: true, stripePriceId: true },
+    select: {
+      plan: true,
+      stripePriceId: true,
+      stripeSubscriptionId: true,
+      subscriptionStatus: true,
+    },
   });
   if (!business) return 0;
-  const { maxProfessionals } = getPlanLimits(resolvePlanId(business));
+  // El mismo límite que aplica bookings/service.ts al crear.
+  const maxProfessionals = maxProfesionalesDelNegocio(business);
   if (maxProfessionals === null) return null;
   const activos = await prisma.professional.count({
     where: { businessId, active: true, deletedAt: null },

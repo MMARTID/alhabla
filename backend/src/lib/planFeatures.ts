@@ -81,6 +81,39 @@ export function getPlanLimits(planId: PlanId): PlanLimitsAndFeatures {
   return PLAN_FEATURES[planId];
 }
 
+/**
+ * ¿Ha tenido el negocio alguna suscripción en Stripe, viva o ya cancelada?
+ * `syncSubscription` rellena las dos columnas a la vez y ninguna se borra al
+ * cancelar, así que basta con cualquiera de ellas.
+ */
+export function haTenidoSuscripcion(business: {
+  stripeSubscriptionId?: string | null;
+  subscriptionStatus?: string | null;
+}): boolean {
+  return (
+    business.stripeSubscriptionId != null || business.subscriptionStatus != null
+  );
+}
+
+/**
+ * Límite de profesionales activos que se aplica al negocio (null = sin
+ * límite). Con suscripción, el de su plan. Sin ella, ninguno: el paso del
+ * equipo del alta va antes del pago, `Business.plan` vale «basic» por
+ * defecto y el plan que viene a contratar (`?plan=pro`) solo lo conoce la
+ * app, así que con el de Inicio quien venía a por Pro o Scale se quedaba en
+ * 3 (hallazgo 6 de docs/auditorias/2026-10-28-auditoria-de-producto.md). El
+ * plan se elige en el checkout.
+ */
+export function maxProfesionalesDelNegocio(business: {
+  stripePriceId?: string | null;
+  plan?: string | null;
+  stripeSubscriptionId?: string | null;
+  subscriptionStatus?: string | null;
+}): number | null {
+  if (!haTenidoSuscripcion(business)) return null;
+  return getPlanLimits(resolvePlanId(business)).maxProfessionals;
+}
+
 export function planAllows(planId: PlanId, feature: PlanFeature): boolean {
   return PLAN_FEATURES[planId].features.includes(feature);
 }
