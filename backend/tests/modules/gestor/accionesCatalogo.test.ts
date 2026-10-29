@@ -531,6 +531,12 @@ describe("crear_profesionales", () => {
   });
 
   it("respeta el límite del plan al proponer: inicio admite 3 activos", async () => {
+    mockedBizFindUnique.mockResolvedValue({
+      plan: null,
+      stripePriceId: null,
+      stripeSubscriptionId: "sub_1",
+      subscriptionStatus: "ACTIVE",
+    } as never);
     mockedProCount.mockResolvedValue(2);
     expect(
       await comprobar("crear_profesionales", {
@@ -553,12 +559,31 @@ describe("crear_profesionales", () => {
     mockedBizFindUnique.mockResolvedValue({
       plan: "enterprise",
       stripePriceId: null,
+      stripeSubscriptionId: "sub_1",
+      subscriptionStatus: "ACTIVE",
     } as never);
     mockedProCount.mockResolvedValue(50);
     expect(
       (
         await comprobar("crear_profesionales", {
           profesionales: [{ nombre: "Pedro" }],
+        })
+      ).ok
+    ).toBe(true);
+  });
+
+  it("sin suscripción todavía (antes del checkout) no limita, como el panel", async () => {
+    mockedBizFindUnique.mockResolvedValue({
+      plan: "basic",
+      stripePriceId: null,
+      stripeSubscriptionId: null,
+      subscriptionStatus: null,
+    } as never);
+    mockedProCount.mockResolvedValue(3);
+    expect(
+      (
+        await comprobar("crear_profesionales", {
+          profesionales: [{ nombre: "Pedro" }, { nombre: "Ana" }],
         })
       ).ok
     ).toBe(true);

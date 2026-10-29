@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import type { Business, SubscriptionStatus } from "@prisma/client";
 import { prisma } from "../../lib/prisma.js";
+import { nombreDelNegocioDecible } from "../../lib/nombreDelNegocio.js";
 import { errorMessage } from "../../lib/logUtils.js";
 import { isUniqueConstraintError } from "../../lib/prismaErrors.js";
 import { reclamarEnvio } from "../../lib/messageIdempotency.js";
@@ -111,10 +112,8 @@ export function construirEnlaceAlta(
  * «Negocio de <email>» por defecto).
  */
 export function nombreParaWhatsapp(business: { name: string }): string {
-  const limpio = business.name.replace(/\s+/g, " ").trim();
-  if (!limpio || limpio.startsWith("Negocio de ") || limpio.includes("@")) {
-    return "tu negocio";
-  }
+  const limpio = nombreDelNegocioDecible(business.name);
+  if (!limpio) return "tu negocio";
   return limpio.length > 60 ? limpio.slice(0, 60).trimEnd() : limpio;
 }
 

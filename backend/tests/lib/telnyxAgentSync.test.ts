@@ -272,6 +272,38 @@ describe("createTelnyxAssistantForAgent", () => {
     });
   });
 
+  // Hallazgo 1 de la auditoría del 28-10: el registro crea «Negocio de
+  // <email>» y el saludo del assistant decía el email del dueño.
+  it("con el nombre provisional del registro, el saludo del assistant no dice el email", async () => {
+    mockedBusinessFindUnique.mockResolvedValue({
+      ...BASE_BUSINESS,
+      name: "Negocio de ana@example.com",
+      agentSettings: {
+        ...DEFAULT_AGENT_SETTINGS,
+        languages: ["es-ES", "ca-ES"],
+        voiceLanguage: "ca-ES",
+      },
+    } as any);
+    mockedListVoices.mockResolvedValue([
+      { id: "Soniox.tts-rt-v2.Marta", language: "en", gender: "female" },
+    ]);
+    mockedCreateAssistant.mockResolvedValue({
+      id: "assistant_1",
+      name: "alhabla-biz1-agent1",
+      instructions: "i",
+    });
+
+    await createTelnyxAssistantForAgent({
+      agentId: "agent1",
+      businessId: "biz1",
+    });
+
+    const payload = mockedCreateAssistant.mock.calls[0][0];
+    expect(payload.greeting).toBe(
+      "Hola, t'atén una intel·ligència artificial. En què et puc ajudar?"
+    );
+  });
+
   // Ajustes guardados con reglas anteriores (catalán en `languages` y
   // saludo en español): la cooficial guardada pasa a ser el principal, así
   // que saluda en catalán, como hacía en producción.

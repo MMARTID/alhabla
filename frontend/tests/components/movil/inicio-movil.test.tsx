@@ -6,6 +6,7 @@ import { InicioMovil } from "@/components/movil/inicio-movil";
 import {
   getAgenda,
   getBillingSummary,
+  getBookingSettings,
   getCalls,
   getOnboardingState,
   getPendingBookings,
@@ -32,15 +33,35 @@ vi.mock("@/lib/api", () => ({
   moverCita: vi.fn(),
   cancelarCita: vi.fn(),
   avisarClienteDeCita: vi.fn(),
+  confirmForwarding: vi.fn(),
+  getForwardingCheck: vi.fn(),
+  startForwardingCheck: vi.fn(),
+  updateMyBusiness: vi.fn(),
 }));
 vi.mock("@/components/providers", () => ({ useBusiness: () => ({ hasToken: true }) }));
+
+const abierto = { enabled: true, intervals: [{ start: "09:00", end: "20:00" }] };
+const cerrado = { enabled: false, intervals: [] };
+const horario = {
+  version: 1,
+  week: {
+    monday: abierto,
+    tuesday: abierto,
+    wednesday: abierto,
+    thursday: abierto,
+    friday: abierto,
+    saturday: abierto,
+    sunday: cerrado,
+  },
+  exceptions: [],
+};
 
 const negocio = {
   id: "biz_1",
   name: "Peluquería Aurora",
   phone: "+34912345678",
   timezone: "Europe/Madrid",
-  schedule: {},
+  schedule: horario,
   plan: "basic",
   active: true,
   bookingCapacity: 2,
@@ -120,6 +141,7 @@ describe("InicioMovil", () => {
     vi.mocked(getBillingSummary).mockResolvedValue({ includedMinutes: 100, consumedMinutes: 30, extraMinuteCents: 45 } as never);
     vi.mocked(getCalls).mockResolvedValue({ data: [], total: 0, limit: 6, offset: 0, conteos: { todas: 0, conCita: 0, porDevolver: 0 } });
     vi.mocked(getStats).mockResolvedValue({} as never);
+    vi.mocked(getBookingSettings).mockResolvedValue({ bookingCapacity: 2, professionals: [], services: [] });
   });
 
   afterEach(() => vi.useRealTimers());
@@ -153,5 +175,112 @@ describe("InicioMovil", () => {
     const hoja = await screen.findByRole("dialog", { name: "Estado del servicio" });
     expect(within(hoja).getByText("Un asunto requiere tu atención")).toBeInTheDocument();
     expect(within(hoja).getByText("Cita sin reservar")).toBeInTheDocument();
+  });
+
+  it("sin horario avisa de que atiende pero no reserva, con un solo aviso más en el chip", async () => {
+    conCliente(<InicioMovil business={{ ...negocio, schedule: {} }} avisoDeCalendario={null} />);
+
+    expect(await screen.findByRole("link", { name: /Configura tu horario/ })).toHaveAttribute("href", "/agente/horario");
+    const chip = await screen.findByRole("button", { name: "Estado del servicio: 2 avisos" });
+    await userEvent.click(chip);
+    const hoja = await screen.findByRole("dialog", { name: "Estado del servicio" });
+    expect(within(hoja).getByText("Atiende, pero no reserva: falta el horario")).toBeInTheDocument();
+    expect(within(hoja).getByRole("link", { name: "Configurar horario" })).toHaveAttribute("href", "/agente/horario");
+  });
+
+  it("sin agenda, «Atiende, pero no reserva» no suma un segundo aviso", async () => {
+    conCliente(
+      <InicioMovil
+        business={{ ...negocio, activeCalendar: { ...negocio.activeCalendar!, connected: false } }}
+        avisoDeCalendario={null}
+      />
+    );
+
+    // La cita sin reservar y la agenda: la recepcionista no cuenta aparte.
+    const chip = await screen.findByRole("button", { name: "Estado del servicio: 2 avisos" });
+    await userEvent.click(chip);
+    const hoja = await screen.findByRole("dialog", { name: "Estado del servicio" });
+    expect(within(hoja).getByText("Atiende, pero no reserva: falta elegir dónde reservar")).toBeInTheDocument();
+  });
+
+  it("en la agenda de Alhabla, sin calendario externo, atiende y reserva", async () => {
+    conCliente(
+      <InicioMovil business={{ ...negocio, activeCalendar: null, modoDeAgenda: "alhabla" }} avisoDeCalendario={null} />
+    );
+
+    // Solo la cita sin reservar: ni la agenda ni la recepcionista avisan.
+    const chip = await screen.findByRole("button", { name: "Estado del servicio: 1 aviso" });
+    expect(screen.queryByRole("link", { name: /Elige dónde reservar/ })).not.toBeInTheDocument();
+    await userEvent.click(chip);
+    const hoja = await screen.findByRole("dialog", { name: "Estado del servicio" });
+    expect(within(hoja).getByText("Atendiendo llamadas")).toBeInTheDocument();
+  });
+
+  it("avisa de los profesionales con el nombre del alta y de los servicios sin precio", async () => {
+    const profesional = (id: string, name: string) => ({
+      id,
+      name,
+      active: true,
+      serviceIds: [],
+      serviceLevels: {},
+      createdAt: "",
+      updatedAt: "",
+    });
+    const servicio = (id: string, priceCents: number | null) => ({
+      id,
+      name: `Servicio ${id}`,
+      durationMinutes: 30,
+      priceCents,
+      active: true,
+      createdAt: "",
+      updatedAt: "",
+    });
+    vi.mocked(getBookingSettings).mockResolvedValue({
+      bookingCapacity: 2,
+      professionals: [profesional("p1", "Profesional 1"), profesional("p2", "Profesional 2"), profesional("p3", "Marta")],
+      services: [servicio("s1", null), servicio("s2", 2500)],
+    });
+
+    conCliente(<InicioMovil business={negocio} avisoDeCalendario={null} />);
+
+    const equipo = await screen.findByRole("link", { name: /Ponles nombre a tu equipo/ });
+    expect(equipo).toHaveAttribute("href", "/agente/profesionales");
+    expect(equipo).toHaveTextContent("«Profesional 1» y «Profesional 2» siguen con el nombre del alta");
+    const precios = screen.getByRole("link", { name: /Pon precio a tus servicios/ });
+    expect(precios).toHaveAttribute("href", "/agente/servicios");
+    expect(precios).toHaveTextContent("Un servicio no tiene precio");
+  });
+
+  it("con «Dar precios: nunca» no pide precios", async () => {
+    vi.mocked(getBookingSettings).mockResolvedValue({
+      bookingCapacity: 2,
+      professionals: [],
+      services: [{ id: "s1", name: "Corte", durationMinutes: 30, priceCents: null, active: true, createdAt: "", updatedAt: "" }],
+    });
+
+    conCliente(
+      <InicioMovil
+        business={{ ...negocio, agentSettings: { darPrecios: "nunca" } as Business["agentSettings"] }}
+        avisoDeCalendario={null}
+      />
+    );
+
+    await screen.findByRole("region", { name: "Próxima cita" });
+    expect(screen.queryByRole("link", { name: /Pon precio a tus servicios/ })).not.toBeInTheDocument();
+  });
+
+  it("al llegar con ?desvio=abrir abre los pasos del desvío si falta", async () => {
+    vi.mocked(getOnboardingState).mockResolvedValue({
+      steps: { schedule: true, services: true, professionals: true, calendar: true, whatsapp: true, forwarding: false },
+      progress: 80,
+      dismissedAt: null,
+      completedAt: null,
+      isActive: true,
+      forwarding: { status: "ready", phoneNumber: "+34910004127", confirmedAt: null, firstCallAt: null },
+    });
+
+    conCliente(<InicioMovil business={negocio} avisoDeCalendario={null} abrirDesvio={1} />);
+
+    expect(await screen.findByRole("dialog", { name: "Desvía tu teléfono" })).toBeInTheDocument();
   });
 });
