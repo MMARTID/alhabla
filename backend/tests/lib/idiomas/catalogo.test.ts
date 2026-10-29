@@ -66,6 +66,15 @@ describe("catálogo de idiomas", () => {
       }
       expect(saludo.repetir, codigo).toContain("{servicio}");
       expect(saludo.repetirLoDeLaUltimaVez, codigo).not.toContain("{servicio}");
+      // Las presentaciones sin nombre de negocio no lo llevan; la del
+      // cliente, sí su nombre.
+      expect(saludo.sinNombre.presentacion, codigo).not.toContain("{");
+      expect(saludo.sinNombre.presentacionAlCliente, codigo).not.toContain(
+        "{negocio}"
+      );
+      expect(saludo.sinNombre.presentacionAlCliente, codigo).toContain(
+        "{nombre}"
+      );
       expect(idioma.transcripcion.soniox, codigo).toBe(idioma.iso);
     }
   });
@@ -330,7 +339,7 @@ describe("catálogo de idiomas — saludos con el aviso de IA", () => {
     "ru-RU": { ia: "искусственн", grabacion: "записывается" },
   };
   const base = {
-    negocio: "Negocio de prueba",
+    negocio: "Peluquería de prueba",
     genero: "femenina" as const,
     primeraSemana: false,
     cliente: null,
@@ -338,8 +347,8 @@ describe("catálogo de idiomas — saludos con el aviso de IA", () => {
   };
 
   it.each(CODIGOS_DE_IDIOMA)("%s: el saludo fijo dice que es una IA y no habla de grabar", (codigo) => {
-    const saludo = componerSaludo(codigo, "Negocio de prueba");
-    expect(saludo).toContain("Negocio de prueba");
+    const saludo = componerSaludo(codigo, "Peluquería de prueba");
+    expect(saludo).toContain("Peluquería de prueba");
     expect(saludo.toLowerCase()).toContain(AVISO[codigo].ia);
     expect(saludo).not.toContain(AVISO[codigo].grabacion);
     // El de una llamada a quien no se conoce y sin grabar es el mismo.
@@ -353,7 +362,7 @@ describe("catálogo de idiomas — saludos con el aviso de IA", () => {
       grabando: true,
     });
     expect(saludo).toContain("Lucía");
-    expect(saludo).toContain("Negocio de prueba");
+    expect(saludo).toContain("Peluquería de prueba");
     expect(saludo).toContain("Corte de pelo");
     expect(saludo.toLowerCase()).toContain(AVISO[codigo].ia);
     expect(saludo).toContain(AVISO[codigo].grabacion);
@@ -376,7 +385,7 @@ describe("catálogo de idiomas — saludos con el aviso de IA", () => {
     expect(
       componerSaludoDeLlamada("es-ES", { ...base, primeraSemana: true })
     ).toBe(
-      "Negocio de prueba, te atiende su nueva asistente de inteligencia artificial. ¿En qué te ayudo?"
+      "Peluquería de prueba, te atiende su nueva asistente de inteligencia artificial. ¿En qué te ayudo?"
     );
     expect(
       componerSaludoDeLlamada("es-ES", {
@@ -385,7 +394,7 @@ describe("catálogo de idiomas — saludos con el aviso de IA", () => {
         primeraSemana: true,
       })
     ).toBe(
-      "Negocio de prueba, te atiende su nuevo asistente de inteligencia artificial. ¿En qué te ayudo?"
+      "Peluquería de prueba, te atiende su nuevo asistente de inteligencia artificial. ¿En qué te ayudo?"
     );
     expect(
       componerSaludoDeLlamada("es-ES", {
@@ -396,7 +405,72 @@ describe("catálogo de idiomas — saludos con el aviso de IA", () => {
         grabando: true,
       })
     ).toBe(
-      "Hola, Lucía, soy el asistente de inteligencia artificial de Negocio de prueba. La llamada se graba; si prefieres que no, dímelo. ¿Quieres repetir Mechas o prefieres algo nuevo?"
+      "Hola, Lucía, soy el asistente de inteligencia artificial de Peluquería de prueba. La llamada se graba; si prefieres que no, dímelo. ¿Quieres repetir Mechas o prefieres algo nuevo?"
+    );
+  });
+});
+
+// Hallazgo 1 de docs/auditorias/2026-10-28-auditoria-de-producto.md: el
+// registro crea «Negocio de <email>» y la recepcionista lo decía tal cual.
+describe("catálogo de idiomas — saludo sin un nombre de negocio decible", () => {
+  const PROVISIONALES = [
+    "Negocio de ana@example.com",
+    "  Negocio de   ana@example.com ",
+    "ana@example.com",
+    "",
+    "   ",
+  ];
+  const base = {
+    negocio: "Negocio de ana@example.com",
+    genero: "femenina" as const,
+    primeraSemana: false,
+    cliente: null,
+    grabando: false,
+  };
+
+  it.each(PROVISIONALES)("«%s»: el saludo fijo en español no dice el nombre", (nombre) => {
+    expect(componerSaludo("es-ES", nombre)).toBe(
+      "Hola, estás hablando con una inteligencia artificial. ¿En qué te ayudo?"
+    );
+  });
+
+  it.each(CODIGOS_DE_IDIOMA)("%s: ni email ni «Negocio de», sigue avisando de la IA y sin huecos", (codigo) => {
+    const saludos = [
+      componerSaludo(codigo, base.negocio),
+      componerSaludoDeLlamada(codigo, base),
+      componerSaludoDeLlamada(codigo, { ...base, primeraSemana: true }),
+      componerSaludoDeLlamada(codigo, {
+        ...base,
+        cliente: { nombre: "Lucía", servicio: "Corte de pelo" },
+        grabando: true,
+      }),
+    ];
+    for (const saludo of saludos) {
+      expect(saludo, codigo).not.toContain("@");
+      expect(saludo, codigo).not.toContain("Negocio de");
+      expect(saludo, codigo).not.toMatch(/\{\w+\}/);
+      expect(mencionaLaIA(saludo), codigo).toBe(true);
+    }
+    // El de quien no se conoce y sin grabar sigue siendo el fijo.
+    expect(componerSaludoDeLlamada(codigo, base)).toBe(saludos[0]);
+    expect(saludos[3]).toContain("Lucía");
+    expect(saludos[3]).toContain("Corte de pelo");
+  });
+
+  it("en español, al cliente que ya reservó, con su nombre y sin el del negocio", () => {
+    expect(
+      componerSaludoDeLlamada("es-ES", {
+        ...base,
+        cliente: { nombre: "Lucía", servicio: null },
+      })
+    ).toBe(
+      "Hola, Lucía, estás hablando con una inteligencia artificial. ¿Quieres repetir lo de la última vez o prefieres algo nuevo?"
+    );
+  });
+
+  it("un nombre real con espacios de más se dice limpio", () => {
+    expect(componerSaludo("es-ES", "  Peluquería\n  Ana ")).toBe(
+      "Peluquería Ana, te atiende su asistente de inteligencia artificial. ¿En qué te ayudo?"
     );
   });
 });

@@ -200,6 +200,13 @@ describe("POST /professionals — límite de profesionales por plan", () => {
   const mockedProfessionalCreate = vi.mocked(prisma.professional.create);
   const mockedServiceCount = vi.mocked(prisma.service.count);
 
+  // Con suscripción, el límite es el de su plan; sin ella (el alta, antes
+  // del checkout), ninguno.
+  const CON_SUSCRIPCION = {
+    stripeSubscriptionId: "sub_1",
+    subscriptionStatus: "ACTIVE",
+  };
+
   beforeEach(async () => {
     vi.clearAllMocks();
     fastify = Fastify();
@@ -213,6 +220,7 @@ describe("POST /professionals — límite de profesionales por plan", () => {
     mockedGetBookingSettingsBusinessFindUnique.mockResolvedValue({
       plan: "basic",
       stripePriceId: null,
+      ...CON_SUSCRIPCION,
     } as any);
     mockedProfessionalCount.mockResolvedValue(3);
 
@@ -234,6 +242,7 @@ describe("POST /professionals — límite de profesionales por plan", () => {
     mockedGetBookingSettingsBusinessFindUnique.mockResolvedValue({
       plan: "pro",
       stripePriceId: null,
+      ...CON_SUSCRIPCION,
     } as any);
     mockedServiceCount.mockResolvedValue(0);
     mockedProfessionalCount.mockResolvedValue(9);
@@ -267,6 +276,7 @@ describe("POST /professionals — límite de profesionales por plan", () => {
     mockedGetBookingSettingsBusinessFindUnique.mockResolvedValue({
       plan: "enterprise",
       stripePriceId: null,
+      ...CON_SUSCRIPCION,
     } as any);
     mockTransactionProfessionalCreate.mockResolvedValue({
       id: "professional_50",
@@ -287,6 +297,54 @@ describe("POST /professionals — límite de profesionales por plan", () => {
     expect(mockedProfessionalCount).not.toHaveBeenCalled();
   });
 
+  // Hallazgo 6 de docs/auditorias/2026-10-28-auditoria-de-producto.md:
+  // `plan` vale «basic» por defecto y el paso del equipo va antes del pago.
+  it("en el alta, sin suscripción, deja crear el cuarto profesional aunque `plan` siga en «basic»", async () => {
+    mockedGetBookingSettingsBusinessFindUnique.mockResolvedValue({
+      plan: "basic",
+      stripePriceId: null,
+      stripeSubscriptionId: null,
+      subscriptionStatus: null,
+    } as any);
+    mockedProfessionalCount.mockResolvedValue(3);
+    mockTransactionProfessionalCreate.mockResolvedValue({
+      id: "professional_4",
+      name: "Cuarto",
+      active: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      serviceLinks: [],
+    } as any);
+
+    const response = await fastify.inject({
+      method: "POST",
+      url: "/professionals",
+      payload: { name: "Cuarto", active: true, serviceIds: [] },
+    });
+
+    expect(response.statusCode).toBe(201);
+    expect(mockedProfessionalCount).not.toHaveBeenCalled();
+  });
+
+  it("con la suscripción cancelada sigue aplicando el límite de su plan", async () => {
+    mockedGetBookingSettingsBusinessFindUnique.mockResolvedValue({
+      plan: "basic",
+      stripePriceId: null,
+      stripeSubscriptionId: "sub_1",
+      subscriptionStatus: "CANCELED",
+    } as any);
+    mockedProfessionalCount.mockResolvedValue(3);
+
+    const response = await fastify.inject({
+      method: "POST",
+      url: "/professionals",
+      payload: { name: "Cuarto", active: true, serviceIds: [] },
+    });
+
+    expect(response.statusCode).toBe(403);
+    expect(response.json().limit).toBe(3);
+  });
+
   it("bloquea también la reactivación de un profesional cuando el cupo está lleno", async () => {
     mockedProfessionalFindFirst.mockResolvedValue({
       id: "professional_4",
@@ -297,6 +355,7 @@ describe("POST /professionals — límite de profesionales por plan", () => {
     mockedGetBookingSettingsBusinessFindUnique.mockResolvedValue({
       plan: "basic",
       stripePriceId: null,
+      ...CON_SUSCRIPCION,
     } as any);
     mockedProfessionalCount.mockResolvedValue(3);
 
