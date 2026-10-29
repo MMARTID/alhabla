@@ -1,30 +1,48 @@
 import Link from "next/link";
 import { ArrowRight, Plus } from "lucide-react";
+import { EnTuNegocioScroll } from "@/components/en-tu-negocio";
+import { GestorSimulacionSection } from "@/components/gestor-simulacion";
 import { LandingHero } from "@/components/landing-hero";
-import { OwnerAssistantChatMockup } from "@/components/owner-assistant-chat";
+import { LlamadaScroll } from "@/components/llamada-scroll";
+import { Reveal } from "@/components/scroll-reveal";
 import { OficioDelSector } from "@/components/sector/oficio-del-sector";
 import { PreciosDelSector } from "@/components/sector/precios-del-sector";
 import { Pregunta } from "@/components/sector/pregunta";
-import { TranscripcionLlamada } from "@/components/sector/transcripcion-llamada";
 import { WhatsappDelCliente } from "@/components/sector/whatsapp-del-cliente";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
-import type { NicheAccent } from "@/lib/niche-landings";
+import { GUIONES_GESTOR } from "@/lib/gestor-guiones";
+import type { OwnerAssistant } from "@/lib/niche-landings";
+import { GUIONES_SECTOR } from "@/lib/relato-guiones";
 import type { SectorLanding } from "@/lib/sectores/tipos";
 
 /**
- * La landing de sector, «Las preguntas de la dueña» (PLAN-WEB-CONTENIDO.md y
- * el contrato de .impeccable/surfaces/web-src-components-site-landing-tsx.md):
- * las preguntas que se hace la dueña antes de probar, cada una contestada en
- * dos líneas y demostrada con una pieza del producto. Ocho bloques fijos:
- * hero, la llamada, tu asistente (con la regla de confianza), el WhatsApp
- * del cliente, el oficio, el precio, cinco preguntas y el cierre. Lo que
- * cambia de un oficio a otro está en lib/sectores/<sector>.ts. La portada
- * es otra (main-landing.tsx).
+ * La landing de sector: las preguntas de la dueña, con texto y 3D
+ * compensados (decisión del fundador del 29-10-2026; el contrato está en
+ * .impeccable/surfaces/web-src-components-site-landing-tsx.md). Las dos
+ * preguntas grandes se contestan con las escenas de la portada movidas por
+ * el guion del oficio: la llamada que pasa del iPhone al panel del portátil
+ * (LlamadaScroll + EnTuNegocioScroll, GUIONES_SECTOR) y tu asistente
+ * resolviendo una ausencia por WhatsApp con el panel al lado
+ * (GestorSimulacionSection, GUIONES_GESTOR). Entre escena y escena, dos
+ * líneas y una pieza plana: el WhatsApp de la clienta, sus servicios, el
+ * precio y cinco preguntas. Lo que cambia de un oficio a otro está en
+ * lib/sectores/<sector>.ts y en esos dos guiones. La portada es otra
+ * (main-landing.tsx).
  */
 export function SiteLanding({ sector }: { sector: SectorLanding }) {
   const acento = sector.acento;
   const planesHref = `/planes?niche=${encodeURIComponent(sector.slug)}`;
+  const relato = GUIONES_SECTOR[sector.slug];
+  const asistente: OwnerAssistant = {
+    title: sector.asistente.pregunta,
+    description: sector.asistente.respuesta,
+    examples: sector.asistente.situaciones.map(({ titulo, texto }) => ({
+      title: titulo,
+      description: texto,
+    })) as OwnerAssistant["examples"],
+    closing: `Con tus ${sector.clientes} manda Alhabla. Con tu agenda mandas tú.`,
+  };
 
   return (
     <main
@@ -51,54 +69,15 @@ export function SiteLanding({ sector }: { sector: SectorLanding }) {
         />
       </div>
 
-      {/* «Cómo funciona» de la cabecera salta aquí. */}
-      <Pregunta
-        id="como-funciona"
-        primera
+      {/* La primera pregunta abre la escena del iPhone («Cómo funciona» de
+          la cabecera salta a la escena, que lleva el id). */}
+      <EntradaDeEscena
         pregunta={sector.llamada.pregunta}
         respuesta={sector.llamada.respuesta}
-        lado="derecha"
-        prueba={
-          <TranscripcionLlamada
-            negocio={sector.negocio}
-            quien={sector.llamada.quien}
-            duracion={sector.llamada.duracion}
-            lineas={sector.llamada.lineas}
-            acento={acento}
-          />
-        }
+        color={acento.strong}
       />
-
-      <Pregunta
-        id="tu-asistente"
-        pregunta={sector.asistente.pregunta}
-        respuesta={sector.asistente.respuesta}
-        lado="izquierda"
-        prueba={
-          <OwnerAssistantChatMockup
-            escenario={{
-              id: "ausencia",
-              reloj: "",
-              diaCorto: "",
-              turnos: sector.asistente.turnos,
-              vistas: [],
-              avisos: {},
-            }}
-            accent={acento}
-            pie="Ejemplo con nombres inventados."
-            entrada={false}
-          />
-        }
-      >
-        <ReglaDeConfianza clientes={sector.clientes} acento={acento} />
-        <Link
-          href="/agenda-por-whatsapp"
-          className="mt-6 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-tinta underline decoration-linea-fuerte underline-offset-4 transition hover:decoration-tinta"
-        >
-          Todo lo que le puedes pedir a tu asistente
-          <ArrowRight className="h-4 w-4" aria-hidden="true" />
-        </Link>
-      </Pregunta>
+      <LlamadaScroll guion={relato} acento={acento} antetitulo={false} />
+      <EnTuNegocioScroll guion={relato} acento={acento} antetitulo={false} />
 
       <Pregunta
         id="whatsapp"
@@ -107,14 +86,23 @@ export function SiteLanding({ sector }: { sector: SectorLanding }) {
         lado="derecha"
         prueba={
           <WhatsappDelCliente
-            negocio={sector.negocio}
-            quien={sector.llamada.quien}
+            quien={`${relato.cliente.nombre} ${relato.cliente.apellido}`}
             confirmacion={sector.whatsapp.confirmacion}
             conversacion={sector.whatsapp.conversacion}
             acento={acento}
           />
         }
       />
+
+      <div id="tu-asistente" className="scroll-m-20">
+        <GestorSimulacionSection
+          data={asistente}
+          guion={GUIONES_GESTOR[sector.slug]}
+          accent={acento}
+          masInfoHref="/agenda-por-whatsapp"
+          numerar={false}
+        />
+      </div>
 
       <OficioDelSector oficio={sector.oficio} acento={acento} />
 
@@ -179,42 +167,36 @@ export function SiteLanding({ sector }: { sector: SectorLanding }) {
 }
 
 /**
- * «Alhabla concilia y el negocio confirma», en las palabras del fundador:
- * lo único que hace sin preguntar es atender a los clientes; lo que toca el
- * negocio pide «Confirmar» (el mismo botón del chat de al lado).
+ * Dos líneas antes de una escena 3D: la pregunta de la dueña y su respuesta,
+ * centradas, para que la escena llegue contestando algo y no sola.
  */
-function ReglaDeConfianza({
-  clientes,
-  acento,
+function EntradaDeEscena({
+  pregunta,
+  respuesta,
+  color,
 }: {
-  clientes: string;
-  acento: NicheAccent;
+  pregunta: string;
+  respuesta: string;
+  color: string;
 }) {
   return (
-    <div className="mt-8 rounded-3xl border border-linea p-6">
-      <p className="text-xl font-black leading-7 tracking-[-0.01em] text-tinta">
-        Con tus {clientes} manda Alhabla.
-      </p>
-      <p className="mt-1.5 text-sm leading-6 text-apagado">
-        Reserva, cambia o anula la cita que te piden, sin preguntarte.
-      </p>
-      <p className="mt-5 text-xl font-black leading-7 tracking-[-0.01em] text-tinta">
-        Con tu agenda mandas tú.
-      </p>
-      <p className="mt-1.5 text-sm leading-6 text-apagado">
-        Ausencias, citas, precios u horario: nada cambia hasta que pulsas{" "}
+    <section aria-labelledby="entrada-llamada" className="pb-6 pt-4 sm:pb-10 sm:pt-6">
+      <Reveal className="mx-auto max-w-3xl px-4 text-center sm:px-6">
         <span
-          className="inline-block rounded-full border px-2.5 text-xs font-semibold leading-5"
-          style={{
-            borderColor: acento.strong,
-            backgroundColor: acento.soft,
-            color: acento.deep,
-          }}
+          className="mx-auto block h-10 w-px"
+          style={{ backgroundColor: color }}
+          aria-hidden="true"
+        />
+        <h2
+          id="entrada-llamada"
+          className="mt-8 text-balance text-3xl font-black leading-[1.1] tracking-[-0.02em] text-tinta sm:text-5xl"
         >
-          Confirmar
-        </span>
-        .
-      </p>
-    </div>
+          {pregunta}
+        </h2>
+        <p className="mx-auto mt-5 max-w-2xl text-pretty text-lg leading-8 text-apagado">
+          {respuesta}
+        </p>
+      </Reveal>
+    </section>
   );
 }

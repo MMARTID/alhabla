@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { SECTORES } from "@/lib/sectores";
+import { GUIONES_GESTOR } from "@/lib/gestor-guiones";
+import { GUIONES_SECTOR } from "@/lib/relato-guiones";
 import type { SectorLanding } from "@/lib/sectores/tipos";
 import { paginasDeLaSeccion } from "@/lib/paginas";
 
@@ -19,10 +21,9 @@ function textos(s: SectorLanding): string[] {
     s.hero.frase,
     s.llamada.pregunta,
     s.llamada.respuesta,
-    ...s.llamada.lineas.map((l) => ("accion" in l ? l.accion : l.texto)),
     s.asistente.pregunta,
     s.asistente.respuesta,
-    ...s.asistente.turnos.map((t) => t.texto),
+    ...s.asistente.situaciones.flatMap((x) => [x.titulo, x.texto]),
     s.whatsapp.pregunta,
     s.whatsapp.respuesta,
     s.whatsapp.confirmacion.servicio,
@@ -94,16 +95,25 @@ describe("datos de las landings de sector", () => {
         }
       });
 
-      it("la llamada reserva y manda el WhatsApp, y el saludo lo pone la plantilla", () => {
-        const acciones = sector.llamada.lineas.flatMap((l) =>
-          "accion" in l ? [l.icono] : []
+      it("las escenas 3D cuentan la historia de este negocio", () => {
+        const relato = GUIONES_SECTOR[sector.slug];
+        const gestor = GUIONES_GESTOR[sector.slug];
+        expect(relato.negocio).toBe(sector.negocio);
+        expect(gestor.negocio).toBe(sector.negocio);
+        // Las tres pestañas de tu asistente son sus tres escenarios, en
+        // orden, y la primera es la ausencia, con quien falta y quien cubre.
+        expect(sector.asistente.situaciones).toHaveLength(gestor.escenarios.length);
+        const [ausencia] = sector.asistente.situaciones;
+        expect(ausencia.texto).toContain(relato.profesional);
+        expect(ausencia.texto).toContain(relato.companera);
+        for (const x of sector.asistente.situaciones) {
+          expect(palabras(x.texto), x.titulo).toBeLessThanOrEqual(30);
+        }
+        // El WhatsApp de la clienta es el de la cita de la llamada.
+        expect(sector.whatsapp.confirmacion.servicio).toBe(
+          `${relato.servicio.nombre}, con ${relato.profesional}`
         );
-        expect(acciones).toContain("reserva");
-        expect(acciones).toContain("whatsapp");
-        const primera = sector.llamada.lineas[0];
-        expect("texto" in primera && primera.texto).not.toMatch(
-          /inteligencia artificial/
-        );
+        expect(sector.whatsapp.confirmacion.cuando).toMatch(/a las 17:30$/);
       });
 
       it("la tabla de servicios enseña los tres niveles y duraciones reales", () => {

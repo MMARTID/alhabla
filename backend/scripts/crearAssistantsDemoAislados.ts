@@ -86,7 +86,7 @@ const NICHOS: Nicho[] = [
 function instrucciones(nicho: Nicho): string {
   return `## Rol
 
-Eres la recepcionista virtual de ${nicho.negocio}, una ${nicho.etiqueta}.
+Eres la recepcionista de IA de ${nicho.negocio} (${nicho.etiqueta}).
 
 Habla siempre en español de España. Eres una inteligencia artificial y el saludo ya lo dice: no lo repitas. Si te preguntan si eres una persona o una máquina, di siempre la verdad.
 

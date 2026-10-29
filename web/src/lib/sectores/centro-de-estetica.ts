@@ -1,14 +1,12 @@
-import { ausenciaDe } from "@/lib/gestor-guiones";
 import { NICHE_ACCENTS } from "@/lib/niche-accents";
 import type { SectorLanding } from "@/lib/sectores/tipos";
 
 /**
- * Cristina llama dudando entre dos faciales, la recepcionista le explica los
- * dos sin recomendarle ninguno y le reserva el peeling con Sara (la llamada);
- * luego lo pasa al lunes contestando al WhatsApp. La ausencia es otra tarde:
- * Sara se pone mala y la presoterapia de Beatriz pasa a Elena. Los nombres
- * son los de lib/relato-guiones.ts y lib/gestor-guiones.ts; los móviles
- * empiezan por 79, un rango sin atribuir.
+ * Cristina llama y reserva facial con peeling con Sara (la escena del
+ * iPhone: GUIONES_SECTOR, lib/relato-guiones.ts) y luego la cambia
+ * contestando al WhatsApp (sus mensajes). En la escena de tu asistente
+ * (GUIONES_GESTOR, lib/gestor-guiones.ts) Sara falta y su cita pasa a Elena,
+ * la especialista libre. Los móviles empiezan por 79, un rango sin atribuir.
  */
 export const centroDeEstetica: SectorLanding = {
   slug: "centro-de-estetica",
@@ -31,62 +29,29 @@ export const centroDeEstetica: SectorLanding = {
     pregunta: "¿Y si suena mientras estoy en cabina?",
     respuesta:
       "Ya no eliges entre dejar a la clienta en la camilla o perder la llamada. Contesta la recepcionista: explica cada tratamiento con lo que le has escrito, busca hueco con la esteticista que toca y la cita llega por WhatsApp.",
-    quien: "Cristina P.",
-    duracion: "1 min 20 s",
-    lineas: [
-      {
-        de: "cliente",
-        texto:
-          "¿Qué diferencia hay entre la higiene facial y el facial con peeling?",
-      },
-      {
-        de: "recepcionista",
-        texto:
-          "La higiene es una limpieza de una hora. El peeling añade una exfoliación y dura 75 minutos.",
-      },
-      { de: "cliente", texto: "¿Y cuál me va mejor a mí?" },
-      {
-        de: "recepcionista",
-        texto:
-          "Eso te lo dirá la esteticista cuando te vea la piel; por teléfono no te lo sé decir. ¿Te reservo uno de los dos?",
-      },
-      {
-        de: "cliente",
-        texto: "El peeling, mañana por la tarde. Soy Cristina.",
-      },
-      {
-        accion: "Mira tu agenda: 75 min libres a las 16:30 con Sara",
-        icono: "agenda",
-      },
-      {
-        de: "recepcionista",
-        texto:
-          "Mañana a las 16:30 con Sara, Cristina. Te mando la confirmación por WhatsApp.",
-      },
-      {
-        accion: "Cita en tu agenda: jueves, 16:30, con Sara",
-        icono: "reserva",
-      },
-      { accion: "Confirmación por WhatsApp a Cristina", icono: "whatsapp" },
-    ],
   },
 
   asistente: {
     pregunta: "¿Y si a mediodía falta una esteticista?",
     respuesta:
       "Se lo escribes a tu asistente entre una clienta y otra. Marca la ausencia, te enseña qué citas tenía y te propone a la compañera libre que mejor hace cada tratamiento. Sin tu «Confirmar», no mueve nada.",
-    turnos: ausenciaDe({
-      aviso: "Sara se ha puesto mala y se va a casa. Esta tarde no vuelve",
-      profesional: "Sara",
-      cuando: "esta tarde",
-      motivo: "enferma",
-      cita: "la cita de Beatriz N.",
-      servicio: "Presoterapia",
-      hora: "17:00",
-      otra: "Elena",
-      cliente: "Beatriz",
-      telefono: "+34 794 61 08 25",
-    }),
+    situaciones: [
+      {
+        titulo: "Si una esteticista no viene",
+        texto:
+          "«Sara no puede venir hoy»: deja de recibir citas y tu asistente propone pasar su facial a Elena, la especialista libre. Confirmas y avisa a la clienta.",
+      },
+      {
+        titulo: "Mover una cita",
+        texto:
+          "«Pasa la presoterapia de Beatriz al viernes»: comprueba que cabe, la mueve en tu agenda y te pregunta si avisa a Beatriz.",
+      },
+      {
+        titulo: "Enseñarle algo a la recepcionista",
+        texto:
+          "«Los bonos se pagan en el centro, no por teléfono»: lo apunta y la recepcionista lo dice desde la siguiente llamada.",
+      },
+    ],
   },
 
   whatsapp: {
@@ -95,7 +60,7 @@ export const centroDeEstetica: SectorLanding = {
       "No. Nada que instalar: llaman al centro como siempre y la cita les llega por WhatsApp. Dejas de explicar por dónde se pide hora; si no pueden venir, contestan al mensaje y la recepcionista la mueve.",
     confirmacion: {
       servicio: "Facial con peeling, con Sara",
-      cuando: "jueves 5 de noviembre a las 16:30",
+      cuando: "jueves 5 de noviembre a las 17:30",
     },
     conversacion: [
       {

@@ -1,13 +1,12 @@
-import { ausenciaDe } from "@/lib/gestor-guiones";
 import { NICHE_ACCENTS } from "@/lib/niche-accents";
 import type { SectorLanding } from "@/lib/sectores/tipos";
 
 /**
- * Lucía llama para bañar y cortar a Toby, un caniche mediano: la
- * recepcionista pregunta el peso, reserva «baño y corte perro mediano» con
- * Álex y le manda la cita por WhatsApp (la llamada, la de la antigua página
- * de guía); luego la pasa al viernes contestando al mensaje. La ausencia es
- * otra tarde: Rosa se va y el deslanado de las cuatro pasa a Álex.
+ * Lucía llama y reserva baño perro mediano con Álex (la escena del iPhone:
+ * GUIONES_SECTOR, lib/relato-guiones.ts) y luego la cambia contestando al
+ * WhatsApp (sus mensajes). En la escena de tu asistente (GUIONES_GESTOR,
+ * lib/gestor-guiones.ts) Álex falta y su cita pasa a Iván, quien mejor lo
+ * hace de los libres. Los móviles empiezan por 79, un rango sin atribuir.
  *
  * Verdad del sector: en el alta es «Otros», sin servicios propios de
  * peluquería canina; el dueño da de alta un servicio por tamaño. La reserva
@@ -36,64 +35,29 @@ export const peluqueriaCanina: SectorLanding = {
     pregunta: "¿Y si suena mientras estoy secando a un perro?",
     respuesta:
       "Ya no eliges entre dejar al perro solo en la mesa o perder la llamada. Contesta la recepcionista: pregunta qué perro es, reserva el servicio de su tamaño y le manda la cita por WhatsApp.",
-    quien: "Lucía P.",
-    duracion: "1 min 05 s",
-    lineas: [
-      {
-        de: "cliente",
-        texto: "Hola, quería cita para bañar y cortar a mi perro.",
-      },
-      {
-        de: "recepcionista",
-        texto: "Claro. ¿Qué perro es y cuánto pesa, más o menos?",
-      },
-      {
-        de: "cliente",
-        texto: "Un caniche mediano, unos doce kilos. Se llama Toby.",
-      },
-      {
-        accion:
-          "Mira tu agenda: baño y corte perro mediano son 2 h; mañana a las 9:30 cabe con Álex",
-        icono: "agenda",
-      },
-      {
-        de: "recepcionista",
-        texto:
-          "Entonces es baño y corte de perro mediano, unas dos horas. Mañana a las 9:30 con Álex, ¿te va bien?",
-      },
-      {
-        de: "cliente",
-        texto: "Perfecto. Le dan miedo los secadores, por cierto. Soy Lucía.",
-      },
-      {
-        de: "recepcionista",
-        texto:
-          "Queda dicho en la llamada para el equipo. Hecho, Lucía: mañana a las 9:30 con Álex; te llega la confirmación por WhatsApp.",
-      },
-      {
-        accion: "Cita en tu agenda: jueves, 9:30, baño y corte perro mediano",
-        icono: "reserva",
-      },
-      { accion: "Confirmación por WhatsApp a Lucía", icono: "whatsapp" },
-    ],
   },
 
   asistente: {
-    pregunta: "¿Y si a mediodía falta una peluquera?",
+    pregunta: "¿Y si a mediodía falta un peluquero?",
     respuesta:
-      "Se lo dices a tu asistente por WhatsApp. Marca la ausencia, te dice qué perros tenía citados y te propone a la compañera libre que mejor hace cada servicio. Nada cambia hasta que pulsas «Confirmar».",
-    turnos: ausenciaDe({
-      aviso:
-        "Rosa se ha tenido que ir al veterinario con su perra. Esta tarde no vuelve",
-      profesional: "Rosa",
-      cuando: "esta tarde",
-      cita: "la cita de Diego F.",
-      servicio: "Deslanado perro grande",
-      hora: "16:00",
-      otra: "Álex",
-      cliente: "Diego",
-      telefono: "+34 798 21 57 09",
-    }),
+      "Se lo dices a tu asistente por WhatsApp. Marca la ausencia, te dice qué perros tenía citados y te propone al compañero libre que mejor hace cada servicio. Nada cambia hasta que pulsas «Confirmar».",
+    situaciones: [
+      {
+        titulo: "Si un peluquero no viene",
+        texto:
+          "«Álex no viene hoy, se ha torcido un tobillo»: deja de recibir citas y tu asistente propone pasar sus baños a Iván, el especialista libre.",
+      },
+      {
+        titulo: "Las vacunas, al día",
+        texto:
+          "«Dile que sin vacunas no los atendemos»: lo apunta y la recepcionista pide la cartilla desde la siguiente llamada.",
+      },
+      {
+        titulo: "Una tarifa nueva",
+        texto:
+          "«El baño de perro pequeño sube a 28 €»: cambia en tu catálogo y la recepcionista lo dice así.",
+      },
+    ],
   },
 
   whatsapp: {
@@ -101,14 +65,14 @@ export const peluqueriaCanina: SectorLanding = {
     respuesta:
       "No, y se acabó convencerlos de usar una app: llaman como siempre y la cita les llega al WhatsApp que ya usan. Si al perro le surge algo, contestan al mensaje y la recepcionista la mueve o la anula.",
     confirmacion: {
-      servicio: "Baño y corte perro mediano, con Álex",
-      cuando: "jueves 5 de noviembre a las 9:30",
+      servicio: "Baño perro mediano, con Álex",
+      cuando: "jueves 5 de noviembre a las 17:30",
     },
     conversacion: [
       {
         de: "cliente",
         texto:
-          "A Toby le toca vacuna el jueves por la mañana. ¿Lo pasamos al viernes por la tarde?",
+          "A Toby le toca vacuna el jueves por la tarde. ¿Lo pasamos al viernes por la tarde?",
       },
       {
         de: "recepcionista",
@@ -118,7 +82,7 @@ export const peluqueriaCanina: SectorLanding = {
       {
         de: "recepcionista",
         texto:
-          "Listo, Lucía: baño y corte el viernes 6 a las 16:30 con Álex. La del jueves queda anulada.",
+          "Listo, Lucía: baño el viernes 6 a las 16:30 con Álex. La del jueves queda anulada.",
       },
     ],
   },

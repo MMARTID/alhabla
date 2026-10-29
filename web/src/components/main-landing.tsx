@@ -24,8 +24,9 @@ import { AvisoDeFundador, PrecioDePlan } from "@/components/precio-de-plan";
 /**
  * Tu asistente en la portada: las tres situaciones van en el orden de
  * `GUION_GESTOR_GENERAL` (ausencia, cierre, precio). Lo que cuentan es lo que
- * hace el backend: marca la ausencia y dice cuántas citas tenía, pero a quién
- * pasarlas lo decide el dueño, y cada paso espera a su «Confirmar».
+ * hace el backend: marca la ausencia, dice cuántas citas tenía y propone
+ * pasarlas a quien mejor hace el servicio de los libres, y cada paso espera
+ * a su «Confirmar».
  */
 const ASISTENTE_PORTADA: OwnerAssistant = {
   badge: "Incluida en todos los planes",

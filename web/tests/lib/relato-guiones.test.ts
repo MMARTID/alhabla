@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-import { nicheLandings, type NicheSlug } from "@/lib/niche-landings";
+import { SECTORES as SECTORES_DE_LANDING, type SectorSlug } from "@/lib/sectores";
 import {
   GUION_GENERAL,
   GUIONES_SECTOR,
@@ -10,7 +10,7 @@ import {
   sumarMinutos,
 } from "@/lib/relato-guiones";
 
-const SECTORES = Object.keys(nicheLandings) as NicheSlug[];
+const SECTORES = Object.keys(SECTORES_DE_LANDING) as SectorSlug[];
 
 /**
  * Los guiones del relato iPhone → portátil: uno por landing, la misma

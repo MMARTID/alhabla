@@ -1,13 +1,12 @@
-import { ausenciaDe } from "@/lib/gestor-guiones";
 import { NICHE_ACCENTS } from "@/lib/niche-accents";
 import type { SectorLanding } from "@/lib/sectores/tipos";
 
 /**
- * Carmen llama y reserva corte y color con Marta (la llamada), recibe la
- * confirmación y la pasa al viernes contestando al WhatsApp (sus mensajes).
- * La ausencia es otra tarde: Ana se va y sus mechas pasan a Laura. Los
- * nombres son los del relato de la portada (lib/relato-guiones.ts); los
- * móviles empiezan por 79, un rango sin atribuir.
+ * Carmen llama y reserva corte y color con Marta (la escena del iPhone:
+ * GUIONES_SECTOR, lib/relato-guiones.ts) y luego la cambia contestando al
+ * WhatsApp (sus mensajes). En la escena de tu asistente (GUIONES_GESTOR,
+ * lib/gestor-guiones.ts) Marta falta y su cita pasa a Laura, la especialista
+ * libre. Los móviles empiezan por 79, un rango sin atribuir.
  */
 export const peluqueria: SectorLanding = {
   slug: "peluqueria",
@@ -30,58 +29,29 @@ export const peluqueria: SectorLanding = {
     pregunta: "¿Y si suena mientras estoy con un tinte?",
     respuesta:
       "Ya no eliges entre dejar a la clienta a medias o perder la llamada. Contesta la recepcionista: mira tu agenda, reserva con quien toca y le manda la cita por WhatsApp.",
-    quien: "Carmen R.",
-    duracion: "1 min 12 s",
-    lineas: [
-      {
-        de: "cliente",
-        texto: "Hola, ¿tenéis hueco mañana para corte y color?",
-      },
-      {
-        de: "recepcionista",
-        texto:
-          "Sí. Corte y color son unos 90 minutos. ¿A qué hora te viene mejor?",
-      },
-      { de: "cliente", texto: "Por la tarde, si puede ser." },
-      {
-        accion:
-          "Mira tu agenda: a las 17:00 no cabe; a las 17:30, Marta está libre",
-        icono: "agenda",
-      },
-      {
-        de: "recepcionista",
-        texto: "Mañana a las 17:30 con Marta. ¿A nombre de quién la pongo?",
-      },
-      { de: "cliente", texto: "Carmen." },
-      {
-        de: "recepcionista",
-        texto:
-          "Hecho, Carmen: corte y color mañana a las 17:30 con Marta. Te mando la confirmación por WhatsApp.",
-      },
-      {
-        accion: "Cita en tu agenda: jueves, 17:30, con Marta",
-        icono: "reserva",
-      },
-      { accion: "Confirmación por WhatsApp a Carmen", icono: "whatsapp" },
-    ],
   },
 
   asistente: {
     pregunta: "¿Y si a mediodía falta una estilista?",
     respuesta:
       "Se lo dices a tu asistente por WhatsApp. Marca la ausencia, te dice qué citas tenía y te propone pasarlas a la estilista libre que mejor hace cada servicio. Cada cambio, y cada aviso a la clienta, con tu «Confirmar».",
-    turnos: ausenciaDe({
-      aviso: "Ana se ha tenido que ir, una urgencia. Hoy ya no vuelve",
-      profesional: "Ana",
-      cuando: "esta tarde",
-      motivo: "urgencia",
-      cita: "la cita de Rosa M.",
-      servicio: "Mechas",
-      hora: "17:00",
-      otra: "Laura",
-      cliente: "Rosa",
-      telefono: "+34 791 48 20 16",
-    }),
+    situaciones: [
+      {
+        titulo: "Si una estilista no viene",
+        texto:
+          "«Marta está de baja hoy»: deja de recibir citas y tu asistente propone pasar sus mechas a Laura, la especialista libre. Confirmas y avisa a la clienta.",
+      },
+      {
+        titulo: "La cita que te piden en caja",
+        texto:
+          "«Apunta a Rosa el jueves a las 5, mechas»: comprueba el hueco, la apunta y, si le das el móvil, le manda la confirmación.",
+      },
+      {
+        titulo: "Una tarifa nueva",
+        texto:
+          "«El alisado pasa a 120 €»: cambia en tu catálogo y la recepcionista lo dice así desde la siguiente llamada.",
+      },
+    ],
   },
 
   whatsapp: {

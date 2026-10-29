@@ -99,6 +99,7 @@ export function GestorSimulacionSection({
   guion,
   accent,
   masInfoHref,
+  numerar = true,
 }: {
   data: OwnerAssistant;
   guion: GuionGestor;
@@ -106,6 +107,9 @@ export function GestorSimulacionSection({
   accent?: NicheAccent;
   /** Enlace a la página de tu asistente (/agenda-por-whatsapp). */
   masInfoHref?: string;
+  /** «01 · 02 · 03» delante de cada situación (la portada); en las
+   * landings de sector van sin número: son ejemplos sueltos. */
+  numerar?: boolean;
 }) {
   // Con movimiento reducido, la versión quieta llega tras montar: el servidor
   // no sabe la preferencia (ver useMovimientoReducido).
@@ -272,13 +276,15 @@ export function GestorSimulacionSection({
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className={styles.cabecera}>
           <Reveal>
-            <span
-              className={a ? styles.badgeSector : "badge-soft gap-2"}
-              style={a ? ({ backgroundColor: a.soft, color: a.deep, "--tw-ring-color": `${a.strong}33` } as CSSProperties) : undefined}
-            >
-              <Check className="h-3.5 w-3.5" aria-hidden="true" />
-              {data.badge}
-            </span>
+            {data.badge ? (
+              <span
+                className={a ? styles.badgeSector : "badge-soft gap-2"}
+                style={a ? ({ backgroundColor: a.soft, color: a.deep, "--tw-ring-color": `${a.strong}33` } as CSSProperties) : undefined}
+              >
+                <Check className="h-3.5 w-3.5" aria-hidden="true" />
+                {data.badge}
+              </span>
+            ) : null}
             <h2 id="gestor-titulo" className={styles.titulo}>
               {data.title}
             </h2>
@@ -296,7 +302,7 @@ export function GestorSimulacionSection({
                   onClick={() => elegir(i)}
                   style={{ "--p": i === escenario ? progreso : 0 } as CSSProperties}
                 >
-                  <span className={styles.situacionNumero}>0{i + 1}</span>
+                  {numerar ? <span className={styles.situacionNumero}>0{i + 1}</span> : null}
                   <span className={styles.situacionTitulo}>{ejemplo.title}</span>
                   <span className={styles.situacionTexto}>
                     <span>{ejemplo.description}</span>

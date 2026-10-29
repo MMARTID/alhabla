@@ -1,16 +1,12 @@
-import { ausenciaDe } from "@/lib/gestor-guiones";
 import { NICHE_ACCENTS } from "@/lib/niche-accents";
 import type { SectorLanding } from "@/lib/sectores/tipos";
 
 /**
- * Irene llama para un relleno, pero sus extensiones son de otro centro y de
- * hace un mes: con la regla del estudio (lo que sabe la recepcionista,
- * `Business.businessDetails`) acaba en retirada y juego de volumen con
- * Nerea, dos servicios en una sola cita con el tiempo sumado
- * (book_appointment con varios `serviceIds`). Es la conversación de la
- * página-artículo anterior, recortada. Luego pasa la cita al viernes
- * contestando al WhatsApp. La ausencia es otra tarde: Alba se va y su
- * lifting de las cinco pasa a Nerea.
+ * Irene llama y reserva relleno de pestañas con Nerea (la escena del iPhone:
+ * GUIONES_SECTOR, lib/relato-guiones.ts) y luego la cambia contestando al
+ * WhatsApp (sus mensajes). En la escena de tu asistente (GUIONES_GESTOR,
+ * lib/gestor-guiones.ts) Nerea falta y su cita pasa a Alba, la especialista
+ * libre. Los móviles empiezan por 79, un rango sin atribuir.
  *
  * En el alta, los estudios de pestañas entran como negocio «Otros»
  * (backend/src/lib/businessType.ts) con servicios genéricos: aquí no se
@@ -38,59 +34,29 @@ export const pestanasYCejas: SectorLanding = {
     pregunta: "¿Y si suena mientras pongo un juego de volumen?",
     respuesta:
       "Ya no eliges entre soltar las pinzas o perder la llamada. Contesta la recepcionista, aplica tu regla de rellenos, reserva con quien toca y le manda la cita por WhatsApp.",
-    quien: "Irene G.",
-    duracion: "1 min 5 s",
-    lineas: [
-      {
-        de: "cliente",
-        texto:
-          "Quería un relleno esta semana. Me las puse en otro sitio hace un mes.",
-      },
-      {
-        de: "recepcionista",
-        texto:
-          "Entonces el estudio lo hace como retirada y juego nuevo. ¿Clásicas o de volumen?",
-      },
-      { de: "cliente", texto: "De volumen." },
-      {
-        accion:
-          "Mira tu agenda: retirada y volumen son 3 h; el jueves a las 10:00 cabe con Nerea",
-        icono: "agenda",
-      },
-      {
-        de: "recepcionista",
-        texto:
-          "El jueves a las diez con Nerea; son unas tres horas. ¿A nombre de quién?",
-      },
-      { de: "cliente", texto: "Irene." },
-      {
-        de: "recepcionista",
-        texto: "Hecho, Irene. Te mando la confirmación por WhatsApp.",
-      },
-      {
-        accion: "Cita en tu agenda: jueves, 10:00, con Nerea",
-        icono: "reserva",
-      },
-      { accion: "Confirmación por WhatsApp a Irene", icono: "whatsapp" },
-    ],
   },
 
   asistente: {
     pregunta: "¿Y si a mediodía falta una técnica?",
     respuesta:
       "Se lo escribes a tu asistente entre clienta y clienta. Marca la ausencia, te dice qué citas tenía y te propone a la técnica libre que mejor hace cada servicio. Nada cambia sin tu «Confirmar».",
-    turnos: ausenciaDe({
-      aviso: "Alba se ha puesto mala y se va a casa. Esta tarde no vuelve",
-      profesional: "Alba",
-      cuando: "esta tarde",
-      motivo: "enferma",
-      cita: "la cita de Sonia R.",
-      servicio: "Lifting de pestañas",
-      hora: "17:00",
-      otra: "Nerea",
-      cliente: "Sonia",
-      telefono: "+34 794 63 21 07",
-    }),
+    situaciones: [
+      {
+        titulo: "Si una técnica no viene",
+        texto:
+          "«Nerea no viene hoy, tiene fiebre»: deja de recibir citas y tu asistente propone pasar su lifting a Alba, la especialista libre.",
+      },
+      {
+        titulo: "Una regla del estudio",
+        texto:
+          "«Dile que el relleno solo vale con pestañas nuestras»: lo apunta y la recepcionista lo explica en la siguiente llamada.",
+      },
+      {
+        titulo: "Un precio nuevo",
+        texto:
+          "«El lifting sube a 45 €»: cambia en tu catálogo y la recepcionista ya lo dice así.",
+      },
+    ],
   },
 
   whatsapp: {
@@ -98,8 +64,8 @@ export const pestanasYCejas: SectorLanding = {
     respuesta:
       "No. Dejas de pedirles que reserven por una app o por Instagram: llaman como siempre y la cita les llega por WhatsApp. Si no pueden venir, contestan al mensaje y la recepcionista la mueve o la anula.",
     confirmacion: {
-      servicio: "Retirada y juego de volumen, con Nerea",
-      cuando: "jueves 5 de noviembre a las 10:00",
+      servicio: "Relleno de pestañas, con Nerea",
+      cuando: "jueves 5 de noviembre a las 17:30",
     },
     conversacion: [
       {
@@ -109,13 +75,13 @@ export const pestanasYCejas: SectorLanding = {
       {
         de: "recepcionista",
         texto:
-          "El viernes a las 16:00 Nerea tiene las tres horas libres. ¿Te la cambio?",
+          "El viernes a las 16:00 Nerea tiene la hora libre. ¿Te la cambio?",
       },
       { de: "cliente", texto: "Sí, genial" },
       {
         de: "recepcionista",
         texto:
-          "Listo, Irene: viernes 6 a las 16:00 con Nerea, y anulada la del jueves.",
+          "Listo, Irene: relleno el viernes 6 a las 16:00 con Nerea, y anulada la del jueves.",
       },
     ],
   },

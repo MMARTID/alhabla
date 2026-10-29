@@ -1,13 +1,12 @@
-import { ausenciaDe } from "@/lib/gestor-guiones";
 import { NICHE_ACCENTS } from "@/lib/niche-accents";
 import type { SectorLanding } from "@/lib/sectores/tipos";
 
 /**
- * Sonia llama con un bono regalo para el ritual de chocolate del sábado: la
- * hora que quería está cogida y entra a las siete con Lucía (la llamada, de
- * la página-artículo anterior); luego lo pasa al domingo contestando al
- * WhatsApp. La ausencia es otra tarde: Irene se va y su masaje de piedras
- * de las seis pasa a Lucía.
+ * Sonia llama y reserva ritual de chocolate con Lucía (la escena del iPhone:
+ * GUIONES_SECTOR, lib/relato-guiones.ts) y luego la cambia contestando al
+ * WhatsApp (sus mensajes). En la escena de tu asistente (GUIONES_GESTOR,
+ * lib/gestor-guiones.ts) Lucía falta y su cita pasa a Óscar, quien mejor lo
+ * hace de los libres. Los móviles empiezan por 79, un rango sin atribuir.
  *
  * Solo masajes de relajación y rituales, nada terapéutico. En el backend un
  * spa se da de alta como «Otros» (sin plantilla de servicios propia), así
@@ -40,60 +39,29 @@ export const spaYMasajes: SectorLanding = {
     pregunta: "¿Y si suena mientras doy un masaje?",
     respuesta:
       "Ya no eliges entre dejar el masaje a medias o perder la llamada. En cabina solo se oye la música: fuera contesta la recepcionista, da la hora y la confirma por WhatsApp.",
-    quien: "Sonia O.",
-    duracion: "1 min 25 s",
-    lineas: [
-      {
-        de: "cliente",
-        texto:
-          "Me regalaron un bono para el ritual de chocolate. ¿Tenéis algo el sábado por la tarde?",
-      },
-      {
-        accion:
-          "Mira tu agenda: el ritual son 90 min; a las 19:00 Lucía está libre",
-        icono: "agenda",
-      },
-      {
-        de: "recepcionista",
-        texto:
-          "A media tarde está completo; a las siete, con Lucía. ¿Te encaja?",
-      },
-      { de: "cliente", texto: "A las siete, perfecto. Soy Sonia." },
-      {
-        de: "recepcionista",
-        texto:
-          "Reservado, Sonia: sábado a las 19:00, ritual de chocolate con Lucía. Trae el bono, que lo comprobamos en recepción.",
-      },
-      {
-        accion: "Cita en tu agenda: sábado, 19:00, ritual con Lucía",
-        icono: "reserva",
-      },
-      { de: "cliente", texto: "¿Tengo que llevar algo más?" },
-      {
-        de: "recepcionista",
-        texto:
-          "Nada: albornoz y zapatillas te los damos aquí. Te llega todo por WhatsApp.",
-      },
-      { accion: "Confirmación por WhatsApp a Sonia", icono: "whatsapp" },
-    ],
   },
 
   asistente: {
     pregunta: "¿Y si a mediodía falta una terapeuta?",
     respuesta:
-      "Se lo escribes a tu asistente al salir de cabina. Marca la ausencia, te dice qué citas tenía y te propone a la terapeuta libre que mejor hace cada masaje. Sin tu «Confirmar», no se mueve nada.",
-    turnos: ausenciaDe({
-      aviso: "Irene se encuentra mal y se va a casa. Esta tarde no vuelve",
-      profesional: "Irene",
-      cuando: "esta tarde",
-      motivo: "se encuentra mal",
-      cita: "la cita de Elena V.",
-      servicio: "Masaje con piedras calientes",
-      hora: "18:00",
-      otra: "Lucía",
-      cliente: "Elena",
-      telefono: "+34 793 62 07 41",
-    }),
+      "Se lo escribes a tu asistente al salir de cabina. Marca la ausencia, te dice qué citas tenía y te propone a quien mejor hace cada masaje de los libres. Sin tu «Confirmar», no se mueve nada.",
+    situaciones: [
+      {
+        titulo: "Si una terapeuta no viene",
+        texto:
+          "«Lucía no viene hoy, está con gripe»: deja de recibir citas y tu asistente propone pasar su masaje a Óscar, el especialista libre.",
+      },
+      {
+        titulo: "Un festivo",
+        texto:
+          "«El lunes 12 cerramos, es festivo»: la recepcionista no reserva nada ese día.",
+      },
+      {
+        titulo: "Un ritual con otro precio",
+        texto:
+          "«El ritual de chocolate pasa a 85 €»: se actualiza en tu catálogo y lo dice así desde la siguiente llamada.",
+      },
+    ],
   },
 
   whatsapp: {
@@ -102,13 +70,13 @@ export const spaYMasajes: SectorLanding = {
       "No, y dejas de educarlos para que usen una app: llaman como siempre y la cita les llega por WhatsApp. Si se les complica el día, contestan al mensaje y la recepcionista la mueve o la anula.",
     confirmacion: {
       servicio: "Ritual de chocolate, con Lucía",
-      cuando: "sábado 7 de noviembre a las 19:00",
+      cuando: "jueves 5 de noviembre a las 17:30",
     },
     conversacion: [
       {
         de: "cliente",
         texto:
-          "Me ha surgido una comida familiar el sábado. ¿Hay algo el domingo por la mañana?",
+          "Me ha surgido una cena de trabajo el jueves. ¿Hay algo el domingo por la mañana?",
       },
       {
         de: "recepcionista",
@@ -119,7 +87,7 @@ export const spaYMasajes: SectorLanding = {
       {
         de: "recepcionista",
         texto:
-          "Cambiado, Sonia: ritual de chocolate el domingo 8 de noviembre a las 11:00 con Lucía. El sábado queda libre.",
+          "Cambiado, Sonia: ritual de chocolate el domingo 8 de noviembre a las 11:00 con Lucía. La del jueves queda anulada.",
       },
     ],
   },

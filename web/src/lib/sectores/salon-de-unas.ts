@@ -1,14 +1,12 @@
-import { ausenciaDe } from "@/lib/gestor-guiones";
 import { NICHE_ACCENTS } from "@/lib/niche-accents";
 import type { SectorLanding } from "@/lib/sectores/tipos";
 
 /**
- * Paula llama con gel de otro salón: la recepcionista entiende que es
- * retirada y semi, reserva los 75 minutos con Laura (la llamada) y Paula la
- * pasa al sábado con Noa contestando al WhatsApp (sus mensajes). La ausencia
- * es otra tarde: Laura se va enferma y el gel de Irene pasa a Julia. Las
- * técnicas son las de lib/relato-guiones.ts y lib/gestor-guiones.ts; los
- * móviles empiezan por 79, un rango sin atribuir.
+ * Paula llama y reserva manicura semipermanente con Laura (la escena del
+ * iPhone: GUIONES_SECTOR, lib/relato-guiones.ts) y luego la cambia
+ * contestando al WhatsApp (sus mensajes). En la escena de tu asistente
+ * (GUIONES_GESTOR, lib/gestor-guiones.ts) Laura falta y su cita pasa a Noa,
+ * la especialista libre. Los móviles empiezan por 79, un rango sin atribuir.
  *
  * Contrastado con el backend: el prompt del sector pregunta si es aplicación
  * nueva, mantenimiento o retirada (seccionesDelPrompt.ts) y conoce el último
@@ -36,59 +34,29 @@ export const salonDeUnas: SectorLanding = {
     pregunta: "¿Y si suena mientras estoy esmaltando?",
     respuesta:
       "Ya no eliges entre dejar una mano a medio esmaltar o perder la llamada. Contesta la recepcionista, pregunta si hay retirada, guarda el tiempo justo y le manda la cita por WhatsApp.",
-    quien: "Paula D.",
-    duracion: "1 min 4 s",
-    lineas: [
-      {
-        de: "cliente",
-        texto:
-          "Hola, quería semipermanente el jueves. Ahora llevo gel de otro sitio.",
-      },
-      {
-        de: "recepcionista",
-        texto:
-          "Entonces es retirada y semi, unos 75 minutos. ¿Te viene mejor por la mañana o por la tarde?",
-      },
-      { de: "cliente", texto: "Por la tarde, al salir de trabajar." },
-      {
-        accion:
-          "Mira tu agenda: el jueves a las 17:30 caben los 75 min con Laura",
-        icono: "agenda",
-      },
-      {
-        de: "recepcionista",
-        texto: "El jueves a las 17:30 con Laura. ¿Me dices tu nombre?",
-      },
-      { de: "cliente", texto: "Paula." },
-      {
-        de: "recepcionista",
-        texto:
-          "Apuntada, Paula: retirada y semi el jueves a las 17:30 con Laura. Ahora te llega por WhatsApp.",
-      },
-      {
-        accion: "Cita en tu agenda: jueves, 17:30, con Laura",
-        icono: "reserva",
-      },
-      { accion: "Confirmación por WhatsApp a Paula", icono: "whatsapp" },
-    ],
   },
 
   asistente: {
     pregunta: "¿Y si a mediodía falta una técnica?",
     respuesta:
       "Escríbeselo a tu asistente en la pausa. Marca su ausencia, te enseña qué citas tenía y te propone moverlas a la técnica libre que mejor las hace. Avisa a cada clienta cuando pulsas «Confirmar».",
-    turnos: ausenciaDe({
-      aviso: "Laura se va a casa, no se encuentra bien. Esta tarde no vuelve",
-      profesional: "Laura",
-      cuando: "esta tarde",
-      motivo: "enferma",
-      cita: "la cita de Irene C.",
-      servicio: "Uñas de gel",
-      hora: "16:30",
-      otra: "Julia",
-      cliente: "Irene",
-      telefono: "+34 793 18 47 52",
-    }),
+    situaciones: [
+      {
+        titulo: "Si una técnica libra",
+        texto:
+          "«Laura tiene hoy el día libre»: no le entra ninguna cita y tu asistente propone pasar las suyas a Noa, la especialista libre.",
+      },
+      {
+        titulo: "Lo que no supo responder",
+        texto:
+          "«¿Qué te han preguntado hoy que no supieras?»: te lo cuenta y, si quieres, se lo enseñas para la próxima.",
+      },
+      {
+        titulo: "Un servicio nuevo",
+        texto:
+          "«Añade retirada de acrílico, 20 minutos, 10 €»: entra en tu catálogo y la recepcionista ya lo ofrece.",
+      },
+    ],
   },
 
   whatsapp: {
@@ -96,7 +64,7 @@ export const salonDeUnas: SectorLanding = {
     respuesta:
       "No, y dejas de insistirles para que usen una app de reservas: llaman como siempre y la cita les llega por WhatsApp. Si les surge algo, contestan al mensaje y la recepcionista la mueve o la anula.",
     confirmacion: {
-      servicio: "Retirada y semi, con Laura",
+      servicio: "Manicura semipermanente, con Laura",
       cuando: "jueves 5 de noviembre a las 17:30",
     },
     conversacion: [
@@ -107,13 +75,13 @@ export const salonDeUnas: SectorLanding = {
       {
         de: "recepcionista",
         texto:
-          "El sábado a las 10:00 Noa tiene libres los 75 minutos. ¿Te la paso con ella?",
+          "El sábado a las 10:00 Noa tiene la hora libre. ¿Te la paso con ella?",
       },
       { de: "cliente", texto: "Vale, con Noa" },
       {
         de: "recepcionista",
         texto:
-          "Listo, Paula: retirada y semi el sábado 7 de noviembre a las 10:00 con Noa. La del jueves queda anulada.",
+          "Listo, Paula: manicura semipermanente el sábado 7 de noviembre a las 10:00 con Noa. La del jueves queda anulada.",
       },
     ],
   },

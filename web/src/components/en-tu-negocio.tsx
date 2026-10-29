@@ -76,6 +76,7 @@ function pasosDe(g: GuionRelato): [PasoCopy, PasoCopy, PasoCopy] {
       pantalla: "Panel",
       titulo: "Abres el portátil y ya sabes cómo va el día.",
       texto:
+        g.pasos?.negocio[0] ??
         "El panel te enseña de un vistazo si la recepción está atendiendo, cuántas llamadas ha cogido y qué citas vienen.",
       detalles: [
         "Estado de la recepción, tu número y el desvío",
@@ -88,7 +89,9 @@ function pasosDe(g: GuionRelato): [PasoCopy, PasoCopy, PasoCopy] {
       etiqueta: "Llamadas",
       pantalla: "Detalle de una llamada",
       titulo: "Cada llamada, transcrita y grabada si hay permiso.",
-      texto: `Abre la llamada de ${g.cliente.nombre} y ves qué pidió, por qué se le ofreció esa hora y la cita que salió de ella.`,
+      texto:
+        g.pasos?.negocio[1] ??
+        `Abre la llamada de ${g.cliente.nombre} y ves qué pidió, por qué se le ofreció esa hora y la cita que salió de ella.`,
       detalles: [
         "La grabación, si el cliente da permiso, para escucharla cuando quieras",
         "La transcripción turno a turno",
@@ -101,6 +104,7 @@ function pasosDe(g: GuionRelato): [PasoCopy, PasoCopy, PasoCopy] {
       pantalla: "Tu asistente",
       titulo: "Cambia tu agenda escribiendo, como a una persona.",
       texto:
+        g.pasos?.negocio[2] ??
         "Pregúntale por la agenda y pídele cambios desde el panel. Es la misma asistente que tienes en WhatsApp.",
       detalles: [
         "Te resume el día y te dice si una hora está libre",
@@ -135,9 +139,13 @@ function estiloAcento(acento?: NicheAccent): CSSProperties | undefined {
 export function EnTuNegocioScroll({
   guion = GUION_GENERAL,
   acento,
+  antetitulo = true,
 }: {
   guion?: GuionRelato;
   acento?: NicheAccent;
+  /** «En tu negocio» encima de los pasos; en las landings de sector, solo
+   * para lectores de pantalla (como en LlamadaScroll). */
+  antetitulo?: boolean;
 }) {
   const pasos = useMemo(() => pasosDe(guion), [guion]);
   const r = useMemo(() => relato(guion), [guion]);
@@ -690,7 +698,9 @@ export function EnTuNegocioScroll({
                               (0.18 * i) / r.turnos.length
                             ).toFixed(3)}
                           >
-                            <small>{turno.agente ? "RECEPCIONISTA" : "CLIENTE"}</small>
+                            <small>
+                              {turno.agente ? "RECEPCIONISTA" : "CLIENTE"}
+                            </small>
                             {turno.texto}
                           </div>
                         ))}
@@ -812,7 +822,10 @@ export function EnTuNegocioScroll({
         </div>
         <div className="ng-rejilla">
           <div className="ng-texto">
-            <h2 id="negocio-titulo" className="ng-antetitulo">
+            <h2
+              id="negocio-titulo"
+              className={antetitulo ? "ng-antetitulo" : "sr-only"}
+            >
               En tu negocio
             </h2>
             <div className="ng-copias" aria-hidden="true">

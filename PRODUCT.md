@@ -111,10 +111,11 @@ Lo que un producto vecino no podría copiar honestamente:
   dueño escribe que alguien del equipo no viene y tu asistente encadena tres pasos, cada uno con su
   «Confirmar» (`backend/src/modules/gestor/accionesAgenda.ts`):
   1. `marcar_ausencia` bloquea a esa persona en ese tramo (hasta 62 días), la recepcionista deja
-     de reservarle ahí, y tu asistente cuenta cuántas citas tenía: «Tiene 3 citas en ese tramo: dime
-     si las movemos o las cancelamos».
-  2. `mover_cita` pasa cada cita a otra hora o a otro profesional (con `buscar_hueco` para
-     encontrar dónde cabe), comprobando la disponibilidad y actualizando el calendario conectado;
+     de reservarle ahí, y tu asistente cuenta cuántas citas tenía y ofrece pasarlas, a la misma
+     hora, a quien mejor hace el servicio de los que están libres.
+  2. `mover_cita` pasa cada cita a otra hora o a otro profesional, comprobando la disponibilidad y
+     actualizando el calendario conectado. Si el dueño no dice a quién y quien la tenía falta,
+     propone al especialista libre (entre iguales, a quien tenga menos citas ese día);
      o `cancelar_cita` si no hay sitio.
   3. Tras cada «Hecho», tu asistente pregunta «¿Le aviso a Lucía por WhatsApp de la nueva hora?» con
      dos botones, «Sí, avísale» o «Le llamo yo», y `avisar_cliente` le manda el cambio o la

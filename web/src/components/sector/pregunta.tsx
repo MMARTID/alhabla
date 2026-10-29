@@ -5,7 +5,7 @@ import type { ReactNode } from "react";
  * respuesta en dos líneas y, al lado, la pieza de producto que lo demuestra.
  * `prueba` alterna de lado de un bloque al siguiente para dar ritmo; en el
  * móvil va siempre debajo de la respuesta; desde `lg`, la pregunta se queda
- * fija mientras se lee la prueba. `pie` va debajo, a todo el ancho.
+ * fija mientras se lee la prueba.
  */
 export function Pregunta({
   id,
@@ -15,7 +15,6 @@ export function Pregunta({
   lado,
   primera = false,
   children,
-  pie,
 }: {
   id?: string;
   pregunta: string;
@@ -26,10 +25,8 @@ export function Pregunta({
   /** La que va pegada al hero: menos aire arriba, para que asome en la
    * primera pantalla. */
   primera?: boolean;
-  /** Lo que va bajo la respuesta (la regla de confianza, un enlace). */
+  /** Lo que va bajo la respuesta (el reparto del oficio, un enlace). */
   children?: ReactNode;
-  /** Lo que cierra el bloque a todo el ancho (el reparto del oficio). */
-  pie?: ReactNode;
 }) {
   const tituloId = id ? `${id}-titulo` : undefined;
 
@@ -69,9 +66,6 @@ export function Pregunta({
         >
           {prueba}
         </div>
-        {pie ? (
-          <div className="lg:col-span-12 lg:row-start-2">{pie}</div>
-        ) : null}
       </div>
     </section>
   );

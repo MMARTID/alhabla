@@ -197,30 +197,29 @@ each page's image explicitly from its `openGraph`/`twitter` metadata.
   sector accordion, plans and FAQ (`home-faqs.ts`).
 - `SiteLanding` — The eight sector landings (`/peluqueria`, `/barberia`, `/centro-de-estetica`,
   `/salon-de-unas`, `/fisioterapia`, `/pestanas-y-cejas`, `/spa-y-masajes`,
-  `/peluqueria-canina`), template «Las preguntas de la dueña» since 2026-10-29
-  (`PLAN-WEB-CONTENIDO.md`; direction contract in
-  `.impeccable/surfaces/web-src-components-site-landing-tsx.md`). Eight fixed blocks, ~800 words:
-  `LandingHero`; three `Pregunta` blocks (`components/sector/pregunta.tsx`), each a two-line
-  answer proven with a product piece — the call transcribed (`TranscripcionLlamada`), the chat
-  with tu asistente (`OwnerAssistantChatMockup`, turns built with `ausenciaDe` from
-  `lib/gestor-guiones.ts`) plus the trust rule «Con tus clientes manda Alhabla. Con tu agenda
-  mandas tú.», and the WhatsApp the customer gets (`WhatsappDelCliente`, the approved `confirmacion_cita_v3`
-  verbatim); `OficioDelSector`, a fourth `Pregunta` whose proof is the app's services table
-  drawn (`ServiciosDelOficio`: duration and the Especialista / Lo hace / No sugerir pill per
-  professional; the typical calls are folded into its two-line answer), then the split by
-  speciality full width and,
-  in fisioterapia, the short health note;
-  `PreciosDelSector` (three compact plans; the founder pill takes the sector accent); five
-  folded questions; the black close with «Empezar ahora». Motion: one moment only, the call
-  transcript unfolding line by line when it scrolls in (`DesplieguePorLineas`, one
-  IntersectionObserver, visible without JS or with reduced motion); no `Reveal` on the sections
-  or the chats (`entrada={false}`). Everything that changes per sector is
-  in `web/src/lib/sectores/` (see Frontend Lib). Removed on 2026-10-29: third-party sector data
-  and press quotes, the per-city figures (`SectorCiudadesIdiomas`, `lib/sector-ciudades.ts`; the
-  30 `/<niche>/[ciudad]` pages had been merged into the sector page on 2026-10-20, 301 in
-  `next.config.mjs`), `TeamRoutingSection`, `WhatsAppBenefitsTable`, the 1,300-word guide, the
-  articles block and the landing calculator (`RevenueLossCalculator`). The iPhone → laptop story
-  stays on the home page only.
+  `/peluqueria-canina`). Since the evening of 2026-10-29, «text and 3D balanced» (the founder
+  found the all-text v1 of that morning «horrendo»; direction contract in
+  `.impeccable/surfaces/web-src-components-site-landing-tsx.md`): `LandingHero`; the first
+  owner question in two lines (`EntradaDeEscena`) opening the home page's iPhone → laptop story
+  driven by the sector script (`LlamadaScroll` + `EnTuNegocioScroll` with
+  `GUIONES_SECTOR[slug]`, `lib/relato-guiones.ts`); «¿Mis clientas tienen que bajarse algo?»
+  (`Pregunta` + `WhatsappDelCliente`, the approved `confirmacion_cita_v3` verbatim, same
+  customer and booking as the call); tu asistente in 3D (`GestorSimulacionSection` with
+  `GUIONES_GESTOR[slug]`, title = the sector's absence question, three tabs from
+  `asistente.situaciones`, closing «Con tus clientes manda Alhabla. Con tu agenda mandas tú.»);
+  `OficioDelSector` (the app's services table, `ServiciosDelOficio`: duration and the
+  Especialista / Lo hace / No sugerir pill per professional, the split by speciality and, in
+  fisioterapia, the health note); `PreciosDelSector`; five folded questions; the black close
+  with «Empezar ahora». All eight sectors have both scripts (pestañas y cejas, spa y masajes and
+  peluquería canina got theirs that day); `tests/lib/sectores.test.ts` checks that the scripts'
+  `negocio`, the absence names and the WhatsApp booking match the sector data. Everything else
+  that changes per sector is in `web/src/lib/sectores/` (see Frontend Lib). Removed on
+  2026-10-29: third-party sector data and press quotes, the per-city figures
+  (`SectorCiudadesIdiomas`, `lib/sector-ciudades.ts`; the 30 `/<niche>/[ciudad]` pages had been
+  merged into the sector page on 2026-10-20, 301 in `next.config.mjs`), `TeamRoutingSection`,
+  `WhatsAppBenefitsTable`, the 1,300-word guide, the articles block, the landing calculator
+  (`RevenueLossCalculator`) and, in the evening, the flat call transcript
+  (`TranscripcionLlamada`, `DesplieguePorLineas`).
 - `LandingHero` — Single-column hero of the sector landings: H1 «Recepcionista de IA para
   {paraQuien}» over `HeroHilos` (canvas of voice "threads" whose pulses take the sector accent;
   the section needs `relative isolate` and no background of its own, or the `-z-10` canvas

@@ -1,13 +1,12 @@
-import { ausenciaDe } from "@/lib/gestor-guiones";
 import { NICHE_ACCENTS } from "@/lib/niche-accents";
 import type { SectorLanding } from "@/lib/sectores/tipos";
 
 /**
- * Javier llama con las sillas llenas para cortarse esa misma tarde y entra
- * con Sergio (la llamada); al rato retrasa la hora contestando al WhatsApp.
- * La ausencia es otro día: Luis se va a mediodía y su corte y barba de las
- * cinco pasa a Dani. Los barberos son los de lib/relato-guiones.ts y
- * lib/gestor-guiones.ts; los móviles empiezan por 79, un rango sin atribuir.
+ * Javier llama y reserva corte y barba con Luis (la escena del iPhone:
+ * GUIONES_SECTOR, lib/relato-guiones.ts) y luego la cambia contestando al
+ * WhatsApp (sus mensajes). En la escena de tu asistente (GUIONES_GESTOR,
+ * lib/gestor-guiones.ts) Luis falta y su cita pasa a Dani, quien mejor lo
+ * hace de los libres. Los móviles empiezan por 79, un rango sin atribuir.
  */
 export const barberia: SectorLanding = {
   slug: "barberia",
@@ -30,46 +29,29 @@ export const barberia: SectorLanding = {
     pregunta: "¿Y si suena con todas las sillas llenas?",
     respuesta:
       "No sueltas la máquina ni dejas sonar el móvil. Contesta la recepcionista, busca el primer hueco en el que cabe el servicio entero y le manda la hora por WhatsApp.",
-    quien: "Javier M.",
-    duracion: "48 s",
-    lineas: [
-      { de: "cliente", texto: "¿Tenéis algo esta tarde para corte y barba?" },
-      {
-        accion:
-          "Mira tu agenda: corte y barba son 45 min; a las 18:00 cabe con Sergio",
-        icono: "agenda",
-      },
-      {
-        de: "recepcionista",
-        texto: "Esta tarde tengo a las 18:00 con Sergio. ¿Te la reservo?",
-      },
-      { de: "cliente", texto: "Venga, a las seis. Javier." },
-      {
-        de: "recepcionista",
-        texto:
-          "Hecho, Javier: corte y barba hoy a las 18:00 con Sergio. Te llega la confirmación por WhatsApp.",
-      },
-      { accion: "Cita en tu agenda: hoy, 18:00, con Sergio", icono: "reserva" },
-      { accion: "Confirmación por WhatsApp a Javier", icono: "whatsapp" },
-    ],
   },
 
   asistente: {
     pregunta: "¿Y si a mediodía falta un barbero?",
     respuesta:
       "Se lo escribes a tu asistente entre corte y corte. Marca la ausencia, te dice qué citas tenía y te propone pasarlas al barbero libre que mejor hace cada servicio. Con tu «Confirmar», las mueve y avisa a cada cliente.",
-    turnos: ausenciaDe({
-      aviso: "Luis se ha ido, le ha surgido algo. Esta tarde no viene",
-      profesional: "Luis",
-      cuando: "esta tarde",
-      motivo: "imprevisto",
-      cita: "la cita de Marcos P.",
-      servicio: "Corte y barba",
-      hora: "17:00",
-      otra: "Dani",
-      cliente: "Marcos",
-      telefono: "+34 792 55 31 84",
-    }),
+    situaciones: [
+      {
+        titulo: "Si un barbero no viene",
+        texto:
+          "«Hoy Luis no viene, está malo»: deja de recibir citas y tu asistente propone pasar sus cortes a Dani, que está libre. Confirmas y avisa al cliente.",
+      },
+      {
+        titulo: "¿Hay hueco a las 6?",
+        texto:
+          "Te dice si cabe y con quién; con un «apúntale a Javier», lo deja en tu agenda.",
+      },
+      {
+        titulo: "Un festivo",
+        texto:
+          "«El lunes 12 cerramos»: ese día queda cerrado y la recepcionista no reserva nada.",
+      },
+    ],
   },
 
   whatsapp: {
@@ -77,20 +59,20 @@ export const barberia: SectorLanding = {
     respuesta:
       "No. Nada de apps ni de pedir cita por un canal concreto: llaman como siempre y la hora les llega por WhatsApp. Si se les tuerce la tarde, contestan y la recepcionista la mueve.",
     confirmacion: {
-      servicio: "Corte y barba, con Sergio",
-      cuando: "hoy, miércoles 4 de noviembre, a las 18:00",
+      servicio: "Corte y barba, con Luis",
+      cuando: "jueves 5 de noviembre a las 17:30",
     },
     conversacion: [
       { de: "cliente", texto: "Salgo más tarde del curro, ¿hay algo a las 7?" },
       {
         de: "recepcionista",
-        texto: "A las 19:00 Sergio está libre. ¿Te la paso a esa hora?",
+        texto: "A las 19:00 Luis está libre. ¿Te la paso a esa hora?",
       },
       { de: "cliente", texto: "Sí" },
       {
         de: "recepcionista",
         texto:
-          "Listo, Javier: corte y barba hoy a las 19:00 con Sergio. La de las 18:00 queda anulada.",
+          "Listo, Javier: corte y barba el jueves a las 19:00 con Luis. La de las 17:30 queda anulada.",
       },
     ],
   },
@@ -122,8 +104,7 @@ export const barberia: SectorLanding = {
         niveles: ["lo-hace", "especialista", "no-sugerir"],
       },
     ],
-    reparto:
-      "El degradado, a tu especialista; el aprendiz, solo si lo piden.",
+    reparto: "El degradado, a tu especialista; el aprendiz, solo si lo piden.",
   },
 
   faqs: [
