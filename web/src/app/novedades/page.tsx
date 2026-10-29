@@ -5,14 +5,16 @@ import { metadataDePagina } from "@/lib/seo";
 /**
  * Novedades del producto (2026-10-20), sacadas de los PR fusionados en main
  * (git log). Solo lo que nota un negocio o su cliente; nada interno
- * (infraestructura, migraciones, documentación). Añadir arriba cada mes y
+ * (infraestructura, migraciones, documentación). Dentro de cada mes, primero
+ * lo que toca las dos promesas (no perder llamadas y tu asistente por
+ * WhatsApp) y después precios y panel. Añadir arriba cada mes y
  * actualizar `actualizado` en lib/paginas.ts: es la página que más cambia y
  * le dice a Google que el sitio está vivo.
  */
 const ruta = "/novedades";
 const titulo = "Novedades de Alhabla, mes a mes";
 const descripcion =
-  "Lo que ha cambiado en tu recepcionista de IA: idiomas nuevos, aviso de IA, grabación con permiso, precios y mejoras de la agenda y el WhatsApp.";
+  "Lo que ha cambiado en tu recepcionista de IA: la agenda de Alhabla, tu asistente por WhatsApp, idiomas nuevos, aviso de IA, grabación con permiso y precios.";
 
 export const metadata = metadataDePagina({ ruta, titulo, descripcion });
 
@@ -23,20 +25,32 @@ const MESES: { mes: string; fecha: string; novedades: Novedad[] }[] = [
     fecha: "2026-10",
     novedades: [
       {
-        titulo: "Precios más claros y con más minutos",
-        texto: "Los planes se publican sin IVA, como en el resto del sector, y suben los minutos: Inicio 59 € con 200, Pro 139 € con 600 y Scale 269 € con 1.500. Los 15 primeros negocios tienen precio de fundador.",
+        titulo: "La agenda de Alhabla: conectar un calendario es opcional",
+        texto: "Si no usas Google Calendar, Outlook ni iCloud, la recepcionista reserva en la agenda de Alhabla. Desde el panel apuntas citas nuevas, bloqueas horas y marcas la ausencia de alguien del equipo.",
       },
       {
-        titulo: "Hablar con una persona antes de contratar",
-        texto: "Nuevo formulario de contacto y WhatsApp del equipo para resolver dudas sin compromiso.",
+        titulo: "Tu agenda en el calendario del móvil",
+        texto: "Con un enlace te suscribes a la agenda de Alhabla desde el calendario del iPhone o de Google, y ves tus citas sin abrir el panel.",
       },
       {
-        titulo: "Grabación solo con permiso",
-        texto: "La recepcionista pide permiso para grabar mientras busca hueco y explica para qué. A quien ya aceptó se lo recuerda al descolgar; si dice que no, solo queda la transcripción.",
+        titulo: "Tu asistente entiende notas de voz",
+        texto: "Puedes mandarle un audio por WhatsApp en lugar de escribir: lo entiende igual que un mensaje.",
+      },
+      {
+        titulo: "Si algo falla, toma el recado",
+        texto: "Si un problema técnico impide reservar, la recepcionista no cuelga sin más: toma nota y te avisa para que llames tú.",
+      },
+      {
+        titulo: "La hora libre más cercana",
+        texto: "Si no hay hueco a la hora que pide el cliente, ofrece la más próxima en lugar de preguntar otra vez.",
       },
       {
         titulo: "Te reconoce si ya has reservado",
         texto: "A quien ya reservó con ese teléfono lo saluda por su nombre y le propone repetir lo de la última vez.",
+      },
+      {
+        titulo: "Grabación solo con permiso",
+        texto: "La recepcionista pide permiso para grabar mientras busca hueco y explica para qué. A quien ya aceptó se lo recuerda al descolgar; si dice que no, solo queda la transcripción.",
       },
       {
         titulo: "Aviso de inteligencia artificial en la primera frase",
@@ -47,14 +61,6 @@ const MESES: { mes: string; fecha: string; novedades: Novedad[] }[] = [
         texto: "Se suma el ruso a los idiomas de todos los planes, la recepcionista recuerda en qué idioma habla cada cliente y nombra los servicios en ese idioma.",
       },
       {
-        titulo: "La hora libre más cercana",
-        texto: "Si no hay hueco a la hora que pide el cliente, ofrece la más próxima en lugar de preguntar otra vez.",
-      },
-      {
-        titulo: "Si algo falla, toma el recado",
-        texto: "Si un problema técnico impide reservar, la recepcionista no cuelga sin más: toma nota y te avisa para que llames tú.",
-      },
-      {
         titulo: "Catalán, euskera y gallego, automáticos",
         texto: "La lengua cooficial se activa sola por el código postal del negocio, con voces que la hablan de verdad, y se puede elegir como idioma principal.",
       },
@@ -63,8 +69,16 @@ const MESES: { mes: string; fecha: string; novedades: Novedad[] }[] = [
         texto: "El panel se rediseña para el escritorio y el móvil, y sigue el modo claro u oscuro de tu dispositivo.",
       },
       {
-        titulo: "El Gestor entiende notas de voz",
-        texto: "Puedes mandarle un audio por WhatsApp en lugar de escribir: lo entiende igual que un mensaje.",
+        titulo: "Precios más claros y con más minutos",
+        texto: "Los planes se publican sin IVA, como en el resto del sector, y suben los minutos: Inicio 59 € con 200, Pro 139 € con 600 y Scale 269 € con 1.500. Los 15 primeros negocios tienen precio de fundador.",
+      },
+      {
+        titulo: "Hablar con una persona antes de contratar",
+        texto: "Nuevo formulario de contacto y WhatsApp del equipo para resolver dudas o verlo funcionando con tu negocio.",
+      },
+      {
+        titulo: "Una web más corta y más clara",
+        texto: "La web cuenta Alhabla en el orden que importa: primero que no pierdas ninguna llamada, después tu asistente por WhatsApp. Y la comparamos con las plataformas para montar tu propio agente de voz.",
       },
     ],
   },
@@ -73,8 +87,8 @@ const MESES: { mes: string; fecha: string; novedades: Novedad[] }[] = [
     fecha: "2026-09",
     novedades: [
       {
-        titulo: "El Gestor por WhatsApp",
-        texto: "El dueño cambia horarios, ausencias, precios y citas escribiendo a Alhabla por WhatsApp. Nada cambia sin su «Confirmar».",
+        titulo: "Tu asistente por WhatsApp",
+        texto: "El dueño cambia horarios, precios y citas, o marca la ausencia de alguien del equipo, escribiéndole por WhatsApp. Nada cambia sin su «Confirmar».",
       },
       {
         titulo: "Outlook y Calendario de Apple",
@@ -110,7 +124,6 @@ export default function NovedadesPage() {
       titulo={titulo}
       descripcion={descripcion}
       ubicacion="novedades"
-      imagen={null}
       entradilla={
         <p>
           Alhabla mejora cada semana con lo que vemos en las llamadas reales y lo que nos cuentan los negocios. Aquí está

@@ -72,13 +72,42 @@ const nextConfig = {
       { source: "/salones-de-unas", destination: "/salon-de-unas", permanent: true },
       { source: "/fisioterapeutas", destination: "/fisioterapia", permanent: true },
       // Las 30 páginas sector × ciudad se fusionaron en la de su sector el
-      // 2026-10-20 (sin búsquedas por ciudad; Google indexó 2 de 30): sus
-      // cifras viven ahora en la sección de ciudades de cada sector
-      // (lib/sector-ciudades.ts). El 301 conserva lo que Google ya indexó.
+      // 2026-10-20 (sin búsquedas por ciudad; Google indexó 2 de 30); sus
+      // cifras salieron de la web con la plantilla de sector del 2026-10-29.
+      // El 301 conserva lo que Google ya indexó.
       {
         source:
           "/:nicho(peluqueria|barberia|centro-de-estetica|salon-de-unas|fisioterapia)/:ciudad(madrid|barcelona|valencia|sevilla|zaragoza|malaga)",
         destination: "/:nicho",
+        permanent: true,
+      },
+      // Las comparativas con otras recepcionistas y con personas salieron el
+      // 2026-10-29: cada una va a la página que responde su misma búsqueda.
+      // Nunca un comodín `/comparativa/:path*`, que se tragaría las
+      // comparativas con plataformas que viven en la misma carpeta.
+      {
+        source: "/comparativa/alhabla-vs-heydiga",
+        destination: "/planes",
+        permanent: true,
+      },
+      {
+        source: "/comparativa/alhabla-vs-fonio",
+        destination: "/planes",
+        permanent: true,
+      },
+      {
+        source: "/comparativa/recepcionista-de-ia-vs-recepcionista-humana",
+        destination: "/blog/cuanto-cuesta-una-recepcionista-de-ia",
+        permanent: true,
+      },
+      {
+        source: "/comparativa/recepcionista-de-ia-vs-secretaria-telefonica",
+        destination: "/blog/contestador-automatico-vs-recepcionista-virtual",
+        permanent: true,
+      },
+      {
+        source: "/comparativa/recepcionista-de-ia-vs-centralita-virtual",
+        destination: "/blog/contestador-automatico-vs-recepcionista-virtual",
         permanent: true,
       },
       // El asistente del negocio tras el registro se mudó a la app.

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { SiteFooter } from "@/components/site-footer";
 import { listarArticulos } from "@/lib/blog";
 import { TarjetaDeArticulo } from "@/components/blog/tarjeta-de-articulo";
+import { EscucharUnaLlamada } from "./escuchar-una-llamada";
 import { SiteHeader } from "@/components/site-header";
 import { absoluteUrl, buildBreadcrumbStructuredData, ogImages, organizationId, siteName, websiteId } from "@/lib/seo";
 
@@ -62,8 +63,9 @@ export default async function BlogPage() {
               Ideas para no perder ni una llamada
             </h1>
             <p className="mt-4 text-base leading-7 text-muted sm:text-lg">
-              Cómo atender el teléfono, llenar la agenda y no perder citas en peluquerías, barberías, centros de estética,
-              salones de uñas, fisioterapia y otros negocios con cita previa, contado sin humo.
+              Cómo atender el teléfono sin soltar lo que tienes entre manos, no perder citas y organizar tu día en
+              peluquerías, barberías, centros de estética, salones de uñas, fisioterapia y otros negocios con cita previa,
+              contado sin humo.
             </p>
           </section>
 
@@ -90,24 +92,22 @@ export default async function BlogPage() {
           <section className="mt-16 rounded-3xl border border-[#ddd6fe] bg-[#f3eeff] p-6 sm:p-10 lg:flex lg:items-center lg:justify-between lg:gap-10">
             <div className="max-w-2xl">
               <h2 className="text-2xl font-bold tracking-tight text-[#0a0a0a] sm:text-3xl">
-                ¿Quieres oír cómo atiende Alhabla con tus servicios y tu horario?
+                ¿Quieres oír cómo atiende una llamada?
               </h2>
               <p className="mt-3 text-base leading-7 text-muted">
-                Una recepcionista que coge todas las llamadas, reserva en tu calendario y te avisa por WhatsApp. 7 días
-                de prueba, sin permanencia.
+                Habla desde el navegador con una recepcionista de ejemplo y pídele una cita como lo haría tu cliente. Sin
+                registrarte.
               </p>
             </div>
             <div className="mt-6 flex flex-wrap gap-3 lg:mt-0 lg:shrink-0">
+              <EscucharUnaLlamada />
               <Link
                 href="/planes"
-                className="btn-primary px-6"
+                className="btn-secondary px-6"
                 data-evento="clic_probar"
                 data-ubicacion="blog"
               >
-                Ver planes
-              </Link>
-              <Link href="/#como-funciona" className="btn-secondary px-6">
-                Cómo funciona
+                Probar 7 días gratis
               </Link>
             </div>
           </section>

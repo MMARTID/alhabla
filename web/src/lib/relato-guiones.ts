@@ -10,7 +10,7 @@ import type { NicheSlug } from "@/lib/niche-landings";
  * historia con su vocabulario.
  *
  * Los profesionales de cada sector son los mismos que salen en el resto de
- * su landing (reparto por especialidad y el Gestor), para que no cambien de
+ * su landing (reparto por especialidad y tu asistente), para que no cambien de
  * nombre de una sección a otra. Los números de teléfono empiezan por 79: un
  * rango sin atribuir en el Plan Nacional de Numeración, no son de nadie.
  */
@@ -33,7 +33,7 @@ export type GuionRelato = {
   };
   /** Quien llama. */
   cliente: { nombre: string; apellido: string; telefono: string };
-  /** Con quién reserva, y quien la sustituye cuando falta (el Gestor). */
+  /** Con quién reserva, y quien la sustituye cuando falta (tu asistente). */
   profesional: string;
   companera: string;
   servicio: Servicio;
@@ -59,7 +59,7 @@ export const GUION_GENERAL: GuionRelato = {
     elCliente: "el cliente",
     mientras: "estabas con una clienta",
   },
-  cliente: { nombre: "Laura", apellido: "G.", telefono: "+34 791 32 55 57" },
+  cliente: { nombre: "Laura", apellido: "G.", telefono: "+34 790 24 61 75" },
   profesional: "Marta",
   companera: "Lucía",
   servicio: { nombre: "Corte y color", minutos: 90 },
@@ -223,7 +223,7 @@ export function relato(g: GuionRelato) {
     franja,
     /**
      * La llamada entera, turno a turno, como la lleva de verdad la
-     * recepcionista (sus instrucciones en Telnyx, lib/seccionesDelPrompt.ts):
+     * recepcionista (sus instrucciones, backend/src/lib/seccionesDelPrompt.ts):
      * saluda con el nombre del negocio y el aviso de IA; solo dice la
      * duración si pasa de 80 minutos; a quien llama por primera vez le pide
      * permiso para grabar mientras comprueba el hueco (voiceTools,
@@ -358,7 +358,7 @@ export function relato(g: GuionRelato) {
       },
     ] as { quien: string; cuando: string; chip: string | null }[],
     /**
-     * Panel: la conversación con el Gestor (una baja y sus citas), con sus
+     * Panel: la conversación con tu asistente (una baja y sus citas), con sus
      * tools reales: `listar_agenda` (las citas, no los huecos), `buscar_hueco`
      * para cada hora y una propuesta a la vez con «Confirmar».
      */
@@ -378,7 +378,7 @@ export function relato(g: GuionRelato) {
       ],
       orden: `Vale. Márcala ausente y luego pásale esas dos a ${companera}.`,
       /**
-       * Como el Gestor real: una propuesta cada vez, y nada cambia hasta que
+       * Como en el producto: una propuesta cada vez, y nada cambia hasta que
        * el dueño pulsa «Confirmar» (textos de modules/gestor/accionesAgenda.ts).
        */
       propuesta: `¿Confirmas? Marcar a ${profesional} como ausente el jueves: la recepcionista no le reservará nada. Ojo: ya tiene 3 citas ahí, que no se mueven solas.`,

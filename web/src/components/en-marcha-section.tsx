@@ -6,8 +6,9 @@ import { TRIAL_REASSURANCE } from "@/lib/plans";
 
 /**
  * Puesta en marcha (2026-09-26): responde a «¿es difícil?» justo antes del
- * precio, con los tres pasos reales del alta (negocio → calendario →
- * desvío). Sin tiempos inventados.
+ * precio, con los tres pasos reales del alta (negocio → dónde van las citas
+ * → desvío). Conectar un calendario es opcional desde el 2026-10-28: sin él,
+ * las citas van a la agenda de Alhabla. Sin tiempos inventados.
  */
 const PASOS = [
   {
@@ -16,9 +17,9 @@ const PASOS = [
       "Lo buscas en Google y Alhabla rellena los datos básicos. Eliges tu sector y partes de sus servicios habituales; solo ajustas precios, duraciones y quién hace cada cosa.",
   },
   {
-    titulo: "Conectas tu calendario",
+    titulo: "Eliges dónde van las citas",
     texto:
-      "Google Calendar, Outlook o iCloud. Alhabla lee tus huecos y apunta las citas donde ya las miras tú, sin cambiar de agenda.",
+      "En tu Google Calendar, Outlook o iCloud, donde ya las miras tú. Y si no usas ninguno, en la agenda de Alhabla, que también ves en el calendario del móvil.",
   },
   {
     titulo: "Activas el desvío",
@@ -60,7 +61,7 @@ export function EnMarchaSection() {
             data-evento="clic_probar"
             data-ubicacion="en_marcha"
           >
-            Empezar la prueba <ArrowRight className="h-4 w-4" aria-hidden="true" />
+            Probar 7 días gratis <ArrowRight className="h-4 w-4" aria-hidden="true" />
           </Link>
         </Reveal>
       </div>

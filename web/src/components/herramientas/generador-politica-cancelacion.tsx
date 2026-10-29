@@ -14,9 +14,9 @@ import {
 
 /**
  * Generador de /herramientas/politica-de-cancelacion. Con unas pocas
- * decisiones (plazo, señal, ausencias, retraso, cómo se avisa) escribe tres
- * textos: el cartel del mostrador, el de la web y la frase que va al final
- * del mensaje de confirmación.
+ * decisiones (plazo, señal, qué pasa si no vienen, retraso, cómo se avisa)
+ * escribe tres textos: el cartel del mostrador, el de la web y la frase que
+ * va al final del mensaje de confirmación.
  *
  * El HTML del servidor sale con los textos de los valores por defecto, así
  * que sin JavaScript se lee un ejemplo completo.
@@ -142,7 +142,7 @@ export function GeneradorPoliticaCancelacion() {
               [
                 ["aviso", "Le escribimos para recordarle la política"],
                 ["senal", "Le pedimos señal para la siguiente cita"],
-                ["dejar", "Dejamos de darle cita tras varias ausencias"],
+                ["dejar", "Dejamos de darle cita si falta varias veces sin avisar"],
               ] as const
             ).map(([valor, texto]) => (
               <Opcion key={valor} nombre="ausencias" valor={valor} actual={p.ausencias} onElegir={(v) => cambiar("ausencias", v)}>
@@ -152,7 +152,7 @@ export function GeneradorPoliticaCancelacion() {
           </div>
           {p.ausencias === "dejar" ? (
             <div className="mt-4 max-w-[12rem]">
-              <Campo id={ids.max} etiqueta="Número de ausencias">
+              <Campo id={ids.max} etiqueta="Veces sin venir">
                 <input id={ids.max} type="number" min={1} max={10} className="field w-full" value={p.maxAusencias} onChange={(e) => cambiar("maxAusencias", e.target.value)} />
               </Campo>
             </div>

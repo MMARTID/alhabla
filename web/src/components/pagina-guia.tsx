@@ -4,8 +4,7 @@ import Link from "next/link";
 import { ArrowRight, Check, ExternalLink, Info, Lightbulb, TriangleAlert, type LucideIcon } from "lucide-react";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
-import { TRIAL_REASSURANCE } from "@/lib/plans";
-import { FOTOS } from "@/lib/fotos";
+import { TRIAL_DAYS, TRIAL_REASSURANCE } from "@/lib/plans";
 import { paginaDe } from "@/lib/paginas";
 import {
   absoluteUrl,
@@ -53,9 +52,13 @@ type Props = {
   entradilla: ReactNode;
   /** Texto plano de la entradilla para el JSON-LD (la de metadata). */
   descripcion: string;
-  /** Por defecto, la foto que el registro (lib/paginas.ts) da a la página;
-   * `null` para no pintar ninguna. */
-  imagen?: ImagenDeCabecera | null;
+  /** Foto de cabecera opcional (de banco, con su crédito). Por defecto
+   * ninguna: las páginas enseñan el producto con `pieza`. */
+  imagen?: ImagenDeCabecera;
+  /** Una pieza del producto (el chat con tu asistente, la cita en el
+   * calendario, el WhatsApp que recibe el cliente) que va junto a la
+   * cabecera en lugar de la foto: con ella no se pinta foto ninguna. */
+  pieza?: ReactNode;
   cta?: { texto: string; href: string } | null;
   ctaSecundario?: { texto: string; href: string };
   /** Identificador de la página en los eventos de clic (`data-ubicacion`). */
@@ -79,7 +82,8 @@ export function PaginaGuia({
   entradilla,
   descripcion,
   imagen: imagenPropia,
-  cta = { texto: "Probar Alhabla 7 días", href: "/planes" },
+  pieza,
+  cta = { texto: `Probar ${TRIAL_DAYS} días gratis`, href: "/planes" },
   ctaSecundario,
   ubicacion,
   children,
@@ -90,8 +94,8 @@ export function PaginaGuia({
   grafo = [],
   tipo = "WebPage",
 }: Props) {
-  const { actualizado, foto } = paginaDe(ruta);
-  const imagen = imagenPropia === undefined ? (foto ? FOTOS[foto] : undefined) : imagenPropia ?? undefined;
+  const { actualizado } = paginaDe(ruta);
+  const imagen = pieza ? undefined : imagenPropia;
   const Icono = etiqueta.icono;
   const url = absoluteUrl(ruta);
 
@@ -148,34 +152,43 @@ export function PaginaGuia({
         </nav>
 
         <header className="mx-auto max-w-5xl px-4 py-10 sm:px-6 sm:py-14 lg:px-8">
-          <span className="badge-soft gap-2">
-            <Icono className="h-3.5 w-3.5" aria-hidden="true" />
-            {etiqueta.texto}
-          </span>
-          <h1 className="mt-5 max-w-3xl text-balance text-4xl font-black leading-[1.05] tracking-[-0.03em] sm:text-5xl">
-            {titulo}
-          </h1>
-          <div className="mt-5 max-w-2xl space-y-4 text-lg leading-8 text-muted">{entradilla}</div>
-          {actualizado ? (
-            <p className="mt-4 text-sm text-tenue">
-              Actualizado el <time dateTime={actualizado}>{fechaLarga(actualizado)}</time>
-            </p>
-          ) : null}
-          {cta || ctaSecundario ? (
-            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-              {cta ? (
-                <Link href={cta.href} className="btn-primary h-12 px-6" data-evento="clic_probar" data-ubicacion={ubicacion}>
-                  {cta.texto} <ArrowRight className="h-4 w-4" aria-hidden="true" />
-                </Link>
+          <div
+            className={
+              pieza ? "grid items-start gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,25rem)] lg:gap-12" : undefined
+            }
+          >
+            <div>
+              <span className="badge-soft gap-2">
+                <Icono className="h-3.5 w-3.5" aria-hidden="true" />
+                {etiqueta.texto}
+              </span>
+              <h1 className="mt-5 max-w-3xl text-balance text-4xl font-black leading-[1.05] tracking-[-0.03em] sm:text-5xl">
+                {titulo}
+              </h1>
+              <div className="mt-5 max-w-2xl space-y-4 text-lg leading-8 text-muted">{entradilla}</div>
+              {actualizado ? (
+                <p className="mt-4 text-sm text-tenue">
+                  Actualizado el <time dateTime={actualizado}>{fechaLarga(actualizado)}</time>
+                </p>
               ) : null}
-              {ctaSecundario ? (
-                <Link href={ctaSecundario.href} className="btn-secondary h-12 px-6">
-                  {ctaSecundario.texto}
-                </Link>
+              {cta || ctaSecundario ? (
+                <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+                  {cta ? (
+                    <Link href={cta.href} className="btn-primary h-12 px-6" data-evento="clic_probar" data-ubicacion={ubicacion}>
+                      {cta.texto} <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                    </Link>
+                  ) : null}
+                  {ctaSecundario ? (
+                    <Link href={ctaSecundario.href} className="btn-secondary h-12 px-6">
+                      {ctaSecundario.texto}
+                    </Link>
+                  ) : null}
+                </div>
               ) : null}
+              {cta?.href === "/planes" ? <p className="mt-3 text-sm text-muted">{TRIAL_REASSURANCE}</p> : null}
             </div>
-          ) : null}
-          {cta?.href === "/planes" ? <p className="mt-3 text-sm text-muted">{TRIAL_REASSURANCE}</p> : null}
+            {pieza ? <div className="lg:pt-2">{pieza}</div> : null}
+          </div>
           {imagen ? (
             <figure className="mt-10">
               <Image
@@ -366,10 +379,14 @@ export function Tabla({
   /** Índice de la columna que va resaltada (la de Alhabla en una comparativa). */
   destacada?: number;
 }) {
+  // Con cuatro columnas o más (ElevenAgents y Reception frente a Alhabla), a
+  // 560 px cada celda se queda en una palabra por línea: mejor desplazar.
+  const anchoMinimo = cabecera.length > 3 ? "min-w-[760px]" : "min-w-[560px]";
+
   return (
     <div>
       <div className="overflow-x-auto rounded-2xl border border-linea">
-        <table className="w-full min-w-[560px] border-collapse text-left text-sm">
+        <table className={`w-full ${anchoMinimo} border-collapse text-left text-sm`}>
           <thead>
             <tr className="bg-relleno">
               {cabecera.map((c, i) => (
@@ -496,5 +513,107 @@ export function IndiceDePaginas({ paginas }: { paginas: { ruta: string; nombre: 
         </li>
       ))}
     </ul>
+  );
+}
+
+/* ----------------------------------------------------------------------- */
+/* Piezas del producto para la cabecera (`pieza`)                           */
+/* ----------------------------------------------------------------------- */
+
+/** Alto de una hora en la vista de día de `CitaEnElCalendario`, en rem. */
+const ALTO_HORA = 2.75;
+
+function horaEnTexto(hora: number) {
+  const minutos = Math.round((hora % 1) * 60);
+  return `${Math.floor(hora)}:${String(minutos).padStart(2, "0")}`;
+}
+
+type Tramo = { inicio: number; fin: number; titulo: string };
+
+/**
+ * La cita que apunta la recepcionista, como se ve en el calendario del
+ * negocio: una franja del día con lo que ya estaba apuntado (que cuenta
+ * como ocupado) y la cita nueva con su descripción. El título («Servicio —
+ * Cliente») y las líneas de la descripción son los que escribe Alhabla
+ * (backend/src/adapters/calendar/eventoDeCalendario.ts).
+ */
+export function CitaEnElCalendario({
+  calendario,
+  dia,
+  desde,
+  hasta,
+  ocupado,
+  cita,
+  pie = "Ejemplo; el negocio y los nombres son inventados.",
+}: {
+  calendario: { icono: ReactNode; nombre: string };
+  /** «Jueves, 5 de noviembre». */
+  dia: string;
+  /** Primera y última hora de la franja (16 → 16:00). */
+  desde: number;
+  hasta: number;
+  /** Lo que ya tenías apuntado a mano: esas horas no se ofrecen. */
+  ocupado?: Tramo;
+  cita: Tramo & { detalle: [string, string][] };
+  pie?: string;
+}) {
+  const horas = Array.from({ length: hasta - desde + 1 }, (_, i) => desde + i);
+  const posicion = ({ inicio, fin }: Tramo) => ({
+    top: `${(inicio - desde) * ALTO_HORA}rem`,
+    height: `${(fin - inicio) * ALTO_HORA}rem`,
+  });
+  return (
+    <figure>
+      <div className="overflow-hidden rounded-3xl border border-linea bg-superficie">
+        <div className="flex items-center gap-3 border-b border-linea bg-relleno px-5 py-3">
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-linea bg-superficie">
+            {calendario.icono}
+          </span>
+          <p className="min-w-0 text-sm font-semibold text-tinta">{calendario.nombre}</p>
+          <p className="ml-auto text-xs text-apagado">{dia}</p>
+        </div>
+        <div className="px-5 pb-5 pt-4">
+          <div className="relative" style={{ height: `${(hasta - desde) * ALTO_HORA}rem` }}>
+            {horas.map((hora) => (
+              <div
+                key={hora}
+                className="absolute inset-x-0 flex items-center gap-3"
+                style={{ top: `${(hora - desde) * ALTO_HORA}rem`, transform: "translateY(-50%)" }}
+                aria-hidden="true"
+              >
+                <span className="w-10 text-right text-xs tabular-nums text-tenue">{horaEnTexto(hora)}</span>
+                <span className="h-px flex-1 bg-linea-suave" />
+              </div>
+            ))}
+            {ocupado ? (
+              <div
+                className="absolute left-[3.25rem] right-0 rounded-xl border border-linea bg-relleno-fuerte px-3 py-1.5 text-xs text-apagado"
+                style={posicion(ocupado)}
+              >
+                <span className="font-semibold text-tinta">{ocupado.titulo}</span> · {horaEnTexto(ocupado.inicio)}
+              </div>
+            ) : null}
+            <div
+              className="absolute left-[3.25rem] right-0 rounded-xl border border-lavado-borde bg-lavado px-3 py-2"
+              style={posicion(cita)}
+            >
+              <p className="text-sm font-bold leading-5 text-morado-tinta">{cita.titulo}</p>
+              <p className="text-xs tabular-nums text-morado-tinta">
+                {horaEnTexto(cita.inicio)} – {horaEnTexto(cita.fin)}
+              </p>
+            </div>
+          </div>
+          <dl className="mt-5 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 border-t border-linea-suave pt-4 text-sm leading-6">
+            {cita.detalle.map(([etiqueta, valor]) => (
+              <div key={etiqueta} className="contents">
+                <dt className="text-apagado">{etiqueta}</dt>
+                <dd className="text-tinta">{valor}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      </div>
+      <figcaption className="mt-3 px-1 text-xs leading-5 text-tenue">{pie}</figcaption>
+    </figure>
   );
 }

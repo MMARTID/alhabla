@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MobileNav } from "@/components/mobile-nav";
@@ -66,13 +66,13 @@ describe("MobileNav", () => {
   it("el enlace de planes incluye el nicho cuando se indica", () => {
     render(<MobileNav niche="barberia" />);
 
-    expect(screen.getByRole("link", { name: /Empezar/ })).toHaveAttribute("href", "/planes?niche=barberia");
+    expect(screen.getByRole("link", { name: /Probar/ })).toHaveAttribute("href", "/planes?niche=barberia");
   });
 
   it("sin nicho, el enlace de planes no lleva query string", () => {
     render(<MobileNav />);
 
-    expect(screen.getByRole("link", { name: /Empezar/ })).toHaveAttribute("href", "/planes");
+    expect(screen.getByRole("link", { name: /Probar/ })).toHaveAttribute("href", "/planes");
   });
 
   it("incluye los ocho sectores como enlaces reales, no anclas", async () => {
@@ -95,7 +95,7 @@ describe("MobileNav", () => {
     }
   });
 
-  it("Precios y Blog son páginas reales; Cómo funciona y Preguntas siguen siendo anclas", async () => {
+  it("Tu asistente, Precios, Blog y Contacto son páginas reales; Cómo funciona sigue siendo un ancla", async () => {
     const user = userEvent.setup();
     render(<MobileNav niche="barberia" />);
     await user.click(screen.getByRole("button", { name: "Abrir menú" }));
@@ -104,6 +104,10 @@ describe("MobileNav", () => {
     expect(within(menu).getByRole("link", { name: "Precios" })).toHaveAttribute("href", "/planes?niche=barberia");
     expect(within(menu).getByRole("link", { name: "Blog" })).toHaveAttribute("href", "/blog");
     expect(within(menu).getByRole("link", { name: "Cómo funciona" })).toHaveAttribute("href", "#como-funciona");
-    expect(within(menu).getByRole("link", { name: "Preguntas" })).toHaveAttribute("href", "#preguntas");
+    expect(within(menu).getByRole("link", { name: "Tu asistente" })).toHaveAttribute("href", "/agenda-por-whatsapp");
+    expect(within(menu).getByRole("link", { name: "Contacto" })).toHaveAttribute("href", "/contacto");
+    expect(within(menu).queryByRole("link", { name: "Preguntas" })).toBeNull();
+    // La acción de probar lleva el mismo texto en toda la web.
+    expect(within(menu).getByRole("link", { name: "Probar 7 días gratis" })).toHaveAttribute("href", "/planes?niche=barberia");
   });
 });

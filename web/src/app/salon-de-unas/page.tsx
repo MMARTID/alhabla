@@ -1,16 +1,18 @@
 import { SiteLanding } from "@/components/site-landing";
-import { getNicheMetadata, getNicheStructuredData, nicheLandings } from "@/lib/niche-landings";
+import { datosEstructuradosDeSector, metadatosDeSector } from "@/lib/sectores";
+import { salonDeUnas as sector } from "@/lib/sectores/salon-de-unas";
 
-const content = nicheLandings["salon-de-unas"];
-export const metadata = getNicheMetadata(content);
+export const metadata = metadatosDeSector(sector);
 
 export default function SalonDeUnasPage() {
   return (
     <>
-      <SiteLanding content={content} />
+      <SiteLanding sector={sector} />
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(getNicheStructuredData(content)) }}
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(datosEstructuradosDeSector(sector)),
+        }}
       />
     </>
   );

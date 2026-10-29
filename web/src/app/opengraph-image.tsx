@@ -8,10 +8,10 @@ export const contentType = OG_CONTENT_TYPE;
 
 export default function OpenGraphImage() {
   return imagenOg({
-    etiqueta: "Recepcionista con IA",
+    etiqueta: "Recepcionista de IA",
     titulo: "No pierdas otra reserva por no contestar el teléfono",
     subtitulo:
-      "Atiende llamadas, resuelve dudas y reserva citas en tu agenda 24/7, y te avisa por WhatsApp.",
+      "Atiende tus llamadas para que no pierdas ninguna, reserva en tu agenda y tú lo llevas por WhatsApp.",
     pie: "7 días de prueba · Sin permanencia",
     derecha: {
       tipo: "foto",

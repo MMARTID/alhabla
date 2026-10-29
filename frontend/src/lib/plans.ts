@@ -26,13 +26,13 @@ export const plans: readonly Plan[] = [
     founderPrice: 39,
     minutes: 200,
     extraPerMinute: 0.3,
-    description: "Para negocios que quieren empezar a no perder llamadas importantes.",
+    description: "Para que no se te escape ninguna llamada desde el primer día.",
     summary: "3 profesionales · reservas en tu calendario o en la agenda de Alhabla · 200 minutos incluidos",
     features: [
-      "Atención telefónica 24/7",
-      "Habla en 8 idiomas, con voces naturales: español, inglés, francés, alemán, italiano, portugués, neerlandés y ruso",
-      "También puede atender en catalán, euskera o gallego",
-      "Reservas directas en tu calendario de Google, Outlook o iCloud, o en la agenda de Alhabla si no usas ninguno",
+      "Contesta tus llamadas a cualquier hora, también en festivos",
+      "Habla español y 7 idiomas más, y el catalán, euskera o gallego de tu zona",
+      "Reservas en tu calendario de Google, Outlook o iCloud, o en la agenda de Alhabla si no usas ninguno",
+      "Tu asistente por WhatsApp: horarios, precios, citas y ausencias, con tu «Confirmar»",
       "Hasta 3 profesionales en tu agenda",
       "Confirmación de cita por WhatsApp al cliente",
       "200 minutos de llamadas incluidos",
@@ -46,12 +46,12 @@ export const plans: readonly Plan[] = [
     founderPrice: 99,
     minutes: 600,
     extraPerMinute: 0.25,
-    description: "La opción recomendada: además de atender, te llena la agenda y reduce las ausencias.",
+    description: "La opción recomendada: más profesionales y recordatorios para que nadie olvide su cita.",
     summary: "10 profesionales · recordatorios de cita · 600 minutos incluidos",
     features: [
       "Todo lo de Inicio",
       "Hasta 10 profesionales en tu agenda",
-      "Recordatorios de cita por WhatsApp que reducen las ausencias",
+      "Recordatorios de cita por WhatsApp, para que no se les olvide venir",
       "Resumen semanal de llamadas y reservas en tu email",
       "Elige entre todas las voces de tu recepcionista",
       "600 minutos de llamadas incluidos",
@@ -108,6 +108,10 @@ export function formatExtraMinute(price: number) {
 /** «Desde 59 € + IVA/mes»: el precio vigente del plan más barato. */
 export const PRECIO_DESDE = `Desde ${plans[0].price} € + IVA/mes`;
 
+/** «1.500»: con punto también en las cifras de cuatro, que `Intl` en es-ES
+ * deja sin agrupar («1500»). */
 export function formatIncludedMinutes(minutes: number) {
-  return new Intl.NumberFormat("es-ES").format(minutes);
+  return new Intl.NumberFormat("es-ES", { useGrouping: "always" }).format(
+    minutes
+  );
 }

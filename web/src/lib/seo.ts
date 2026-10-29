@@ -4,7 +4,7 @@ import { plans } from "@/lib/plans";
 export const siteName = "Alhabla";
 export const defaultTitle = "Alhabla: recepcionista de IA que contesta llamadas y reserva citas";
 export const defaultDescription =
-  "Alhabla es la recepcionista de IA de tu negocio: coge el teléfono cuando tú no puedes, reserva en tu calendario y confirma cada cita por WhatsApp.";
+  "Alhabla es la recepcionista de IA de tu negocio: atiende tus llamadas para que no pierdas ninguna y tú lo gestionas todo por WhatsApp o desde el panel.";
 
 /** Rango de cuotas mensuales sin IVA, para los `AggregateOffer` del grafo. */
 export const PRECIO_MINIMO = String(Math.min(...plans.map((plan) => plan.price)));
@@ -134,19 +134,19 @@ export const landingStructuredData = {
       "@type": "SoftwareApplication",
       name: siteName,
       description:
-        "Recepcionista de IA que contesta las llamadas de negocios con cita previa, reserva en su calendario de Google, Outlook o iCloud y confirma por WhatsApp.",
+        "Recepcionista de IA que contesta las llamadas de negocios con cita previa, reserva en su calendario de Google, Outlook o iCloud, o en la agenda de Alhabla, y confirma por WhatsApp.",
       applicationCategory: "BusinessApplication",
       operatingSystem: "Web",
       // Lo que hace de verdad, comprobado contra el código el 2026-10-20
       // (la misma lista que «Qué hace distinto» de /llms.txt).
       featureList: [
         "Contesta las llamadas que el negocio no coge, con su número de siempre (desvío)",
-        "Comprueba el hueco en Google Calendar, Outlook o iCloud antes de reservar",
+        "Comprueba el hueco en Google Calendar, Outlook, iCloud o la agenda de Alhabla antes de reservar",
         "Reparto de citas por especialidad de cada profesional",
         "Confirmación de la cita por WhatsApp y recordatorio con botones (Pro y Scale)",
         "Lista de espera: aviso por WhatsApp si se libera por una cancelación la hora que pidió el cliente",
-        "El Gestor: el dueño cambia citas, horario, precios y equipo por WhatsApp, con notas de voz",
-        "Ausencias del equipo: recoloca las citas y avisa a cada cliente, con la confirmación del dueño",
+        "Tu asistente por WhatsApp: el dueño cambia citas, horario, precios y equipo escribiendo o con notas de voz, y nada se aplica sin su «Confirmar»",
+        "Ausencias del equipo: dice qué citas tenía, ayuda a pasarlas a quien diga el dueño y avisa a cada cliente, con su confirmación",
         "Castellano y siete idiomas más, y catalán, euskera o gallego según la zona",
         "Aviso de inteligencia artificial al descolgar y grabación solo con permiso",
       ],
@@ -173,7 +173,7 @@ export const landingStructuredData = {
         audienceType: "Peluquerías, barberías, salones de uñas, centros de estética, fisioterapia, pestañas y cejas, spa y masajes y peluquería canina",
       },
       description:
-        "Atiende las llamadas que el negocio no puede coger, con su número de siempre, y reserva la cita en su agenda real; el dueño gestiona los cambios por WhatsApp.",
+        "Atiende las llamadas que el negocio no puede coger, con su número de siempre, y reserva la cita en su agenda; el dueño lo gestiona todo por WhatsApp o desde el panel.",
       url: absoluteUrl("/"),
     },
   ],

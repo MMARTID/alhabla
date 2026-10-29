@@ -15,11 +15,42 @@ import { LlamadaScroll } from "@/components/llamada-scroll";
 import { GestorSimulacionSection } from "@/components/gestor-simulacion";
 import { PuntosFuertesSection } from "@/components/puntos-fuertes-section";
 import { WhatsAppClientesSection } from "@/components/whatsapp-clientes-section";
-import { generalOwnerAssistant, nicheLinks } from "@/lib/niche-landings";
+import { nicheLinks, type OwnerAssistant } from "@/lib/niche-landings";
 import { GUION_GESTOR_GENERAL } from "@/lib/gestor-guiones";
 import { HOME_QUICK_FAQS } from "@/lib/home-faqs";
 import { formatExtraMinute, formatIncludedMinutes, plans, TRIAL_REASSURANCE } from "@/lib/plans";
 import { AvisoDeFundador, PrecioDePlan } from "@/components/precio-de-plan";
+
+/**
+ * Tu asistente en la portada: las tres situaciones van en el orden de
+ * `GUION_GESTOR_GENERAL` (ausencia, cierre, precio). Lo que cuentan es lo que
+ * hace el backend: marca la ausencia y dice cuántas citas tenía, pero a quién
+ * pasarlas lo decide el dueño, y cada paso espera a su «Confirmar».
+ */
+const ASISTENTE_PORTADA: OwnerAssistant = {
+  badge: "Incluida en todos los planes",
+  title: "Y si a mediodía falta alguien, se lo dices a tu asistente.",
+  description:
+    "Tu asistente es la que trabaja para ti: le escribes por WhatsApp o desde el panel, como a una persona de confianza, y ella se encarga. Te propone cada cambio y lo hace cuando pulsas «Confirmar».",
+  examples: [
+    {
+      title: "Si alguien del equipo falta",
+      description:
+        "«Marta está de baja hoy»: deja de recibir citas y te dice cuántas tenía. Tú dices a quién pasar cada una; ella la mueve y avisa al cliente por WhatsApp.",
+    },
+    {
+      title: "Si cierras un día",
+      description:
+        "«El lunes 12 cerramos, es festivo»: ese día queda cerrado y la recepcionista no reserva nada, sin tocar el calendario a mano.",
+    },
+    {
+      title: "Si cambias un precio",
+      description:
+        "«El corte de caballero sube a 18 €»: se actualiza en tu carta y la recepcionista ya lo dice así cuando se lo preguntan.",
+    },
+  ],
+  closing: "Con tus clientes manda Alhabla. Con tu agenda mandas tú.",
+};
 
 /**
  * Un sector por tarjeta, cada uno con su foto de `public/heroes/`: la escena
@@ -33,7 +64,7 @@ import { AvisoDeFundador, PrecioDePlan } from "@/components/precio-de-plan";
 const SECTORES = [
   { href: "/peluqueria", title: "Peluquerías", description: "Cortes, color y tratamientos sin soltar el secador.", imagen: "/heroes/peluqueria.jpg" },
   { href: "/barberia", title: "Barberías", description: "Degradados y arreglos sin dejar la máquina a medias.", imagen: "/heroes/barberia.jpg" },
-  { href: "/salon-de-unas", title: "Salones de uñas", description: "Manicuras sin interrupciones; la agenda se llena sola.", imagen: "/heroes/salon-de-unas.jpg" },
+  { href: "/salon-de-unas", title: "Salones de uñas", description: "Semipermanentes y gel sin soltar la lima.", imagen: "/heroes/salon-de-unas.jpg" },
   { href: "/centro-de-estetica", title: "Centros de estética", description: "Reservas y dudas resueltas mientras estás en cabina.", imagen: "/heroes/centro-de-estetica.jpg" },
   { href: "/fisioterapia", title: "Fisioterapia", description: "Las citas entran solas mientras tratas en camilla.", imagen: "/heroes/fisioterapia.jpg" },
 ] as const;
@@ -352,25 +383,25 @@ export function MainLanding() {
         <HeroHilos />
         <div className="mx-auto flex max-w-4xl flex-col items-center space-y-7 px-4 py-16 text-center sm:px-6 sm:py-24 lg:px-8 lg:py-28">
           <Reveal y={14}>
-            <span className="badge-soft">Recepción telefónica para negocios con cita previa</span>
+            <span className="badge-soft">Recepcionista de IA para negocios con cita previa</span>
           </Reveal>
           <Reveal delay={0.06} y={16}>
             <h1 className="text-balance text-[2.75rem] font-black leading-[1.02] tracking-[-0.045em] text-[#0a0a0a] sm:text-6xl lg:text-[4.6rem]">
               Tu negocio no tiene que parar para atender el teléfono.
             </h1>
             <p className="mx-auto mt-6 max-w-xl text-lg leading-8 text-[#52525b]">
-              Alhabla responde con tu número, consulta tu agenda y confirma citas mientras tu equipo sigue atendiendo.
+              Alhabla atiende tus llamadas con IA para que no pierdas ninguna, y tú lo gestionas todo por WhatsApp o desde el panel.
             </p>
           </Reveal>
           <Reveal delay={0.12} y={16}>
             <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:justify-center">
-              <Link href="/planes" className="btn-primary h-12 px-6" data-evento="clic_probar" data-ubicacion="portada">Probar Alhabla 7 días <ArrowRight className="h-4 w-4" aria-hidden="true" /></Link>
+              <Link href="/planes" className="btn-primary h-12 px-6" data-evento="clic_probar" data-ubicacion="portada">Probar 7 días gratis <ArrowRight className="h-4 w-4" aria-hidden="true" /></Link>
               <button type="button" onClick={() => setIsDemoOpen(true)} className="btn-secondary h-12 px-6"><Headphones className="h-4 w-4" aria-hidden="true" /> Escuchar cómo atiende</button>
             </div>
           </Reveal>
           <Reveal delay={0.18} y={12}>
             <p className="flex flex-wrap justify-center gap-x-5 gap-y-2 text-sm font-medium text-[#3f3f46]">
-              {["Sin cambiar de número", "Google, Outlook o iCloud", "Sin permanencia"].map((item) => <span key={item} className="inline-flex items-center gap-1.5"><Check className="h-4 w-4 text-[#8b5cf6]" aria-hidden="true" />{item}</span>)}
+              {["Tu número de siempre", "Con tu calendario o sin él", "Sin permanencia"].map((item) => <span key={item} className="inline-flex items-center gap-1.5"><Check className="h-4 w-4 text-[#8b5cf6]" aria-hidden="true" />{item}</span>)}
             </p>
           </Reveal>
         </div>
@@ -378,25 +409,25 @@ export function MainLanding() {
 
 
       {/*
-        Orden (2026-09-29): cómo funciona, scroll-driven y con el teléfono
-        (los tres pasos de una llamada) → lo que ve el dueño en su panel, con
-        el portátil en 3D → qué la hace distinta de un contestador → qué
-        recibe el cliente por WhatsApp → El Gestor → puesta en marcha →
-        sectores → precio → dudas.
+        Orden (2026-10-29, el de las promesas): que no se pierda ninguna
+        llamada (los tres pasos en el teléfono y, sin corte, lo que ve el
+        dueño en el portátil: las dos secciones van siempre juntas, ver
+        lib/transicion-bolsillo-negocio.ts) → tu asistente por WhatsApp →
+        qué la hace distinta de un contestador → lo que recibe el cliente →
+        puesta en marcha → sectores → precio → dudas.
       */}
       <LlamadaScroll />
 
       <EnTuNegocioScroll />
 
+      {/* Tu asistente en acción: el WhatsApp del dueño en el teléfono y su
+          panel en el portátil, reaccionando a cada cambio. Cada landing de
+          sector monta la misma simulación con su guion (lib/gestor-guiones.ts). */}
+      <GestorSimulacionSection data={ASISTENTE_PORTADA} guion={GUION_GESTOR_GENERAL} masInfoHref="/agenda-por-whatsapp" />
+
       <PuntosFuertesSection onEscuchar={() => setIsDemoOpen(true)} />
 
       <WhatsAppClientesSection />
-
-      {/* El Gestor en acción (2026-09-30): el WhatsApp del dueño en el
-          teléfono y su panel en el portátil, reaccionando a cada cambio.
-          Aquí con el guion general; cada landing de sector monta la misma
-          simulación con el suyo (lib/gestor-guiones.ts). */}
-      <GestorSimulacionSection data={generalOwnerAssistant} guion={GUION_GESTOR_GENERAL} />
 
       <EnMarchaSection />
 
@@ -408,7 +439,7 @@ export function MainLanding() {
       <section id="sectores" className="scroll-m-20 border-b border-[#e5e5e5] py-16 sm:py-24">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <Reveal>
-            <h2 className="max-w-3xl text-3xl font-black tracking-tight sm:text-5xl">Cada negocio tiene su forma de llenar la agenda.</h2>
+            <h2 className="max-w-3xl text-3xl font-black tracking-tight sm:text-5xl">Cada oficio tiene sus propias llamadas.</h2>
           </Reveal>
           <div className="mt-14 sm:mt-16">
             {/* Una pieza por forma de mirar, que no es la misma en cada
@@ -466,16 +497,23 @@ export function MainLanding() {
                   </div>
                   <p className="mt-3 text-sm font-semibold text-[#27272a]">{formatIncludedMinutes(plan.minutes)} minutos incluidos · {formatExtraMinute(plan.extraPerMinute)}</p>
                   <p className="mt-2 text-sm leading-6 text-[#52525b]">{plan.description}</p>
+                  {/* Los minutos ya van bajo el precio: fuera de la lista. */}
                   <ul className="mb-7 mt-5 space-y-2.5 border-t border-[#e5e5e5] pt-5">
-                    {plan.features.map((feature) => (
+                    {plan.features.filter((feature) => !feature.endsWith("minutos de llamadas incluidos")).map((feature) => (
                       <li key={feature} className="flex items-start gap-2.5 text-sm leading-6 text-[#27272a]">
                         <Check className="mt-1 h-4 w-4 shrink-0 text-[#8b5cf6]" aria-hidden="true" />
                         {feature}
                       </li>
                     ))}
                   </ul>
-                  <Link href={`/planes?plan=${plan.id}`} className={plan.featured ? "btn-primary mt-auto" : "btn-secondary mt-auto"}>
-                    Elegir {plan.name}
+                  <Link
+                    href={`/planes?plan=${plan.id}`}
+                    className={plan.featured ? "btn-primary mt-auto" : "btn-secondary mt-auto"}
+                    aria-label={`Probar 7 días gratis el plan ${plan.name}`}
+                    data-evento="clic_probar"
+                    data-ubicacion={`portada_plan_${plan.id}`}
+                  >
+                    Probar 7 días gratis
                   </Link>
                 </article>
               </Reveal>
@@ -505,7 +543,7 @@ export function MainLanding() {
         </div>
       </section>
 
-      <section className="bg-[#0a0a0a] text-white"><Reveal className="mx-auto flex max-w-7xl flex-col items-start justify-between gap-7 px-4 py-16 sm:px-6 sm:py-20 lg:flex-row lg:items-center lg:px-8"><div><h2 className="max-w-xl text-3xl font-black tracking-tight sm:text-5xl">Prueba qué pasa cuando nadie deja una llamada sin atender.</h2></div><Link href="/planes" className="btn-purple shrink-0" data-evento="clic_probar" data-ubicacion="portada_cierre">Empezar ahora <ArrowRight className="h-4 w-4" aria-hidden="true" /></Link></Reveal></section>
+      <section className="bg-[#0a0a0a] text-white"><Reveal className="mx-auto flex max-w-7xl flex-col items-start justify-between gap-7 px-4 py-16 sm:px-6 sm:py-20 lg:flex-row lg:items-center lg:px-8"><div><h2 className="max-w-xl text-3xl font-black tracking-tight sm:text-5xl">Que ninguna llamada a tu negocio se quede sin respuesta.</h2></div><Link href="/planes" className="btn-purple shrink-0" data-evento="clic_probar" data-ubicacion="portada_cierre">Empezar ahora <ArrowRight className="h-4 w-4" aria-hidden="true" /></Link></Reveal></section>
       <SiteFooter />
       <DemoVoiceCall open={isDemoOpen} onClose={() => setIsDemoOpen(false)} />
     </main>

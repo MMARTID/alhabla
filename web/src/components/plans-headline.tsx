@@ -9,7 +9,9 @@ const currencyFormatter = new Intl.NumberFormat("es-ES", {
   maximumFractionDigits: 0,
 });
 
-const GENERIC_TITLE = "Convierte llamadas en reservas, sin complicarte.";
+// La promesa primera de Alhabla (PRODUCT.md › Visión del fundador): que no se
+// pierda ninguna llamada. El precio va justo debajo, en las tarjetas.
+const GENERIC_TITLE = "Que no se te escape ninguna llamada.";
 
 export function PlansHeadline() {
   const [title, setTitle] = useState<string>(GENERIC_TITLE);

@@ -98,7 +98,7 @@ export async function getDemoPlaceDetails(placeId: string) {
 }
 
 export type DemoWebCall = {
-  /** Assistant de Telnyx de la cuenta de demostración del nicho. */
+  /** Assistant de la cuenta de demostración del nicho en el proveedor de voz. */
   assistantId: string;
   niche: string;
   maxDurationSeconds: number;

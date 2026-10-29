@@ -34,10 +34,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     .at(-1);
 
   return [
-    // Sin las comparativas desde el 2026-10-28 (decisión del dueño, tras la
-    // revisión de docs/auditorias/2026-10-27-competencia-y-comparativas.md):
-    // siguen publicadas y enlazadas, pero no se anuncian a los buscadores.
-    ...PAGINAS.filter((p) => p.seccion !== "comparativas").map((p) => {
+    ...PAGINAS.map((p) => {
       const fecha = p.ruta === "/blog" ? ultimoArticulo : p.actualizado;
       const imagenes = (p.imagenes ?? []).filter(esPropia);
       return {

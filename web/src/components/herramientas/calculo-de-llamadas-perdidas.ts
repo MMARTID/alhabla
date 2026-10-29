@@ -9,8 +9,7 @@ import { plans, type Plan } from "@/lib/plans";
 
 export type IdSector = "peluqueria" | "barberia" | "unas" | "estetica" | "fisioterapia" | "pestanas" | "spa" | "canina";
 
-/** Valores de partida: orientativos, no estadísticas. El ticket de los cinco
- * primeros es el mismo que usan sus landings (lib/niche-landings.ts). */
+/** Valores de partida: orientativos, no estadísticas. */
 export const SECTORES_DE_LA_CALCULADORA: readonly { id: IdSector; nombre: string; ticket: number; visitas: number }[] = [
   { id: "peluqueria", nombre: "Peluquería", ticket: 45, visitas: 6 },
   { id: "barberia", nombre: "Barbería", ticket: 25, visitas: 12 },

@@ -221,11 +221,11 @@ graph TD
 | Ruta | Qué es |
 |---|---|
 | `/` | Landing |
-| `/peluqueria`, `/barberia`, `/centro-de-estetica`, `/salon-de-unas`, `/fisioterapia`, `/peluqueria-canina`, `/pestanas-y-cejas`, `/spa-y-masajes` | Landings por sector (las antiguas `/<sector>/<ciudad>` redirigen aquí con 301) |
-| `/planes` | Planes y calculadora de ROI |
+| `/peluqueria`, `/barberia`, `/centro-de-estetica`, `/salon-de-unas`, `/fisioterapia`, `/pestanas-y-cejas`, `/spa-y-masajes`, `/peluqueria-canina` | Landings por sector, plantilla «Las preguntas de la dueña» con los textos en `web/src/lib/sectores/` (las antiguas `/<sector>/<ciudad>` redirigen aquí con 301) |
+| `/planes` | Planes y precios |
 | `/recepcionista-ia-en-catalan`, `/recepcionista-ia-en-euskera`, `/recepcionista-ia-en-gallego` | Atención en las lenguas cooficiales |
-| `/agenda-por-whatsapp` | El Gestor: el dueño gestiona la agenda por WhatsApp |
-| `/comparativa`, `/comparativa/*` | Alhabla frente a fonio y HeyDiga, y la recepcionista de IA frente a centralita, secretaria y persona |
+| `/agenda-por-whatsapp` | Tu asistente: el dueño gestiona su negocio por WhatsApp (en el código, «el Gestor») |
+| `/comparativa`, `/comparativa/alhabla-vs-{retell-ai,vapi,bland-ai,synthflow,elevenlabs}` | Alhabla frente a las plataformas para montar tu propio agente de voz (las comparativas con HeyDiga, fonio y personas redirigen con 301) |
 | `/desvio-de-llamadas`, `/desvio-de-llamadas/<operador>` | Códigos de desvío por operador (e `iphone-y-android`) |
 | `/integraciones`, `/integraciones/*` | Google Calendar, Outlook, iCloud y WhatsApp |
 | `/herramientas`, `/herramientas/*` | Calculadora de llamadas perdidas, guion, mensajes de contestador, plantillas de recordatorio y política de cancelación |

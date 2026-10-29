@@ -1,18 +1,18 @@
 import Link from "next/link";
 import { PhoneCall } from "lucide-react";
 import { BotonImprimir } from "@/components/herramientas/boton-imprimir";
-import { Conversacion, Nota, PaginaGuia, Seccion, Tabla, Texto } from "@/components/pagina-guia";
+import { Conversacion, PaginaGuia, Seccion, Tabla } from "@/components/pagina-guia";
 import { metadataDePagina } from "@/lib/seo";
 
 /**
- * Guion para atender el teléfono del salón (2026-10-20). Para quien coge el
- * teléfono con una clienta delante: seis pasos, tres situaciones difíciles,
- * errores comunes y una variante por sector. El bloque `#guion-imprimible`
+ * Guion para atender el teléfono del salón (2026-10-20). Para las llamadas
+ * que sí se cogen: seis pasos, cuatro situaciones difíciles y la pregunta de
+ * cada sector. Con una clienta delante, la respuesta es no cogerlo. El bloque `#guion-imprimible`
  * es lo único que sale al imprimir (CSS de abajo, con `:has()`), para
  * dejarlo pegado junto al teléfono.
  *
  * Lo que dice de la recepcionista de IA, ajustado a los hechos del
- * producto: avisa de que es una IA, mira la agenda real antes de ofrecer,
+ * producto: avisa de que es una IA, mira tu agenda antes de ofrecer,
  * reserva con quien piden por su nombre, resume la cita antes de reservarla
  * y pregunta si manda la confirmación por WhatsApp (backend/src/lib/
  * seccionesDelPrompt.ts, «## Reserva»), saluda por su nombre a quien ya
@@ -54,17 +54,17 @@ const PASOS = [
   {
     titulo: "Ofrece dos horas concretas",
     frase: "«Tengo el jueves a las cinco o el viernes a las diez y media. ¿Cuál te viene mejor?»",
-    porQue: "Elegir entre dos es fácil. «¿Cuándo te viene bien?» abre una negociación de cinco minutos con la agenda en la mano.",
+    porQue: "Abre la agenda antes de proponer. Elegir entre dos es fácil; «¿cuándo te viene bien?» abre una negociación de cinco minutos.",
   },
   {
     titulo: "Pide nombre y teléfono",
     frase: "«¿A nombre de quién la pongo? ¿Y un móvil por si hay que avisarte? Te llegará la confirmación por WhatsApp.»",
-    porQue: "Sin teléfono no hay recordatorio ni forma de avisar si algo cambia. Decir para qué lo usarás es, además, lo que pide la protección de datos.",
+    porQue: "Sin teléfono no hay recordatorio ni forma de avisar si algo cambia. Apúntalo directamente en la agenda, no en un papel «para pasarlo luego».",
   },
   {
     titulo: "Repite y confirma",
     frase: "«Te lo repito: jueves 23 a las cinco, corte y color con Marta, a nombre de Laura. ¿Correcto?»",
-    porQue: "Aquí se cazan los errores de día y de hora, que son los que acaban en ausencia. Apunta mientras lo dices, no después de colgar.",
+    porQue: "Aquí se cazan los errores de jueves por viernes y cinco por quince, que acaban en una clienta que no viene.",
   },
   {
     titulo: "Despide con lo que viene después",
@@ -92,7 +92,7 @@ const SITUACIONES = [
   {
     titulo: "Si suena con una clienta en el sillón",
     texto:
-      "Pide permiso a quien tienes delante, coge y sé breve: «¿Me dejas tu nombre y te llamo en diez minutos?». Y llama. Una devolución que no llega es peor que no haber cogido.",
+      "No lo cojas: la que tienes delante va primero. Si las llamadas que no coges van a una recepcionista, deja que suene. Si no, devuelve la llamada en cuanto termines; una devolución que no llega es peor que no haber cogido.",
   },
 ] as const;
 
@@ -111,9 +111,8 @@ export default function GuionParaAtenderElTelefonoPage() {
       ctaSecundario={{ texto: "Ir al guion", href: "#guion" }}
       entradilla={
         <p>
-          Lo que tiene que pasar en una llamada para que termine en una cita bien apuntada: seis pasos, qué decir en
-          cada uno y qué hacer cuando la llamada se tuerce. Con una variante para cada sector y una versión para
-          imprimir y dejar junto al teléfono.
+          Seis pasos para que una llamada termine en una cita bien apuntada, qué decir en cada uno y qué hacer cuando
+          se tuerce. Para imprimir y dejar junto al teléfono.
         </p>
       }
       faqs={[
@@ -137,23 +136,11 @@ export default function GuionParaAtenderElTelefonoPage() {
           answer:
             "Pregunta lo justo para saber la duración y reserva lo más probable. Si de verdad no se puede saber sin verle, ofrece una valoración corta o reserva el servicio largo: es mejor que sobre tiempo a que falte.",
         },
-        {
-          question: "¿Puedo tener el guion impreso junto al teléfono?",
-          answer:
-            "Para eso está el botón de imprimir: sale solo el guion y las situaciones difíciles, en una hoja. Lo útil es que quien coge el teléfono sea quien sea, lo haga igual.",
-        },
-        {
-          question: "¿La recepcionista de IA sigue este mismo guion?",
-          answer:
-            "Sigue la misma lógica: saluda con el nombre del negocio avisando de que es una inteligencia artificial, pregunta qué servicio quiere, mira la agenda real y ofrece una hora libre. Antes de reservar repite servicio, día, hora y nombre, y pregunta si le manda la confirmación por WhatsApp; el teléfono lo toma del número desde el que llaman. A quien ya reservó con ese número le saluda por su nombre y le ofrece repetir lo de la última vez. Lo que no sabe es lo que no está apuntado en ninguna parte.",
-        },
       ]}
       relacionadas={[
         { href: "/herramientas/mensajes-de-contestador", titulo: "Mensajes de contestador", texto: "Para las llamadas que no puedes coger." },
         { href: "/herramientas/politica-de-cancelacion", titulo: "Política de cancelación", texto: "La frase del último paso, con tus plazos." },
         { href: "/herramientas/calculadora-de-llamadas-perdidas", titulo: "Calculadora de llamadas perdidas", texto: "Lo que cuestan las que no llegas a coger." },
-        { href: "/blog/lista-de-espera-huecos-libres", titulo: "Lista de espera para huecos libres", texto: "El «te escribo si se libera» que llena huecos." },
-        { href: "/blog/que-hace-una-recepcionista-virtual", titulo: "Qué hace una recepcionista de IA", texto: "Lo que resuelve en una llamada y lo que no." },
       ]}
       cierre="Que cada llamada termine en una cita bien apuntada."
     >
@@ -196,24 +183,6 @@ export default function GuionParaAtenderElTelefonoPage() {
 
       <Seccion
         fondo
-        titulo="Errores que cuestan citas"
-        entradilla={<p>Ninguno parece grave en el momento. Todos acaban en un cliente que no viene o que no vuelve a llamar.</p>}
-      >
-        <Tabla
-          cabecera={["Lo que pasa", "Por qué cuesta", "Mejor así"]}
-          filas={[
-            ["Coger con prisa: «¿Sí?»", "Quien llama duda de si ha marcado bien y siente que molesta.", "El nombre del negocio, aunque sea deprisa."],
-            ["«¿Cuándo te viene bien?» sin mirar la agenda", "Te dirán la hora que ya tienes ocupada, y vuelta a empezar.", "Abre la agenda primero y ofrece dos huecos."],
-            ["Apuntar en un papel «para pasarlo luego»", "El papel se pierde o se pasa mal, y aparece una cita doble.", "Directamente en la agenda, mientras hablas."],
-            ["No repetir los datos", "Jueves y viernes, cinco y quince: los errores de oído no se ven hasta el día.", "Repite día, hora, servicio y nombre antes de colgar."],
-            ["Un precio cerrado de algo que depende", "El día de la cita el precio es otro y empieza mal.", "Una horquilla y de qué depende."],
-            ["Dejar en espera sin decir cuánto", "Al minuto la gente cuelga, y no vuelve a llamar.", "«¿Te importa esperar un minuto?» y vuelve antes."],
-            ["Prometer que llamarás y no hacerlo", "Para el cliente es peor que no haber cogido.", "Apunta el nombre y el teléfono y llama en el rato que dijiste."],
-          ]}
-        />
-      </Seccion>
-
-      <Seccion
         titulo="La pregunta que cambia en cada sector"
         entradilla={
           <p>
@@ -238,62 +207,28 @@ export default function GuionParaAtenderElTelefonoPage() {
       </Seccion>
 
       <Seccion
-        fondo
-        titulo="Cómo lo hace una recepcionista de IA"
+        id="si-no-puedes"
+        titulo="Y cuando no puedes cogerlo"
         entradilla={
           <p>
-            Cuando no puedes coger, las llamadas que desvías a una recepcionista de IA siguen la misma lógica. Así suena
-            en una peluquería un jueves por la tarde.
+            Con el <Link href="/desvio-de-llamadas">desvío</Link>, la recepcionista de IA sigue estos mismos pasos. Avisa
+            de que es una IA, mira tu agenda y repite la cita antes de reservarla; tú lo ves por WhatsApp o en el panel.
           </p>
         }
       >
-        <div className="grid gap-8 lg:grid-cols-2 lg:items-start">
+        <div className="max-w-2xl">
           <Conversacion
             etiqueta="Ejemplo de llamada atendida por la recepcionista de IA"
             turnos={[
               { quien: "recepcionista", texto: "Peluquería Nerea, te atiende su asistente de inteligencia artificial. ¿En qué te ayudo?" },
               { quien: "cliente", texto: "Hola, quería hora para cortarme el pelo con Marta. ¿El viernes a las diez puede ser?" },
-              { quien: "recepcionista", texto: "Mientras lo compruebo, ¿te parece bien que grabe tus llamadas para que Peluquería Nerea pueda revisarlas?" },
-              { quien: "cliente", texto: "Sí, vale." },
-              { quien: "recepcionista", texto: "Gracias. A las diez Marta está ocupada, pero tiene libre a las diez y media. ¿Te viene bien?" },
-              { quien: "cliente", texto: "Sí, perfecto." },
-              { quien: "recepcionista", texto: "¿A nombre de quién la pongo?" },
-              { quien: "cliente", texto: "Laura Gómez." },
+              { quien: "recepcionista", texto: "A las diez Marta está ocupada, pero tiene libre a las diez y media. ¿Te viene bien?" },
+              { quien: "cliente", texto: "Sí, perfecto. A nombre de Laura Gómez." },
               { quien: "recepcionista", texto: "Te lo resumo: corte con Marta el viernes a las diez y media, a nombre de Laura Gómez. ¿Te la reservo y te mando la confirmación por WhatsApp a este número?" },
               { quien: "cliente", texto: "Sí, gracias." },
               { quien: "recepcionista", texto: "Hecho, Laura. Ahora te llega un WhatsApp de Alhabla con la confirmación de la cita." },
             ]}
           />
-          <Texto>
-            <p>
-              Avisa al empezar de que es una inteligencia artificial y dice el nombre de tu negocio. Antes de ofrecer una
-              hora mira tu agenda real y tu horario, y si piden a alguien por su nombre, reserva con esa persona. Antes de
-              reservar repite servicio, día, hora y nombre, y pregunta si manda la confirmación por WhatsApp: si el
-              cliente dice que sí, le llega en ese momento.
-            </p>
-            <p>
-              Si quien llama ya reservó antes desde ese número, le saluda por su nombre y le pregunta si quiere repetir el
-              servicio de la última vez. Si dice que sí, no le vuelve a pedir ni el servicio ni el nombre.
-            </p>
-            <p>
-              El precio que da es el que tenga cada servicio en tu catálogo, y tú eliges en «Cómo atiende» si lo dice
-              siempre, solo si se lo preguntan (es lo que viene marcado) o nunca. Si un servicio no tiene precio, no se lo
-              inventa. Lo que se habló queda en la transcripción de la llamada. La grabación de audio, solo si el cliente
-              acepta cuando se lo pregunta, una sola vez; si dice que no, queda solo la transcripción.
-            </p>
-            <p>
-              Lo que no sabe es lo que no está apuntado en ninguna parte: cómo le gusta el flequillo a tu clienta o lo que
-              te contó la última vez. Por eso funciona mejor como el que coge lo que tú no puedes coger, no como sustituto
-              del mostrador. Cómo llegan esas llamadas, en la{" "}
-              <Link href="/desvio-de-llamadas">guía de desvío por operador</Link>.
-            </p>
-          </Texto>
-        </div>
-        <div className="mt-8">
-          <Nota tipo="consejo" titulo="Pruébalo como si fueras cliente">
-            Antes de dar el guion por bueno, llama a tu negocio desde otro móvil y pide cita como lo haría un cliente. Lo
-            que te incomode a ti como cliente, cámbialo.
-          </Nota>
         </div>
       </Seccion>
     </PaginaGuia>

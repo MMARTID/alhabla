@@ -1,282 +1,220 @@
-
 import Link from "next/link";
-import { ArrowRight, Check, Scissors, Sparkles, Store } from "lucide-react";
+import { ArrowRight, Plus } from "lucide-react";
 import { LandingHero } from "@/components/landing-hero";
+import { OwnerAssistantChatMockup } from "@/components/owner-assistant-chat";
+import { OficioDelSector } from "@/components/sector/oficio-del-sector";
+import { PreciosDelSector } from "@/components/sector/precios-del-sector";
+import { Pregunta } from "@/components/sector/pregunta";
+import { TranscripcionLlamada } from "@/components/sector/transcripcion-llamada";
+import { WhatsappDelCliente } from "@/components/sector/whatsapp-del-cliente";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
-import { SectorDataSection } from "@/components/sector-data-section";
-import { SectorCiudadesIdiomas } from "@/components/sector-ciudades-idiomas";
-import { EnTuNegocioScroll } from "@/components/en-tu-negocio";
-import { LlamadaScroll } from "@/components/llamada-scroll";
-import { TeamRoutingSection } from "@/components/team-routing-section";
-import { GuiaDelSector } from "@/components/sector/guia-sector";
-import { ArticulosDelSector } from "@/components/sector/articulos-del-sector";
-import { GestorSimulacionSection } from "@/components/gestor-simulacion";
-import { WhatsAppBenefitsTable } from "@/components/whatsapp-benefits-table";
-import { RevenueLossCalculator } from "@/components/revenue-loss-calculator";
-import { Reveal } from "@/components/scroll-reveal";
-import { formatIncludedMinutes, plans, TRIAL_REASSURANCE } from "@/lib/plans";
-import { AvisoDeFundador, PrecioDePlan } from "@/components/precio-de-plan";
-import { type NicheLandingContent } from "@/lib/niche-landings";
-import { GUIONES_SECTOR } from "@/lib/relato-guiones";
-import { GUIONES_GESTOR } from "@/lib/gestor-guiones";
-import { MainLanding } from "@/components/main-landing";
+import type { NicheAccent } from "@/lib/niche-landings";
+import type { SectorLanding } from "@/lib/sectores/tipos";
 
-function buildPlansHref(niche?: string) {
-  return niche ? `/planes?niche=${encodeURIComponent(niche)}` : "/planes";
-}
-
-const BENEFIT_ICONS = [Scissors, Sparkles, Store] as const;
-
-export function SiteLanding({ content }: { content?: NicheLandingContent }) {
-  // La portada general tiene que resolver una sola pregunta —qué hace Alhabla
-  // y por qué probarlo—. El material largo vive en las páginas de cada sector,
-  // donde esa profundidad sí responde a una intención de búsqueda concreta.
-  if (!content) return <MainLanding />;
-
-  const visibleBenefits = content.benefits;
-  const visibleFaqs = content.faqs;
-  const plansHref = buildPlansHref(content?.slug);
+/**
+ * La landing de sector, «Las preguntas de la dueña» (PLAN-WEB-CONTENIDO.md y
+ * el contrato de .impeccable/surfaces/web-src-components-site-landing-tsx.md):
+ * las preguntas que se hace la dueña antes de probar, cada una contestada en
+ * dos líneas y demostrada con una pieza del producto. Ocho bloques fijos:
+ * hero, la llamada, tu asistente (con la regla de confianza), el WhatsApp
+ * del cliente, el oficio, el precio, cinco preguntas y el cierre. Lo que
+ * cambia de un oficio a otro está en lib/sectores/<sector>.ts. La portada
+ * es otra (main-landing.tsx).
+ */
+export function SiteLanding({ sector }: { sector: SectorLanding }) {
+  const acento = sector.acento;
+  const planesHref = `/planes?niche=${encodeURIComponent(sector.slug)}`;
 
   return (
     <main
       id="main-content"
-      // Sin campo de partículas (decisión 2026-09-16): en la landing ensuciaba
-      // el contenido y competiría con las animaciones del hero; queda
-      // reservado a login/registro/onboarding.
-      className="relative isolate min-h-screen w-full bg-white text-[#0a0a0a]"
+      className="relative isolate min-h-screen w-full bg-lienzo text-tinta"
       data-landing="alhabla"
     >
       <a
         href="#contenido"
-        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[60] focus:rounded-[10px] focus:bg-[#0a0a0a] focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-white"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[60] focus:rounded-[10px] focus:bg-tinta focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-sobre-tinta"
       >
         Saltar al contenido
       </a>
 
-      <SiteHeader niche={content?.slug} />
+      <SiteHeader niche={sector.slug} />
 
       <div id="contenido" tabIndex={-1} className="outline-none">
-        <LandingHero content={content} />
+        <LandingHero
+          slug={sector.slug}
+          paraQuien={sector.paraQuien}
+          frase={sector.hero.frase}
+          acento={acento}
+          demo={sector.demo}
+        />
       </div>
 
-      {content.sectorData ? <SectorDataSection data={content.sectorData} accent={content.accent} /> : null}
-
-      {/*
-        Ciudades e idiomas justo después de los datos del sector (2026-10-20):
-        recoge lo que antes repartían 30 páginas `/[sector]/[ciudad]` casi
-        vacías — la cifra del sector en cada gran ciudad — y lo que sí cambia
-        según dónde esté el negocio: la lengua cooficial que se activa sola.
-      */}
-      <SectorCiudadesIdiomas nicho={content.slug} accent={content.accent} textos={content.ciudades} />
-
-      {/*
-        Sin fondo propio a partir de aquí (salvo los bloques negros reales,
-        como el CTA final): las secciones dejaban de tener fondo transparente
-        y tapaban el campo de partículas, que solo se veía en el hero y en
-        "precios" — la queja real de "solo hay efecto en dos zonas". El ritmo
-        visual entre secciones lo dan el espaciado y, donde ya existía, el
-        borde — no un tinte de fondo.
-      */}
-      {/*
-        Reparto por especialidad justo después de los datos del sector: el
-        visitante acaba de ver el problema (cifras) y ahora ve el primer
-        diferenciador del producto — la cita cae en la persona que él
-        elegiría. Es el diferenciador del producto y va en todos los planes
-        — por eso no vive dentro de precios.
-      */}
-      <TeamRoutingSection data={content.teamRouting} accent={content.accent} />
-
-      {/*
-        La guía del oficio justo después del reparto (2026-10-20): el
-        visitante acaba de ver las tres reglas del reparto y la guía las baja
-        a su sector — las llamadas típicas, los servicios con sus tiempos y
-        quién suele hacerlos, cuándo llaman y los errores al empezar. Es el
-        contenido que solo tiene esta landing; sin él, las cinco compartían
-        más de la mitad del texto y Google solo indexaba una.
-      */}
-      <GuiaDelSector guia={content.guia} />
-
-      {/*
-        El Gestor después del reparto y de la guía: el visitante ya ha visto
-        que la agenda reparte sola por profesional, y ahora ve que además
-        puede hablarle por WhatsApp cuando algo cambia (una baja, un cierre).
-        Desde el 2026-10-22 es la misma simulación que la portada (el
-        WhatsApp del dueño en el iPhone y el panel en el portátil), con el
-        guion del sector (lib/gestor-guiones.ts) y su color.
-      */}
-      <GestorSimulacionSection
-        data={content.ownerAssistant}
-        guion={GUIONES_GESTOR[content.slug]}
-        accent={content.accent}
-        masInfoHref="/agenda-por-whatsapp"
+      {/* «Cómo funciona» de la cabecera salta aquí. */}
+      <Pregunta
+        id="como-funciona"
+        primera
+        pregunta={sector.llamada.pregunta}
+        respuesta={sector.llamada.respuesta}
+        lado="derecha"
+        prueba={
+          <TranscripcionLlamada
+            negocio={sector.negocio}
+            quien={sector.llamada.quien}
+            duracion={sector.llamada.duracion}
+            lineas={sector.llamada.lineas}
+            acento={acento}
+          />
+        }
       />
 
-      <WhatsAppBenefitsTable accent={content.accent} titulo={content.whatsappClientes.titulo} filas={content.whatsappClientes.filas} />
+      <Pregunta
+        id="tu-asistente"
+        pregunta={sector.asistente.pregunta}
+        respuesta={sector.asistente.respuesta}
+        lado="izquierda"
+        prueba={
+          <OwnerAssistantChatMockup
+            escenario={{
+              id: "ausencia",
+              reloj: "",
+              diaCorto: "",
+              turnos: sector.asistente.turnos,
+              vistas: [],
+              avisos: {},
+            }}
+            accent={acento}
+            pie="Ejemplo con nombres inventados."
+            entrada={false}
+          />
+        }
+      >
+        <ReglaDeConfianza clientes={sector.clientes} acento={acento} />
+        <Link
+          href="/agenda-por-whatsapp"
+          className="mt-6 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-tinta underline decoration-linea-fuerte underline-offset-4 transition hover:decoration-tinta"
+        >
+          Todo lo que le puedes pedir a tu asistente
+          <ArrowRight className="h-4 w-4" aria-hidden="true" />
+        </Link>
+      </Pregunta>
 
-      <section className="py-16 sm:py-20 lg:py-24">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <Reveal>
-            <h2 className="max-w-2xl text-3xl font-black leading-tight tracking-tight text-[#0a0a0a] sm:text-4xl">
-              {content?.benefitsTitle ?? "Una recepción que entiende tu negocio, sea cual sea."}
-            </h2>
-          </Reveal>
+      <Pregunta
+        id="whatsapp"
+        pregunta={sector.whatsapp.pregunta}
+        respuesta={sector.whatsapp.respuesta}
+        lado="derecha"
+        prueba={
+          <WhatsappDelCliente
+            negocio={sector.negocio}
+            quien={sector.llamada.quien}
+            confirmacion={sector.whatsapp.confirmacion}
+            conversacion={sector.whatsapp.conversacion}
+            acento={acento}
+          />
+        }
+      />
 
-          <div className="mt-10 grid gap-5 lg:grid-cols-3">
-            {visibleBenefits.map(({ title, description, result }, index) => {
-              const Icon = BENEFIT_ICONS[index] ?? Store;
-              return (
-                <Reveal key={title} delay={index * 0.1}>
-                  <article className="panel landing-card-hover h-full p-6 sm:p-7">
-                    <div
-                      className="flex h-11 w-11 items-center justify-center rounded-xl"
-                      style={content?.accent ? { backgroundColor: content.accent.soft, color: content.accent.strong } : { backgroundColor: "#f3eeff", color: "#8b5cf6" }}
-                    >
-                      <Icon className="h-5 w-5" />
-                    </div>
-                    <h3 className="mt-5 text-lg font-bold text-[#0a0a0a]">{title}</h3>
-                    <p className="mt-3 text-sm leading-6 text-[#52525b]">{description}</p>
-                    <div className="mt-5 border-t border-[#e5e5e5] pt-4">
-                      <p className="flex items-start gap-2 text-sm font-semibold leading-5 text-[#27272a]">
-                        <Check className="mt-0.5 h-4 w-4 shrink-0" style={{ color: content?.accent?.strong ?? "#8b5cf6" }} />
-                        {result}
-                      </p>
-                    </div>
-                  </article>
-                </Reveal>
-              );
-            })}
-          </div>
-        </div>
-      </section>
+      <OficioDelSector oficio={sector.oficio} acento={acento} />
 
-      {/*
-        Cómo funciona, justo antes de la calculadora y precios (2026-09-25):
-        el arco es problema (datos) → confianza (reparto, El Gestor,
-        WhatsApp, beneficios) → mecanismo (cómo funciona) → cuantificación
-        (calculadora) → precio. Desde el 2026-10-02 el mecanismo es el mismo
-        relato que la portada —la llamada en el iPhone («En tu bolsillo»), el
-        relevo con la pantalla de bloqueo y el panel en el portátil («En tu
-        negocio»)— con el guion del sector (sus servicios, su equipo, su
-        vocabulario, ver lib/relato-guiones.ts) y su color. Sustituye al
-        antiguo HowItWorksScrollytelling.
-      */}
-      <LlamadaScroll guion={GUIONES_SECTOR[content.slug]} acento={content.accent} />
-      <EnTuNegocioScroll guion={GUIONES_SECTOR[content.slug]} acento={content.accent} />
+      <PreciosDelSector slug={sector.slug} acento={acento} />
 
-      {/*
-        Orden decidido (2026-09-16): la calculadora vive justo antes de
-        Precios. La cifra de pérdida queda fresca al ver los precios, y /planes
-        reutiliza esa estimación (plans-with-roi) — su CTA ya no pide
-        comprar antes de haber visto cómo funciona el producto.
-      */}
-      <RevenueLossCalculator content={content?.calculator} activeNiche={content?.slug} accent={content?.accent} />
-
-      <section id="precios" className="scroll-m-20 mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-20 lg:px-8">
-        <Reveal className="max-w-2xl">
-          <h2 className="text-3xl font-black tracking-tight text-[#0a0a0a] sm:text-4xl">{content.planesTitulo}</h2>
-          <p className="mt-4 flex flex-wrap items-center gap-2 text-base font-semibold leading-7 text-[#27272a]">
-            <Check className="h-5 w-5 shrink-0" style={{ color: content?.accent?.strong ?? "#8b5cf6" }} aria-hidden="true" />
-            {TRIAL_REASSURANCE}
-          </p>
-          <AvisoDeFundador className="mt-2" />
-        </Reveal>
-
-        <div className="mt-8 grid gap-5 lg:grid-cols-3">
-          {plans.map((plan, index) => (
-            <Reveal key={plan.id} delay={index * 0.1}>
-              {/*
-                El plan recomendado se marcaba con una tarjeta negra maciza,
-                que a media página competía con el bloque negro del CTA final y
-                dejaba dos anclas oscuras compitiendo por la misma mirada. Pasa
-                a fondo blanco con un aro morado: La Regla del Acento Único
-                admite el "borde seleccionado" como el elemento morado que
-                reclama la atención, y así el negro se reserva para el cierre.
-              */}
-              <article
-                className={
-                  plan.featured
-                    ? "landing-card-hover relative flex h-full flex-col rounded-3xl bg-white p-7 ring-2 ring-[#8b5cf6]"
-                    : "landing-card-hover flex h-full flex-col rounded-3xl border border-[#e5e5e5] bg-white p-7"
-                }
-                style={
-                  plan.featured && content?.accent
-                    ? { boxShadow: `0 0 0 2px ${content.accent.strong}` }
-                    : undefined
-                }
-              >
-                <div className="flex items-center justify-between gap-3">
-                  <h3 className="text-lg font-bold text-[#0a0a0a]">{plan.name}</h3>
-                  {plan.featured ? <span className="badge-soft">Recomendado</span> : null}
-                </div>
-                <div className="mt-6">
-                  <PrecioDePlan plan={plan} />
-                </div>
-                <p className="mt-3 text-sm font-semibold text-[#27272a]">
-                  Incluye {formatIncludedMinutes(plan.minutes)} minutos de llamadas al mes
-                </p>
-                <p className="mt-2 text-sm leading-7 text-[#52525b]">{plan.summary}</p>
-                <Link
-                  href={`${plansHref}${plansHref.includes("?") ? "&" : "?"}plan=${plan.id}`}
-                  className={plan.featured ? "btn-primary mt-6" : "btn-secondary mt-6"}
-                >
-                  Empezar con {plan.name}
-                </Link>
-              </article>
-            </Reveal>
-          ))}
-        </div>
-      </section>
-
-      <section id="preguntas" className="scroll-m-20 border-y border-[#e5e5e5] py-16 sm:py-20">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <Reveal>
-            <h2 className="text-3xl font-black tracking-tight text-[#0a0a0a] sm:text-4xl">{content.faqsTitulo}</h2>
-          </Reveal>
-
-          <div className="mt-8 grid items-start gap-3 sm:grid-cols-2">
-            {visibleFaqs.map(({ question, answer }, index) => (
-              <Reveal key={question} delay={Math.min(index, 5) * 0.05} y={12}>
-                <details className="group rounded-2xl border border-[#e5e5e5] bg-white p-5">
-                  <summary className="flex cursor-pointer list-none items-start justify-between gap-4 text-sm font-semibold leading-6 text-[#0a0a0a] marker:content-none">
-                    {question}
-                    <span className="mt-1 text-lg leading-none transition group-open:rotate-45" style={{ color: content?.accent?.strong ?? "#8b5cf6" }} aria-hidden="true">+</span>
-                  </summary>
-                  <p className="mt-3 border-t border-[#e5e5e5] pt-3 text-sm leading-6 text-[#52525b]">{answer}</p>
-                </details>
-              </Reveal>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/*
-        Los artículos del sector antes del cierre (2026-10-22): quien ha
-        llegado hasta las preguntas y aún no se decide tiene dónde seguir
-        leyendo, y Google llega a los artículos desde una página indexada.
-      */}
-      <ArticulosDelSector content={content} />
-
-      <section className="bg-[#0a0a0a] text-white">
-        <Reveal className="mx-auto flex max-w-7xl flex-col items-start gap-6 px-4 py-16 sm:px-6 sm:py-20 lg:flex-row lg:items-center lg:justify-between lg:px-8">
-          <h2 className="max-w-xl text-3xl font-black tracking-tight sm:text-4xl">
-            {content?.closingTitle ?? "Empieza a no perder llamadas esta semana."}
-          </h2>
-          <div className="shrink-0">
-            <Link
-              href={plansHref}
-              className="btn-purple"
-              data-evento="clic_probar"
-              data-ubicacion="sector_cierre"
+      <section
+        id="preguntas"
+        aria-labelledby="preguntas-titulo"
+        className="scroll-m-20 border-t border-linea py-14 sm:py-20 lg:py-24"
+      >
+        <div className="mx-auto grid max-w-6xl gap-8 px-4 sm:px-6 lg:grid-cols-12 lg:gap-16 lg:px-8">
+          <div className="lg:col-span-4">
+            <h2
+              id="preguntas-titulo"
+              className="text-3xl font-black leading-[1.1] tracking-[-0.02em] text-tinta sm:text-4xl"
             >
-              Empezar ahora
-              <ArrowRight className="h-4 w-4" aria-hidden="true" />
-            </Link>
+              Más preguntas
+            </h2>
           </div>
-        </Reveal>
+          <div className="lg:col-span-8">
+            <div className="divide-y divide-linea border-y border-linea">
+              {sector.faqs.map(({ question, answer }) => (
+                <details key={question} className="group">
+                  <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-6 rounded-[10px] py-4 text-base font-semibold leading-6 text-tinta focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-morado focus-visible:ring-offset-2 [&::-webkit-details-marker]:hidden">
+                    {question}
+                    <Plus
+                      className="h-5 w-5 shrink-0 transition-transform duration-200 group-open:rotate-45"
+                      style={{ color: acento.strong }}
+                      aria-hidden="true"
+                    />
+                  </summary>
+                  <p className="max-w-2xl pb-5 text-base leading-7 text-apagado">
+                    {answer}
+                  </p>
+                </details>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="bg-oscuro text-white">
+        <div className="mx-auto flex max-w-6xl flex-col items-start gap-8 px-4 py-16 sm:px-6 sm:py-20 lg:flex-row lg:items-center lg:justify-between lg:px-8">
+          <h2 className="max-w-2xl text-balance text-3xl font-black leading-[1.1] tracking-[-0.02em] sm:text-4xl">
+            {sector.cierre}
+          </h2>
+          <Link
+            href={planesHref}
+            className="inline-flex h-12 shrink-0 items-center justify-center gap-2 rounded-[10px] bg-white px-6 text-sm font-semibold text-tinta transition duration-200 hover:-translate-y-0.5 hover:bg-white/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-oscuro"
+            data-evento="clic_probar"
+            data-ubicacion="sector_cierre"
+          >
+            Empezar ahora
+            <ArrowRight className="h-4 w-4" aria-hidden="true" />
+          </Link>
+        </div>
       </section>
 
       <SiteFooter />
     </main>
+  );
+}
+
+/**
+ * «Alhabla concilia y el negocio confirma», en las palabras del fundador:
+ * lo único que hace sin preguntar es atender a los clientes; lo que toca el
+ * negocio pide «Confirmar» (el mismo botón del chat de al lado).
+ */
+function ReglaDeConfianza({
+  clientes,
+  acento,
+}: {
+  clientes: string;
+  acento: NicheAccent;
+}) {
+  return (
+    <div className="mt-8 rounded-3xl border border-linea p-6">
+      <p className="text-xl font-black leading-7 tracking-[-0.01em] text-tinta">
+        Con tus {clientes} manda Alhabla.
+      </p>
+      <p className="mt-1.5 text-sm leading-6 text-apagado">
+        Reserva, cambia o anula la cita que te piden, sin preguntarte.
+      </p>
+      <p className="mt-5 text-xl font-black leading-7 tracking-[-0.01em] text-tinta">
+        Con tu agenda mandas tú.
+      </p>
+      <p className="mt-1.5 text-sm leading-6 text-apagado">
+        Ausencias, citas, precios u horario: nada cambia hasta que pulsas{" "}
+        <span
+          className="inline-block rounded-full border px-2.5 text-xs font-semibold leading-5"
+          style={{
+            borderColor: acento.strong,
+            backgroundColor: acento.soft,
+            color: acento.deep,
+          }}
+        >
+          Confirmar
+        </span>
+        .
+      </p>
+    </div>
   );
 }

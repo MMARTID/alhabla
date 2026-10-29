@@ -3,14 +3,15 @@
 import Link from "next/link";
 import { appUrl } from "@/lib/app-url";
 import { useEffect, useRef, useState } from "react";
-import { ArrowRight, Menu, X } from "lucide-react";
-import { nicheLinks, type NicheSlug } from "@/lib/niche-landings";
+import { Menu, X } from "lucide-react";
+import { nicheLinks } from "@/lib/niche-landings";
+import type { SectorSlug } from "@/lib/sectores/tipos";
 
-function buildPlansHref(niche?: NicheSlug) {
+function buildPlansHref(niche?: SectorSlug) {
   return niche ? `/planes?niche=${encodeURIComponent(niche)}` : "/planes";
 }
 
-export function MobileNav({ niche, inicio = "" }: { niche?: NicheSlug; inicio?: string }) {
+export function MobileNav({ niche, inicio = "" }: { niche?: SectorSlug; inicio?: string }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const plansHref = buildPlansHref(niche);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -62,12 +63,14 @@ export function MobileNav({ niche, inicio = "" }: { niche?: NicheSlug; inicio?: 
     <div ref={containerRef} className="flex items-center gap-2 md:hidden">
       <Link
         href={plansHref}
-        className="btn-primary h-11 px-4 text-sm"
+        className="btn-primary h-11 px-3.5 text-sm"
         data-evento="clic_probar"
         data-ubicacion="cabecera_movil"
       >
-        Empezar
-        <ArrowRight className="h-4 w-4" aria-hidden="true" />
+        {/* El texto entero no cabe junto a la marca y el menú por debajo de
+            380 px: ahí, la versión corta. */}
+        <span className="min-[380px]:hidden">Probar gratis</span>
+        <span className="hidden min-[380px]:inline">Probar 7 días gratis</span>
       </Link>
       <button
         ref={toggleRef}
@@ -117,17 +120,17 @@ export function MobileNav({ niche, inicio = "" }: { niche?: NicheSlug; inicio?: 
               <a href={`${inicio}#como-funciona`} onClick={closeMenu} className={linkClass}>
                 Cómo funciona
               </a>
+              <Link href="/agenda-por-whatsapp" onClick={closeMenu} className={linkClass}>
+                Tu asistente
+              </Link>
               <Link href={plansHref} onClick={closeMenu} className={linkClass}>
                 Precios
               </Link>
               <Link href="/blog" onClick={closeMenu} className={linkClass}>
                 Blog
               </Link>
-              <a href={`${inicio}#preguntas`} onClick={closeMenu} className={linkClass}>
-                Preguntas
-              </a>
               <Link href="/contacto" onClick={closeMenu} className={linkClass}>
-                Hablar con nosotros
+                Contacto
               </Link>
               <a href={appUrl("/login")} onClick={closeMenu} className={linkClass}>
                 Iniciar sesión
@@ -139,7 +142,7 @@ export function MobileNav({ niche, inicio = "" }: { niche?: NicheSlug; inicio?: 
                 data-evento="clic_probar"
                 data-ubicacion="menu_movil"
               >
-                Empezar ahora
+                Probar 7 días gratis
               </Link>
             </div>
           </nav>

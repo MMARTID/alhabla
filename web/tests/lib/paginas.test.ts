@@ -3,7 +3,6 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import sitemap from "@/app/sitemap";
 import { GET as llms } from "@/app/llms.txt/route";
-import { FOTOS } from "@/lib/fotos";
 import { PAGINAS, paginaDe, paginasBajo } from "@/lib/paginas";
 
 const APP = path.join(process.cwd(), "src", "app");
@@ -38,12 +37,9 @@ describe("registro de páginas indexables", () => {
     expect(fuera).toEqual([]);
   });
 
-  it("no repite rutas y cada foto existe en el catálogo", () => {
+  it("no repite rutas", () => {
     const rutas = PAGINAS.map((p) => p.ruta);
     expect(new Set(rutas).size).toBe(rutas.length);
-    for (const p of PAGINAS) {
-      if (p.foto) expect(FOTOS[p.foto], `${p.ruta}: foto ${p.foto}`).toBeDefined();
-    }
   });
 
   it("los resúmenes caben en una tarjeta y en /llms.txt", () => {
@@ -60,17 +56,11 @@ describe("registro de páginas indexables", () => {
     }
   });
 
-  it("el sitemap lista las páginas del registro (menos las comparativas) y sus imágenes propias", () => {
+  it("el sitemap lista todas las páginas del registro y sus imágenes propias", () => {
     const entradas = sitemap();
     const urls = entradas.map((e) => new URL(e.url).pathname);
-    // Las comparativas siguen en el registro (índice, enlaces) pero salieron
-    // del sitemap el 2026-10-28.
-    const enSitemap = PAGINAS.filter((pagina) => pagina.seccion !== "comparativas");
-    for (const { ruta } of enSitemap) expect(urls).toContain(ruta);
-    for (const { ruta } of PAGINAS.filter((pagina) => pagina.seccion === "comparativas")) {
-      expect(urls).not.toContain(ruta);
-    }
-    for (const p of enSitemap.filter((pagina) => pagina.imagenes?.length)) {
+    for (const { ruta } of PAGINAS) expect(urls).toContain(ruta);
+    for (const p of PAGINAS.filter((pagina) => pagina.imagenes?.length)) {
       const entrada = entradas.find((e) => new URL(e.url).pathname === p.ruta);
       expect(entrada?.images, p.ruta).toHaveLength(p.imagenes!.length);
     }
@@ -100,5 +90,18 @@ describe("/llms.txt", () => {
     expect(texto).toContain("## Precios");
     expect(texto).toContain("/desvio-de-llamadas");
     expect(texto).toContain("/integraciones/google-calendar");
+  });
+
+  it("anuncia las comparativas con plataformas de agentes de voz", async () => {
+    const texto = await llms().text();
+    expect(texto).toContain("## Comparativas");
+    for (const { ruta } of paginasBajo("/comparativa")) expect(texto).toContain(`https://alhabla.ai${ruta})`);
+  });
+
+  it("no usa el vocabulario que la web ya no usa (fuera de los artículos del blog)", async () => {
+    const [resumen] = (await llms().text()).split("## Blog");
+    for (const prohibido of ["Gestor", "agenda real", "recepcionista virtual", "24/7", "Telnyx"]) {
+      expect(resumen, prohibido).not.toContain(prohibido);
+    }
   });
 });

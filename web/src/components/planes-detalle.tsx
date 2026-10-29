@@ -23,16 +23,16 @@ const FILAS: Fila[] = [
   { concepto: "Minuto extra sin IVA", valores: [eur(inicio.extraPerMinute), eur(pro.extraPerMinute), eur(scale.extraPerMinute)] },
   { concepto: "Profesionales en la agenda", valores: ["Hasta 3", "Hasta 10", "Sin límite"] },
   { concepto: "Atención 24 horas, todos los días", valores: [true, true, true] },
+  { concepto: "Tu asistente: horarios, precios y citas por WhatsApp", valores: [true, true, true] },
+  { concepto: "Si falta alguien: te ayuda a recolocar sus citas y a avisar a cada cliente", valores: [true, true, true] },
   { concepto: "Reserva en Google, Outlook, iCloud o en la agenda de Alhabla", valores: [true, true, true] },
   { concepto: "Reparto por especialidad", valores: [true, true, true] },
   { concepto: "Confirmación de la cita por WhatsApp", valores: [true, true, true] },
-  { concepto: "El Gestor por WhatsApp para el dueño", valores: [true, true, true] },
-  { concepto: "Si falta alguien: recolocar sus citas y avisar a cada cliente", valores: [true, true, true] },
   { concepto: "Avisos al dueño por WhatsApp, con botones para resolverlos", valores: [true, true, true] },
   { concepto: "Lista de espera: aviso por WhatsApp si se libera la hora que pidió el cliente", valores: [true, true, true] },
   { concepto: "Da el precio de tu catálogo (tú eliges cuándo)", valores: [true, true, true] },
   { concepto: "Aviso de IA en la primera frase y grabación solo con permiso", valores: [true, true, true] },
-  { concepto: "«Comprobar desvío» con una llamada real", valores: [true, true, true] },
+  { concepto: "Comprobación del desvío con una llamada de prueba", valores: [true, true, true] },
   { concepto: "Castellano y 7 idiomas más, y el catalán, euskera o gallego de tu zona", valores: [true, true, true] },
   { concepto: "Recordatorios de cita por WhatsApp", valores: [false, true, true] },
   { concepto: "Resumen semanal por email", valores: [false, true, true] },
@@ -219,13 +219,6 @@ export function PlanesDetalle() {
             </details>
           ))}
         </div>
-        <p className="mt-6 text-sm text-muted">
-          ¿Comparando con otras opciones? Mira{" "}
-          <Link href="/comparativa" className="font-semibold text-morado-tinta underline underline-offset-4">
-            las comparativas
-          </Link>{" "}
-          con otras recepcionistas de IA, una persona en plantilla o una secretaria telefónica.
-        </p>
       </section>
     </div>
   );

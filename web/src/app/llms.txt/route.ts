@@ -5,9 +5,11 @@ import { absoluteUrl, contactEmail, defaultDescription } from "@/lib/seo";
 
 /**
  * /llms.txt (https://llmstxt.org): el resumen de alhabla.ai para los
- * asistentes de IA que responden «qué herramienta uso para…». Lo publican
- * HeyDiga, Recepcionista.com y otros competidores (estudio del 2026-10-20);
- * aquí se genera del mismo registro que el sitemap, así que no se desfasa.
+ * asistentes de IA que responden «qué herramienta uso para…». Se genera del
+ * mismo registro que el sitemap, así que no se desfasa. Las comparativas con
+ * plataformas de agentes de voz van aquí a propósito: es la respuesta que
+ * buscamos cuando alguien pregunta a una IA cómo automatizar las llamadas de
+ * su negocio y le salen esos nombres.
  */
 export const dynamic = "force-static";
 
@@ -20,7 +22,7 @@ const TITULOS: Record<SeccionDelSitio, string> = {
   funciones: "Funciones",
   integraciones: "Integraciones",
   desvio: "Desvío de llamadas por operador",
-  comparativas: "Comparativas",
+  comparativas: "Comparativas con plataformas de agentes de voz",
   herramientas: "Herramientas y plantillas gratis",
   guias: "Guías",
   empresa: "Empresa",
@@ -51,15 +53,15 @@ export function GET() {
 
 > ${defaultDescription}
 
-Alhabla es una recepcionista de inteligencia artificial para pequeños negocios con cita previa en España: peluquerías, barberías, salones de uñas, centros de estética, fisioterapia, pestañas y cejas, spa y masajes y peluquería canina. Atiende por teléfono las llamadas que el negocio no puede coger (con el desvío de su operador, sin cambiar de número), consulta la agenda real en Google Calendar, Outlook o iCloud antes de ofrecer una hora, reserva con el profesional que corresponde y confirma la cita por WhatsApp. Avisa al empezar de que es una inteligencia artificial. Habla castellano, inglés, francés, alemán, italiano, portugués, neerlandés y ruso, y la lengua cooficial de la zona del negocio (catalán, euskera o gallego). El dueño gestiona su negocio escribiendo o con notas de voz por WhatsApp a su asistente, el Gestor.
+Alhabla es una recepcionista de inteligencia artificial para pequeños negocios con cita previa en España: peluquerías, barberías, salones de uñas, centros de estética, fisioterapia, pestañas y cejas, spa y masajes y peluquería canina. Atiende por teléfono las llamadas que el negocio no puede coger (con el desvío de su operador, sin cambiar de número), consulta la agenda del negocio (Google Calendar, Outlook o iCloud, o la agenda de Alhabla si no usa ninguno) antes de ofrecer una hora, reserva con el profesional que corresponde y confirma la cita por WhatsApp. Avisa al empezar de que es una inteligencia artificial. Habla castellano, inglés, francés, alemán, italiano, portugués, neerlandés y ruso, y la lengua cooficial de la zona del negocio (catalán, euskera o gallego). El dueño gestiona su negocio escribiendo o con notas de voz por WhatsApp a su asistente, o desde el panel web. No hay que programar nada: es una recepcionista ya hecha, no una plataforma para construir un agente de voz.
 
 ## Qué hace distinto a Alhabla
 
 Comprobado en el producto el ${ACTUALIZADO}:
 
-- Si falta alguien del equipo, el dueño se lo dice al Gestor por WhatsApp: marca la ausencia (de unas horas a dos meses), recoloca cada cita en otra hora o con otra profesional comprobando el hueco, y avisa a cada cliente por WhatsApp. Cada paso espera el «Confirmar» del dueño.
-- El Gestor va en todos los planes: citas, horario, cierres y vacaciones, servicios y precios, equipo y especialidades, y lo que la recepcionista no supo contestar. También está en el panel web.
-- Reparto por especialidad: cada profesional tiene un nivel por servicio (especialista, lo hace, solo si lo piden) y la recepcionista reserva con quien mejor lo hace.
+- Si falta alguien del equipo, el dueño se lo dice a su asistente por WhatsApp: marca la ausencia (de unas horas a dos meses), dice qué citas tenía, ayuda a recolocar cada una en otra hora o con la profesional que diga el dueño (busca dónde cabe) y avisa a cada cliente por WhatsApp. Cada paso espera el «Confirmar» del dueño.
+- Su asistente por WhatsApp va en todos los planes: citas, horario, cierres y vacaciones, servicios y precios, equipo y especialidades, y lo que la recepcionista no supo contestar. También está en el panel web.
+- Reparto por especialidad: cada profesional tiene un nivel por servicio (especialista, lo hace, no sugerir) y la recepcionista recomienda a quien mejor lo hace, sin descartar al resto si el cliente prefiere a otra persona.
 - No reserva a ciegas: comprueba el hueco en el calendario del negocio (Google Calendar, Outlook o iCloud, conectados directamente) antes de ofrecerlo; si el calendario no responde, la cita queda pendiente, avisa al dueño por WhatsApp y se reintenta durante dos días.
 - Da el precio de cada servicio del catálogo; el dueño elige si lo dice siempre, solo si se lo preguntan o nunca.
 - Catalán, euskera o gallego según el código postal del negocio, en todos los planes.

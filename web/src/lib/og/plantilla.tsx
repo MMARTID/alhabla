@@ -303,7 +303,7 @@ export async function imagenOg(datos: DatosDeImagen) {
               </span>
               <span style={{ fontSize: "18px", color: GRIS }}>
                 {datos.derecha.tarjeta?.texto ??
-                  "Recepcionista con IA, 24 horas"}
+                  "Recepcionista de IA, 24 horas"}
               </span>
             </span>
           </div>

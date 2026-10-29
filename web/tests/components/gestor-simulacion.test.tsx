@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 
 /**
- * El Gestor en acción (gestor-simulacion.tsx) con el guion de un sector: la
+ * Tu asistente en acción (gestor-simulacion.tsx) con el guion de un sector: la
  * conversación arranca sola cuando el teléfono se ve casi entero, el dueño
  * teclea en tiempo real, el panel anuncia cada cambio al pulsar
  * «Confirmar», se puede pausar o saltar de situación y, con movimiento
@@ -18,10 +18,24 @@ vi.mock("framer-motion", async (original) => ({
 
 import { GestorSimulacionSection } from "@/components/gestor-simulacion";
 import { GUIONES_GESTOR } from "@/lib/gestor-guiones";
-import { nicheLandings } from "@/lib/niche-landings";
+import { NICHE_ACCENTS } from "@/lib/niche-accents";
+import type { OwnerAssistant } from "@/lib/niche-landings";
 
-const contenido = nicheLandings.fisioterapia;
 const guion = GUIONES_GESTOR.fisioterapia;
+
+/** Los textos de la sección los pone cada página; aquí, unos propios para
+ * no depender de los datos de una landing concreta. */
+const textos: OwnerAssistant = {
+  badge: "Incluida en todos los planes",
+  title: "Y si a mediodía falta alguien, se lo dices a tu asistente.",
+  description: "Le escribes por WhatsApp y ella se encarga, siempre con tu «Confirmar».",
+  examples: [
+    { title: "Si alguien del equipo falta", description: "Pablo está de baja hoy." },
+    { title: "Si cierras un día", description: "Un festivo." },
+    { title: "Si cambias un precio", description: "Una sesión sube." },
+  ],
+  closing: "Con tus clientes manda Alhabla. Con tu agenda mandas tú.",
+};
 
 const avisos: { el: Element; aviso: IntersectionObserverCallback }[] = [];
 
@@ -118,9 +132,9 @@ const tecleando = () => borrador() !== "Mensaje" && borrador().length > 3;
 function pintar() {
   return render(
     <GestorSimulacionSection
-      data={contenido.ownerAssistant}
+      data={textos}
       guion={guion}
-      accent={contenido.accent}
+      accent={NICHE_ACCENTS.fisioterapia}
       masInfoHref="/agenda-por-whatsapp"
     />
   );
@@ -142,10 +156,10 @@ describe("GestorSimulacionSection", () => {
 
   it("pinta las situaciones del sector y las tres conversaciones para lectores de pantalla", () => {
     pintar();
-    expect(screen.getByRole("heading", { level: 2, name: contenido.ownerAssistant.title })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 2, name: textos.title })).toBeInTheDocument();
     const situaciones = within(screen.getByRole("group", { name: "Situaciones de ejemplo" })).getAllByRole("button");
     expect(situaciones.map((b) => b.querySelector("span:nth-child(2)")?.textContent)).toEqual(
-      contenido.ownerAssistant.examples.map((e) => e.title)
+      textos.examples.map((e) => e.title)
     );
     expect(situaciones[0]).toHaveAttribute("aria-pressed", "true");
     // La versión en texto lleva los tres guiones enteros, con su vocabulario.
@@ -154,7 +168,7 @@ describe("GestorSimulacionSection", () => {
     expect(lista.textContent).toContain("Tú: Pablo está de baja hoy");
     expect(lista.textContent).toContain("Pulsas «Confirmar».");
     expect(lista.textContent).toContain("¿Le aviso a Andrés por WhatsApp de la nueva hora?");
-    expect(screen.getByRole("link", { name: /Todo lo que puedes pedirle a tu Gestor/ })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: /Todo lo que puedes pedirle a tu asistente/ })).toHaveAttribute(
       "href",
       "/agenda-por-whatsapp"
     );

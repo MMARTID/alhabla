@@ -1,16 +1,23 @@
 import { imagenOg, OG_CONTENT_TYPE, OG_SIZE } from "@/lib/og/plantilla";
+import { tituloDeSector } from "@/lib/sectores";
+import { pestanasYCejas as sector } from "@/lib/sectores/pestanas-y-cejas";
 
 export const runtime = "nodejs";
-export const alt = "Recepcionista de IA para pestañas y cejas | Alhabla";
+export const alt = `${tituloDeSector(sector)} | Alhabla`;
 export const size = OG_SIZE;
 export const contentType = OG_CONTENT_TYPE;
 
 export default function OpenGraphImage() {
   return imagenOg({
-    etiqueta: "Pestañas y cejas",
-    titulo: "Recepcionista de IA para estudios de pestañas y cejas",
-    subtitulo: "Contesta mientras trabajas con pinzas y reserva relleno, juego nuevo o lifting con quien lo domina.",
-    pie: "Reserva en Google, Outlook o iCloud",
-    derecha: { tipo: "panel", grande: "¿Relleno o juego nuevo?", pequeno: "Pregunta lo justo y reserva lo que toca." },
+    etiqueta: sector.nombre,
+    titulo: tituloDeSector(sector),
+    subtitulo: sector.hero.frase,
+    pie: "7 días de prueba · Sin permanencia",
+    acento: sector.acento,
+    derecha: {
+      tipo: "panel",
+      grande: sector.llamada.pregunta,
+      pequeno: "Contesta, reserva y lo confirma por WhatsApp.",
+    },
   });
 }

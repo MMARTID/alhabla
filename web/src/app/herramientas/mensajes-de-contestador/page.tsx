@@ -6,6 +6,8 @@ import {
   SITUACIONES_DE_CONTESTADOR,
   TEXTOS_DE_CONTESTADOR,
 } from "@/components/herramientas/textos-de-contestador";
+import { LoQueHaceAlhabla } from "@/components/herramientas/lo-que-hace-alhabla";
+import { Plegado } from "@/components/herramientas/plegado";
 import { Fuentes, ListaCheck, Nota, PaginaGuia, Pasos, Seccion, Texto } from "@/components/pagina-guia";
 import { metadataDePagina } from "@/lib/seo";
 
@@ -50,30 +52,14 @@ export default function MensajesDeContestadorPage() {
       entradilla={
         <p>
           Lo que oye quien te llama cuando no puedes coger, y lo que lee quien te escribe por WhatsApp con el local
-          cerrado. Textos para cinco situaciones del contestador y para las dos respuestas automáticas de WhatsApp
-          Business, en ocho sectores, listos para grabar o pegar.
+          cerrado. Textos por sector, listos para grabar o pegar.
         </p>
       }
       faqs={[
         {
-          question: "¿Cuánto debe durar el mensaje del contestador?",
+          question: "¿Por qué mis clientas de siempre no reciben el mensaje de ausencia?",
           answer:
-            "Unos veinte segundos, que leídos con calma son unas cincuenta palabras. Más largo, la gente cuelga antes de la señal; por eso estos textos piden una sola cosa: nombre y teléfono.",
-        },
-        {
-          question: "¿Pongo el horario en el mensaje?",
-          answer:
-            "Sí, dicho como se habla: «de martes a sábado, de diez a dos y de cinco a ocho», no «diez cero cero a catorce cero cero». Es lo que más se pregunta y el contestador lo resuelve sin que tengas que devolver la llamada.",
-        },
-        {
-          question: "¿A quién le mando el mensaje de ausencia en WhatsApp Business?",
-          answer:
-            "La aplicación deja elegir entre todos, los que no tienes en la libreta de contactos, todos menos algunos o solo algunos. Si el número es solo del negocio y guardas a tus clientes como contactos, elige «Todos»: con la otra opción, tus clientas de siempre no lo recibirían.",
-        },
-        {
-          question: "¿Por qué no sale mi mensaje de bienvenida?",
-          answer:
-            "Porque solo se envía la primera vez que alguien te escribe o cuando vuelve a escribir tras 14 días sin hablar contigo. Y se desactiva automáticamente si conectas Meta Business Agent, según la ayuda de WhatsApp.",
+            "Porque en Destinatarios está elegido «Los que no están en la libreta de contactos». Si el número es solo del negocio y guardas a tus clientes como contactos, elige «Todos».",
         },
         {
           question: "¿Qué digo en el mensaje de vacaciones?",
@@ -88,58 +74,18 @@ export default function MensajesDeContestadorPage() {
       ]}
       relacionadas={[
         { href: "/blog/contestador-automatico-vs-recepcionista-virtual", titulo: "Contestador automático o recepcionista de IA", texto: "Qué cambia cuando alguien resuelve la llamada en lugar de apuntar el recado." },
-        { href: "/comparativa/recepcionista-de-ia-vs-centralita-virtual", titulo: "IA frente a una centralita virtual", texto: "El «pulse 1» frente a una conversación que termina en cita." },
         { href: "/blog/reservas-fuera-de-horario", titulo: "Reservas fuera de horario", texto: "Las llamadas de la noche y del domingo, y qué hacer con ellas." },
-        { href: "/blog/whatsapp-business-para-citas", titulo: "WhatsApp Business para citas", texto: "Perfil, respuestas rápidas y cuándo dar el salto a la plataforma." },
         { href: "/herramientas/guion-para-atender-el-telefono", titulo: "Guion para atender el teléfono", texto: "Para las llamadas que sí coges." },
       ]}
-      cierre="Que fuera de horario te sigan pidiendo cita."
+      cierre="Teléfono y WhatsApp atendidos, también con el local cerrado."
     >
       <Seccion
-        titulo="Antes de grabar"
-        entradilla={<p>Un buen mensaje de contestador se nota en lo que no tiene. Siete reglas para el tuyo.</p>}
-      >
-        <ListaCheck
-          items={[
-            <>
-              <strong>El nombre del negocio, lo primero.</strong> Quien llama tiene que saber en un segundo que ha
-              marcado bien.
-            </>,
-            <>
-              <strong>Veinte segundos como mucho.</strong> Unas cincuenta palabras dichas con calma. Si no caben, sobra
-              algo.
-            </>,
-            <>
-              <strong>Una sola petición.</strong> Nombre y teléfono. Si pides también el servicio, el día y la hora,
-              nadie se acuerda de todo al oír la señal.
-            </>,
-            <>
-              <strong>El horario dicho como se habla.</strong> «De martes a sábado, de diez a dos y de cinco a ocho».
-            </>,
-            <>
-              <strong>Sin precios.</strong> Cambian, y un mensaje viejo con un precio viejo es una discusión el día de
-              la cita.
-            </>,
-            <>
-              <strong>Una promesa que vayas a cumplir.</strong> «Te llamamos hoy mismo» solo si de verdad devuelves las
-              llamadas el mismo día.
-            </>,
-            <>
-              <strong>Grábalo en silencio, despacio y de pie.</strong> Sin secador de fondo. De pie la voz sale con más
-              aire; despacio, se entiende el número.
-            </>,
-          ]}
-        />
-      </Seccion>
-
-      <Seccion
         id="textos"
-        fondo
         titulo="Los textos, por sector"
         entradilla={
           <p>
             Cambia lo que va entre llaves: {CAMPOS.join(", ")}. El horario, como lo dirías en voz alta; la vuelta y el
-            festivo, con el día concreto («el lunes 1 de septiembre», «el 12 de octubre»).
+            festivo, con el día concreto («el martes 1 de septiembre», «el 12 de octubre»).
           </p>
         }
       >
@@ -197,85 +143,107 @@ export default function MensajesDeContestadorPage() {
         </div>
       </Seccion>
 
-      <Seccion
-        titulo="Dónde se pone el mensaje de ausencia en WhatsApp Business"
-        entradilla={<p>En la aplicación WhatsApp Business, según su servicio de ayuda oficial.</p>}
-      >
-        <Pasos
-          pasos={[
-            { titulo: "Abre la pestaña Herramientas", texto: <>Y toca <strong>Mensaje de ausencia</strong>.</> },
-            { titulo: "Actívalo", texto: <>Enciende <strong>Enviar mensaje de ausencia</strong> y toca el mensaje para pegar tu texto.</> },
-            {
-              titulo: "Elige cuándo sale, en Programar",
-              texto: (
+      <Seccion fondo titulo="Antes de usarlos">
+        <div className="grid gap-4">
+          <Plegado titulo="Siete reglas para grabar el contestador">
+            <ListaCheck
+              items={[
                 <>
-                  <strong>Enviar siempre</strong>, <strong>Horario personalizado</strong> (para unas vacaciones) o{" "}
-                  <strong>Fuera del horario comercial</strong>. Esta última solo aparece si tienes el horario puesto en el
-                  perfil de empresa: rellénalo antes.
-                </>
-              ),
-            },
-            {
-              titulo: "Elige a quién, en Destinatarios",
-              texto: (
+                  <strong>El nombre del negocio, lo primero.</strong> Quien llama tiene que saber en un segundo que ha
+                  marcado bien.
+                </>,
                 <>
-                  Todos, los que no están en la libreta de contactos, todos excepto algunos o solo algunos. Después,{" "}
-                  <strong>Guardar</strong>.
-                </>
-              ),
-            },
-          ]}
-        />
-        <div className="mt-6 grid gap-4 lg:grid-cols-2">
-          <Nota tipo="info" titulo="El de bienvenida está al lado">
-            En la misma pestaña Herramientas, <strong>Mensaje de bienvenida</strong>. Sale la primera vez que alguien te
-            escribe o cuando vuelve tras 14 días sin escribirte; a quien te escribió ayer no le llega.
-          </Nota>
-          <Nota tipo="importante" titulo="El móvil tiene que tener conexión">
-            La ayuda de WhatsApp avisa de que el dispositivo necesita conexión a internet para enviar estos mensajes. Si
-            apagas el móvil del negocio en vacaciones, el mensaje de ausencia no sale.
-          </Nota>
+                  <strong>Veinte segundos como mucho.</strong> Unas cincuenta palabras dichas con calma. Si no caben, sobra
+                  algo.
+                </>,
+                <>
+                  <strong>Una sola petición.</strong> Nombre y teléfono. Si pides también el servicio, el día y la hora,
+                  nadie se acuerda de todo al oír la señal.
+                </>,
+                <>
+                  <strong>El horario dicho como se habla.</strong> «De martes a sábado, de diez a dos y de cinco a ocho».
+                </>,
+                <>
+                  <strong>Sin precios.</strong> Cambian, y un mensaje viejo con un precio viejo es una discusión el día de
+                  la cita.
+                </>,
+                <>
+                  <strong>Una promesa que vayas a cumplir.</strong> «Te llamamos hoy mismo» solo si de verdad devuelves las
+                  llamadas el mismo día.
+                </>,
+                <>
+                  <strong>Grábalo en silencio, despacio y de pie.</strong> Sin secador de fondo. De pie la voz sale con más
+                  aire; despacio, se entiende el número.
+                </>,
+              ]}
+            />
+            <Nota tipo="consejo" titulo="Escucha tu propio contestador">
+              Llama a tu negocio desde otro móvil un domingo. Si el mensaje es de hace dos veranos, o no se entiende el
+              número, lo sabrás antes que tus clientes.
+            </Nota>
+          </Plegado>
+          <Plegado titulo="Dónde se pone el mensaje de ausencia en WhatsApp Business">
+            <Pasos
+              pasos={[
+                { titulo: "Abre la pestaña Herramientas", texto: <>Y toca <strong>Mensaje de ausencia</strong>.</> },
+                { titulo: "Actívalo", texto: <>Enciende <strong>Enviar mensaje de ausencia</strong> y toca el mensaje para pegar tu texto.</> },
+                {
+                  titulo: "Elige cuándo sale, en Programar",
+                  texto: (
+                    <>
+                      <strong>Enviar siempre</strong>, <strong>Horario personalizado</strong> (para unas vacaciones) o{" "}
+                      <strong>Fuera del horario comercial</strong>. Esta última solo aparece si tienes el horario puesto en el
+                      perfil de empresa: rellénalo antes.
+                    </>
+                  ),
+                },
+                {
+                  titulo: "Elige a quién, en Destinatarios",
+                  texto: (
+                    <>
+                      Todos, los que no están en la libreta de contactos, todos excepto algunos o solo algunos. Después,{" "}
+                      <strong>Guardar</strong>.
+                    </>
+                  ),
+                },
+              ]}
+            />
+            <div className="mt-6 grid gap-4 lg:grid-cols-2">
+              <Nota tipo="info" titulo="El de bienvenida está al lado">
+                En la misma pestaña Herramientas, <strong>Mensaje de bienvenida</strong>. Sale la primera vez que alguien te
+                escribe o cuando vuelve tras 14 días sin escribirte; a quien te escribió ayer no le llega.
+              </Nota>
+              <Nota tipo="importante" titulo="El móvil tiene que tener conexión">
+                La ayuda de WhatsApp avisa de que el dispositivo necesita conexión a internet para enviar estos mensajes. Si
+                apagas el móvil del negocio en vacaciones, el mensaje de ausencia no sale.
+              </Nota>
+            </div>
+          </Plegado>
+          <Plegado titulo="Y el contestador del teléfono, ¿dónde se graba?">
+            <Texto>
+              <p>
+                Depende de la línea. En un móvil, el buzón de voz suele ser un servicio de tu operador, y el saludo se graba
+                llamando a su número de buzón; en un fijo, puede ser el del operador, el de tu teléfono o el de la centralita si tienes
+                una. Cada operador lo explica en su ayuda, y como cambia de uno a otro, aquí no te damos códigos que puedan
+                estar viejos.
+              </p>
+              <p>
+                Una cosa sí conviene saber antes de tocarlo: en muchas líneas, el buzón es en realidad un desvío «si no
+                contesta» hacia el número del buzón. Si un día desvías esas llamadas a otro número, ese desvío ocupa su
+                sitio. Lo explicamos operador por operador en la <Link href="/desvio-de-llamadas">guía de desvío de
+                llamadas</Link>.
+              </p>
+            </Texto>
+          </Plegado>
         </div>
       </Seccion>
 
-      <Seccion fondo titulo="Y el contestador del teléfono, ¿dónde se graba?">
-        <Texto>
-          <p>
-            Depende de la línea. En un móvil, el buzón de voz suele ser un servicio de tu operador, y el saludo se graba
-            llamando a su número de buzón; en un fijo, puede ser el del operador, el de tu teléfono o el de la centralita si tienes
-            una. Cada operador lo explica en su ayuda, y como cambia de uno a otro, aquí no te damos códigos que puedan
-            estar viejos.
-          </p>
-          <p>
-            Una cosa sí conviene saber antes de tocarlo: en muchas líneas, el buzón es en realidad un desvío «si no
-            contesta» hacia el número del buzón. Si un día desvías esas llamadas a otro número, ese desvío ocupa su
-            sitio. Lo explicamos operador por operador en la <Link href="/desvio-de-llamadas">guía de desvío de
-            llamadas</Link>.
-          </p>
-        </Texto>
-      </Seccion>
-
-      <Seccion titulo="Lo que un contestador no hace">
-        <Texto>
-          <p>
-            Un contestador no da citas. Recoge el recado y espera a que lo escuches, y la cita depende de que devuelvas
-            la llamada antes de que esa persona haya llamado al siguiente negocio de la lista. Si recibes pocas llamadas
-            fuera de horario y las devuelves siempre el mismo día, es suficiente.
-          </p>
-          <p>
-            Si son muchas, o llegan cuando tienes las manos ocupadas, la diferencia está en quién resuelve la llamada.
-            Una recepcionista de IA contesta a esas mismas llamadas, mira tu agenda y deja la cita apuntada, con la
-            confirmación por WhatsApp si el cliente la quiere, también a las once de la noche. Lo contamos con calma en{" "}
-            <Link href="/blog/contestador-automatico-vs-recepcionista-virtual">contestador automático o recepcionista de IA</Link>.
-          </p>
-        </Texto>
-        <div className="mt-6">
-          <Nota tipo="consejo" titulo="Escucha tu propio contestador">
-            Llama a tu negocio desde otro móvil un domingo. Si el mensaje es de hace dos veranos, o no se entiende el
-            número, lo sabrás antes que tus clientes.
-          </Nota>
-        </div>
-      </Seccion>
+      <LoQueHaceAlhabla titulo="Un contestador apunta recados">
+        <p>
+          La recepcionista de IA contesta y da la cita, por teléfono y por WhatsApp, también a las once de la noche.
+          Tus clientes no se bajan nada, y tú lo ves por WhatsApp o en el panel.
+        </p>
+      </LoQueHaceAlhabla>
 
       <Fuentes
         consultadas="2026-10-20"

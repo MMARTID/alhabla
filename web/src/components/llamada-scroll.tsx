@@ -88,9 +88,9 @@ function pasosDe(g: GuionRelato): [PasoCopy, PasoCopy, PasoCopy] {
       numero: "02",
       etiqueta: "Busca hueco",
       pantalla: "Tu agenda",
-      titulo: "Busca hueco en tu agenda real.",
+      titulo: "Busca hueco en tu agenda.",
       texto:
-        "Antes de ofrecer una hora mira tu horario y tu calendario de Google, Outlook o iCloud. Nunca reserva a ciegas ni te monta dos citas a la vez.",
+        "Antes de ofrecer una hora mira tu horario y tu agenda: tu calendario de Google, Outlook o iCloud, o la de Alhabla si no usas ninguno. Nunca te monta dos citas a la vez.",
       detalles: [
         "Cuenta lo que dura el servicio y descarta lo ocupado y los huecos cortos",
         "Elige al profesional adecuado; si la hora está ocupada, propone el siguiente hueco libre",
@@ -103,10 +103,10 @@ function pasosDe(g: GuionRelato): [PasoCopy, PasoCopy, PasoCopy] {
       pantalla: `El WhatsApp de ${tuCliente}`,
       titulo: "La cita entra y todos se enteran.",
       texto:
-        "Queda apuntada en tu calendario sin que hayas tenido que soltar lo que estabas haciendo.",
+        "Queda apuntada en tu agenda sin que hayas tenido que soltar lo que estabas haciendo.",
       detalles: [
         `Si ${elCliente} acepta, le llega la confirmación por WhatsApp`,
-        "Si conectas tu WhatsApp, a ti te avisa de la cita nueva",
+        "Si quieres, a ti también te avisa por WhatsApp",
         "En tu panel tienes la transcripción y, con permiso, la grabación",
       ],
     },

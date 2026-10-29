@@ -97,11 +97,11 @@ function pasosDe(g: GuionRelato): [PasoCopy, PasoCopy, PasoCopy] {
     },
     {
       numero: "03",
-      etiqueta: "Gestor",
-      pantalla: "Tu gestor",
+      etiqueta: "Tu asistente",
+      pantalla: "Tu asistente",
       titulo: "Cambia tu agenda escribiendo, como a una persona.",
       texto:
-        "Pregúntale por la agenda y pídele cambios. Es el mismo gestor que te atiende por WhatsApp.",
+        "Pregúntale por la agenda y pídele cambios desde el panel. Es la misma asistente que tienes en WhatsApp.",
       detalles: [
         "Te resume el día y te dice si una hora está libre",
         "Marca una ausencia y te ayuda a recolocar sus citas",
@@ -330,18 +330,18 @@ export function EnTuNegocioScroll({
                 </svg>
                 Llamadas
               </div>
-              <p className="mx-grupo">RECEPCIONISTA</p>
+              <p className="mx-grupo">TU EQUIPO DE IA</p>
               <div className="mx-item">
                 <svg>
                   <use href="#ng-i-bot" />
                 </svg>
-                Agente
+                Recepcionista
               </div>
               <div className="mx-item" data-nav="2">
                 <svg>
                   <use href="#ng-i-msg" />
                 </svg>
-                Gestor
+                Tu asistente
               </div>
               <div className="mx-pie">
                 <p className="mx-grupo">CUENTA</p>
@@ -380,7 +380,7 @@ export function EnTuNegocioScroll({
                       entran y revisa las últimas conversaciones.
                     </p>
                   </div>
-                  <span className="mx-btn">Configurar agente</span>
+                  <span className="mx-btn">Configurar recepcionista</span>
                 </header>
                 <div className="mx-card mx-estado" data-a=".16">
                   <div className="mx-ok">
@@ -690,7 +690,7 @@ export function EnTuNegocioScroll({
                               (0.18 * i) / r.turnos.length
                             ).toFixed(3)}
                           >
-                            <small>{turno.agente ? "AGENTE" : "CLIENTE"}</small>
+                            <small>{turno.agente ? "RECEPCIONISTA" : "CLIENTE"}</small>
                             {turno.texto}
                           </div>
                         ))}
@@ -707,7 +707,7 @@ export function EnTuNegocioScroll({
                     </svg>
                   </span>
                   <div>
-                    <p className="mx-h1">Tu gestor</p>
+                    <p className="mx-h1">Tu asistente</p>
                     <p>
                       Pregúntale por la agenda y pídele cambios: servicios,
                       equipo, horario, citas. Misma conversación que en
@@ -798,7 +798,7 @@ export function EnTuNegocioScroll({
                     </div>
                   </div>
                   <div className="mx-escribir">
-                    <span className="mx-campo">Escribe a tu gestor…</span>
+                    <span className="mx-campo">Escribe a tu asistente…</span>
                     <span className="mx-enviar">
                       <svg>
                         <use href="#ng-i-send" />

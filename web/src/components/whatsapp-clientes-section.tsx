@@ -4,9 +4,10 @@ import { SiWhatsapp } from "@icons-pack/react-simple-icons";
 import { Reveal } from "@/components/scroll-reveal";
 
 /**
- * Lo que recibe el cliente final por WhatsApp (2026-09-26). Mismas promesas
- * que `WhatsAppBenefitsTable` de las landings de nicho, contadas con una
- * línea de detalle cada una y el plan donde aplica.
+ * Lo que recibe el cliente final por WhatsApp (2026-09-26), con el titular
+ * de la visión desde el 2026-10-29: el negocio se adapta al cliente, que no
+ * se baja nada ni aprende un canal nuevo. Una línea de detalle por ventaja y
+ * el plan donde aplica.
  */
 const VENTAJAS = [
   {
@@ -17,7 +18,7 @@ const VENTAJAS = [
   {
     Icono: BellRing,
     titulo: "Recordatorio antes de la cita",
-    texto: "Un aviso previo que reduce las ausencias y los huecos muertos en tu agenda.",
+    texto: "Un aviso antes de su cita para que no se le olvide: menos huecos vacíos de clientes que no vienen.",
     plan: "Pro y Scale",
   },
   {
@@ -47,10 +48,10 @@ export function WhatsAppClientesSection() {
             Para tus clientes
           </span>
           <h2 id="whatsapp-clientes-titulo" className="mt-5 text-3xl font-black tracking-tight text-[#0a0a0a] sm:text-4xl">
-            La cita no acaba al colgar.
+            Deja de educar a tus clientes.
           </h2>
           <p className="mt-4 max-w-md text-base leading-7 text-[#52525b] sm:text-lg sm:leading-8">
-            Tus clientes reciben su cita por WhatsApp y la gestionan desde ahí, sin volver a llamar. Todo lo que cambian acaba en tu agenda, sin que tengas que tocar nada.
+            Ni aplicaciones que descargar ni un canal que aprender: llaman como siempre y reciben su cita por WhatsApp, que ya usan. Lo que cambian desde ahí acaba en tu agenda sin que toques nada.
           </p>
         </Reveal>
 
