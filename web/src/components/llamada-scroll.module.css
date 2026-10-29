@@ -442,13 +442,13 @@
   gap: 0.6cqw;
   padding: 3cqw 3.6cqw;
   border-radius: 3cqw;
-  background: #f3eeff;
+  background: var(--acento-suave, #f3eeff);
 }
 
 .buscandoEtiqueta {
   font-size: 3.2cqw;
   font-weight: 600;
-  color: #6d28d9;
+  color: var(--acento-tinta, #6d28d9);
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
@@ -466,7 +466,7 @@
   right: -1.2cqw;
   height: 16cqw;
   border-radius: 3cqw;
-  box-shadow: inset 0 0 0 0.5cqw #8b5cf6;
+  box-shadow: inset 0 0 0 0.5cqw var(--acento, #8b5cf6);
   pointer-events: none;
   z-index: 1;
 }
@@ -483,7 +483,7 @@
 /* ── 1 · Llamada ─────────────────────────────────────────────── */
 
 .llamada {
-  background: linear-gradient(180deg, #2e1065 0%, #16082f 55%, #0a0a0a 100%);
+  background: linear-gradient(180deg, var(--llamada-fondo, #2e1065) 0%, var(--llamada-fondo-2, #16082f) 55%, #0a0a0a 100%);
   color: #fff;
   padding: 17cqw 6cqw 7cqw;
 }
@@ -527,7 +527,7 @@
 
 .burbujaAlhabla {
   align-self: flex-end;
-  background: #8b5cf6;
+  background: var(--acento-burbuja, #8b5cf6);
   border-bottom-right-radius: 1.2cqw;
 }
 
@@ -552,7 +552,7 @@
   width: 1.3cqw;
   height: 100%;
   border-radius: 99px;
-  background: #a78bfa;
+  background: var(--acento-claro, #a78bfa);
   transform-origin: center;
 }
 
@@ -652,20 +652,20 @@
   padding: 2.4cqw 3cqw;
   border-radius: 2.6cqw;
   font-size: 3.8cqw;
-  background: #f3eeff;
-  color: #6d28d9;
-  box-shadow: inset 1cqw 0 0 #8b5cf6;
+  background: var(--acento-suave, #f3eeff);
+  color: var(--acento-tinta, #6d28d9);
+  box-shadow: inset 1cqw 0 0 var(--acento, #8b5cf6);
 }
 
 .citaNueva .citaTitulo {
-  color: #4c1d95;
+  color: var(--acento-tinta, #4c1d95);
 }
 
 .etiquetaNueva {
   float: right;
   padding: 0.4cqw 2cqw;
   border-radius: 99px;
-  background: #8b5cf6;
+  background: var(--acento-burbuja, #8b5cf6);
   color: #fff;
   font-size: 3cqw;
   font-weight: 600;
@@ -763,7 +763,7 @@
   width: 10cqw;
   height: 10cqw;
   border-radius: 50%;
-  background: #8b5cf6;
+  background: var(--acento-burbuja, #8b5cf6);
 }
 
 .waMicro svg {

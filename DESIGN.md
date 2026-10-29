@@ -689,24 +689,39 @@ Anidado).
 
 ### Landing de sector (web)
 
-`web/src/components/site-landing.tsx`, «Las preguntas de la dueña» (2026-10-29). La misma
-plantilla para los ocho oficios; solo cambian los textos y el acento (`lib/sectores/`). Ocho
-bloques en orden fijo: hero centrado sobre los hilos de voz; tres preguntas de la dueña («¿Y si
-suena mientras…?», «¿Y si a mediodía falta alguien?», «¿Mis clientas tienen que bajarse algo?»),
-cada una con la respuesta en dos líneas a un lado y, al otro, una pieza del producto que lo
-demuestra (la llamada transcrita, el chat con tu asistente con sus «Confirmar», el WhatsApp que
-recibe la clienta), alternando lado; las tres llamadas típicas del oficio; los tres planes en una
-pieza; cinco preguntas plegadas; el cierre en `oscuro` con «Empezar ahora».
+`web/src/components/site-landing.tsx`: texto y 3D compensados (29-10-2026, por la tarde; la v1
+de esa mañana, toda texto, le pareció «horrenda» al fundador). Es la misma plantilla para los ocho
+oficios. Cambian los textos, el acento y los dos guiones de las escenas (`lib/sectores/`,
+`GUIONES_SECTOR` y `GUIONES_GESTOR`). El orden es fijo:
 
-- **Un acento por página**, el del oficio: subrayado del H1, iconos de la transcripción, botones del
-  chat, la regla de confianza, la franja del plan recomendado y la pastilla de fundador (que fuera
-  de los sectores es morada). Nada morado en una landing de sector.
+1. El hero centrado sobre los hilos de voz.
+2. La primera pregunta de la dueña en dos líneas, centrada, bajo una raya fina del acento. Abre
+   la escena de la portada: la llamada en el iPhone pasa al panel del portátil 3D.
+3. «¿Mis clientas tienen que bajarse algo?», con su WhatsApp: contesta citando la confirmación y
+   la cambia.
+4. Tu asistente en 3D: el WhatsApp del dueño y el panel en el portátil, con tres situaciones.
+5. Los servicios del oficio, con el reparto en una línea.
+6. Los tres planes.
+7. Cinco preguntas plegadas.
+8. El cierre en `oscuro`, con «Empezar ahora».
+
+Entre dos escenas nunca hay más que dos líneas y una pieza plana.
+
+- **Un acento por página**, el del oficio. Lo lleva todo lo de la página: el subrayado del H1, los
+  raíles y botones de las escenas, el teléfono por dentro (pantalla de llamada, burbujas, onda y
+  cita nueva, con variables CSS que en la portada caen en el morado), los botones del chat, la
+  franja del plan recomendado y la pastilla de fundador. El morado que queda es la interfaz real
+  del panel en el portátil.
+- **Sin antetítulos ni numeración de adorno**. En sector, las escenas van sin «En tu bolsillo» ni
+  «En tu negocio» (props `antetitulo={false}`; el h2 se queda para lectores de pantalla). Las
+  situaciones de tu asistente van sin 01/02/03 (`numerar={false}`) y sin pastilla encima. Los
+  «01 · Contesta» de los pasos se quedan, porque llevan secuencia.
 - **H1** «Recepcionista de IA para {oficio}» en dos líneas en escritorio: con un oficio de más de
   12 caracteres («clínicas de fisioterapia») baja un punto de tamaño en vez de partirse en tres.
-- **Sin** fotos de banco, cifras de terceros, ciudades, beneficios en tarjetas ni el relato
-  iPhone → portátil (que vive solo en la portada). Ningún párrafo de más de 40 palabras.
-- La regla de confianza va en una tarjeta con borde, no en un bloque de color: «Con tus clientas
-  manda Alhabla. Con tu agenda mandas tú.», con la pastilla «Confirmar» en el acento.
+- **Sin** fotos de banco, cifras de terceros, ciudades ni beneficios en tarjetas. Ningún párrafo de
+  más de 40 palabras.
+- La regla de confianza cierra la escena de tu asistente: «Con tus clientas manda Alhabla. Con tu
+  agenda mandas tú.»
 
 ### Logotipo
 

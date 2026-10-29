@@ -1,4 +1,4 @@
-import type { NicheSlug } from "@/lib/niche-landings";
+import type { SectorSlug } from "@/lib/sectores/tipos";
 
 /**
  * El guion del relato «En tu bolsillo» → «En tu negocio» (la llamada en el
@@ -42,6 +42,17 @@ export type GuionRelato = {
   /** Otros clientes y servicios del día, para la agenda y el panel. */
   otrosClientes: [string, string, string, string];
   otrosServicios: [Servicio, Servicio, Servicio, Servicio];
+  /**
+   * El texto de cada paso de las dos escenas en el idioma del oficio
+   * (LlamadaScroll: contesta, busca hueco, confirma; EnTuNegocioScroll:
+   * panel, llamada, tu asistente). Sin él, el texto general de la portada.
+   * Que cada sector tenga el suyo es también lo que mantiene las ocho
+   * landings por debajo de la auditoría de parecido (seo:similitud).
+   */
+  pasos?: {
+    llamada: [string, string, string];
+    negocio: [string, string, string];
+  };
   /** Las cifras de la semana en el panel. */
   semana: {
     citas: number;
@@ -74,13 +85,25 @@ export const GUION_GENERAL: GuionRelato = {
   semana: { citas: 23, masQueAntes: 6, llamadas: 41, ingresos: 1186 },
 };
 
-export const GUIONES_SECTOR: Record<NicheSlug, GuionRelato> = {
+export const GUIONES_SECTOR: Record<SectorSlug, GuionRelato> = {
   peluqueria: {
     ...GUION_GENERAL,
     cliente: { nombre: "Carmen", apellido: "R.", telefono: "+34 791 32 55 57" },
     profesional: "Marta",
     companera: "Laura",
     otrosClientes: ["Ana T.", "Sergio P.", "Rosa M.", "Elena S."],
+    pasos: {
+      llamada: [
+        "Con las manos en un tinte no coges el teléfono: a los pocos tonos contesta Alhabla, dice el nombre del salón y atiende a la clienta como lo harías tú en el mostrador.",
+        "Corte y color son 90 minutos: busca dónde caben enteros con la estilista que lo hace y descarta los huecos cortos entre dos clientas.",
+        "Carmen tiene su hora con Marta y tú no has soltado el pincel. La confirmación le llega al móvil por WhatsApp.",
+      ],
+      negocio: [
+        "Entre clienta y clienta abres el panel: ves si la recepción está atendiendo, cuántas llamadas ha cogido hoy y qué citas quedan por la tarde.",
+        "Abres la llamada de Carmen: qué pidió, por qué le dio las 17:30 con Marta y la cita que salió de ella.",
+        "Si mañana falta una estilista, se lo escribes como a una compañera de mostrador, aquí o en tu WhatsApp.",
+      ],
+    },
   },
   barberia: {
     negocio: "Barbería Santos",
@@ -102,6 +125,18 @@ export const GUIONES_SECTOR: Record<NicheSlug, GuionRelato> = {
       { nombre: "Arreglo de barba", minutos: 20 },
       { nombre: "Corte infantil", minutos: 20 },
     ],
+    pasos: {
+      llamada: [
+        "Con la navaja en la mano no se coge el móvil. Tras unos tonos contesta Alhabla con el nombre de la barbería y atiende al cliente sin hacerle esperar.",
+        "Corte y barba son 45 minutos: mira qué barbero está libre y el primer hueco en el que cabe entero, sin pisar el corte de nadie.",
+        "Javier tiene su hora con Luis y tú no has parado el degradado. Le llega la cita por WhatsApp.",
+      ],
+      negocio: [
+        "Cuando se vacía una silla, abres el panel: si la recepción está atendiendo, cuántas llamadas ha cogido y quién se sienta después.",
+        "Abres la llamada de Javier y lees qué pidió, por qué le tocó Luis a esa hora y la reserva que quedó.",
+        "¿Falta un barbero o cambias un precio? Se lo dices desde el panel o desde tu WhatsApp: es la misma asistente.",
+      ],
+    },
     semana: { citas: 58, masQueAntes: 9, llamadas: 74, ingresos: 1102 },
   },
   "salon-de-unas": {
@@ -124,6 +159,18 @@ export const GUIONES_SECTOR: Record<NicheSlug, GuionRelato> = {
       { nombre: "Retirada y semi", minutos: 75 },
       { nombre: "Nail art", minutos: 45 },
     ],
+    pasos: {
+      llamada: [
+        "Con la lima en la mano y la lámpara encendida no puedes contestar. Lo hace Alhabla al poco de sonar, con el nombre del estudio de uñas.",
+        "Una semipermanente es una hora: busca cuándo la tiene libre la técnica que la hace y no la encaja en un hueco de media hora.",
+        "Paula tiene su hora con Laura y tú no has dejado la mesa. Le llega el aviso de la cita por WhatsApp.",
+      ],
+      negocio: [
+        "Mientras seca un esmalte, abres el panel: si la recepción atiende, cuántas llamadas ha cogido y qué clientas vienen después.",
+        "Abres la llamada de Paula y ves qué servicio quería, por qué fue con Laura a esa hora y la cita que salió.",
+        "El día libre de una técnica o un servicio nuevo: se lo escribes a tu asistente, la misma de tu WhatsApp.",
+      ],
+    },
     semana: { citas: 41, masQueAntes: 7, llamadas: 52, ingresos: 1148 },
   },
   "centro-de-estetica": {
@@ -150,6 +197,18 @@ export const GUIONES_SECTOR: Record<NicheSlug, GuionRelato> = {
       { nombre: "Masaje relajante", minutos: 60 },
       { nombre: "Higiene facial", minutos: 60 },
     ],
+    pasos: {
+      llamada: [
+        "En cabina no sales a coger el teléfono. A los pocos tonos contesta Alhabla con el nombre del centro y atiende a la clienta como tu recepción.",
+        "Un facial con peeling son 75 minutos y no lo hace cualquiera: busca el hueco de la esteticista que lo hace y respeta lo que ya está reservado.",
+        "Cristina tiene su facial con Sara y tú no has salido de cabina. Recibe la confirmación por WhatsApp.",
+      ],
+      negocio: [
+        "Entre tratamiento y tratamiento miras el panel: si la recepción atiende, cuántas llamadas ha cogido y qué tratamientos quedan por la tarde.",
+        "Abres la llamada de Cristina: qué tratamiento pidió, por qué se lo dio con Sara y la cita que salió.",
+        "Una baja, un bono o un tratamiento nuevo: se lo pides a tu asistente desde el panel, como en WhatsApp.",
+      ],
+    },
     semana: { citas: 27, masQueAntes: 5, llamadas: 46, ingresos: 1593 },
   },
   fisioterapia: {
@@ -172,12 +231,126 @@ export const GUIONES_SECTOR: Record<NicheSlug, GuionRelato> = {
       { nombre: "Masaje deportivo", minutos: 60 },
       { nombre: "Rehabilitación de rodilla", minutos: 45 },
     ],
+    pasos: {
+      llamada: [
+        "En plena sesión no se coge el teléfono. Contesta Alhabla con el nombre de la clínica y atiende al paciente sin preguntarle por su historial.",
+        "Una primera consulta es una hora: busca cuándo la tiene libre el fisio que la hace y no la parte entre dos sesiones.",
+        "Andrés tiene su primera consulta con Pablo y tú no has dejado la camilla. La confirmación le llega por WhatsApp.",
+      ],
+      negocio: [
+        "Entre paciente y paciente abres el panel: si la recepción atiende, cuántas llamadas ha cogido y qué sesiones quedan hoy.",
+        "Abres la llamada de Andrés y lees qué consulta pidió, por qué le tocó Pablo a esa hora y la cita que salió.",
+        "Una baja o una mañana de formación: se la cuentas a tu asistente desde el panel o por WhatsApp.",
+      ],
+    },
     semana: { citas: 34, masQueAntes: 4, llamadas: 39, ingresos: 1530 },
+  },
+  "pestanas-y-cejas": {
+    negocio: "Estudio Lía",
+    palabras: {
+      tuCliente: "tu clienta",
+      tusClientes: "Tus clientas",
+      elCliente: "la clienta",
+      mientras: "tenías las pinzas en la mano",
+    },
+    cliente: { nombre: "Irene", apellido: "G.", telefono: "+34 794 51 30 88" },
+    profesional: "Nerea",
+    companera: "Alba",
+    servicio: { nombre: "Relleno de pestañas", minutos: 60 },
+    pide: "¿Tenéis hueco mañana para un relleno de pestañas?",
+    otrosClientes: ["Sonia R.", "Paula C.", "Marta L.", "Eva M."],
+    otrosServicios: [
+      { nombre: "Juego de volumen", minutos: 150 },
+      { nombre: "Laminado de cejas", minutos: 45 },
+      { nombre: "Lifting de pestañas", minutos: 60 },
+      { nombre: "Diseño de cejas", minutos: 30 },
+    ],
+    pasos: {
+      llamada: [
+        "Pegando extensiones pelo a pelo no hay mano libre para el móvil. Responde Alhabla tras unos tonos y presenta el estudio por su nombre.",
+        "Un relleno es una hora: lo pone donde la técnica que lo hace tiene la hora entera, nunca a caballo entre dos juegos.",
+        "Irene tiene su relleno con Nerea y tú sigues con el juego de volumen. Su cita le llega por WhatsApp.",
+      ],
+      negocio: [
+        "Al terminar un juego miras el panel: recepción en marcha, llamadas cogidas y quién se tumba en la camilla después.",
+        "Abres la llamada de Irene: qué pidió, por qué fue con Nerea a esa hora y qué cita quedó.",
+        "Una técnica que se pone mala o un precio que sube: díselo a tu asistente, la que tienes en WhatsApp.",
+      ],
+    },
+    semana: { citas: 36, masQueAntes: 6, llamadas: 44, ingresos: 1410 },
+  },
+  "spa-y-masajes": {
+    negocio: "Spa Alameda",
+    palabras: {
+      tuCliente: "tu cliente",
+      tusClientes: "Tus clientes",
+      elCliente: "el cliente",
+      mientras: "estabas dando un masaje",
+    },
+    cliente: { nombre: "Sonia", apellido: "O.", telefono: "+34 793 27 84 15" },
+    profesional: "Lucía",
+    companera: "Óscar",
+    servicio: { nombre: "Ritual de chocolate", minutos: 90 },
+    pide: "¿Tenéis hueco mañana para el ritual de chocolate?",
+    otrosClientes: ["Elena V.", "Marcos T.", "Raquel D.", "Jorge P."],
+    otrosServicios: [
+      { nombre: "Masaje relajante", minutos: 60 },
+      { nombre: "Piedras calientes", minutos: 75 },
+      { nombre: "Reflexología", minutos: 45 },
+      { nombre: "Masaje descontracturante", minutos: 60 },
+    ],
+    pasos: {
+      llamada: [
+        "En cabina solo suena la música. Fuera, a los pocos tonos, responde Alhabla con el nombre del spa y atiende sin prisa.",
+        "El ritual de chocolate son 90 minutos: busca cuándo lo tiene libre quien lo hace y no lo encaja en un hueco corto.",
+        "Sonia tiene su ritual con Lucía y tú no has interrumpido el masaje. La reserva le llega por WhatsApp.",
+      ],
+      negocio: [
+        "Al salir de cabina echas un vistazo al panel: si la recepción atiende, las llamadas del día y los masajes que quedan.",
+        "Abres la llamada de Sonia y lees qué ritual quería, por qué le dio las 17:30 con Lucía y la reserva que salió.",
+        "Una terapeuta con gripe o un ritual que cambia de precio: se lo cuentas a tu asistente, la de tu WhatsApp.",
+      ],
+    },
+    semana: { citas: 31, masQueAntes: 5, llamadas: 38, ingresos: 1865 },
+  },
+  "peluqueria-canina": {
+    negocio: "Peluquería canina Trufa",
+    palabras: {
+      tuCliente: "tu cliente",
+      tusClientes: "Tus clientes",
+      elCliente: "el cliente",
+      mientras: "estabas secando a un perro",
+    },
+    cliente: { nombre: "Lucía", apellido: "P.", telefono: "+34 798 46 02 19" },
+    profesional: "Álex",
+    companera: "Iván",
+    servicio: { nombre: "Baño perro mediano", minutos: 60 },
+    pide: "¿Tenéis hueco mañana para bañar a mi perro? Es un caniche mediano.",
+    otrosClientes: ["Diego F.", "Marta S.", "Carlos R.", "Ana B."],
+    otrosServicios: [
+      { nombre: "Deslanado perro grande", minutos: 150 },
+      { nombre: "Baño perro pequeño", minutos: 60 },
+      { nombre: "Stripping", minutos: 90 },
+      { nombre: "Corte de uñas", minutos: 15 },
+    ],
+    pasos: {
+      llamada: [
+        "Con un perro mojado en la mesa no sueltas la ducha. Tras unos tonos contesta Alhabla con el nombre de la peluquería y pregunta qué perro es.",
+        "Un baño de perro mediano es una hora: busca cuándo está libre quien lo hace y no lo mete entre dos perros en media hora.",
+        "Lucía tiene el baño de Toby con Álex y tú sigues con el secador. La cita le llega por WhatsApp.",
+      ],
+      negocio: [
+        "Mientras se seca un perro, miras el panel: si la recepción atiende, las llamadas que ha cogido y los perros que quedan hoy.",
+        "Abres la llamada de Lucía: qué perro es, qué pidió y por qué le tocó Álex a esa hora.",
+        "Un peluquero que se tuerce un tobillo o un baño que sube de precio: se lo escribes a tu asistente.",
+      ],
+    },
+    semana: { citas: 29, masQueAntes: 4, llamadas: 36, ingresos: 1235 },
   },
 };
 
 /** El guion de una landing: el de su sector, o el general en la portada. */
-export function guionDe(sector?: NicheSlug): GuionRelato {
+export function guionDe(sector?: SectorSlug): GuionRelato {
   return sector ? GUIONES_SECTOR[sector] : GUION_GENERAL;
 }
 

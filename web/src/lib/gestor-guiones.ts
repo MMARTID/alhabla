@@ -1,4 +1,4 @@
-import type { NicheSlug } from "@/lib/niche-landings";
+import type { SectorSlug } from "@/lib/sectores/tipos";
 
 /**
  * Los guiones de tu asistente en acción (`components/gestor-simulacion.tsx`;
@@ -68,7 +68,13 @@ export type Turno =
   /** Lo escribe el Gestor; `seguido`: viene justo detrás de otro mensaje
    * suyo (la pregunta del sistema tras un «Hecho»), casi sin espera.
    * `hito`: una consulta que el panel resalta al leerse (no cambia nada). */
-  | { de: "gestor"; texto: string; botones?: [string, string]; seguido?: boolean; hito?: Hito }
+  | {
+      de: "gestor";
+      texto: string;
+      botones?: [string, string];
+      seguido?: boolean;
+      hito?: Hito;
+    }
   /** El dueño pulsa un botón del mensaje anterior; `hito` es el cambio que
    * ejecuta y que el panel refleja. */
   | { de: "boton"; texto: string; hito?: Hito };
@@ -94,7 +100,13 @@ export type VistaAgenda = {
   /** Las citas que no cambian. */
   citas: CitaAgenda[];
   /** Alguien del equipo deja de estar: su columna se raya (entera o un tramo). */
-  ausencia?: { col: number; etiqueta: string; fila?: number; filas?: number; hito: Hito };
+  ausencia?: {
+    col: number;
+    etiqueta: string;
+    fila?: number;
+    filas?: number;
+    hito: Hito;
+  };
   /** La cita que cambia (la que se mueve o la que se apunta). */
   cita?: {
     cita: CitaAgenda;
@@ -110,7 +122,12 @@ export type VistaAgenda = {
   };
 };
 
-export type DiaEspecial = { fecha: [string, string]; titulo: string; detalle: string; chip: string };
+export type DiaEspecial = {
+  fecha: [string, string];
+  titulo: string;
+  detalle: string;
+  chip: string;
+};
 
 /** «Tu recepcionista» › Disponibilidad: la semana y los días especiales. */
 export type VistaHorario = {
@@ -150,7 +167,8 @@ export type VistaResumen = {
   hito: Hito;
 };
 
-export type Vista = VistaAgenda | VistaHorario | VistaServicios | VistaInformacion | VistaResumen;
+export type Vista =
+  VistaAgenda | VistaHorario | VistaServicios | VistaInformacion | VistaResumen;
 
 export type Escenario = {
   id: string;
@@ -219,7 +237,12 @@ export function pasosDe(escenario: Escenario): Paso[] {
   escenario.turnos.forEach((turno, i) => {
     if (turno.de === "dueno") {
       for (let letras = 1; letras <= turno.texto.length; letras++) {
-        pasos.push({ turno: i, fase: "tecleando", letras, espera: RITMO.letra });
+        pasos.push({
+          turno: i,
+          fase: "tecleando",
+          letras,
+          espera: RITMO.letra,
+        });
       }
       pasos.push({ turno: i, fase: "enviado", espera: RITMO.enviado });
       return;
@@ -232,8 +255,14 @@ export function pasosDe(escenario: Escenario): Paso[] {
       });
       const letras = turno.texto.length;
       const lectura = turno.botones
-        ? Math.min(RITMO.lecturaConBotonesMax, RITMO.lecturaBase + letras * RITMO.lecturaConBotonesPorLetra) + RITMO.botones
-        : Math.min(RITMO.lecturaMax, RITMO.lecturaBase + letras * RITMO.lecturaPorLetra);
+        ? Math.min(
+            RITMO.lecturaConBotonesMax,
+            RITMO.lecturaBase + letras * RITMO.lecturaConBotonesPorLetra
+          ) + RITMO.botones
+        : Math.min(
+            RITMO.lecturaMax,
+            RITMO.lecturaBase + letras * RITMO.lecturaPorLetra
+          );
       pasos.push({ turno: i, fase: "visible", espera: lectura });
       return;
     }
@@ -244,7 +273,10 @@ export function pasosDe(escenario: Escenario): Paso[] {
 
 /** Lo que dura una situación entera, con sus pausas. */
 export function duracionDe(escenario: Escenario): number {
-  return pasosDe(escenario).reduce((total, p) => total + p.espera, RITMO.inicial + RITMO.final);
+  return pasosDe(escenario).reduce(
+    (total, p) => total + p.espera,
+    RITMO.inicial + RITMO.final
+  );
 }
 
 /** Lo que dura una vuelta completa (las tres situaciones). */
@@ -255,7 +287,8 @@ export function duracionDelGuion(guion: GuionGestor): number {
 /** Cuánto ha pasado de la situación (0–1) con `paso` pasos aplicados. */
 export function progresoEn(pasos: Paso[], paso: number, total: number): number {
   let transcurrido = RITMO.inicial;
-  for (let i = 0; i < Math.min(paso, pasos.length); i++) transcurrido += pasos[i].espera;
+  for (let i = 0; i < Math.min(paso, pasos.length); i++)
+    transcurrido += pasos[i].espera;
   return Math.min(1, transcurrido / total);
 }
 
@@ -288,10 +321,14 @@ export function estadoDeTurnos(
 
 /** Los hitos ya alcanzados: los botones pulsados que ejecutan algo y las
  * consultas del Gestor ya leídas. */
-export function hitosAlcanzados(escenario: Escenario, estados: EstadoDeTurno[]): Hito[] {
+export function hitosAlcanzados(
+  escenario: Escenario,
+  estados: EstadoDeTurno[]
+): Hito[] {
   const hitos: Hito[] = [];
   escenario.turnos.forEach((turno, i) => {
-    if (turno.de !== "dueno" && turno.hito && estados[i] === "visible") hitos.push(turno.hito);
+    if (turno.de !== "dueno" && turno.hito && estados[i] === "visible")
+      hitos.push(turno.hito);
   });
   return hitos;
 }
@@ -393,9 +430,18 @@ function avisosDeAusencia(c: {
   avisada: string;
 }): Escenario["avisos"] {
   return {
-    ausente: { titulo: `${c.profesional}, ausente hoy`, detalle: `${mayuscula(c.motivo)} · sin citas nuevas` },
-    movida: { titulo: `${mayuscula(c.cita)} → ${c.otra}`, detalle: `${c.cliente} · ${c.hora}` },
-    avisada: { titulo: `${c.cliente}, ${c.avisada}`, detalle: "Nueva hora enviada" },
+    ausente: {
+      titulo: `${c.profesional}, ausente hoy`,
+      detalle: `${mayuscula(c.motivo)} · sin citas nuevas`,
+    },
+    movida: {
+      titulo: `${mayuscula(c.cita)} → ${c.otra}`,
+      detalle: `${c.cliente} · ${c.hora}`,
+    },
+    avisada: {
+      titulo: `${c.cliente}, ${c.avisada}`,
+      detalle: "Nueva hora enviada",
+    },
   };
 }
 
@@ -424,7 +470,10 @@ const LUNES_12: DiaEspecial = {
 };
 
 /** «El lunes 12 cerramos»: `cerrar_dia`, igual en la portada y en la barbería. */
-function cierreDeFestivo(c: { aviso: string; semana: VistaHorario["semana"] }): Escenario {
+function cierreDeFestivo(c: {
+  aviso: string;
+  semana: VistaHorario["semana"];
+}): Escenario {
   return {
     id: "cierre",
     reloj: "20:12",
@@ -433,7 +482,8 @@ function cierreDeFestivo(c: { aviso: string; semana: VistaHorario["semana"] }): 
       { de: "dueno", texto: c.aviso },
       {
         de: "gestor",
-        texto: "¿Confirmas? Cerrar el lunes 12 de octubre (festivo): la recepcionista no reservará ese día.",
+        texto:
+          "¿Confirmas? Cerrar el lunes 12 de octubre (festivo): la recepcionista no reservará ese día.",
         botones: ["Confirmar", "Cancelar"],
       },
       { de: "boton", texto: "Confirmar", hito: "cerrado" },
@@ -443,8 +493,20 @@ function cierreDeFestivo(c: { aviso: string; semana: VistaHorario["semana"] }): 
           "Hecho: el lunes 12 de octubre queda cerrado. Las citas ya reservadas ese día no se cancelan solas: revísalas en la agenda.",
       },
     ],
-    vistas: [{ tipo: "horario", semana: c.semana, especiales: [JUEVES_1], nuevo: { ...LUNES_12, hito: "cerrado" } }],
-    avisos: { cerrado: { titulo: "Lunes 12 de octubre, cerrado", detalle: "Festivo · día especial" } },
+    vistas: [
+      {
+        tipo: "horario",
+        semana: c.semana,
+        especiales: [JUEVES_1],
+        nuevo: { ...LUNES_12, hito: "cerrado" },
+      },
+    ],
+    avisos: {
+      cerrado: {
+        titulo: "Lunes 12 de octubre, cerrado",
+        detalle: "Festivo · día especial",
+      },
+    },
   };
 }
 
@@ -482,7 +544,10 @@ function cambioDePrecio(c: {
       },
     ],
     avisos: {
-      precio: { titulo: `${c.servicio}: ${c.despues} €`, detalle: `Antes ${c.antes} € · catálogo al día` },
+      precio: {
+        titulo: `${c.servicio}: ${c.despues} €`,
+        detalle: `Antes ${c.antes} € · catálogo al día`,
+      },
     },
   };
 }
@@ -512,7 +577,13 @@ function agendaDePeluqueria(c: {
     profesionales: c.profesionales,
     citas: [
       { col: 1, fila: 2, filas: 4, titulo: "Mechas", cliente: "Elena S." },
-      { col: 1, fila: 7, filas: 1, titulo: "Corte caballero", cliente: "Sergio P." },
+      {
+        col: 1,
+        fila: 7,
+        filas: 1,
+        titulo: "Corte caballero",
+        cliente: "Sergio P.",
+      },
       { col: 2, fila: 1, filas: 3, titulo: "Alisado", cliente: "Rosa M." },
       { col: 2, fila: 8, filas: 2, titulo: "Peinado", cliente: "Paula V." },
     ],
@@ -548,7 +619,13 @@ export const GUION_GESTOR_GENERAL: GuionGestor = {
       vistas: [
         agendaDePeluqueria({
           profesionales: ["Marta", "Ana", "Lucía"],
-          cita: { col: 0, fila: 4, filas: 3, titulo: "Corte y color", cliente: "Carmen R." },
+          cita: {
+            col: 0,
+            fila: 4,
+            filas: 3,
+            titulo: "Corte y color",
+            cliente: "Carmen R.",
+          },
           horas: "11:00 – 12:30",
         }),
       ],
@@ -562,7 +639,10 @@ export const GUION_GESTOR_GENERAL: GuionGestor = {
         avisada: "avisada",
       }),
     },
-    cierreDeFestivo({ aviso: "El lunes 12 cerramos, es festivo", semana: SEMANA_TIPO }),
+    cierreDeFestivo({
+      aviso: "El lunes 12 cerramos, es festivo",
+      semana: SEMANA_TIPO,
+    }),
     cambioDePrecio({
       aviso: "El corte de caballero sube a 18 €",
       servicio: "Corte caballero",
@@ -588,7 +668,7 @@ const INFORMACION_UNAS = [
   "El nail art se cobra por uña, desde 2 €.",
 ];
 
-export const GUIONES_GESTOR: Record<NicheSlug, GuionGestor> = {
+export const GUIONES_GESTOR: Record<SectorSlug, GuionGestor> = {
   peluqueria: {
     negocio: "Peluquería Nuria",
     escenarios: [
@@ -611,7 +691,13 @@ export const GUIONES_GESTOR: Record<NicheSlug, GuionGestor> = {
         vistas: [
           agendaDePeluqueria({
             profesionales: ["Marta", "Ana", "Laura"],
-            cita: { col: 0, fila: 4, filas: 4, titulo: "Mechas", cliente: "Rosa M." },
+            cita: {
+              col: 0,
+              fila: 4,
+              filas: 4,
+              titulo: "Mechas",
+              cliente: "Rosa M.",
+            },
             horas: "11:00 – 13:00",
           }),
         ],
@@ -630,25 +716,35 @@ export const GUIONES_GESTOR: Record<NicheSlug, GuionGestor> = {
         reloj: "13:20",
         diaCorto: "Mié",
         turnos: [
-          { de: "dueno", texto: "Apunta a Rosa el jueves 29 a las 5, mechas. Su móvil: 791 58 06 33" },
+          {
+            de: "dueno",
+            texto:
+              "Apunta a Rosa el jueves 29 a las 5, mechas. Su móvil: 791 58 06 33",
+          },
           {
             de: "gestor",
-            texto: "¿Confirmas? Apuntar a Rosa el jueves 29 de octubre a las 17:00, Mechas (120 min) con Marta.",
+            texto:
+              "¿Confirmas? Apuntar a Rosa el jueves 29 de octubre a las 17:00, Mechas (120 min) con Marta.",
             botones: ["Confirmar", "Cancelar"],
           },
           { de: "boton", texto: "Confirmar", hito: "apuntada" },
           {
             de: "gestor",
-            texto: "Hecho: Rosa queda apuntada el jueves 29 de octubre a las 17:00, Mechas con Marta. Ya está en tu calendario.",
+            texto:
+              "Hecho: Rosa queda apuntada el jueves 29 de octubre a las 17:00, Mechas con Marta. Ya está en tu calendario.",
           },
           {
             de: "gestor",
-            texto: "¿Le mando a Rosa la confirmación por WhatsApp al +34 791 58 06 33?",
+            texto:
+              "¿Le mando a Rosa la confirmación por WhatsApp al +34 791 58 06 33?",
             botones: ["Sí, mándasela", "No"],
             seguido: true,
           },
           { de: "boton", texto: "Sí, mándasela", hito: "confirmada" },
-          { de: "gestor", texto: "Le mando a Rosa la confirmación al +34 791 58 06 33." },
+          {
+            de: "gestor",
+            texto: "Le mando a Rosa la confirmación al +34 791 58 06 33.",
+          },
         ],
         vistas: [
           {
@@ -657,22 +753,61 @@ export const GUIONES_GESTOR: Record<NicheSlug, GuionGestor> = {
             desdeHora: 15,
             profesionales: ["Marta", "Ana", "Laura"],
             citas: [
-              { col: 1, fila: 0, filas: 3, titulo: "Corte y color", cliente: "Elena S." },
-              { col: 2, fila: 2, filas: 2, titulo: "Corte señora", cliente: "Paula V." },
-              { col: 0, fila: 0, filas: 2, titulo: "Corte señora", cliente: "Nerea V." },
-              { col: 1, fila: 6, filas: 2, titulo: "Peinado", cliente: "Irene C." },
+              {
+                col: 1,
+                fila: 0,
+                filas: 3,
+                titulo: "Corte y color",
+                cliente: "Elena S.",
+              },
+              {
+                col: 2,
+                fila: 2,
+                filas: 2,
+                titulo: "Corte señora",
+                cliente: "Paula V.",
+              },
+              {
+                col: 0,
+                fila: 0,
+                filas: 2,
+                titulo: "Corte señora",
+                cliente: "Nerea V.",
+              },
+              {
+                col: 1,
+                fila: 6,
+                filas: 2,
+                titulo: "Peinado",
+                cliente: "Irene C.",
+              },
             ],
             cita: {
-              cita: { col: 0, fila: 4, filas: 4, titulo: "Mechas", cliente: "Rosa" },
+              cita: {
+                col: 0,
+                fila: 4,
+                filas: 4,
+                titulo: "Mechas",
+                cliente: "Rosa",
+              },
               horas: "17:00 – 19:00",
               nueva: "apuntada",
-              whatsapp: { hito: "confirmada", etiqueta: "Confirmación enviada" },
+              whatsapp: {
+                hito: "confirmada",
+                etiqueta: "Confirmación enviada",
+              },
             },
           },
         ],
         avisos: {
-          apuntada: { titulo: "Mechas de Rosa, apuntadas", detalle: "Jueves 29 · 17:00 · con Marta" },
-          confirmada: { titulo: "Rosa, confirmada", detalle: "Confirmación enviada" },
+          apuntada: {
+            titulo: "Mechas de Rosa, apuntadas",
+            detalle: "Jueves 29 · 17:00 · con Marta",
+          },
+          confirmada: {
+            titulo: "Rosa, confirmada",
+            detalle: "Confirmación enviada",
+          },
         },
       },
       cambioDePrecio({
@@ -711,14 +846,44 @@ export const GUIONES_GESTOR: Record<NicheSlug, GuionGestor> = {
             desdeHora: 9,
             profesionales: ["Sara", "Paula", "Elena"],
             citas: [
-              { col: 1, fila: 1, filas: 2, titulo: "Higiene facial", cliente: "Lorena G." },
-              { col: 1, fila: 5, filas: 2, titulo: "Masaje relajante", cliente: "Marina F." },
-              { col: 2, fila: 0, filas: 2, titulo: "Depilación láser", cliente: "Silvia R." },
-              { col: 2, fila: 3, filas: 2, titulo: "Presoterapia", cliente: "Beatriz N." },
+              {
+                col: 1,
+                fila: 1,
+                filas: 2,
+                titulo: "Higiene facial",
+                cliente: "Lorena G.",
+              },
+              {
+                col: 1,
+                fila: 5,
+                filas: 2,
+                titulo: "Masaje relajante",
+                cliente: "Marina F.",
+              },
+              {
+                col: 2,
+                fila: 0,
+                filas: 2,
+                titulo: "Depilación láser",
+                cliente: "Silvia R.",
+              },
+              {
+                col: 2,
+                fila: 3,
+                filas: 2,
+                titulo: "Presoterapia",
+                cliente: "Beatriz N.",
+              },
             ],
             ausencia: { col: 0, etiqueta: "Ausente hoy", hito: "ausente" },
             cita: {
-              cita: { col: 0, fila: 6, filas: 3, titulo: "Facial con peeling", cliente: "Inés G." },
+              cita: {
+                col: 0,
+                fila: 6,
+                filas: 3,
+                titulo: "Facial con peeling",
+                cliente: "Inés G.",
+              },
               horas: "12:00 – 13:15",
               movida: { hito: "movida", col: 2 },
               whatsapp: { hito: "avisada", etiqueta: "Avisada" },
@@ -740,7 +905,10 @@ export const GUIONES_GESTOR: Record<NicheSlug, GuionGestor> = {
         reloj: "15:48",
         diaCorto: "Mié",
         turnos: [
-          { de: "dueno", texto: "Pasa la presoterapia de Beatriz al viernes a la misma hora" },
+          {
+            de: "dueno",
+            texto: "Pasa la presoterapia de Beatriz al viernes a la misma hora",
+          },
           {
             de: "gestor",
             texto:
@@ -755,7 +923,8 @@ export const GUIONES_GESTOR: Record<NicheSlug, GuionGestor> = {
           },
           {
             de: "gestor",
-            texto: "¿Le aviso a Beatriz por WhatsApp de la nueva hora? Si prefieres llamarle tú: +34 794 61 08 25.",
+            texto:
+              "¿Le aviso a Beatriz por WhatsApp de la nueva hora? Si prefieres llamarle tú: +34 794 61 08 25.",
             botones: ["Sí, avísale", "Le llamo yo"],
             seguido: true,
           },
@@ -769,13 +938,43 @@ export const GUIONES_GESTOR: Record<NicheSlug, GuionGestor> = {
             desdeHora: 15,
             profesionales: ["Sara", "Paula", "Elena"],
             citas: [
-              { col: 0, fila: 0, filas: 3, titulo: "Facial con peeling", cliente: "Cristina P." },
-              { col: 0, fila: 5, filas: 2, titulo: "Depilación láser", cliente: "Silvia R." },
-              { col: 2, fila: 1, filas: 2, titulo: "Masaje relajante", cliente: "Marina F." },
-              { col: 2, fila: 6, filas: 2, titulo: "Higiene facial", cliente: "Lorena G." },
+              {
+                col: 0,
+                fila: 0,
+                filas: 3,
+                titulo: "Facial con peeling",
+                cliente: "Cristina P.",
+              },
+              {
+                col: 0,
+                fila: 5,
+                filas: 2,
+                titulo: "Depilación láser",
+                cliente: "Silvia R.",
+              },
+              {
+                col: 2,
+                fila: 1,
+                filas: 2,
+                titulo: "Masaje relajante",
+                cliente: "Marina F.",
+              },
+              {
+                col: 2,
+                fila: 6,
+                filas: 2,
+                titulo: "Higiene facial",
+                cliente: "Lorena G.",
+              },
             ],
             cita: {
-              cita: { col: 1, fila: 3, filas: 2, titulo: "Presoterapia", cliente: "Beatriz N." },
+              cita: {
+                col: 1,
+                fila: 3,
+                filas: 2,
+                titulo: "Presoterapia",
+                cliente: "Beatriz N.",
+              },
               horas: "16:30 – 17:15",
               movida: { hito: "movida", destino: "viernes 2 · 16:30" },
               whatsapp: { hito: "avisada", etiqueta: "Avisada" },
@@ -783,8 +982,14 @@ export const GUIONES_GESTOR: Record<NicheSlug, GuionGestor> = {
           },
         ],
         avisos: {
-          movida: { titulo: "Presoterapia de Beatriz → viernes", detalle: "Viernes 2 · 16:30 · con Paula" },
-          avisada: { titulo: "Beatriz N., avisada", detalle: "Nueva hora enviada" },
+          movida: {
+            titulo: "Presoterapia de Beatriz → viernes",
+            detalle: "Viernes 2 · 16:30 · con Paula",
+          },
+          avisada: {
+            titulo: "Beatriz N., avisada",
+            detalle: "Nueva hora enviada",
+          },
         },
       },
       {
@@ -792,24 +997,38 @@ export const GUIONES_GESTOR: Record<NicheSlug, GuionGestor> = {
         reloj: "20:05",
         diaCorto: "Mié",
         turnos: [
-          { de: "dueno", texto: "Dile que los bonos se pagan en el centro, no por teléfono" },
+          {
+            de: "dueno",
+            texto: "Dile que los bonos se pagan en el centro, no por teléfono",
+          },
           {
             de: "gestor",
-            texto: "¿Confirmas? Añadir a lo que sabe la recepcionista «Los bonos se pagan en el centro, no por teléfono».",
+            texto:
+              "¿Confirmas? Añadir a lo que sabe la recepcionista «Los bonos se pagan en el centro, no por teléfono».",
             botones: ["Confirmar", "Cancelar"],
           },
           { de: "boton", texto: "Confirmar", hito: "ensenado" },
-          { de: "gestor", texto: "Hecho: la recepcionista ya lo tiene en cuenta en las próximas llamadas." },
+          {
+            de: "gestor",
+            texto:
+              "Hecho: la recepcionista ya lo tiene en cuenta en las próximas llamadas.",
+          },
         ],
         vistas: [
           {
             tipo: "informacion",
             lineas: INFORMACION_ESTETICA,
-            nueva: { texto: "Los bonos se pagan en el centro, no por teléfono.", hito: "ensenado" },
+            nueva: {
+              texto: "Los bonos se pagan en el centro, no por teléfono.",
+              hito: "ensenado",
+            },
           },
         ],
         avisos: {
-          ensenado: { titulo: "La recepcionista ya lo sabe", detalle: "Bonos: se pagan en el centro" },
+          ensenado: {
+            titulo: "La recepcionista ya lo sabe",
+            detalle: "Bonos: se pagan en el centro",
+          },
         },
       },
     ],
@@ -841,14 +1060,44 @@ export const GUIONES_GESTOR: Record<NicheSlug, GuionGestor> = {
             desdeHora: 9,
             profesionales: ["Laura", "Julia", "Noa"],
             citas: [
-              { col: 1, fila: 0, filas: 3, titulo: "Uñas de gel", cliente: "Irene C." },
-              { col: 1, fila: 6, filas: 2, titulo: "Pedicura spa", cliente: "Marta B." },
-              { col: 2, fila: 1, filas: 2, titulo: "Relleno de gel", cliente: "Sofía L." },
-              { col: 2, fila: 7, filas: 1, titulo: "Manicura clásica", cliente: "Nerea V." },
+              {
+                col: 1,
+                fila: 0,
+                filas: 3,
+                titulo: "Uñas de gel",
+                cliente: "Irene C.",
+              },
+              {
+                col: 1,
+                fila: 6,
+                filas: 2,
+                titulo: "Pedicura spa",
+                cliente: "Marta B.",
+              },
+              {
+                col: 2,
+                fila: 1,
+                filas: 2,
+                titulo: "Relleno de gel",
+                cliente: "Sofía L.",
+              },
+              {
+                col: 2,
+                fila: 7,
+                filas: 1,
+                titulo: "Manicura clásica",
+                cliente: "Nerea V.",
+              },
             ],
             ausencia: { col: 0, etiqueta: "Ausente hoy", hito: "ausente" },
             cita: {
-              cita: { col: 0, fila: 4, filas: 2, titulo: "Semipermanente", cliente: "Carla D." },
+              cita: {
+                col: 0,
+                fila: 4,
+                filas: 2,
+                titulo: "Semipermanente",
+                cliente: "Carla D.",
+              },
               horas: "11:00 – 12:00",
               movida: { hito: "movida", col: 2 },
               whatsapp: { hito: "avisada", etiqueta: "Avisada" },
@@ -873,26 +1122,38 @@ export const GUIONES_GESTOR: Record<NicheSlug, GuionGestor> = {
           { de: "dueno", texto: "¿Qué te han preguntado hoy que no supieras?" },
           {
             de: "gestor",
-            texto: "Hoy, una cosa, dos veces: si hacéis uñas press-on. ¿Se lo enseño? Dime qué les contesto.",
+            texto:
+              "Hoy, una cosa, dos veces: si hacéis uñas press-on. ¿Se lo enseño? Dime qué les contesto.",
           },
           { de: "dueno", texto: "Sí, hacemos press-on: 35 € y con cita" },
           {
             de: "gestor",
-            texto: "¿Confirmas? Añadir a lo que sabe la recepcionista «Hacemos uñas press-on: 35 €, con cita previa».",
+            texto:
+              "¿Confirmas? Añadir a lo que sabe la recepcionista «Hacemos uñas press-on: 35 €, con cita previa».",
             botones: ["Confirmar", "Cancelar"],
           },
           { de: "boton", texto: "Confirmar", hito: "ensenado" },
-          { de: "gestor", texto: "Hecho: la recepcionista ya lo tiene en cuenta en las próximas llamadas." },
+          {
+            de: "gestor",
+            texto:
+              "Hecho: la recepcionista ya lo tiene en cuenta en las próximas llamadas.",
+          },
         ],
         vistas: [
           {
             tipo: "informacion",
             lineas: INFORMACION_UNAS,
-            nueva: { texto: "Hacemos uñas press-on: 35 €, con cita previa.", hito: "ensenado" },
+            nueva: {
+              texto: "Hacemos uñas press-on: 35 €, con cita previa.",
+              hito: "ensenado",
+            },
           },
         ],
         avisos: {
-          ensenado: { titulo: "Press-on: ya lo contesta", detalle: "35 € · con cita previa" },
+          ensenado: {
+            titulo: "Press-on: ya lo contesta",
+            detalle: "35 € · con cita previa",
+          },
         },
       },
       {
@@ -900,14 +1161,22 @@ export const GUIONES_GESTOR: Record<NicheSlug, GuionGestor> = {
         reloj: "20:44",
         diaCorto: "Mié",
         turnos: [
-          { de: "dueno", texto: "Añade retirada de acrílico, 20 minutos, 10 €" },
+          {
+            de: "dueno",
+            texto: "Añade retirada de acrílico, 20 minutos, 10 €",
+          },
           {
             de: "gestor",
-            texto: "¿Confirmas? Dar de alta el servicio Retirada de acrílico (20 min, 10 €).",
+            texto:
+              "¿Confirmas? Dar de alta el servicio Retirada de acrílico (20 min, 10 €).",
             botones: ["Confirmar", "Cancelar"],
           },
           { de: "boton", texto: "Confirmar", hito: "creado" },
-          { de: "gestor", texto: "Hecho: he creado Retirada de acrílico. La recepcionista ya lo ofrece." },
+          {
+            de: "gestor",
+            texto:
+              "Hecho: he creado Retirada de acrílico. La recepcionista ya lo ofrece.",
+          },
         ],
         vistas: [
           {
@@ -920,11 +1189,19 @@ export const GUIONES_GESTOR: Record<NicheSlug, GuionGestor> = {
               { nombre: "Pedicura spa", duracion: 60, precio: 35 },
               { nombre: "Nail art", duracion: 30, precio: 12 },
             ],
-            nuevo: { nombre: "Retirada de acrílico", duracion: 20, precio: 10, hito: "creado" },
+            nuevo: {
+              nombre: "Retirada de acrílico",
+              duracion: 20,
+              precio: 10,
+              hito: "creado",
+            },
           },
         ],
         avisos: {
-          creado: { titulo: "Retirada de acrílico, en la carta", detalle: "20 min · 10 € · ya se ofrece" },
+          creado: {
+            titulo: "Retirada de acrílico, en la carta",
+            detalle: "20 min · 10 € · ya se ofrece",
+          },
         },
       },
     ],
@@ -956,15 +1233,51 @@ export const GUIONES_GESTOR: Record<NicheSlug, GuionGestor> = {
             desdeHora: 9,
             profesionales: ["Luis", "Sergio", "Dani"],
             citas: [
-              { col: 1, fila: 0, filas: 1, titulo: "Corte clásico", cliente: "Álex R." },
-              { col: 1, fila: 3, filas: 2, titulo: "Corte y barba", cliente: "Marcos P." },
-              { col: 1, fila: 8, filas: 1, titulo: "Arreglo de barba", cliente: "Iván S." },
-              { col: 2, fila: 1, filas: 1, titulo: "Corte degradado", cliente: "Hugo L." },
-              { col: 2, fila: 8, filas: 1, titulo: "Corte infantil", cliente: "Leo R." },
+              {
+                col: 1,
+                fila: 0,
+                filas: 1,
+                titulo: "Corte clásico",
+                cliente: "Álex R.",
+              },
+              {
+                col: 1,
+                fila: 3,
+                filas: 2,
+                titulo: "Corte y barba",
+                cliente: "Marcos P.",
+              },
+              {
+                col: 1,
+                fila: 8,
+                filas: 1,
+                titulo: "Arreglo de barba",
+                cliente: "Iván S.",
+              },
+              {
+                col: 2,
+                fila: 1,
+                filas: 1,
+                titulo: "Corte degradado",
+                cliente: "Hugo L.",
+              },
+              {
+                col: 2,
+                fila: 8,
+                filas: 1,
+                titulo: "Corte infantil",
+                cliente: "Leo R.",
+              },
             ],
             ausencia: { col: 0, etiqueta: "Ausente hoy", hito: "ausente" },
             cita: {
-              cita: { col: 0, fila: 6, filas: 2, titulo: "Corte y barba", cliente: "Javier M." },
+              cita: {
+                col: 0,
+                fila: 6,
+                filas: 2,
+                titulo: "Corte y barba",
+                cliente: "Javier M.",
+              },
               horas: "12:00 – 12:45",
               movida: { hito: "movida", col: 2 },
               whatsapp: { hito: "avisada", etiqueta: "Avisado" },
@@ -986,21 +1299,27 @@ export const GUIONES_GESTOR: Record<NicheSlug, GuionGestor> = {
         reloj: "18:36",
         diaCorto: "Mié",
         turnos: [
-          { de: "dueno", texto: "¿Hay hueco mañana a las 6 para un corte y barba?" },
+          {
+            de: "dueno",
+            texto: "¿Hay hueco mañana a las 6 para un corte y barba?",
+          },
           {
             de: "gestor",
-            texto: "Sí: mañana jueves a las 18:00 hay hueco para corte y barba (45 min), con Dani libre. ¿Te lo apunto?",
+            texto:
+              "Sí: mañana jueves a las 18:00 hay hueco para corte y barba (45 min), con Dani libre. ¿Te lo apunto?",
           },
           { de: "dueno", texto: "Apúntale a Javier" },
           {
             de: "gestor",
-            texto: "¿Confirmas? Apuntar a Javier el jueves 1 de octubre a las 18:00, Corte y barba (45 min) con Dani.",
+            texto:
+              "¿Confirmas? Apuntar a Javier el jueves 1 de octubre a las 18:00, Corte y barba (45 min) con Dani.",
             botones: ["Confirmar", "Cancelar"],
           },
           { de: "boton", texto: "Confirmar", hito: "apuntada" },
           {
             de: "gestor",
-            texto: "Hecho: Javier queda apuntado el jueves 1 de octubre a las 18:00, Corte y barba con Dani. Ya está en tu calendario.",
+            texto:
+              "Hecho: Javier queda apuntado el jueves 1 de octubre a las 18:00, Corte y barba con Dani. Ya está en tu calendario.",
           },
         ],
         vistas: [
@@ -1010,22 +1329,67 @@ export const GUIONES_GESTOR: Record<NicheSlug, GuionGestor> = {
             desdeHora: 16,
             profesionales: ["Luis", "Sergio", "Dani"],
             citas: [
-              { col: 0, fila: 0, filas: 1, titulo: "Corte clásico", cliente: "Álex R." },
-              { col: 0, fila: 4, filas: 2, titulo: "Corte y barba", cliente: "Marcos P." },
-              { col: 1, fila: 1, filas: 1, titulo: "Corte degradado", cliente: "Hugo L." },
-              { col: 1, fila: 5, filas: 1, titulo: "Afeitado a navaja", cliente: "Iván S." },
-              { col: 2, fila: 0, filas: 2, titulo: "Corte y barba", cliente: "Leo R." },
-              { col: 2, fila: 7, filas: 1, titulo: "Corte infantil", cliente: "Pau M." },
+              {
+                col: 0,
+                fila: 0,
+                filas: 1,
+                titulo: "Corte clásico",
+                cliente: "Álex R.",
+              },
+              {
+                col: 0,
+                fila: 4,
+                filas: 2,
+                titulo: "Corte y barba",
+                cliente: "Marcos P.",
+              },
+              {
+                col: 1,
+                fila: 1,
+                filas: 1,
+                titulo: "Corte degradado",
+                cliente: "Hugo L.",
+              },
+              {
+                col: 1,
+                fila: 5,
+                filas: 1,
+                titulo: "Afeitado a navaja",
+                cliente: "Iván S.",
+              },
+              {
+                col: 2,
+                fila: 0,
+                filas: 2,
+                titulo: "Corte y barba",
+                cliente: "Leo R.",
+              },
+              {
+                col: 2,
+                fila: 7,
+                filas: 1,
+                titulo: "Corte infantil",
+                cliente: "Pau M.",
+              },
             ],
             cita: {
-              cita: { col: 2, fila: 4, filas: 2, titulo: "Corte y barba", cliente: "Javier" },
+              cita: {
+                col: 2,
+                fila: 4,
+                filas: 2,
+                titulo: "Corte y barba",
+                cliente: "Javier",
+              },
               horas: "18:00 – 18:45",
               nueva: "apuntada",
             },
           },
         ],
         avisos: {
-          apuntada: { titulo: "Javier, apuntado con Dani", detalle: "Jueves 1 · 18:00 · corte y barba" },
+          apuntada: {
+            titulo: "Javier, apuntado con Dani",
+            detalle: "Jueves 1 · 18:00 · corte y barba",
+          },
         },
       },
       cierreDeFestivo({
@@ -1069,14 +1433,44 @@ export const GUIONES_GESTOR: Record<NicheSlug, GuionGestor> = {
             desdeHora: 9,
             profesionales: ["Pablo", "Clara", "Irene"],
             citas: [
-              { col: 1, fila: 0, filas: 2, titulo: "Primera visita", cliente: "Teresa M." },
-              { col: 1, fila: 5, filas: 2, titulo: "Rehabilitación", cliente: "Jorge A." },
-              { col: 2, fila: 1, filas: 1, titulo: "Punción seca", cliente: "Nuria S." },
-              { col: 2, fila: 7, filas: 2, titulo: "Masaje deportivo", cliente: "Óscar B." },
+              {
+                col: 1,
+                fila: 0,
+                filas: 2,
+                titulo: "Primera visita",
+                cliente: "Teresa M.",
+              },
+              {
+                col: 1,
+                fila: 5,
+                filas: 2,
+                titulo: "Rehabilitación",
+                cliente: "Jorge A.",
+              },
+              {
+                col: 2,
+                fila: 1,
+                filas: 1,
+                titulo: "Punción seca",
+                cliente: "Nuria S.",
+              },
+              {
+                col: 2,
+                fila: 7,
+                filas: 2,
+                titulo: "Masaje deportivo",
+                cliente: "Óscar B.",
+              },
             ],
             ausencia: { col: 0, etiqueta: "Ausente hoy", hito: "ausente" },
             cita: {
-              cita: { col: 0, fila: 4, filas: 2, titulo: "Sesión de seguimiento", cliente: "Andrés L." },
+              cita: {
+                col: 0,
+                fila: 4,
+                filas: 2,
+                titulo: "Sesión de seguimiento",
+                cliente: "Andrés L.",
+              },
               horas: "11:00 – 11:45",
               movida: { hito: "movida", col: 2 },
               whatsapp: { hito: "avisada", etiqueta: "Avisado" },
@@ -1098,7 +1492,10 @@ export const GUIONES_GESTOR: Record<NicheSlug, GuionGestor> = {
         reloj: "14:10",
         diaCorto: "Mié",
         turnos: [
-          { de: "dueno", texto: "Irene no está el jueves de 9 a 12, tiene formación" },
+          {
+            de: "dueno",
+            texto: "Irene no está el jueves de 9 a 12, tiene formación",
+          },
           {
             de: "gestor",
             texto:
@@ -1108,7 +1505,8 @@ export const GUIONES_GESTOR: Record<NicheSlug, GuionGestor> = {
           { de: "boton", texto: "Confirmar", hito: "ausente" },
           {
             de: "gestor",
-            texto: "Hecho: Irene no está el jueves 1 de octubre de 09:00 a 12:00; la recepcionista no le reservará nada ahí.",
+            texto:
+              "Hecho: Irene no está el jueves 1 de octubre de 09:00 a 12:00; la recepcionista no le reservará nada ahí.",
           },
         ],
         vistas: [
@@ -1118,17 +1516,56 @@ export const GUIONES_GESTOR: Record<NicheSlug, GuionGestor> = {
             desdeHora: 9,
             profesionales: ["Pablo", "Clara", "Irene"],
             citas: [
-              { col: 0, fila: 0, filas: 2, titulo: "Primera visita", cliente: "Marta B." },
-              { col: 0, fila: 4, filas: 2, titulo: "Sesión de seguimiento", cliente: "Jorge A." },
-              { col: 1, fila: 1, filas: 2, titulo: "Rehabilitación", cliente: "Teresa M." },
-              { col: 1, fila: 6, filas: 1, titulo: "Punción seca", cliente: "Nuria S." },
-              { col: 2, fila: 7, filas: 2, titulo: "Masaje deportivo", cliente: "Óscar B." },
+              {
+                col: 0,
+                fila: 0,
+                filas: 2,
+                titulo: "Primera visita",
+                cliente: "Marta B.",
+              },
+              {
+                col: 0,
+                fila: 4,
+                filas: 2,
+                titulo: "Sesión de seguimiento",
+                cliente: "Jorge A.",
+              },
+              {
+                col: 1,
+                fila: 1,
+                filas: 2,
+                titulo: "Rehabilitación",
+                cliente: "Teresa M.",
+              },
+              {
+                col: 1,
+                fila: 6,
+                filas: 1,
+                titulo: "Punción seca",
+                cliente: "Nuria S.",
+              },
+              {
+                col: 2,
+                fila: 7,
+                filas: 2,
+                titulo: "Masaje deportivo",
+                cliente: "Óscar B.",
+              },
             ],
-            ausencia: { col: 2, etiqueta: "Ausente 9–12 · formación", fila: 0, filas: 6, hito: "ausente" },
+            ausencia: {
+              col: 2,
+              etiqueta: "Ausente 9–12 · formación",
+              fila: 0,
+              filas: 6,
+              hito: "ausente",
+            },
           },
         ],
         avisos: {
-          ausente: { titulo: "Irene, fuera el jueves de 9 a 12", detalle: "Formación · sin citas en ese tramo" },
+          ausente: {
+            titulo: "Irene, fuera el jueves de 9 a 12",
+            detalle: "Formación · sin citas en ese tramo",
+          },
         },
       },
       {
@@ -1136,7 +1573,10 @@ export const GUIONES_GESTOR: Record<NicheSlug, GuionGestor> = {
         reloj: "21:02",
         diaCorto: "Vie",
         turnos: [
-          { de: "dueno", texto: "¿Cuántas llamadas y citas llevamos esta semana?" },
+          {
+            de: "dueno",
+            texto: "¿Cuántas llamadas y citas llevamos esta semana?",
+          },
           {
             de: "gestor",
             texto:
@@ -1146,11 +1586,15 @@ export const GUIONES_GESTOR: Record<NicheSlug, GuionGestor> = {
           { de: "dueno", texto: "Y el seguimiento pasa a 50 minutos" },
           {
             de: "gestor",
-            texto: "¿Confirmas? Cambiar el servicio Sesión de seguimiento: 50 min.",
+            texto:
+              "¿Confirmas? Cambiar el servicio Sesión de seguimiento: 50 min.",
             botones: ["Confirmar", "Cancelar"],
           },
           { de: "boton", texto: "Confirmar", hito: "duracion" },
-          { de: "gestor", texto: "Hecho: Sesión de seguimiento, 50 min, 45 €." },
+          {
+            de: "gestor",
+            texto: "Hecho: Sesión de seguimiento, 50 min, 45 €.",
+          },
         ],
         vistas: [
           {
@@ -1174,18 +1618,413 @@ export const GUIONES_GESTOR: Record<NicheSlug, GuionGestor> = {
               { nombre: "Masaje deportivo", duracion: 60, precio: 50 },
               { nombre: "Suelo pélvico", duracion: 45, precio: 50 },
             ],
-            cambio: { nombre: "Sesión de seguimiento", duracion: 50, hito: "duracion" },
+            cambio: {
+              nombre: "Sesión de seguimiento",
+              duracion: 50,
+              hito: "duracion",
+            },
           },
         ],
         avisos: {
-          duracion: { titulo: "Seguimiento: 50 minutos", detalle: "Antes 45 min · catálogo al día" },
+          duracion: {
+            titulo: "Seguimiento: 50 minutos",
+            detalle: "Antes 45 min · catálogo al día",
+          },
         },
       },
+    ],
+  },
+
+  "pestanas-y-cejas": {
+    negocio: "Estudio Lía",
+    escenarios: [
+      {
+        id: "ausencia",
+        reloj: "8:52",
+        diaCorto: "Mié",
+        turnos: ausenciaDe({
+          aviso: "Nerea no viene hoy, tiene fiebre",
+          profesional: "Nerea",
+          cuando: "hoy",
+          motivo: "fiebre",
+          cita: "la cita de Sonia R.",
+          servicio: "Lifting de pestañas",
+          hora: "11:00",
+          otra: "Alba",
+          cliente: "Sonia",
+          telefono: "+34 794 63 21 07",
+        }),
+        vistas: [
+          {
+            tipo: "agenda",
+            dia: "Miércoles, 30 de septiembre",
+            desdeHora: 9,
+            profesionales: ["Nerea", "Carla", "Alba"],
+            citas: [
+              {
+                col: 1,
+                fila: 0,
+                filas: 5,
+                titulo: "Juego de volumen",
+                cliente: "Marta L.",
+              },
+              {
+                col: 1,
+                fila: 7,
+                filas: 2,
+                titulo: "Laminado de cejas",
+                cliente: "Eva M.",
+              },
+              {
+                col: 2,
+                fila: 0,
+                filas: 2,
+                titulo: "Relleno",
+                cliente: "Paula C.",
+              },
+              {
+                col: 2,
+                fila: 7,
+                filas: 1,
+                titulo: "Diseño de cejas",
+                cliente: "Laura T.",
+              },
+            ],
+            ausencia: { col: 0, etiqueta: "Ausente hoy", hito: "ausente" },
+            cita: {
+              cita: {
+                col: 0,
+                fila: 4,
+                filas: 2,
+                titulo: "Lifting de pestañas",
+                cliente: "Sonia R.",
+              },
+              horas: "11:00 – 12:00",
+              movida: { hito: "movida", col: 2 },
+              whatsapp: { hito: "avisada", etiqueta: "Avisada" },
+            },
+          },
+        ],
+        avisos: avisosDeAusencia({
+          profesional: "Nerea",
+          motivo: "fiebre",
+          cita: "el lifting de Sonia",
+          cliente: "Sonia R.",
+          hora: "11:00",
+          otra: "Alba",
+          avisada: "avisada",
+        }),
+      },
+      {
+        id: "ensenar",
+        reloj: "19:48",
+        diaCorto: "Mié",
+        turnos: [
+          {
+            de: "dueno",
+            texto:
+              "Dile que el relleno solo vale si las pestañas son nuestras y de hace menos de tres semanas",
+          },
+          {
+            de: "gestor",
+            texto:
+              "¿Confirmas? Añadir a lo que sabe la recepcionista «El relleno solo se hace a pestañas puestas aquí hace menos de tres semanas; si no, es retirada y juego nuevo.».",
+            botones: ["Confirmar", "Cancelar"],
+          },
+          { de: "boton", texto: "Confirmar", hito: "ensenado" },
+          {
+            de: "gestor",
+            texto:
+              "Hecho: la recepcionista ya lo tiene en cuenta en las próximas llamadas.",
+          },
+        ],
+        vistas: [
+          {
+            tipo: "informacion",
+            lineas: [
+              "Estamos en la calle del Carmen 4, segundo piso.",
+              "Se paga con tarjeta o Bizum.",
+              "Venir sin máscara de pestañas.",
+            ],
+            nueva: {
+              texto:
+                "El relleno solo se hace a pestañas puestas aquí hace menos de tres semanas; si no, es retirada y juego nuevo.",
+              hito: "ensenado",
+            },
+          },
+        ],
+        avisos: {
+          ensenado: {
+            titulo: "La recepcionista ya lo sabe",
+            detalle: "Relleno: solo con pestañas de la casa",
+          },
+        },
+      },
+      cambioDePrecio({
+        aviso: "El lifting sube a 45 €",
+        servicio: "Lifting de pestañas",
+        duracion: 60,
+        antes: 40,
+        despues: 45,
+        servicios: [
+          { nombre: "Juego de volumen", duracion: 150, precio: 85 },
+          { nombre: "Relleno de pestañas", duracion: 60, precio: 35 },
+          { nombre: "Lifting de pestañas", duracion: 60, precio: 40 },
+          { nombre: "Laminado de cejas", duracion: 45, precio: 32 },
+          { nombre: "Diseño de cejas", duracion: 30, precio: 15 },
+          { nombre: "Retirada", duracion: 30, precio: 12 },
+        ],
+      }),
+    ],
+  },
+
+  "spa-y-masajes": {
+    negocio: "Spa Alameda",
+    escenarios: [
+      {
+        id: "ausencia",
+        reloj: "9:12",
+        diaCorto: "Mié",
+        turnos: ausenciaDe({
+          aviso: "Lucía no viene hoy, está con gripe",
+          profesional: "Lucía",
+          cuando: "hoy",
+          motivo: "gripe",
+          cita: "la cita de Elena V.",
+          servicio: "Masaje relajante",
+          hora: "12:00",
+          otra: "Óscar",
+          cliente: "Elena",
+          telefono: "+34 793 62 07 41",
+        }),
+        vistas: [
+          {
+            tipo: "agenda",
+            dia: "Miércoles, 30 de septiembre",
+            desdeHora: 9,
+            profesionales: ["Lucía", "Irene", "Óscar"],
+            citas: [
+              {
+                col: 1,
+                fila: 1,
+                filas: 3,
+                titulo: "Piedras calientes",
+                cliente: "Raquel D.",
+              },
+              {
+                col: 1,
+                fila: 6,
+                filas: 2,
+                titulo: "Reflexología",
+                cliente: "Jorge P.",
+              },
+              {
+                col: 2,
+                fila: 0,
+                filas: 2,
+                titulo: "Masaje relajante",
+                cliente: "Marcos T.",
+              },
+              {
+                col: 2,
+                fila: 8,
+                filas: 2,
+                titulo: "Descontracturante",
+                cliente: "Ana R.",
+              },
+            ],
+            ausencia: { col: 0, etiqueta: "Ausente hoy", hito: "ausente" },
+            cita: {
+              cita: {
+                col: 0,
+                fila: 6,
+                filas: 2,
+                titulo: "Masaje relajante",
+                cliente: "Elena V.",
+              },
+              horas: "12:00 – 13:00",
+              movida: { hito: "movida", col: 2 },
+              whatsapp: { hito: "avisada", etiqueta: "Avisada" },
+            },
+          },
+        ],
+        avisos: avisosDeAusencia({
+          profesional: "Lucía",
+          motivo: "gripe",
+          cita: "el masaje de Elena",
+          cliente: "Elena V.",
+          hora: "12:00",
+          otra: "Óscar",
+          avisada: "avisada",
+        }),
+      },
+      cierreDeFestivo({
+        aviso: "El lunes 12 cerramos, es festivo",
+        semana: SEMANA_TIPO,
+      }),
+      cambioDePrecio({
+        aviso: "El ritual de chocolate pasa a 85 €",
+        servicio: "Ritual de chocolate",
+        duracion: 90,
+        antes: 79,
+        despues: 85,
+        servicios: [
+          { nombre: "Masaje relajante", duracion: 60, precio: 55 },
+          { nombre: "Descontracturante", duracion: 60, precio: 60 },
+          { nombre: "Piedras calientes", duracion: 75, precio: 70 },
+          { nombre: "Reflexología", duracion: 45, precio: 45 },
+          { nombre: "Ritual de chocolate", duracion: 90, precio: 79 },
+          { nombre: "Circuito de aguas", duracion: 90, precio: 35 },
+        ],
+      }),
+    ],
+  },
+
+  "peluqueria-canina": {
+    negocio: "Peluquería canina Trufa",
+    escenarios: [
+      {
+        id: "ausencia",
+        reloj: "8:47",
+        diaCorto: "Mié",
+        turnos: ausenciaDe({
+          aviso: "Álex no viene hoy, se ha torcido un tobillo",
+          profesional: "Álex",
+          cuando: "hoy",
+          motivo: "lesión",
+          cita: "la cita de Marta S.",
+          servicio: "Baño perro pequeño",
+          hora: "10:00",
+          otra: "Iván",
+          cliente: "Marta",
+          telefono: "+34 798 33 41 26",
+        }),
+        vistas: [
+          {
+            tipo: "agenda",
+            dia: "Miércoles, 30 de septiembre",
+            desdeHora: 9,
+            profesionales: ["Álex", "Rosa", "Iván"],
+            citas: [
+              {
+                col: 1,
+                fila: 0,
+                filas: 5,
+                titulo: "Deslanado perro grande",
+                cliente: "Diego F.",
+              },
+              {
+                col: 1,
+                fila: 7,
+                filas: 3,
+                titulo: "Stripping",
+                cliente: "Carlos R.",
+              },
+              {
+                col: 2,
+                fila: 0,
+                filas: 2,
+                titulo: "Baño perro pequeño",
+                cliente: "Ana B.",
+              },
+              {
+                col: 2,
+                fila: 5,
+                filas: 1,
+                titulo: "Corte de uñas",
+                cliente: "Pedro G.",
+              },
+            ],
+            ausencia: { col: 0, etiqueta: "Ausente hoy", hito: "ausente" },
+            cita: {
+              cita: {
+                col: 0,
+                fila: 2,
+                filas: 2,
+                titulo: "Baño perro pequeño",
+                cliente: "Marta S.",
+              },
+              horas: "10:00 – 11:00",
+              movida: { hito: "movida", col: 2 },
+              whatsapp: { hito: "avisada", etiqueta: "Avisada" },
+            },
+          },
+        ],
+        avisos: avisosDeAusencia({
+          profesional: "Álex",
+          motivo: "lesión",
+          cita: "el baño de Marta",
+          cliente: "Marta S.",
+          hora: "10:00",
+          otra: "Iván",
+          avisada: "avisada",
+        }),
+      },
+      {
+        id: "ensenar",
+        reloj: "20:21",
+        diaCorto: "Mié",
+        turnos: [
+          {
+            de: "dueno",
+            texto:
+              "Dile que a los perros que no están vacunados no los podemos atender",
+          },
+          {
+            de: "gestor",
+            texto:
+              "¿Confirmas? Añadir a lo que sabe la recepcionista «Solo atendemos perros con las vacunas al día; hay que traer la cartilla.».",
+            botones: ["Confirmar", "Cancelar"],
+          },
+          { de: "boton", texto: "Confirmar", hito: "ensenado" },
+          {
+            de: "gestor",
+            texto:
+              "Hecho: la recepcionista ya lo tiene en cuenta en las próximas llamadas.",
+          },
+        ],
+        vistas: [
+          {
+            tipo: "informacion",
+            lineas: [
+              "Estamos en la avenida de la Paz 31, con sitio para aparcar.",
+              "Se paga con tarjeta, Bizum o en efectivo.",
+              "Los perros grandes, mejor a primera hora.",
+            ],
+            nueva: {
+              texto:
+                "Solo atendemos perros con las vacunas al día; hay que traer la cartilla.",
+              hito: "ensenado",
+            },
+          },
+        ],
+        avisos: {
+          ensenado: {
+            titulo: "La recepcionista ya lo sabe",
+            detalle: "Vacunas: traer la cartilla",
+          },
+        },
+      },
+      cambioDePrecio({
+        aviso: "El baño de perro pequeño sube a 28 €",
+        servicio: "Baño perro pequeño",
+        duracion: 60,
+        antes: 25,
+        despues: 28,
+        servicios: [
+          { nombre: "Baño perro pequeño", duracion: 60, precio: 25 },
+          { nombre: "Baño perro mediano", duracion: 60, precio: 32 },
+          { nombre: "Baño y corte mediano", duracion: 120, precio: 45 },
+          { nombre: "Deslanado perro grande", duracion: 150, precio: 60 },
+          { nombre: "Stripping", duracion: 90, precio: 50 },
+          { nombre: "Corte de uñas", duracion: 15, precio: 8 },
+        ],
+      }),
     ],
   },
 };
 
 /** El guion de una landing: el de su sector, o el general en la portada. */
-export function guionDelGestor(sector?: NicheSlug): GuionGestor {
+export function guionDelGestor(sector?: SectorSlug): GuionGestor {
   return sector ? GUIONES_GESTOR[sector] : GUION_GESTOR_GENERAL;
 }

@@ -1,15 +1,12 @@
-import { ausenciaDe } from "@/lib/gestor-guiones";
 import { NICHE_ACCENTS } from "@/lib/niche-accents";
 import type { SectorLanding } from "@/lib/sectores/tipos";
 
 /**
- * Andrés llama por primera vez, cuenta que le molesta el hombro y la
- * recepcionista no le pregunta más: le reserva una primera visita con Pablo
- * (la llamada), y luego la pasa al viernes contestando al WhatsApp (sus
- * mensajes). La ausencia es otra tarde: Clara se va y su seguimiento pasa a
- * Irene. Los nombres son los del relato y la simulación de la portada
- * (lib/relato-guiones.ts, lib/gestor-guiones.ts); los móviles empiezan por
- * 79, un rango sin atribuir.
+ * Andrés llama y reserva primera consulta con Pablo (la escena del iPhone:
+ * GUIONES_SECTOR, lib/relato-guiones.ts) y luego la cambia contestando al
+ * WhatsApp (sus mensajes). En la escena de tu asistente (GUIONES_GESTOR,
+ * lib/gestor-guiones.ts) Pablo falta y su cita pasa a Irene, quien mejor lo
+ * hace de los libres. Los móviles empiezan por 79, un rango sin atribuir.
  *
  * Lo de salud es lo que hace el backend: el prompt de fisioterapia no pide
  * historial ni diagnostica y manda las urgencias a emergencias
@@ -38,58 +35,29 @@ export const fisioterapia: SectorLanding = {
     pregunta: "¿Y si suena mientras tengo a un paciente en la camilla?",
     respuesta:
       "Ya no eliges entre dejar al paciente a medias o perder la llamada. Responde la recepcionista, busca hueco con su fisio y le manda la cita por WhatsApp antes de que acabes la sesión.",
-    quien: "Andrés L.",
-    duracion: "1 min 04 s",
-    lineas: [
-      {
-        de: "cliente",
-        texto:
-          "Hola, quería cita. Es la primera vez; me molesta el hombro desde hace semanas.",
-      },
-      {
-        de: "recepcionista",
-        texto:
-          "Te busco una primera visita, que es de una hora. ¿Por la mañana o por la tarde?",
-      },
-      { de: "cliente", texto: "Temprano, antes de entrar a trabajar." },
-      {
-        accion:
-          "Mira tu agenda: el jueves a las 8:30, Pablo tiene la hora libre",
-        icono: "agenda",
-      },
-      {
-        de: "recepcionista",
-        texto: "El jueves a las 8:30 con Pablo. ¿Me dices tu nombre?",
-      },
-      { de: "cliente", texto: "Andrés Lozano." },
-      {
-        de: "recepcionista",
-        texto: "Listo, Andrés. Ahora te llega la confirmación por WhatsApp.",
-      },
-      {
-        accion: "Cita en tu agenda: jueves, 8:30, primera visita con Pablo",
-        icono: "reserva",
-      },
-      { accion: "Confirmación por WhatsApp a Andrés", icono: "whatsapp" },
-    ],
   },
 
   asistente: {
     pregunta: "¿Y si a mediodía falta un fisio?",
     respuesta:
       "Escríbeselo a tu asistente entre paciente y paciente. Marca la ausencia, te enseña qué sesiones tenía y propone pasarlas al fisio libre que mejor lleva cada tratamiento. Avisa a cada paciente cuando confirmas.",
-    turnos: ausenciaDe({
-      aviso: "Clara se ha puesto mala y se va a casa",
-      profesional: "Clara",
-      cuando: "esta tarde",
-      motivo: "enferma",
-      cita: "la cita de Jorge A.",
-      servicio: "Sesión de seguimiento",
-      hora: "17:00",
-      otra: "Irene",
-      cliente: "Jorge",
-      telefono: "+34 793 27 51 08",
-    }),
+    situaciones: [
+      {
+        titulo: "Si un fisio está de baja",
+        texto:
+          "«Pablo está de baja hoy»: deja de recibir pacientes y tu asistente propone pasar su sesión a Irene, la especialista libre. Confirmas y avisa al paciente.",
+      },
+      {
+        titulo: "Una mañana fuera",
+        texto:
+          "«Irene no está el jueves de 9 a 12, tiene formación»: ese tramo se bloquea y la recepcionista no le da citas.",
+      },
+      {
+        titulo: "Cómo va la semana",
+        texto:
+          "«¿Cuántas llamadas y citas llevamos?»: te lo resume y, sin salir del chat, cambias lo que dura una sesión.",
+      },
+    ],
   },
 
   whatsapp: {
@@ -97,8 +65,8 @@ export const fisioterapia: SectorLanding = {
     respuesta:
       "No. Dejas de pedirles que usen una app o un canal concreto: llaman como siempre y la cita les llega por WhatsApp. Para cambiarla o anularla, contestan a ese mensaje.",
     confirmacion: {
-      servicio: "Primera visita, con Pablo",
-      cuando: "jueves 5 de noviembre a las 8:30",
+      servicio: "Primera consulta, con Pablo",
+      cuando: "jueves 5 de noviembre a las 17:30",
     },
     conversacion: [
       {
@@ -114,7 +82,7 @@ export const fisioterapia: SectorLanding = {
       {
         de: "recepcionista",
         texto:
-          "Hecho, Andrés: primera visita el viernes 6 a las 18:00 con Pablo. La del jueves queda anulada.",
+          "Hecho, Andrés: primera consulta el viernes 6 a las 18:00 con Pablo. La del jueves queda anulada.",
       },
     ],
   },

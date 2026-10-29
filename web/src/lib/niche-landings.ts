@@ -34,7 +34,9 @@ export type NicheAccent = {
 export type OwnerAssistantExample = { title: string; description: string };
 
 export type OwnerAssistant = {
-  badge: string;
+  /** Pastilla sobre el título (la portada); las landings de sector no la
+   * llevan. */
+  badge?: string;
   title: string;
   description: string;
   examples: [

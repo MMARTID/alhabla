@@ -12,6 +12,13 @@
  * la otra, en secuencias de 5 palabras. 0,5 = la mitad de una página está
  * copiada en otra.
  *
+ * No cuenta lo marcado `aria-hidden="true"` (desde el 2026-10-29): las
+ * maquetas del producto dentro de las escenas 3D (las pantallas del iPhone,
+ * el panel del portátil, el chat de tu asistente) y las copias animadas de
+ * los pasos son ilustración, la misma interfaz en la portada y en los ocho
+ * sectores; la página misma dice que no son contenido. El texto que se lee
+ * (preguntas, pasos, respuestas) sí cuenta.
+ *
  * Uso (después de `npm run build`):
  *   npm run seo:similitud                 # falla si algún par ≥ 0,50
  *   UMBRAL=0.4 npm run seo:similitud      # más estricto
@@ -56,7 +63,7 @@ async function rutasDelSitemap() {
 const IGNORAR = new Set(["script", "style", "noscript", "svg", "template"]);
 const VACIOS = new Set(["br", "img", "meta", "link", "input", "hr", "source", "wbr", "area", "col", "embed", "track"]);
 
-/** Texto de `<main>` sin `nav`, `header` ni `footer` internos. */
+/** Texto de `<main>` sin `nav`, `header`, `footer` ni lo `aria-hidden`. */
 function textoPrincipal(html) {
   const pila = [];
   const trozos = [];
@@ -64,7 +71,7 @@ function textoPrincipal(html) {
   let m;
   while ((m = re.exec(html))) {
     if (m[5] !== undefined) {
-      if (pila.includes("main") && !pila.some((t) => IGNORAR.has(t) || t === "nav" || t === "header" || t === "footer")) {
+      if (pila.some((e) => e.tag === "main") && !pila.some((e) => e.oculto || IGNORAR.has(e.tag) || e.tag === "nav" || e.tag === "header" || e.tag === "footer")) {
         trozos.push(m[5]);
       }
       continue;
@@ -72,10 +79,10 @@ function textoPrincipal(html) {
     if (!m[2]) continue;
     const tag = m[2].toLowerCase();
     if (m[1]) {
-      const i = pila.lastIndexOf(tag);
+      const i = pila.findLastIndex((e) => e.tag === tag);
       if (i !== -1) pila.length = i;
     } else if (!m[4] && !VACIOS.has(tag)) {
-      pila.push(tag);
+      pila.push({ tag, oculto: /\saria-hidden="true"/.test(m[3]) });
     }
   }
   return trozos

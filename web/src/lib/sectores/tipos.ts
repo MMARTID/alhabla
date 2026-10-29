@@ -1,4 +1,3 @@
-import type { Turno } from "@/lib/gestor-guiones";
 import type { NicheAccent, NicheSlug } from "@/lib/niche-landings";
 
 /**
@@ -11,27 +10,23 @@ import type { NicheAccent, NicheSlug } from "@/lib/niche-landings";
  *
  * Todo lo que se dice tiene que ser lo que hace hoy el producto: la
  * recepcionista reserva, cambia o anula la cita que pide el cliente; tu
- * asistente marca la ausencia, te dice qué citas tenía y las recoloca con
- * quien TÚ digas, cada paso con «Confirmar». Nada de testimonios, clientes
- * ni cifras propias.
+ * asistente marca la ausencia, te dice qué citas tenía y te propone pasar
+ * cada una a quien mejor hace el servicio de los libres, cada paso con
+ * «Confirmar». Nada de testimonios, clientes ni cifras propias.
+ *
+ * Las dos escenas 3D (la llamada del iPhone al portátil y tu asistente con
+ * el panel) se mueven con los guiones del sector: `GUIONES_SECTOR` en
+ * lib/relato-guiones.ts y `GUIONES_GESTOR` en lib/gestor-guiones.ts, con
+ * el mismo `negocio` que este fichero.
  */
 
-/** Los cinco sectores con guion propio y los tres que vinieron después. */
+/** Los cinco sectores con demo de voz y los tres que vinieron después; los
+ * ocho tienen guion propio. */
 export type SectorSlug =
   NicheSlug | "pestanas-y-cejas" | "spa-y-masajes" | "peluqueria-canina";
 
 /** Una pregunta de la dueña y su respuesta de dos líneas (≤ 40 palabras). */
 export type Pregunta = { pregunta: string; respuesta: string };
-
-/**
- * Una línea de la transcripción, sin el saludo (lo pone la plantilla, que es
- * el aviso legal literal del backend): lo que dice cada uno o, entre medias,
- * lo que hace la recepcionista sin decirlo (mirar la agenda, reservar,
- * mandar el WhatsApp), en una línea corta sin punto final.
- */
-export type LineaDeLlamada =
-  | { de: "recepcionista" | "cliente"; texto: string }
-  | { accion: string; icono: "agenda" | "reserva" | "whatsapp" };
 
 /** Lo que el cliente escribe por WhatsApp y lo que le contesta la recepcionista. */
 export type MensajeDeCliente = {
@@ -54,6 +49,10 @@ export type ServicioDelOficio = {
   minutos: number;
   niveles: [NivelDeServicio, NivelDeServicio, NivelDeServicio];
 };
+
+/** Una pestaña de la escena de tu asistente: lo que le pides y lo que
+ * hace, en una frase (≤ 30 palabras). */
+export type Situacion = { titulo: string; texto: string };
 
 export type Faq = { question: string; answer: string };
 
@@ -78,21 +77,18 @@ export type SectorLanding = {
   /** Frase de calle bajo el H1 (≤ 25 palabras). */
   hero: { frase: string };
 
-  /** «¿Y si suena mientras…?»: la llamada de ejemplo, transcrita. */
-  llamada: Pregunta & {
-    /** Quien llama, como sale en la cabecera: «Carmen R.». */
-    quien: string;
-    /** «1 min 12 s». */
-    duracion: string;
-    lineas: LineaDeLlamada[];
-  };
+  /** «¿Y si suena mientras…?»: abre la escena de la llamada (iPhone →
+   * portátil), que cuenta el guion del sector. */
+  llamada: Pregunta;
 
   /**
-   * «¿Y si a mediodía falta alguien?»: el chat con tu asistente. Los turnos
-   * se arman con `ausenciaDe` de lib/gestor-guiones.ts (la misma cadena que
-   * el backend: tres «Confirmar»).
+   * «¿Y si a mediodía falta alguien?»: titula la escena de tu asistente.
+   * `situaciones` son las tres pestañas de esa escena, en el orden de los
+   * escenarios de `GUIONES_GESTOR[slug]` (la ausencia primero).
    */
-  asistente: Pregunta & { turnos: Turno[] };
+  asistente: Pregunta & {
+    situaciones: [Situacion, Situacion, Situacion];
+  };
 
   /** «¿Mis clientas tienen que bajarse algo?»: el WhatsApp que recibe quien llamó. */
   whatsapp: Pregunta & {

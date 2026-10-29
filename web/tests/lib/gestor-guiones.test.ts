@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-import { nicheLandings, type NicheSlug } from "@/lib/niche-landings";
+import { SECTORES as SECTORES_DE_LANDING, type SectorSlug } from "@/lib/sectores";
 import { GUIONES_SECTOR } from "@/lib/relato-guiones";
 import {
   GUION_GESTOR_GENERAL,
@@ -20,7 +20,7 @@ import {
   type GuionGestor,
 } from "@/lib/gestor-guiones";
 
-const SECTORES = Object.keys(nicheLandings) as NicheSlug[];
+const SECTORES = Object.keys(SECTORES_DE_LANDING) as SectorSlug[];
 const GUIONES: Array<[string, GuionGestor]> = [
   ["general", GUION_GESTOR_GENERAL],
   ...SECTORES.map((s) => [s, GUIONES_GESTOR[s]] as [string, GuionGestor]),
