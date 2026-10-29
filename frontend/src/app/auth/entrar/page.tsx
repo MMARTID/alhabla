@@ -6,6 +6,7 @@ import { Loader2 } from "lucide-react";
 import { redeemPass } from "@/lib/api";
 import { isPlanId, savePendingPlan } from "@/lib/billing-navigation";
 import { normalizeBusinessType } from "@/lib/business-type";
+import { rutaInterna } from "@/lib/login-next";
 import { BrandMark } from "@/components/brand-mark";
 import { webUrl } from "@/lib/web-url";
 
@@ -17,7 +18,9 @@ const REGISTRATION_NICHE_KEY = "alhabla_registration_niche";
  * § 3): canjea el pase de un solo uso por la sesión y sigue con el asistente
  * del negocio. El plan y el sector vienen en la query porque el
  * localStorage de alhabla.ai no se ve desde aquí; se guardan donde
- * /bienvenida los espera.
+ * /bienvenida los espera. `destino` (solo rutas de la app) lleva a otra
+ * pantalla: lo usa el enlace de entrada a dev del MCP alhabla-dev, para
+ * abrir la app como un negocio que ya terminó el alta.
  */
 function EntrarContent() {
   const searchParams = useSearchParams();
@@ -38,7 +41,10 @@ function EntrarContent() {
         if (isPlanId(plan)) savePendingPlan(plan);
         const sector = searchParams.get("sector");
         if (sector) window.localStorage.setItem(REGISTRATION_NICHE_KEY, normalizeBusinessType(sector));
-        window.location.replace(isPlanId(plan) ? `/bienvenida?plan=${plan}` : "/bienvenida");
+        const destino = rutaInterna(searchParams.get("destino"));
+        window.location.replace(
+          destino ?? (isPlanId(plan) ? `/bienvenida?plan=${plan}` : "/bienvenida")
+        );
       })
       .catch(() => {
         if (!cancelado) setError("El pase ha caducado o ya se ha usado.");

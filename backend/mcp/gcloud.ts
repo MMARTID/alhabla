@@ -9,6 +9,25 @@ export const REGION = "europe-west1";
 export const SERVICIO = "alhabla-api";
 export const REPOSITORIO = "MMARTID/botbook";
 
+/**
+ * Lo que dicen gcloud y cloud-sql-proxy cuando la sesión de Google del Mac ha
+ * caducado o se ha revocado (29-10: el dueño creó una contraseña de Google en
+ * una cuenta que antes entraba por Zoho y todas las herramientas de
+ * producción fallaban con un «Reauthentication failed» sin pista).
+ */
+const SESION_CADUCADA =
+  /Reauthentication failed|invalid_grant|problem refreshing your current auth tokens|gcloud auth login|do not currently have an active account|Request had invalid authentication credentials/i;
+
+export const COMO_VOLVER_A_ENTRAR =
+  "Ejecuta en una terminal del Mac `gcloud auth login admin@alhabla.ai` (pide la contraseña de la cuenta de Google, no la del Mac) y vuelve a llamar a la herramienta; no hace falta reiniciar el MCP.";
+
+/** El motivo de un fallo de gcloud, con el arreglo si es la sesión. */
+export function explicarFalloDeGcloud(detalle: string): string {
+  return SESION_CADUCADA.test(detalle)
+    ? `La sesión de Google de gcloud ha caducado o no es válida. ${COMO_VOLVER_A_ENTRAR} (gcloud dijo: ${detalle})`
+    : detalle;
+}
+
 /** Firma de un ejecutor de gcloud: se inyecta en los tests. */
 export type Gcloud = (argumentos: string[]) => Promise<string>;
 
@@ -34,7 +53,7 @@ export const gcloud: Gcloud = async (argumentos) => {
       .slice(-3)
       .join(" ");
     throw new Error(
-      `[MCP] gcloud ${argumentos.slice(0, 3).join(" ")} falló: ${detalle}`,
+      `[MCP] gcloud ${argumentos.slice(0, 3).join(" ")} falló: ${explicarFalloDeGcloud(detalle)}`,
       { cause: error }
     );
   }

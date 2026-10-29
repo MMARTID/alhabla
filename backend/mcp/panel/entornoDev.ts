@@ -20,6 +20,10 @@ export const HERRAMIENTAS = resolve(
   dirname(fileURLToPath(import.meta.url)),
   "../../.."
 );
+/** La carpeta FIJA de las herramientas, aunque este código corra desde otro
+ * checkout (un MCP lanzado desde un worktree, los tests). */
+export const DIR_HERRAMIENTAS =
+  process.env.ALHABLA_HERRAMIENTAS_DIR ?? join(homedir(), ".alhabla-mcp");
 const ESTADO = join(homedir(), "Library/Caches/alhabla-dev");
 export const LOG_DEL_ENTORNO = join(
   homedir(),
@@ -279,6 +283,42 @@ export function verRamaEnDev(rama: string): void {
     stdio: "ignore",
     env: { ...process.env, ALHABLA_DEV_DIR: DIR_DEV },
   });
+  hijo.unref();
+}
+
+/**
+ * Pone las herramientas en el último main (`entorno.sh herramientas`: con
+ * cerrojo, dependencias y backend-sim si hace falta) y dice si cambiaron.
+ */
+export async function actualizarHerramientas(): Promise<{
+  antes: string | null;
+  despues: string | null;
+  cambiaron: boolean;
+}> {
+  const commit = () =>
+    intentar(
+      () => comando("git", ["-C", DIR_HERRAMIENTAS, "rev-parse", "HEAD"]),
+      ""
+    );
+  const antes = await commit();
+  await comando("/bin/bash", [SCRIPT_DEL_ENTORNO, "herramientas"], 10 * 60_000);
+  const despues = await commit();
+  return {
+    antes: antes || null,
+    despues: despues || null,
+    cambiaron: antes !== despues,
+  };
+}
+
+/** Lo mismo sin esperar, al arrancar el MCP: cada sesión nueva deja las
+ * herramientas al día para la siguiente. */
+export function actualizarHerramientasEnSegundoPlano(): void {
+  const hijo = spawn("/bin/bash", [SCRIPT_DEL_ENTORNO, "herramientas"], {
+    detached: true,
+    stdio: "ignore",
+    env: { ...process.env, ALHABLA_DEV_DIR: DIR_DEV },
+  });
+  hijo.on("error", () => undefined);
   hijo.unref();
 }
 

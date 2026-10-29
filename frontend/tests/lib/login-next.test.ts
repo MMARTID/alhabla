@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { destinoTrasLogin } from "@/lib/login-next";
+import { destinoTrasLogin, rutaInterna } from "@/lib/login-next";
 
 describe("destinoTrasLogin", () => {
   it("vuelve a la ruta interna pedida y, sin next, al panel", () => {
@@ -27,5 +27,18 @@ describe("destinoTrasLogin", () => {
     expect(destinoTrasLogin("?next=%2Fagenda%3Fdia%3D2026-10-08%23hoy")).toBe(
       "/agenda?dia=2026-10-08#hoy"
     );
+  });
+});
+
+describe("rutaInterna", () => {
+  it("devuelve la ruta interna y null para lo demás", () => {
+    expect(rutaInterna("/agenda?dia=2026-10-29")).toBe("/agenda?dia=2026-10-29");
+    expect(rutaInterna("/")).toBe("/");
+    expect(rutaInterna(null)).toBeNull();
+    expect(rutaInterna("")).toBeNull();
+    expect(rutaInterna("https://malo.com")).toBeNull();
+    expect(rutaInterna("//malo.com")).toBeNull();
+    expect(rutaInterna("/\\malo.com")).toBeNull();
+    expect(rutaInterna("/\t/malo.com")).toBeNull();
   });
 });
