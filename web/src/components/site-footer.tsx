@@ -24,7 +24,7 @@ const SECTORES = [
 /** Lo que hace Alhabla además de contestar (2026-10-22): estas páginas
  * solo se alcanzaban desde la portada o un sector concreto. */
 const FUNCIONES = [
-  { href: "/agenda-por-whatsapp", label: "El Gestor por WhatsApp" },
+  { href: "/agenda-por-whatsapp", label: "Tu asistente por WhatsApp" },
   { href: "/recepcionista-ia-en-catalan", label: "En catalán" },
   { href: "/recepcionista-ia-en-euskera", label: "En euskera" },
   { href: "/recepcionista-ia-en-gallego", label: "En gallego" },
@@ -54,7 +54,7 @@ const enlace = "inline-flex h-11 items-center transition hover:text-white";
 
 export function SiteFooter() {
   return (
-    <footer className="bg-[#0a0a0a] text-white/70">
+    <footer className="bg-oscuro text-white/70">
       <div className="mx-auto flex max-w-7xl flex-col gap-5 px-4 py-8 sm:px-6 lg:px-8">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <nav
@@ -78,7 +78,7 @@ export function SiteFooter() {
               Blog
             </Link>
             <Link href="/contacto" className={enlace}>
-              Hablar con nosotros
+              Contacto
             </Link>
           </nav>
         </div>

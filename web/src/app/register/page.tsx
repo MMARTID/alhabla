@@ -107,7 +107,7 @@ export default function RegisterPage() {
           <BrandMark className="mx-auto h-14 w-14" />
           <h2 className="text-3xl font-black tracking-tight text-tinta">Crear cuenta</h2>
           <p className="mx-auto max-w-md text-sm leading-6 text-muted">
-            Regístrate para configurar tu asistente y comenzar a mejorar la experiencia de tus clientes.
+            Crea tu cuenta y empieza tus 7 días de prueba. No se cobra nada hasta que acaban.
           </p>
         </div>
 

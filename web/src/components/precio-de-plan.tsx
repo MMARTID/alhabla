@@ -2,6 +2,7 @@
 
 import { BadgeCheck } from "lucide-react";
 import { useCupoDeFundador } from "@/lib/cupo-fundador";
+import type { NicheAccent } from "@/lib/niche-landings";
 import { formatPlanPrice, formatPriceWithVat, type Plan } from "@/lib/plans";
 
 /**
@@ -12,16 +13,21 @@ import { formatPlanPrice, formatPriceWithVat, type Plan } from "@/lib/plans";
  * que cobra el checkout (billing/service.ts usa el mismo recuento). Sin
  * plazas, o si la consulta falla, solo el precio vigente: nunca se anuncia un
  * descuento que quizá ya no existe.
+ *
+ * Con `acento` (las landings de sector), la pastilla de fundador va en el
+ * color del oficio en vez de en morado: una página, un acento.
  */
 export function PrecioDePlan({
   plan,
   tamaño = "md",
   oscuro = false,
+  acento,
 }: {
   plan: Plan;
   /** `md` en las landings (4xl), `lg` en /planes (5xl). */
   tamaño?: "md" | "lg";
   oscuro?: boolean;
+  acento?: NicheAccent;
 }) {
   const cupo = useCupoDeFundador();
   const principal = oscuro ? "text-white" : "text-[#0a0a0a]";
@@ -56,8 +62,17 @@ export function PrecioDePlan({
       <p className={`mt-1 text-sm font-medium ${apagado}`}>{formatPriceWithVat(plan.founderPrice)}</p>
       <span
         className={`mt-2 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${
-          oscuro ? "bg-white/10 text-[#ddd6fe]" : "bg-[#f3eeff] text-[#6d28d9] ring-1 ring-inset ring-[#ddd6fe]"
+          oscuro
+            ? "bg-white/10 text-[#ddd6fe]"
+            : acento
+              ? ""
+              : "bg-[#f3eeff] text-[#6d28d9] ring-1 ring-inset ring-[#ddd6fe]"
         }`}
+        style={
+          acento && !oscuro
+            ? { backgroundColor: acento.soft, color: acento.deep }
+            : undefined
+        }
       >
         <BadgeCheck className="h-3.5 w-3.5" aria-hidden="true" />
         Precio de fundador
@@ -70,13 +85,24 @@ export function PrecioDePlan({
  * La frase que explica el descuento, una vez por bloque de precios y no en
  * cada tarjeta. Desaparece con la última plaza.
  */
-export function AvisoDeFundador({ className = "" }: { className?: string }) {
+export function AvisoDeFundador({
+  className = "",
+  acento,
+}: {
+  className?: string;
+  acento?: NicheAccent;
+}) {
   const cupo = useCupoDeFundador();
   if (!cupo) return null;
 
   return (
     <p className={`text-base leading-7 text-[#27272a] ${className}`}>
-      <strong className="font-semibold text-[#6d28d9]">Precio de fundador</strong> para los {cupo.total} primeros
+      <strong
+        className={`font-semibold ${acento ? "" : "text-[#6d28d9]"}`}
+        style={acento ? { color: acento.deep } : undefined}
+      >
+        Precio de fundador
+      </strong> para los {cupo.total} primeros
       negocios: {cupo.restantes === 1 ? "queda 1 plaza" : `quedan ${cupo.restantes} plazas`}. Lo conservas mientras
       sigas suscrito.
     </p>

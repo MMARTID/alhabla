@@ -19,23 +19,27 @@ Negocios de 1 a 20 empleados. Perfil no técnico, con baja tolerancia a la jerga
 Su situación real es la que define el producto: trabaja de cara al público con las manos
 ocupadas — cortando, en cabina, en camilla — y el teléfono suena mientras atiende. No puede
 cogerlo. El trabajo que quiere resuelto es que **ninguna llamada se pierda y que las citas
-entren solas en su agenda**, configurándolo una vez y olvidándose.
+entren solas en su agenda**, configurándolo una vez y olvidándose. Lo que gana, según el fundador:
+deja de elegir entre coger el teléfono, y dejar a su cliente a medias, o no cogerlo; cuando un
+imprevisto cambia el día (un trabajador que se va a mediodía), sus citas se reorganizan al momento;
+y deja de educar a sus clientes para que descarguen apps o escriban por un canal concreto.
 
 Una cuenta equivale a un negocio y a una persona: el modelo `User` no tiene roles ni
 multiusuario (`backend/prisma/schema.prisma:391`). Quien se registra es quien administra. No existe hoy
 la figura de empleado con acceso limitado al panel.
 
 **Usuario secundario (quien llama):** el cliente final del negocio, que marca el número y habla
-con el agente de voz. Habla español, espera una respuesta natural y rápida y no debería notar
+con la recepcionista. Habla español, espera una respuesta natural y rápida y no debería notar
 que habla con una IA torpe. No es usuario de la interfaz — su experiencia entera ocurre por
 teléfono — pero es quien juzga si el producto funciona.
 
 ## Product Purpose
 
-Alhabla es un SaaS multi-tenant que da a cada negocio uno o más **recepcionistas de voz con IA**
-que atienden las llamadas entrantes, responden preguntas, consultan el horario del negocio,
-comprueban disponibilidad y reservan la cita directamente en el calendario de Google, Outlook o
-Apple/iCloud del negocio.
+La promesa va primero: **que ningún negocio pierda una llamada**. Alhabla es un asistente de IA
+para negocios con cita, con dos papeles. **La recepcionista** atiende a los clientes del negocio
+por teléfono y WhatsApp, responde sus preguntas y reserva la cita en su agenda (la Agenda de
+Alhabla o su Google, Outlook o Apple/iCloud). **Tu asistente** trabaja para el dueño: él le habla
+por WhatsApp o desde el panel web, y ella se encarga.
 
 Existe porque en estos sectores **llamada perdida = cita perdida = ingreso perdido**, y el dueño
 no tiene ni recepcionista ni forma de contestar mientras trabaja.
@@ -43,6 +47,31 @@ no tiene ni recepcionista ni forma de contestar mientras trabaja.
 El éxito se mide en citas que antes se caían y ahora entran, no en minutos hablados ni en
 conversaciones mantenidas. De ahí que el producto lleve calculadora de pérdida de ingresos
 (`RevenueLossCalculator`) y precios argumentados por ROI en `/planes`.
+
+### Visión del fundador (29-10-2026)
+
+Orden de la promesa, en palabras del fundador: primero que nadie pierda una llamada; después, el
+asistente por WhatsApp, que es lo que provoca el «flipa» y lo que diferencia. A largo plazo podría
+existir la opción de gestionarlo solo por WhatsApp, pero hoy el teléfono es la puerta de entrada:
+los negocios no quitan su teléfono mientras sus clientes no se acostumbren a escribir por WhatsApp.
+
+Su pitch, literal: «Alhabla es un asistente de IA para tu negocio que atiende tus llamadas y
+lo gestionas por WhatsApp o el panel web.» Y enseña el móvil: «Flipa: hasta puedes dar de baja a un
+trabajador si te falla y te reorganiza las citas avisando a los clientes por WhatsApp.»
+
+Lo que cambia en el día de la dueña, casi en sus palabras:
+
+1. Deja de decidir entre coger el teléfono y dejar a su cliente a medias, o no cogerlo.
+2. Resuelve los cambios de cita al momento: si a mediodía un trabajador se va por una emergencia,
+   sus citas se reorganizan con el profesional más cualificado disponible. (A 29-10-2026 es
+   visión, no producto: tu asistente marca la ausencia, dice qué citas tenía y ayuda a
+   recolocarlas y a avisar a cada cliente, pero a quién pasarlas lo dice el dueño. La web no
+   promete la elección automática: ver `PLAN-WEB-CONTENIDO.md` › Pendientes.)
+3. Deja de educar a sus clientes para que descarguen aplicaciones de terceros o escriban o llamen
+   por un canal concreto: todo el mundo usa WhatsApp. El negocio se adapta al cliente, no al revés.
+
+«Llenar el día» (captar clientes, mensajes proactivos) está aparcado: nada de spam por WhatsApp.
+«Solo no perder llamadas, pero con todo lo que conlleva.»
 
 ## Positioning
 
@@ -55,7 +84,7 @@ Lo que un producto vecino no podría copiar honestamente:
   `availabilityToken` solo lo exige el esquema de la tool, no el servidor. Si el calendario no
   responde, la cita queda pendiente, el dueño recibe un WhatsApp con botones («La apunté yo»,
   «Reintentar», «Reconectar») y se reintenta cada 6 h durante 48 h: nunca se reserva a ciegas. La
-  agenda real del negocio es la fuente de verdad, no una promesa que luego hay que repasar a mano.
+  agenda del negocio es la fuente de verdad, no una promesa que luego hay que repasar a mano.
 - **Vertical, no constructor genérico de agentes.** Cinco nichos españoles concretos con
   plantillas de servicios, instrucciones por sector y textos de onboarding propios
   (`backend/src/lib/businessType.ts`, `web/src/lib/niche-landings.ts`). Una peluquería y una
@@ -65,27 +94,28 @@ Lo que un producto vecino no podría copiar honestamente:
 - **Reparto por especialidad, no cola ciega.** Cada profesional tiene un nivel por servicio
   (especialista / lo hace / no sugerir). El agente recomienda al especialista una vez y reserva
   igualmente si el cliente insiste; nunca dice que alguien «no se le da bien».
-- **El Gestor: el negocio entero se administra por WhatsApp, no solo la agenda.** El dueño
-  cambia un precio, fija el horario semanal, cierra un día, da de alta o de baja a un
-  profesional, o añade/mueve/cancela una cita — hablando con Alhabla por WhatsApp, sin entrar al
-  panel. El Gestor propone la acción y solo la ejecuta tras un «Confirmar» explícito — nunca de
-  forma autónoma. (Reabrir un día ya cerrado todavía exige el panel web, no WhatsApp.) Está en
-  todos los planes. **No es exclusivo:** a 20-10-2026 no consta en HeyDiga ni en fonio, pero mims
-  (mims.studio, Barcelona, desde 79 €) publica un asistente por WhatsApp para el dueño, con texto
-  y audios, que mueve citas, cambia precios y horarios y cierra días; no publica que pida
-  confirmación antes ni que resuelva ausencias. Recepio (recepio.ai) cambia horario y precios a
-  través de su equipo humano. Lo que diferencia al Gestor es el «Confirmar» en cada cambio, que
-  vaya en el plan de entrada y la ausencia de punta a punta (abajo).
+- **Tu asistente: el negocio entero se administra por WhatsApp, no solo la agenda.** En código es
+  el módulo `gestor` («el Gestor»). El dueño cambia un precio, fija el horario semanal, cierra un
+  día, da de alta o de baja a un profesional, o añade/mueve/cancela una cita — hablando con
+  Alhabla por WhatsApp, sin entrar al panel. Tu asistente propone la acción y solo la ejecuta
+  tras un «Confirmar» explícito — nunca de forma autónoma. (Reabrir un día ya cerrado todavía
+  exige el panel web, no WhatsApp.) Está en todos los planes. **No es exclusivo:** a 20-10-2026
+  no consta en HeyDiga ni en fonio, pero mims (mims.studio, Barcelona, desde 79 €) publica un
+  asistente por WhatsApp para el dueño, con texto y audios, que mueve citas, cambia precios y
+  horarios y cierra días; no publica que pida confirmación antes ni que resuelva ausencias.
+  Recepio (recepio.ai) cambia horario y precios a través de su equipo humano. Lo que diferencia
+  a tu asistente es el «Confirmar» en cada cambio, que vaya en el plan de entrada y la ausencia
+  de punta a punta (abajo).
 - **«Mañana falta Marta»: la ausencia se resuelve entera por WhatsApp, avisos incluidos.** El
-  dueño escribe que alguien del equipo no viene y el Gestor encadena tres pasos, cada uno con su
+  dueño escribe que alguien del equipo no viene y tu asistente encadena tres pasos, cada uno con su
   «Confirmar» (`backend/src/modules/gestor/accionesAgenda.ts`):
   1. `marcar_ausencia` bloquea a esa persona en ese tramo (hasta 62 días), la recepcionista deja
-     de reservarle ahí, y el Gestor cuenta cuántas citas tenía: «Tiene 3 citas en ese tramo: dime
+     de reservarle ahí, y tu asistente cuenta cuántas citas tenía: «Tiene 3 citas en ese tramo: dime
      si las movemos o las cancelamos».
   2. `mover_cita` pasa cada cita a otra hora o a otro profesional (con `buscar_hueco` para
      encontrar dónde cabe), comprobando la disponibilidad y actualizando el calendario conectado;
      o `cancelar_cita` si no hay sitio.
-  3. Tras cada «Hecho», el Gestor pregunta «¿Le aviso a Lucía por WhatsApp de la nueva hora?» con
+  3. Tras cada «Hecho», tu asistente pregunta «¿Le aviso a Lucía por WhatsApp de la nueva hora?» con
      dos botones, «Sí, avísale» o «Le llamo yo», y `avisar_cliente` le manda el cambio o la
      cancelación por WhatsApp. Nada sale al cliente sin ese sí, y no se escribe a quien pidió no
      recibir mensajes.
@@ -93,7 +123,7 @@ Lo que un producto vecino no podría copiar honestamente:
   Ningún competidor revisado el 20-10-2026 publica la cadena entera (HeyDiga, fonio, Habla,
   Primer Tono, mims, Recepio, OfiVoice, Fulminatia, Arsys, safina.ai, y la IA de Treatwell, Fresha,
   Booksy y Koibox); lo más cercano es Recepio, que reasigna y avisa al equipo, no al cliente, en
-  su plan de 249 €. Es el ejemplo que mejor explica el Gestor en una demo o en la web, porque es
+  su plan de 249 €. Es el ejemplo que mejor explica tu asistente en una demo o en la web, porque es
   un problema que el dueño tiene cada semana.
 - **Voz diseñada para no sonar a robot, no solo "voz de IA".** El dueño elige la voz
   escuchándola. En Pro y Scale, entre todas: en español, las 29 voces Ultra de Telnyx con acento
@@ -127,6 +157,10 @@ Lo que un producto vecino no podría copiar honestamente:
   HeyDiga (de 0,25 € en Lite a 0,19 € en Pro), si la venta lo pide. El precio de hoy no está
   atado al coste: es una decisión comercial (ver «Operating Context»).
 
+Desde el 29-10-2026 la web no se compara con HeyDiga, fonio ni con personas: las comparativas son
+contra plataformas para montar tu propio agente de voz (Retell, Vapi y parecidas), y nunca nombran
+a Telnyx.
+
 ## Operating Context
 
 - **Alta guiada:** el registro empieza en la web pública (`alhabla.ai/register`) y entra en la
@@ -137,8 +171,8 @@ Lo que un producto vecino no podría copiar honestamente:
   cliente. El tiempo disponible es corto y interrumpible.
 - **Uso diario:** poco y breve. Se entra al panel a mirar llamadas, transcripciones, resultados
   y próximas citas. No es una herramienta de uso continuo ni un puesto de trabajo.
-- **Herramientas que el negocio ya tiene:** Google Calendar, Outlook o Apple/iCloud como agenda
-  real, su número de teléfono actual, y el teléfono como canal principal de reserva.
+- **Herramientas que el negocio ya tiene:** Google Calendar, Outlook o Apple/iCloud como agenda,
+  su número de teléfono actual, y el teléfono como canal principal de reserva.
 - **Evaluación antes de comprar:** demo de voz pública en el navegador (requiere micrófono y
   WebRTC, vía Telnyx) y la calculadora de pérdida de ingresos.
 - **Comercial:** prueba de 7 días y suscripción Stripe, precios sin IVA (desde el 2026-10-16).
@@ -150,7 +184,7 @@ Lo que un producto vecino no podría copiar honestamente:
 
 **Capacidades confirmadas**
 
-- Agentes de voz por negocio con tono (`warm` / `professional` / `direct`), objetivo
+- Recepcionista de cada negocio con tono (`warm` / `professional` / `direct`), objetivo
   (`bookings` / `customer_service` / `lead_capture`), estilo de respuesta
   (`concise` / `balanced`) y escalado (`take_message` / `request_callback`) configurables.
 - Idioma principal y voz del agente, seleccionables desde `/agente`. El dueño solo elige el
@@ -176,7 +210,7 @@ Lo que un producto vecino no podría copiar honestamente:
   reconexión cuando el refresh token o la contraseña de aplicación caduca.
 - Reparto de citas por especialidad: cada profesional tiene un nivel por servicio (especialista /
   lo hace / no sugerir) que el agente usa para recomendar una vez, sin descartar al resto.
-- El Gestor: el dueño administra por WhatsApp servicios y precios (crear, cambiar, retirar),
+- Tu asistente: el dueño administra por WhatsApp servicios y precios (crear, cambiar, retirar),
   horario semanal, cierres de un día, tramos bloqueados, altas/bajas de profesionales y su
   especialidad, ausencias de una persona del equipo, la información del negocio que usa la
   recepcionista y las reservas (añadir, mover, cancelar), y avisa al cliente del cambio por
@@ -192,9 +226,11 @@ Lo que un producto vecino no podría copiar honestamente:
 
 **Terminología del producto** (visible al usuario)
 
-«Recepcionista virtual», «agente de voz», «llamadas», «citas», «servicios», «profesionales»,
-«horario», «minutos incluidos», «el Gestor», «lista de espera». Nunca «LLM», «modelo», «prompt»,
-«orquestador», «webhook», «API» ni «asistente Retell».
+Se dice «recepcionista» o «recepcionista de IA» (en los titulares, siempre «de IA»), «tu asistente»,
+«llamadas», «citas», «servicios», «profesionales», «horario», «minutos incluidos», «ausencia» y
+«lista de espera». Nunca «recepcionista virtual», «recepcionista de voz», «agente de voz», «el
+Gestor» (solo en código), «agenda real», «competitividad», «productividad», «LLM», «modelo»,
+«prompt», «orquestador», «webhook», «API» ni el nombre de ningún proveedor (Telnyx…).
 
 **Restricciones duras**
 
@@ -225,7 +261,10 @@ Lo que un producto vecino no podría copiar honestamente:
   euros por minuto, citas recuperadas, ROI.
 - **Enfocado al dolor, sin alarmismo:** se nombra el problema y se cuantifica la solución; no se
   exagera.
-- **Sin jerga de IA:** el usuario compra una recepcionista, no una inteligencia artificial.
+- **IA sin complejos, sin jerga técnica:** se dice «IA» («recepcionista de IA», «asistente de IA»),
+  pero sin términos técnicos; se habla como habla el dueño, no como un folleto.
+- **Vender enseñando:** la prueba es el producto funcionando (la llamada, el WhatsApp, el
+  «Confirmar»), no la explicación.
 - **Errores:** en español, accionables y sin culpar al usuario. Los 5xx genéricos del backend
   deben traducirse a algo humano en la interfaz.
 - **Estética comprometida:** SaaS conservadora y profesional para negocios tradicionales
@@ -268,8 +307,9 @@ producto funcionando (demo, transcripción real, la calculadora), no fabricar pr
 
 ## Product Principles
 
-1. **Cero llamadas perdidas es la promesa.** Todo se argumenta y se mide contra ingresos
-   recuperados, no contra funcionalidades.
+1. **Que nadie pierda una llamada.** Es la promesa y va primero, siempre: antes que el asistente o
+   cualquier función nueva. Todo se argumenta y se mide contra ingresos recuperados,
+   no contra funcionalidades.
 2. **Configurar una vez y olvidarse.** Cada pantalla debe acercar al usuario al «ya está»,
    nunca convertirlo en operador de su propio software. La configuración operativa de la
    recepcionista vive en `/agente`; la identidad, seguridad y administración de la cuenta viven
@@ -277,11 +317,20 @@ producto funcionando (demo, transcripción real, la calculadora), no fabricar pr
    protejo y gestiono mi cuenta» reduce la carga cognitiva.
 3. **La agenda del negocio manda.** El producto nunca inventa disponibilidad ni promete un hueco
    que no existe; verificar antes de reservar es innegociable.
-4. **Vender una recepcionista, no una IA.** El vocabulario, la prueba y las expectativas se
-   plantean en términos del negocio, no de la tecnología.
+4. **Vender lo que cambia en el día de la dueña, no la tecnología.** El vocabulario, la prueba y las
+   expectativas se plantean en términos del negocio, no de la tecnología.
 5. **España primero, sin cerrarse la puerta.** Se optimiza sin reservas para español de España,
    euros y `Europe/Madrid`, pero se evitan decisiones estructurales que impidan LATAM o el resto
    de la UE más adelante.
+6. **Alhabla concilia y el negocio confirma.** Alhabla hace el trabajo (ve quién puede, qué hueco
+   hay, a quién avisar) y el negocio da el visto bueno. Sin preguntar, Alhabla solo atiende a los
+   clientes: reservar, cambiar o cancelar su propia cita cuando lo pide por llamada o WhatsApp.
+   Todo lo que toca el negocio (crear citas desde el panel o WhatsApp, mover, eliminar, cambiar
+   precios, horarios…) pide «Confirmar». En una frase: con los clientes manda Alhabla; con tu
+   agenda mandas tú.
+7. **El negocio se adapta al cliente.** Sin apps ni canales nuevos: teléfono y WhatsApp, que ya usa
+   todo el mundo. No se educa a los clientes para que descarguen nada ni escriban por un canal
+   concreto.
 
 ## Accessibility & Inclusion
 

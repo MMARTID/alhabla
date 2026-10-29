@@ -9,13 +9,13 @@ export default function OpenGraphImage() {
   return imagenOg({
     etiqueta: "Contacto",
     titulo: "Habla con una persona del equipo antes de empezar",
-    subtitulo: "Varias sedes, una franquicia o dudas sobre los planes: cuéntanos tu caso.",
+    subtitulo: "Te lo enseñamos funcionando con tu negocio o te resolvemos las dudas.",
     pastilla: null,
     pie: "hola@alhabla.ai",
     derecha: {
       tipo: "panel",
       grande: "Contacto",
-      pequeno: "Te contesta una persona, no un bot",
+      pequeno: "Te contesta una persona del equipo",
     },
   });
 }

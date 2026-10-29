@@ -1,10 +1,12 @@
 # Alhabla
 
-SaaS multi-tenant de recepcionistas de voz con IA para pequeños negocios en España
+SaaS multi-tenant de recepcionistas de IA para pequeños negocios en España
 (peluquerías, barberías, salones de uñas, centros de estética, clínicas de fisioterapia).
-Los agentes de voz atienden llamadas, consultan horario y disponibilidad, y reservan citas
-en el calendario de Google, Outlook o Apple/iCloud del negocio. Desde septiembre de 2026 hablan
-también por WhatsApp con el dueño (avisos y el Gestor) y con sus clientes.
+La recepcionista de IA atiende llamadas, consulta horario y disponibilidad, y reserva citas
+en el calendario de Google, Outlook o Apple/iCloud del negocio (o en la agenda de Alhabla, desde
+octubre de 2026). Desde septiembre de 2026 Alhabla habla también por WhatsApp con el dueño (avisos
+y tu asistente, «el Gestor» en código) y con sus clientes. Visión de producto y vocabulario en
+`PRODUCT.md`; plan de la web en `PLAN-WEB-CONTENIDO.md`.
 
 Backend Fastify 5 + Prisma/PostgreSQL (el estado temporal también: cerrojos, límite de peticiones,
 cachés y claves de un solo uso; sin Redis desde el 2026-10-19, ver AGENTS.md § Corte de Redis a

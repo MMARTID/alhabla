@@ -65,7 +65,7 @@ export default function AvisoLegalPage() {
         </p>
         <p>
           También habla por WhatsApp. Con tus clientes, para confirmarles la cita y, según tu plan, recordársela, y
-          para que reserven, cambien o cancelen escribiendo. Contigo, para enviarte avisos y para El Gestor, con el que
+          para que reserven, cambien o cancelen escribiendo. Contigo, para enviarte avisos y como tu asistente, con la que
           cambias precios, horarios o citas y que siempre te propone el cambio antes de aplicarlo.
         </p>
         <p>

@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { Asterisk } from "lucide-react";
 import { Codigo } from "@/components/desvio/codigo";
 import {
@@ -6,23 +5,23 @@ import {
   ConNumeroDeAlhabla,
   TablaDeCodigos,
 } from "@/components/desvio/codigos-de-desvio";
+import { ComprobarDesvio } from "@/components/desvio/comprobar-desvio";
 import {
   Fuentes,
   Nota,
   PaginaGuia,
-  Pasos,
   Seccion,
-  Tabla,
   Texto,
 } from "@/components/pagina-guia";
 import { metadataDePagina } from "@/lib/seo";
 
 /**
- * Desvío en Jazztel (2026-10-20), con ayuda.jazztel.com (móvil y servicios del
- * fijo). Lo propio de Jazztel: publica los segundos de 5 a 30 pero con un
- * solo asterisco antes (`*ss#`), distinto del estándar `**ss#` que usa Orange,
- * de su mismo grupo; probable errata, sin verificar en red. Su tabla del móvil
- * omite almohadillas finales y el fijo se quita sin almohadilla final.
+ * Desvío en Jazztel (datos del 2026-10-20), con ayuda.jazztel.com (móvil y
+ * servicios del fijo). Lo propio de Jazztel: publica los segundos de 5 a 30
+ * pero con un solo asterisco antes (`*ss#`), distinto del estándar `**ss#`
+ * que usa Orange, de su mismo grupo; probable errata, sin verificar en red.
+ * Su tabla del móvil omite almohadillas finales y el fijo se quita sin
+ * almohadilla final.
  */
 
 const ruta = "/desvio-de-llamadas/jazztel";
@@ -34,38 +33,19 @@ export const metadata = metadataDePagina({ ruta, titulo, descripcion });
 
 const faqs = [
   {
-    question: "¿Qué código uso para elegir los segundos en Jazztel?",
-    answer:
-      "Jazztel escribe **61*número*ss#, con un solo asterisco antes de los segundos. La norma GSM, y Orange, que es de su mismo grupo, usan dos: **61*número**20#. Usa la forma estándar y marca *#61# para ver los segundos que ha guardado la red.",
-  },
-  {
-    question: "¿Entre cuántos segundos puedo elegir?",
-    answer: "Jazztel indica un mínimo de 5 y un máximo de 30 segundos.",
-  },
-  {
     question: "En su tabla, el código del 61 no lleva # al final. ¿Lo pongo?",
     answer:
-      "Sí. En la tabla del móvil de Jazztel faltan las almohadillas finales del 61 y del 62, pero los demás códigos de esa misma tabla las llevan y la norma también. Marca **61*número#.",
+      "Sí. En la tabla del móvil de Jazztel faltan las almohadillas finales del 61 y del 62, pero los demás códigos de esa misma tabla las llevan. Marca **61*número#.",
   },
   {
-    question: "¿Cuánto cuesta el desvío en Jazztel?",
+    question: "Mi fijo no desvía con estos códigos. ¿Por qué?",
     answer:
-      "Activarlo es gratis. Pagas la llamada desviada según tu tarifa; con una tarifa plana de voz y sin pasar su límite, Jazztel dice que es gratuito.",
+      "Jazztel dice que los códigos del fijo cambian según tengas cobertura directa o no, pero solo publica una tabla. Si en tu línea no funcionan, pregúntale cuál te corresponde.",
   },
   {
-    question: "¿Cómo se quita el desvío del fijo?",
+    question: "¿Me cobra algo el fijo por los servicios?",
     answer:
-      "Descuelga y marca #61 para el de no contestas, #67 para el de ocupado o #21 para el de todas. En el fijo, Jazztel los publica sin almohadilla al final.",
-  },
-  {
-    question: "Tengo contestador en el fijo. ¿Me quita las llamadas?",
-    answer:
-      "Sí, si está activo. El de ausencia se quita con #10 y el de ocupado con #11. Hazlo antes de activar el desvío a tu recepcionista.",
-  },
-  {
-    question: "¿Qué quita ##002# en el móvil?",
-    answer:
-      "Todos los desvíos de la línea a la vez. Para quitar solo el de Alhabla, mejor ##61# (y ##67# o ##62# si los pusiste).",
+      "Los servicios del fijo son gratuitos, salvo escuchar los mensajes del contestador si tu acceso es indirecto o AMLT: 0,24 € por llamada, con un máximo de 4,84 € al mes.",
   },
 ];
 
@@ -93,37 +73,31 @@ export default function DesvioJazztelPage() {
       tituloFaqs="Preguntas sobre el desvío en Jazztel"
       relacionadas={[
         {
-          href: "/desvio-de-llamadas/orange",
-          titulo: "Desvío en Orange",
-          texto: "Su mismo grupo, con la sintaxis estándar de los segundos.",
+          href: "/desvio-de-llamadas",
+          titulo: "Todos los operadores",
+          texto: "Desviar o dar el número de Alhabla, y cómo quitarlo.",
         },
         {
-          href: "/desvio-de-llamadas",
-          titulo: "El desvío en todos los operadores",
-          texto: "Tabla resumen y cómo comprobarlo.",
+          href: "/desvio-de-llamadas/orange",
+          titulo: "Desvío en Orange",
+          texto: "Su mismo grupo, con la forma estándar de los segundos.",
         },
         {
           href: "/desvio-de-llamadas/iphone-y-android",
           titulo: "Desvío en iPhone y Android",
           texto: "Por si prefieres el menú del teléfono.",
         },
-        {
-          href: "/herramientas/mensajes-de-contestador",
-          titulo: "Mensajes de contestador",
-          texto: "Si quieres mantener el contestador en otra línea.",
-        },
       ]}
-      cierre="Tu línea de Jazztel, con alguien que coge siempre."
+      cierre="Tú eliges cuánto suena; si no llegas, contesta ella."
     >
       <ConNumeroDeAlhabla>
         <Seccion
           id="movil"
-          titulo="En el móvil Jazztel"
+          titulo="En el móvil Jazztel, con los segundos que elijas"
           entradilla={
             <p>
-              Los códigos son los de la norma GSM. Jazztel añade la consulta (
-              <Codigo>*#61#</Codigo> y compañía) y <Codigo>##002#</Codigo> para
-              quitarlos todos.
+              Elige los segundos y copia el código. Se marca desde el móvil que
+              quieres desviar, en el teclado de la app Teléfono.
             </p>
           }
         >
@@ -141,7 +115,7 @@ export default function DesvioJazztelPage() {
                   consultar: "*#61#",
                   segundos: { opciones: [5, 10, 15, 20, 25, 30], inicial: 20 },
                   detalle:
-                    "Forma estándar, con dos asteriscos antes de los segundos.",
+                    "Con dos asteriscos antes de los segundos, como en Orange.",
                 },
                 {
                   tipo: "Si no contestas",
@@ -172,70 +146,34 @@ export default function DesvioJazztelPage() {
               ]}
             />
           </div>
-        </Seccion>
-
-        <Seccion
-          id="segundos"
-          fondo
-          titulo="Los segundos: un asterisco que no cuadra"
-          entradilla={
-            <p>
-              Jazztel da un mínimo de 5 segundos y un máximo de 30, y lo escribe
-              así: <Codigo>**61*número de teléfono de destino*ss#</Codigo>.
-            </p>
-          }
-        >
-          <div className="grid gap-8">
+          <div className="mt-8">
             <Texto>
               <p>
-                Entre el número y los segundos hay un hueco que la norma reserva
-                para el tipo de servicio, y que casi nunca se rellena. Al
-                quedarse vacío, salen dos asteriscos seguidos:{" "}
-                <Codigo>**61*número**20#</Codigo>. Es lo que dice la
-                especificación 3GPP y lo que publica Orange, que es del mismo
-                grupo que Jazztel. Con un solo asterisco, la red podría leer el
-                20 como ese tipo de servicio y no como segundos.
-              </p>
-              <p>
-                Lo más probable es que sea una errata de su página. No lo hemos
-                podido probar en una línea de Jazztel, así que la recomendación
-                es la forma estándar y comprobar el resultado.
+                <strong>Qué pagas.</strong> Activarlo es gratis. La llamada
+                desviada la pagas según tu tarifa; con tarifa plana de voz y sin
+                pasar de su límite, Jazztel dice que es gratuito.
               </p>
             </Texto>
-            <Tabla
-              cabecera={["Forma", "Código", "Qué hacer"]}
-              filas={[
-                [
-                  "Como la escribe Jazztel",
-                  <Codigo key="j">**61*número*20#</Codigo>,
-                  "No la uses",
-                ],
-                [
-                  "Estándar (3GPP y Orange)",
-                  <Codigo key="e">**61*número**20#</Codigo>,
-                  "Úsala",
-                ],
-                [
-                  "Comprobación",
-                  <Codigo key="c">*#61#</Codigo>,
-                  "Te dice el número y los segundos guardados",
-                ],
-              ]}
-            />
+          </div>
+          <div className="mt-8 grid gap-6 lg:grid-cols-2">
+            <Nota tipo="importante" titulo="El asterisco que falta">
+              <p>
+                Jazztel escribe <Codigo>**61*número*20#</Codigo>, con un solo
+                asterisco antes de los segundos. Orange, de su mismo grupo, usa
+                dos: <Codigo>**61*número**20#</Codigo>. Con uno, la red podría
+                no leer el 20 como segundos. No lo hemos podido probar en una
+                línea de Jazztel: usa la forma con dos, la de la tabla.
+              </p>
+            </Nota>
+            <ComprobarDesvio>
+              <p>
+                Marca <Codigo>*#61#</Codigo>: tiene que salir el número de
+                Alhabla y los segundos que elegiste. Si salen otros, vuelve a
+                marcar el código.
+              </p>
+            </ComprobarDesvio>
           </div>
         </Seccion>
-
-        <Seccion
-          id="coste"
-          titulo="Lo que cuesta"
-          entradilla={
-            <p>
-              Activar el desvío en el móvil es gratis. La llamada desviada la
-              pagas según tu tarifa y, si tienes tarifa plana de voz y no pasas
-              de su límite, Jazztel dice que es «gratuito».
-            </p>
-          }
-        />
 
         <Seccion
           id="fijo"
@@ -244,94 +182,36 @@ export default function DesvioJazztelPage() {
           entradilla={
             <p>
               En el fijo, Jazztel pega el código al número, sin asterisco entre
-              medias, y lo quita sin almohadilla al final. Así lo publica:
+              medias, y lo quita sin almohadilla al final. Descuelga y márcalo
+              tal cual.
             </p>
           }
         >
-          <div className="grid gap-6">
-            <TablaDeCodigos
-              titulo="Fijo Jazztel"
-              subtitulo="Descuelga y marca el código tal como lo publica Jazztel."
-              filas={[
-                {
-                  tipo: "Si no contestas",
-                  recomendado: true,
-                  activar: "*61{N}#",
-                  quitar: "#61",
-                },
-                { tipo: "Si comunicas", activar: "*67{N}#", quitar: "#67" },
-                { tipo: "Todas", activar: "*21{N}#", quitar: "#21" },
-              ]}
-            />
-          </div>
-          <div className="mt-8 grid gap-8 lg:grid-cols-2">
+          <TablaDeCodigos
+            titulo="Fijo Jazztel"
+            filas={[
+              {
+                tipo: "Si no contestas",
+                recomendado: true,
+                activar: "*61{N}#",
+                quitar: "#61",
+              },
+              { tipo: "Si comunicas", activar: "*67{N}#", quitar: "#67" },
+              { tipo: "Todas", activar: "*21{N}#", quitar: "#21" },
+            ]}
+            nota="Jazztel no publica código de consulta para el fijo: la prueba es «Comprobar desvío»."
+          />
+          <div className="mt-8">
             <Texto>
               <p>
-                <strong>Una sola tabla para dos tipos de línea.</strong> La
-                página de servicios del fijo dice que los códigos cambian según
-                tengas cobertura directa o no, pero solo publica esta tabla. Si
-                en tu línea no funciona, pregunta a Jazztel cuál te corresponde,
-                y comprueba el resultado con{" "}
-                <Link href="/desvio-de-llamadas#comprobar">
-                  «Comprobar desvío»
-                </Link>
-                , que es la única prueba en un fijo sin código de consulta.
-              </p>
-              <p>
-                <strong>Lo que cobra.</strong> Los servicios del fijo son
-                gratuitos, salvo escuchar los mensajes del contestador si tu
-                acceso es indirecto o AMLT: 0,24 € por llamada, con un máximo de
-                4,84 € al mes.
+                <strong>Aparta antes el contestador.</strong> Tiene dos modos:
+                ausencia (<Codigo>*10</Codigo> lo activa, <Codigo>#10</Codigo>{" "}
+                lo quita) y ocupado (<Codigo>*11</Codigo> /{" "}
+                <Codigo>#11</Codigo>). Si alguno está puesto, cogerá él las
+                llamadas que debería coger tu recepcionista.
               </p>
             </Texto>
-            <Nota tipo="importante" titulo="Aparta antes el contestador">
-              El contestador del fijo tiene dos modos: ausencia (
-              <Codigo>*10</Codigo> lo activa, <Codigo>#10</Codigo> lo quita) y
-              ocupado (<Codigo>*11</Codigo> / <Codigo>#11</Codigo>). Si alguno
-              está puesto, cogerá él las llamadas que debería coger tu
-              recepcionista.
-            </Nota>
           </div>
-        </Seccion>
-
-        <Seccion
-          id="pasos"
-          titulo="En el móvil, paso a paso y con los segundos"
-          entradilla={
-            <p>
-              Así queda bien puesto a la primera, sin depender de la errata.
-            </p>
-          }
-        >
-          <Pasos
-            pasos={[
-              {
-                titulo: "Elige los segundos y copia el código",
-                texto:
-                  "En la tarjeta del móvil de arriba, con tu número de Alhabla escrito. Sale con dos asteriscos antes de los segundos.",
-              },
-              {
-                titulo: "Márcalo en la app Teléfono",
-                texto:
-                  "Pégalo en el teclado del móvil de Jazztel que quieres desviar y pulsa llamar.",
-              },
-              {
-                titulo: "Consulta con *#61#",
-                texto:
-                  "Debe salir el número de Alhabla y los segundos que elegiste. Si salen otros segundos, la red no ha cogido el parámetro: vuelve a marcarlo.",
-              },
-              {
-                titulo: "Añade el 67 y el 62",
-                texto:
-                  "Para que tampoco se pierdan las llamadas que entran mientras hablas o con el móvil apagado.",
-              },
-              {
-                titulo: "Haz la prueba",
-                texto:
-                  "«Comprobar desvío» en tu panel de Alhabla: te llama, no lo coges y te dice si ha llegado.",
-              },
-            ]}
-          />
         </Seccion>
 
         <Fuentes

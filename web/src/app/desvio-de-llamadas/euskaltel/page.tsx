@@ -6,23 +6,23 @@ import {
   ConNumeroDeAlhabla,
   TablaDeCodigos,
 } from "@/components/desvio/codigos-de-desvio";
+import { ComprobarDesvio } from "@/components/desvio/comprobar-desvio";
 import {
   Fuentes,
   Nota,
   PaginaGuia,
   Seccion,
-  Tabla,
   Texto,
 } from "@/components/pagina-guia";
 import { metadataDePagina } from "@/lib/seo";
 
 /**
- * Desvío en Euskaltel (2026-10-20), con euskaltel.com/ayuda-clientes y su PDF
- * de tarifas de agosto de 2026. Lo propio de Euskaltel: el texto visible de
- * su ayuda del móvil muestra los códigos sin asteriscos (los datos
- * estructurados de la misma página traen la forma buena), el buzón es el
- * 2242 y en el fijo los tres desvíos no tienen cuota, con 4.000 minutos a
- * fijos incluidos.
+ * Desvío en Euskaltel (datos del 2026-10-20), con euskaltel.com/ayuda-clientes
+ * y su PDF de tarifas de agosto de 2026. Lo propio de Euskaltel: el texto
+ * visible de su ayuda del móvil muestra los códigos sin asteriscos (los datos
+ * estructurados de la misma página traen la forma buena), el buzón es el 2242
+ * y en el fijo los tres desvíos no tienen cuota, con 4.000 minutos a fijos
+ * incluidos.
  */
 
 const ruta = "/desvio-de-llamadas/euskaltel";
@@ -34,40 +34,19 @@ export const metadata = metadataDePagina({ ruta, titulo, descripcion });
 
 const faqs = [
   {
-    question:
-      "He copiado el código de la web de Euskaltel y no funciona. ¿Por qué?",
-    answer:
-      "Porque en el texto visible de su página de ayuda del móvil faltan asteriscos. La versión que la misma página da a los buscadores sí trae la forma buena, que es la de la norma: **61*número# para el desvío si no contestas.",
-  },
-  {
-    question: "¿Cuántos segundos puedo elegir?",
-    answer:
-      "Euskaltel indica una espera de 5 a 30 segundos. Se añade al final con doble asterisco: **61*número**20# desvía a los 20 segundos.",
-  },
-  {
-    question: "¿Cuánto cuesta desviar el móvil?",
-    answer:
-      "Euskaltel dice que es un servicio gratuito. No aclara si la llamada desviada se cobra aparte: depende de lo que incluya tu tarifa.",
-  },
-  {
-    question: "¿Y el fijo?",
-    answer:
-      "En sus tarifas de agosto de 2026, el desvío incondicional, el de si comunica y el de si no contesta van sin cuota mensual. La línea fija incluye 4.000 minutos a fijos, y el número de Alhabla es un fijo.",
-  },
-  {
-    question: "¿Qué es el 2242?",
-    answer:
-      "El buzón de voz del móvil de Euskaltel. **61*2242# manda a él las llamadas que no coges; lo mismo con el 67, el 62 y el 21. Si pones Alhabla, el buzón deja de cogerlas.",
-  },
-  {
     question: "¿Qué es el «Desvío Estático» que sale en las tarifas?",
     answer:
       "Una línea aparte de las tarifas del fijo, con 0,726 € de alta en telefonía digital. Euskaltel no explica en qué se diferencia de los otros desvíos, que figuran sin cuota.",
   },
   {
+    question: "Doy el móvil y el fijo. ¿Desvío los dos?",
+    answer:
+      "Puedes desviar los dos al mismo número de Alhabla. «Comprobar desvío» llama a la línea de clientes que tengas en tu panel; la otra, pruébala llamándola desde otro teléfono sin cogerla.",
+  },
+  {
     question: "¿La recepcionista atiende en euskera?",
     answer:
-      "Si tu negocio está en Euskadi, sí: el euskera se activa solo con el código postal de la dirección de tu negocio. Si la dirección no lo lleva, elige el euskera como idioma principal en Agente › Cómo atiende.",
+      "Si tu negocio está en Euskadi, sí: el euskera se activa solo con el código postal de la dirección de tu negocio. Si la dirección no lo lleva, elige el euskera como idioma principal en tu panel, en «Cómo atiende».",
   },
 ];
 
@@ -96,25 +75,19 @@ export default function DesvioEuskaltelPage() {
       tituloFaqs="Preguntas sobre el desvío en Euskaltel"
       relacionadas={[
         {
+          href: "/desvio-de-llamadas",
+          titulo: "Todos los operadores",
+          texto: "Desviar o dar el número de Alhabla, y cómo quitarlo.",
+        },
+        {
           href: "/recepcionista-ia-en-euskera",
           titulo: "Atención en euskera",
-          texto:
-            "En Euskadi, en euskera con el código postal de tu dirección.",
+          texto: "En Euskadi, en euskera con el código postal de tu dirección.",
         },
         {
           href: "/desvio-de-llamadas/telecable",
           titulo: "Desvío en Telecable",
-          texto: "Del mismo grupo, con los códigos completos en su ficha.",
-        },
-        {
-          href: "/desvio-de-llamadas/r-galicia",
-          titulo: "Desvío en R",
-          texto: "Otra web del grupo con los códigos rotos.",
-        },
-        {
-          href: "/desvio-de-llamadas",
-          titulo: "Desvío en todos los operadores",
-          texto: "Qué desvío conviene y cómo comprobarlo.",
+          texto: "Del mismo grupo, también con segundos de 5 a 30.",
         },
       ]}
       cierre="Con Euskaltel, en castellano o en euskera, ninguna llamada sin atender."
@@ -122,13 +95,11 @@ export default function DesvioEuskaltelPage() {
       <ConNumeroDeAlhabla>
         <Seccion
           id="movil"
-          titulo="Los códigos del móvil, con los asteriscos que faltan"
+          titulo="En tu móvil Euskaltel, con los asteriscos que faltan"
           entradilla={
             <p>
-              En el texto visible de la ayuda de Euskaltel los códigos salen sin
-              algunos de sus asteriscos. Los datos estructurados de esa misma
-              página, lo que lee Google, dicen otra cosa: «61* … (espera un
-              tiempo de 5-30 segundos) … #». Es la forma de la norma GSM.
+              Elige los segundos y copia el código. Se marca desde el móvil que
+              quieres desviar, en el teclado de la app Teléfono.
             </p>
           }
         >
@@ -136,7 +107,6 @@ export default function DesvioEuskaltelPage() {
             <CampoNumeroDeAlhabla />
             <TablaDeCodigos
               titulo="Móvil Euskaltel"
-              subtitulo="Escritos según la norma GSM y los datos estructurados de su ayuda."
               filas={[
                 {
                   tipo: "Si no contestas",
@@ -167,72 +137,45 @@ export default function DesvioEuskaltelPage() {
                   consultar: "*#21#",
                 },
               ]}
-              nota="El 67 y el 62 son los que Euskaltel usa para mandar llamadas a su buzón; con el número de Alhabla deberían funcionar igual."
             />
           </div>
           <div className="mt-8">
             <Texto>
               <p>
-                <strong>Por qué importa.</strong> Un código con asteriscos de
-                menos ya no es el mismo código, y no tiene por qué hacer lo que
-                esperas. Después de marcar el tuyo, comprueba con{" "}
-                <Codigo>*#61#</Codigo> que aparece el número de Alhabla y los
-                segundos que elegiste.
-              </p>
-              <p>
-                <strong>Lo que cuesta.</strong> Para el móvil, Euskaltel dice
-                que «es un servicio gratuito». Lo que no aclara es el precio de
-                la llamada desviada, que dependerá de lo que incluya tu tarifa.
+                <strong>Qué pagas.</strong> Para el móvil, Euskaltel dice que es
+                un servicio gratuito. No aclara el precio de la llamada
+                desviada, que dependerá de lo que incluya tu tarifa.
               </p>
             </Texto>
           </div>
-        </Seccion>
-
-        <Seccion
-          id="buzon"
-          fondo
-          titulo="El buzón 2242"
-          entradilla={
-            <p>
-              El buzón del móvil de Euskaltel es el 2242, y se activa con los
-              mismos códigos de desvío: <Codigo>**61*2242#</Codigo>, y lo mismo
-              con el 67, el 62 y el 21.
-            </p>
-          }
-        >
-          <div className="grid gap-8">
-            <Texto>
+          <div className="mt-8 grid gap-6 lg:grid-cols-2">
+            <Nota
+              tipo="importante"
+              titulo="Su web pierde asteriscos, y el buzón es el 2242"
+            >
               <p>
-                Eso quiere decir que el buzón y tu recepcionista compiten por el
-                mismo hueco. Si tenías el buzón en las tres situaciones y solo
-                cambias el 61, las llamadas que entren mientras comunicas o con
-                el móvil apagado seguirán yendo al 2242. Cambia los tres.
+                En la ayuda de Euskaltel los códigos salen con asteriscos de
+                menos, y un código con asteriscos de menos ya no es el mismo
+                código: usa los de la tabla. Además, su buzón (el 2242) se
+                activa con estos mismos desvíos: cambia los tres, o las
+                llamadas que entren mientras comunicas o sin cobertura seguirán
+                yendo al buzón. Para volver a él, marca{" "}
+                <Codigo>**61*2242#</Codigo>.
               </p>
+            </Nota>
+            <ComprobarDesvio>
               <p>
-                Para volver al buzón algún día, quita el desvío con{" "}
-                <Codigo>##61#</Codigo> y marca otra vez{" "}
-                <Codigo>**61*2242#</Codigo>. El porqué de no usar un código que
-                lo quite todo está en{" "}
-                <Link href="/desvio-de-llamadas#quitar">
-                  quitar el desvío sin perder el buzón
-                </Link>
-                .
+                Marca <Codigo>*#61#</Codigo>: tiene que salir el número de
+                Alhabla y los segundos que elegiste.
               </p>
-            </Texto>
-            <Tabla
-              cabecera={["Situación", "Al buzón", "A tu recepcionista"]}
-              filas={[
-                ["No contestas", "**61*2242#", "**61*número#"],
-                ["Comunicas", "**67*2242#", "**67*número#"],
-                ["Apagado", "**62*2242#", "**62*número#"],
-              ]}
-            />
+            </ComprobarDesvio>
           </div>
         </Seccion>
 
         <Seccion
           id="fijo"
-          titulo="El fijo de Euskaltel"
+          fondo
+          titulo="El fijo de Euskaltel, sin cuota"
           entradilla={
             <p>
               En el fijo, los códigos de la ayuda sí están completos. Descuelga,
@@ -240,102 +183,35 @@ export default function DesvioEuskaltelPage() {
             </p>
           }
         >
-          <div className="grid gap-6">
-            <TablaDeCodigos
-              titulo="Fijo Euskaltel"
-              filas={[
-                {
-                  tipo: "Si no contestas",
-                  recomendado: true,
-                  activar: "*61*{N}#",
-                  quitar: "#61#",
-                },
-                {
-                  tipo: "Si comunicas",
-                  recomendado: true,
-                  activar: "*67*{N}#",
-                  quitar: "#67#",
-                },
-                { tipo: "Todas", activar: "*21*{N}#", quitar: "#21#" },
-              ]}
-            />
-          </div>
-          <div className="mt-8 grid gap-8 lg:grid-cols-2">
-            <Texto>
-              <p>
-                <strong>Sin cuota.</strong> En las tarifas de Euskaltel de
-                agosto de 2026, el desvío incondicional, el de si comunica y el
-                de si no contesta aparecen sin cuota mensual. Y la línea fija
-                incluye 4.000 minutos a fijos: como el número de Alhabla es un
-                fijo, el tramo desviado sale de esa bolsa.
-              </p>
-              <p>
-                <strong>El «Desvío Estático».</strong> En las mismas tarifas hay
-                una línea aparte, «Desvío Estático», con 0,726 € de alta en
-                telefonía digital. Euskaltel no explica en ese documento en qué
-                se diferencia de los otros tres.
-              </p>
-            </Texto>
-            <Nota tipo="info" titulo="En Euskadi, también en euskera">
-              Si tu negocio está en Euskadi y su dirección lleva el código
-              postal, tu recepcionista entiende y contesta en euskera a quien
-              llama en euskera, sin configurar nada más. Si la dirección no lo
-              lleva, elige el euskera como idioma principal en Agente › Cómo
-              atiende.{" "}
-              <Link
-                href="/recepcionista-ia-en-euskera"
-                className="font-semibold underline underline-offset-4"
-              >
-                Cómo funciona
-              </Link>
-            </Nota>
-          </div>
-        </Seccion>
-
-        <Seccion
-          id="cual"
-          fondo
-          titulo="¿Desvío el móvil o el fijo?"
-          entradilla={
-            <p>
-              En Euskaltel, las dos líneas salen bien paradas. Desvía la que das
-              a tus clientes, o las dos.
-            </p>
-          }
-        >
-          <Tabla
-            cabecera={["", "Móvil Euskaltel", "Fijo Euskaltel"]}
+          <TablaDeCodigos
+            titulo="Fijo Euskaltel"
             filas={[
-              [
-                "Coste del servicio",
-                "«Es un servicio gratuito»",
-                "Sin cuota mensual en los tres desvíos",
-              ],
-              [
-                "Tramo desviado",
-                "Según tu tarifa (no lo detalla)",
-                "De los 4.000 minutos a fijos",
-              ],
-              ["Segundos de espera", "De 5 a 30", "No publicado"],
-              [
-                "Cómo comprobarlo",
-                "*#61# y «Comprobar desvío»",
-                "«Comprobar desvío»",
-              ],
+              {
+                tipo: "Si no contestas",
+                recomendado: true,
+                activar: "*61*{N}#",
+                quitar: "#61#",
+              },
+              {
+                tipo: "Si comunicas",
+                recomendado: true,
+                activar: "*67*{N}#",
+                quitar: "#67#",
+              },
+              { tipo: "Todas", activar: "*21*{N}#", quitar: "#21#" },
             ]}
+            nota="Euskaltel no publica código de consulta para el fijo: la prueba es «Comprobar desvío»."
           />
           <div className="mt-8">
             <Texto>
               <p>
-                Si das las dos líneas, puedes desviar las dos al mismo número de
-                Alhabla. «Comprobar desvío» llama a la línea de clientes que
-                tengas en tu panel; la otra, pruébala llamándola desde otro
-                teléfono sin cogerla. Y si lo que quieres es que la
-                recepcionista coja siempre primero, tienes la alternativa de{" "}
-                <Link href="/desvio-de-llamadas#cual">
-                  publicar su número como principal
-                </Link>
-                .
+                <strong>Qué pagas.</strong> En las tarifas de agosto de 2026,
+                los tres desvíos del fijo van sin cuota mensual, y la línea
+                incluye 4.000 minutos a fijos. El número de Alhabla es un fijo:
+                el tramo desviado sale de esa bolsa. Y si tu negocio está en
+                Euskadi, la recepcionista contesta en euskera a quien llama en
+                euskera:{" "}
+                <Link href="/recepcionista-ia-en-euskera">cómo funciona</Link>.
               </p>
             </Texto>
           </div>

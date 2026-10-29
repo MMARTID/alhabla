@@ -7,9 +7,9 @@ export const contentType = OG_CONTENT_TYPE;
 
 export default function OpenGraphImage() {
   return imagenOg({
-    etiqueta: "Català · Euskara · Galego",
+    etiqueta: "Català",
     titulo: "Tu recepcionista de IA también atiende en catalán",
-    subtitulo: "En Cataluña y Baleares, desde la primera llamada. Y en castellano y siete idiomas más.",
+    subtitulo: "Y se adapta al valenciano y al balear de quien llama.",
     pie: "Incluido en todos los planes",
     derecha: { tipo: "panel", grande: "Bon dia!", pequeno: "En què et puc ajudar?" },
   });

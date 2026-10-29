@@ -7,7 +7,7 @@ import { Reveal } from "@/components/scroll-reveal";
  * (2026-09-26), sacado del «Positioning» de PRODUCT.md: dos ventajas con
  * dibujo (voz natural, reparto por especialidad) y tres más en una fila
  * compacta. La reserva verificada ya la enseña el teléfono de «Cómo
- * funciona», justo encima; El Gestor tiene sección propia más abajo.
+ * funciona», y tu asistente tiene sección propia justo encima.
  */
 
 const OTRAS = [
@@ -15,7 +15,7 @@ const OTRAS = [
     Icono: Store,
     titulo: "Hecha para tu sector",
     texto:
-      "En peluquerías, barberías, uñas, estética y fisioterapia arranca con los servicios típicos de tu oficio y sus duraciones, no con una plantilla genérica.",
+      "Arranca con los servicios típicos de tu oficio y lo que dura cada uno, sea una peluquería, una clínica de fisioterapia o un spa, no con una plantilla genérica.",
   },
   {
     Icono: MessageSquareText,
@@ -27,7 +27,7 @@ const OTRAS = [
     Icono: CalendarX2,
     titulo: "Si tu calendario falla, no reserva a ciegas",
     texto:
-      "Si tu calendario no responde, la cita queda pendiente, te llega un WhatsApp con botones para resolverla y se reintenta durante dos días. Si la conexión caduca, te avisa para que la renueves.",
+      "Si tu calendario no contesta, no da la hora por buena: la cita queda pendiente y te llega un WhatsApp para resolverla con un toque.",
   },
 ] as const;
 

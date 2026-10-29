@@ -6,6 +6,7 @@ import {
   ConNumeroDeAlhabla,
   TablaDeCodigos,
 } from "@/components/desvio/codigos-de-desvio";
+import { ComprobarDesvio } from "@/components/desvio/comprobar-desvio";
 import {
   Fuentes,
   Nota,
@@ -17,10 +18,9 @@ import {
 import { metadataDePagina } from "@/lib/seo";
 
 /**
- * Desvío en Movistar (2026-10-20). Fuentes: las páginas de servicios de móvil
- * y de fijo de movistar.es (oficiales), su blog y la Comunidad Movistar
- * (respuestas de moderadores, semioficial: se dice cuando un dato viene de
- * ahí). Lo propio de Movistar: el fijo se contrata (4 €/mes por tipo), el
+ * Desvío en Movistar (datos del 2026-10-20). Fuentes: las páginas de
+ * servicios de móvil y de fijo de movistar.es, su blog y la Comunidad
+ * Movistar. Lo propio de Movistar: el fijo se contrata (4 €/mes por tipo), el
  * buzón ocupa por defecto los tres condicionales y MultiSIM solo deja el
  * desvío inmediato.
  */
@@ -34,39 +34,19 @@ export const metadata = metadataDePagina({ ruta, titulo, descripcion });
 
 const faqs = [
   {
-    question: "¿Cuánto cuesta desviar mi móvil Movistar a Alhabla?",
+    question: "¿Se puede activar desde Mi Movistar, sin códigos?",
     answer:
-      "Activarlo, 0 €. Cada llamada desviada cuenta como una llamada desde tu línea hasta el número de Alhabla: si tu tarifa tiene llamadas ilimitadas o un bono de minutos, entra ahí; si es de prepago, necesitas saldo.",
-  },
-  {
-    question: "¿Y si lo que quiero desviar es el fijo del local?",
-    answer:
-      "En el fijo, Movistar cobra 4 € al mes por cada tipo de desvío, que hay que contratar antes de marcar el código. Las llamadas desviadas se pagan además al precio de llamadas de tu línea.",
-  },
-  {
-    question: "Tengo el Pack de servicios básicos. ¿Ya incluye el desvío?",
-    answer:
-      "Solo el inmediato, el que desvía todas las llamadas y deja de sonar el fijo. El de «si no contestas», que es el que interesa para una recepcionista, se contrata aparte.",
-  },
-  {
-    question: "He marcado ##002# y no pasa nada. ¿Por qué?",
-    answer:
-      "Si tu línea tiene MultiSIM, ese código no funciona. La Comunidad Movistar indica que en ese caso hay que llamar al 1004 para que te quiten los desvíos.",
-  },
-  {
-    question: "¿Cómo vuelvo a tener buzón de voz cuando quite el desvío?",
-    answer:
-      "Quita solo el tuyo con ##61# (y ##67# o ##62# si los pusiste) y vuelve a activar el buzón llamando al 22500 o desde tu área privada de Mi Movistar.",
-  },
-  {
-    question: "¿Puedo desviar el fijo cuando está apagado?",
-    answer:
-      "No. En el fijo, Movistar ofrece el desvío inmediato, el de no contestas y el de comunicando; el de apagado o sin cobertura solo existe en el móvil.",
+      "La Comunidad Movistar describe el camino en la web de Mi Movistar: Gestiones de Línea Móvil › Desvío de llamadas, escribes el número y pulsas Guardar. El área de cliente cambia a menudo; si no lo encuentras así, el código del teclado hace lo mismo.",
   },
   {
     question: "¿A qué números no deja desviar Movistar?",
     answer:
       "A los que empiezan por 90X u 80X ni a numeraciones especiales: solo a números nacionales. El de Alhabla es un fijo geográfico español, así que entra.",
+  },
+  {
+    question: "He marcado ##002# y no pasa nada. ¿Por qué?",
+    answer:
+      "Si tu línea tiene MultiSIM, ese código no funciona. La Comunidad Movistar indica que en ese caso hay que llamar al 1004 para que te quiten los desvíos.",
   },
 ];
 
@@ -84,8 +64,8 @@ export default function DesvioMovistarPage() {
         <p>
           En un móvil Movistar, activar el desvío cuesta 0 € y se marca{" "}
           <Codigo>**61*</Codigo>, el número de tu recepcionista y{" "}
-          <Codigo>#</Codigo>. En el fijo es otra historia: cada tipo de desvío
-          se contrata antes, a 4 € al mes.
+          <Codigo>#</Codigo>. En el fijo, cada tipo de desvío se contrata
+          antes, a 4 € al mes.
         </p>
       }
       descripcion={descripcion}
@@ -97,7 +77,7 @@ export default function DesvioMovistarPage() {
         {
           href: "/desvio-de-llamadas",
           titulo: "Todos los operadores",
-          texto: "Qué desvío conviene y la tabla de los demás.",
+          texto: "Desviar o dar el número de Alhabla, y lo que cambia en cada uno.",
         },
         {
           href: "/desvio-de-llamadas/iphone-y-android",
@@ -109,11 +89,6 @@ export default function DesvioMovistarPage() {
           titulo: "Desvío en O2",
           texto: "Otra línea donde MultiSIM obliga a desviar todo.",
         },
-        {
-          href: "/blog/desvio-de-llamadas-si-no-contesta",
-          titulo: "Desvío si no contesta, operador por operador",
-          texto: "El artículo con la tabla del 61 en móvil y fijo.",
-        },
       ]}
       cierre="Tu Movistar sigue sonando; lo que no coges, lo atiende ella."
     >
@@ -123,9 +98,8 @@ export default function DesvioMovistarPage() {
           titulo="En tu móvil Movistar"
           entradilla={
             <p>
-              Movistar publica los cuatro códigos del estándar. Se marcan desde
-              el móvil que quieres desviar, en el teclado de la app Teléfono, y
-              se pulsa llamar.
+              Desde el móvil que quieres desviar, en el teclado de la app
+              Teléfono, y pulsa llamar.
             </p>
           }
         >
@@ -168,107 +142,49 @@ export default function DesvioMovistarPage() {
           <div className="mt-8">
             <Texto>
               <p>
-                <strong>Qué pagas.</strong> Activarlo no cuesta nada. Lo que se
-                cobra es el tramo que va desde tu línea hasta el número de
-                Alhabla, que Movistar trata como «una llamada desde tu línea»:
-                si tu tarifa trae llamadas ilimitadas o una franquicia de
-                minutos, ese tramo entra en ella; en prepago, necesitas saldo
-                para que el desvío funcione.
+                <strong>Qué pagas.</strong> Activarlo, nada. Cada llamada
+                desviada cuenta como una llamada desde tu línea hasta el número
+                de Alhabla: entra en tus llamadas ilimitadas o en tu bono de
+                minutos, y en prepago necesitas saldo.
               </p>
               <p>
-                <strong>A dónde puedes desviar.</strong> Solo a números
-                nacionales; nada de 90X, 80X ni numeraciones especiales. El
-                número de Alhabla es un fijo geográfico español, así que es un
-                destino válido.
-              </p>
-              <p>
-                <strong>Los segundos.</strong> Movistar no publica ni el código
-                ni el margen para cambiar cuánto suena antes de desviar. Un
-                artículo de su blog de 2022 dice que la llamada se desvía si
-                tardas 15 segundos en responder, pero en una lista general que
-                no distingue el fijo del móvil. La norma GSM admite{" "}
-                <Codigo>**61*número**20#</Codigo> para fijar 20 segundos;
-                Movistar no dice si lo acepta, así que, si lo pruebas, marca
-                después <Codigo>*#61#</Codigo>: la respuesta enseña el número y
-                los segundos guardados.
+                <strong>Los segundos.</strong> Movistar no publica cómo
+                cambiarlos; su blog habla de 15 segundos. Si pruebas{" "}
+                <Codigo>**61*número**20#</Codigo>, mira después con{" "}
+                <Codigo>*#61#</Codigo> qué ha guardado.
               </p>
             </Texto>
           </div>
-        </Seccion>
-
-        <Seccion
-          id="buzon"
-          fondo
-          titulo="Tu buzón ya está usando esos tres desvíos"
-          entradilla={
-            <p>
-              En la Comunidad Movistar, un moderador explica que los desvíos por
-              no contestar, por comunicar y por apagado suelen venir activados
-              de serie hacia el buzón de voz.
-            </p>
-          }
-        >
-          <Texto>
-            <p>
-              Eso explica lo que le pasa a mucha gente: marca el 61 con el
-              número de su recepcionista, prueba a no coger y todo va bien, pero
-              luego descubre mensajes en el buzón. Eran llamadas que llegaron
-              mientras hablaba con otro cliente o con el móvil sin cobertura,
-              que seguían apuntando al buzón. Para que no se quede ninguna,
-              activa también el 67 y el 62 con el mismo número.
-            </p>
-            <p>
-              El buzón de Movistar se gestiona llamando al 22500 o desde tu área
-              privada. Apunta eso antes de desviar: es el camino para
-              recuperarlo si un día quitas a Alhabla.
-            </p>
-            <p>
-              <strong>Para quitar el desvío sin perder nada más</strong>, marca{" "}
-              <Codigo>##61#</Codigo>, <Codigo>##67#</Codigo> y{" "}
-              <Codigo>##62#</Codigo>, uno a uno. Movistar avisa de que{" "}
-              <Codigo>##002#</Codigo> quita todos los desvíos «así como el buzón
-              de voz». Y con MultiSIM ese código ni siquiera funciona: la
-              Comunidad Movistar remite al 1004. Tienes el porqué en{" "}
-              <Link href="/desvio-de-llamadas#quitar">
-                quitar el desvío sin perder el buzón
-              </Link>
-              .
-            </p>
-          </Texto>
-        </Seccion>
-
-        <Seccion
-          id="gestion"
-          titulo="Desde Mi Movistar, y el problema del MultiSIM"
-        >
-          <div className="grid gap-8 lg:grid-cols-2">
-            <Texto>
-              <p>
-                Si prefieres no marcar códigos, la Comunidad Movistar describe
-                el camino en la web de Mi Movistar:{" "}
-                <strong>Gestiones de Línea Móvil › Desvío de llamadas</strong>,
-                escribes el número y pulsas <strong>Guardar</strong>. Es una
-                explicación de 2022 y el área de cliente cambia a menudo; si no
-                lo encuentras así, el código del teclado hace lo mismo.
-              </p>
-            </Texto>
+          <div className="mt-8 grid gap-6 lg:grid-cols-2">
             <Nota
               tipo="importante"
-              titulo="Con MultiSIM solo hay desvío inmediato"
+              titulo="Tu buzón ya usa esos tres desvíos"
             >
-              Según la misma fuente, una línea con MultiSIM solo admite el
-              desvío incondicional: todas las llamadas van al destino y tu móvil
-              no suena. Si no quieres renunciar a coger tú las llamadas, la
-              salida es{" "}
-              <Link
-                href="/desvio-de-llamadas#cual"
-                className="font-semibold underline underline-offset-4"
-              >
-                usar Alhabla como número principal
-              </Link>{" "}
-              y elegir en «Cuándo pasarme llamadas» si te pasa al móvil a quien
-              pida hablar contigo.
+              <p>
+                Movistar los trae activados de serie hacia el buzón. Si solo
+                pones el 61, las llamadas que entren mientras comunicas o sin
+                cobertura seguirán acabando en él: pon los tres con el mismo
+                número. Para volver al buzón algún día, quita los tuyos uno a
+                uno y llama al 22500 o entra en tu área privada.
+              </p>
+              <p className="mt-3">
+                <strong>Con MultiSIM</strong> solo hay desvío inmediato: tu
+                móvil dejaría de sonar. Si no quieres eso,{" "}
+                <Link
+                  href="/desvio-de-llamadas#cual"
+                  className="font-semibold underline underline-offset-4"
+                >
+                  da el número de Alhabla como principal
+                </Link>
+                .
+              </p>
             </Nota>
+            <ComprobarDesvio>
+              <p>
+                Marca <Codigo>*#61#</Codigo>: la respuesta enseña el número y
+                los segundos guardados.
+              </p>
+            </ComprobarDesvio>
           </div>
         </Seccion>
 
@@ -278,9 +194,8 @@ export default function DesvioMovistarPage() {
           titulo="El fijo de Movistar: primero se contrata"
           entradilla={
             <p>
-              Aquí el código no basta. Movistar cobra el desvío del fijo como un
-              servicio: 4 € al mes por cada tipo, y hay que darlo de alta antes
-              de marcar nada.
+              Aquí el código no basta: cada tipo de desvío es un servicio de 4 €
+              al mes que hay que dar de alta antes de marcar nada.
             </p>
           }
         >
@@ -320,38 +235,26 @@ export default function DesvioMovistarPage() {
                 { tipo: "Si comunicas", activar: "*67*{N}#", quitar: "#67#" },
                 { tipo: "Inmediato", activar: "*21*{N}#", quitar: "#21#" },
               ]}
-              nota="Movistar no publica códigos de consulta para el fijo."
+              nota="Movistar no publica códigos de consulta para el fijo: la prueba es «Comprobar desvío»."
             />
           </div>
           <div className="mt-8">
             <Texto>
               <p>
-                <strong>Antes de pagar 8 € al mes</strong> por el de no
-                contestas y el de comunicas, piensa a qué número te llaman de
-                verdad. Si la mayoría de tus clientes marcan tu móvil, desviar
-                el móvil no tiene cuota. Y si el fijo es el número que conoce
-                todo el mundo, otra opción es{" "}
+                <strong>El contestador del fijo se adelanta.</strong> Si tienes
+                puesto el de no contestas (<Codigo>*10#</Codigo>) o el de
+                comunicando (<Codigo>*9998</Codigo>), cogerá él las llamadas.
+                Se quitan con <Codigo>#9998</Codigo> y <Codigo>#10#</Codigo>.
+              </p>
+              <p>
+                <strong>Antes de pagar 8 € al mes</strong> por los dos desvíos,
+                piensa a qué número te llaman. Si es sobre todo al móvil,
+                desviar el móvil no tiene cuota; si el fijo es el que conoce
+                todo el mundo, puedes{" "}
                 <Link href="/desvio-de-llamadas#cual">
                   publicar el número de Alhabla como principal
                 </Link>
-                : no hay desvío, así que no hay cuota de desvío.
-              </p>
-              <p>
-                <strong>El contestador del fijo se adelanta.</strong> El
-                contestador de Movistar en el fijo se activa con{" "}
-                <Codigo>*10#</Codigo> para cuando no contestas y con{" "}
-                <Codigo>*9998</Codigo> para cuando comunicas. Si tienes alguno
-                de los dos puesto, cogerá él las llamadas. Se quitan marcando{" "}
-                <Codigo>#9998</Codigo> y después <Codigo>#10#</Codigo>.
-              </p>
-              <p>
-                <strong>Cómo saber si ha quedado bien.</strong> En el fijo no
-                hay código de consulta publicado, así que la prueba es{" "}
-                <Link href="/desvio-de-llamadas#comprobar">
-                  «Comprobar desvío»
-                </Link>
-                : Alhabla llama a tu fijo, no lo coges, y el panel te dice si la
-                llamada ha vuelto a entrar por tu recepcionista.
+                , sin desvío y sin cuota.
               </p>
             </Texto>
           </div>

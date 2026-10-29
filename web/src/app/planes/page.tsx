@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { appUrl } from "@/lib/app-url";
-import { ArrowRight, CalendarDays, Clock3, PhoneCall, Sparkles } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { PlansWithRoi } from "@/components/plans-with-roi";
 import { PlansHeadline } from "@/components/plans-headline";
 import { BackLink } from "@/components/back-link";
@@ -10,7 +10,6 @@ import { SiteFooter } from "@/components/site-footer";
 import { datosDePrecios, PlanesDetalle, PREGUNTAS_DE_FACTURACION } from "@/components/planes-detalle";
 import { absoluteUrl, buildBreadcrumbStructuredData, buildFaqPageStructuredData, ogImages, siteName, websiteId } from "@/lib/seo";
 import { formatIncludedMinutes, plans, starterPlan, TRIAL_DAYS } from "@/lib/plans";
-import { listarArticulos } from "@/lib/blog";
 import { paginaDe } from "@/lib/paginas";
 
 // Título con la palabra clave y el precio de entrada, que es lo que busca
@@ -63,43 +62,31 @@ const planesStructuredData = {
   ],
 };
 
-const benefits = [
-  { title: "Sin fricción", description: "Elige plan primero y crea tu cuenta después.", icon: Sparkles },
-  { title: "Agenda preparada", description: "Conecta calendario cuando accedas al panel.", icon: CalendarDays },
-  { title: "Atención continua", description: "Tu asistente puede responder incluso fuera de horario.", icon: PhoneCall },
-  { title: "Minutos claros", description: "Cada plan indica minutos incluidos y coste adicional.", icon: Clock3 },
-] as const;
-
-/** Para quien compara antes de pagar (2026-10-22): las comparativas solo
- * recibían 3 enlaces internos y /planes es la página que más las necesita. */
-function antesDeDecidir() {
-  const comparativas = [
-    "/comparativa/alhabla-vs-heydiga",
-    "/comparativa/alhabla-vs-fonio",
-    "/comparativa/recepcionista-de-ia-vs-recepcionista-humana",
-  ].map((ruta) => {
-    const { nombre, resumen } = paginaDe(ruta);
-    return { href: ruta, titulo: nombre, resumen };
-  });
-  const precio = listarArticulos().find((a) => a.slug === "cuanto-cuesta-una-recepcionista-de-ia");
-  return precio
-    ? [
-        {
-          href: `/blog/${precio.slug}`,
-          titulo: precio.titulo,
-          // Resumen propio: el del artículo nombra a más proveedores de los
-          // que comparamos aquí (solo HeyDiga y fonio).
-          resumen: "Lo que cobran las recepcionistas de IA en España y lo que cuesta una persona en plantilla.",
-        },
-        ...comparativas,
-      ]
-    : comparativas;
-}
+/** Las tres dudas de quien está a punto de elegir: cuántas llamadas pierde,
+ * cómo se pone en marcha sin cambiar de número y si le sale mejor montarse
+ * su propio agente. `paginaDe` hace fallar el build si alguna sale del
+ * registro. */
+const ANTES_DE_DECIDIR = [
+  {
+    ruta: "/herramientas/calculadora-de-llamadas-perdidas",
+    titulo: "¿Cuántas llamadas pierdes?",
+    texto: "Calcula lo que se va cada mes por las llamadas que no coges, con tus cifras.",
+  },
+  {
+    ruta: "/desvio-de-llamadas",
+    titulo: "Con tu número de siempre",
+    texto: "Desvías a la recepcionista las llamadas que no coges, con el código de tu operador.",
+  },
+  {
+    ruta: "/comparativa",
+    titulo: "¿Y si me monto yo un agente?",
+    texto: "Alhabla frente a Retell AI, Vapi y otras plataformas para construir tu propio agente de voz.",
+  },
+].map(({ ruta, ...resto }) => ({ href: paginaDe(ruta).ruta, ...resto }));
 
 export default function PlansPage() {
-  const lecturas = antesDeDecidir();
   return (
-    <main className="min-h-screen bg-white text-[#0a0a0a]">
+    <main className="min-h-screen bg-lienzo text-tinta">
       <div className="mx-auto flex min-h-screen max-w-7xl flex-col px-6 py-6 lg:px-8">
         <header className="flex items-center justify-between gap-4">
           <BackLink fallbackHref="/" />
@@ -111,14 +98,12 @@ export default function PlansPage() {
         <section className="flex flex-1 items-center py-10 lg:py-16">
           <div className="w-full space-y-10">
             <div className="mx-auto max-w-3xl text-center">
-              <span className="badge-soft">Planes Alhabla</span>
               <PlansHeadline />
-              <p className="mt-5 text-lg leading-8 text-[#52525b]">
-                Elige el plan que encaja hoy y déjanos la recepción: disponibilidad real, tono impecable y operativa lista para crecer.
+              <p className="mt-5 text-lg leading-8 text-muted">
+                Los tres planes cogen tus llamadas, reservan en tu agenda y traen a tu asistente por WhatsApp.
+                Cambian los minutos incluidos, cuántos profesionales caben y algunos extras, como los recordatorios.
               </p>
-              <p className="mt-3 text-sm text-muted">
-                Precios sin IVA. Debajo tienes qué incluye cada plan, cuántos minutos necesitas y cómo se factura.
-              </p>
+              <p className="mt-3 text-sm text-muted">Precios sin IVA.</p>
             </div>
 
             <PlansWithRoi />
@@ -145,37 +130,27 @@ export default function PlansPage() {
               </div>
             </section>
 
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-              {benefits.map(({ title, description, icon: Icon }) => (
-                <article key={title} className="panel landing-card-hover p-5">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#f3eeff] text-[#8b5cf6]">
-                    <Icon className="h-5 w-5" />
-                  </div>
-                  <h3 className="mt-4 font-bold text-[#0a0a0a]">{title}</h3>
-                  <p className="mt-2 text-sm leading-6 text-[#52525b]">{description}</p>
-                </article>
-              ))}
-            </div>
-
             <PlanesDetalle />
 
             <section aria-labelledby="antes-de-decidir">
-              <h2 id="antes-de-decidir" className="text-2xl font-bold tracking-tight text-tinta sm:text-3xl">
+              <h2 id="antes-de-decidir" className="text-2xl font-black tracking-tight text-tinta sm:text-3xl">
                 Antes de decidir
               </h2>
-              <ul className="mt-6 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                {lecturas.map(({ href, titulo, resumen }) => (
+              <ul className="mt-6 grid gap-4 md:grid-cols-3">
+                {ANTES_DE_DECIDIR.map(({ href, titulo, texto }) => (
                   <li key={href}>
                     <Link
                       href={href}
-                      className="panel landing-card-hover flex h-full flex-col p-5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-morado"
+                      className="group panel landing-card-hover flex h-full flex-col p-5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-morado"
                     >
-                      <h3 className="font-bold text-tinta">{titulo}</h3>
-                      <p className="mt-2 line-clamp-3 text-sm leading-6 text-muted">{resumen}</p>
-                      <span className="mt-auto inline-flex items-center gap-1 pt-4 text-sm font-semibold text-morado-tinta">
-                        Leer
-                        <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                      <span className="flex items-start justify-between gap-3 font-bold text-tinta">
+                        {titulo}
+                        <ArrowRight
+                          className="mt-1 h-4 w-4 shrink-0 text-morado transition group-hover:translate-x-0.5"
+                          aria-hidden="true"
+                        />
                       </span>
+                      <span className="mt-2 text-sm leading-6 text-muted">{texto}</span>
                     </Link>
                   </li>
                 ))}

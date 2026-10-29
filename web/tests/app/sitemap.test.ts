@@ -72,7 +72,18 @@ describe("sitemap", () => {
     expect(urls).toContain("https://alhabla.ai/recepcionista-ia-en-catalan");
   });
 
-  it("no lista las comparativas", () => {
-    expect(sitemap().some((e) => e.url.includes("/comparativa"))).toBe(false);
+  it("lista el índice de comparativas y las de cada plataforma, no las retiradas", () => {
+    const urls = sitemap().map((e) => e.url);
+    for (const ruta of [
+      "/comparativa",
+      "/comparativa/alhabla-vs-retell-ai",
+      "/comparativa/alhabla-vs-vapi",
+      "/comparativa/alhabla-vs-bland-ai",
+      "/comparativa/alhabla-vs-synthflow",
+      "/comparativa/alhabla-vs-elevenlabs",
+    ]) {
+      expect(urls).toContain(`https://alhabla.ai${ruta}`);
+    }
+    expect(urls.some((u) => /heydiga|fonio|recepcionista-de-ia-vs-/.test(u))).toBe(false);
   });
 });

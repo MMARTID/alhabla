@@ -51,7 +51,7 @@ type TranscriptItem = {
 const DEMO_MAX_DURATION_SECONDS = 60;
 const CONTACT_EMAIL = "hola@alhabla.ai";
 const DEMO_NOT_CONFIGURED = "DEMO_NOT_CONFIGURED";
-/** Elemento <audio> donde el SDK de Telnyx engancha el audio del assistant. */
+/** Elemento <audio> donde el SDK de WebRTC engancha el audio del assistant. */
 const REMOTE_AUDIO_ID = "demo-audio-remoto";
 
 function describeDemoError(error: unknown) {
@@ -83,7 +83,7 @@ function formatDuration(totalSeconds: number) {
 }
 
 /**
- * Mensajes de la conversación que Telnyx emite por el canal `telnyx.ai.conversation`
+ * Mensajes de la conversación que emite el proveedor por el canal `telnyx.ai.conversation`
  * mientras dura la llamada. El SDK los tipa como `{ type: string; ... }`, así que
  * aquí solo se leen las formas que sabemos interpretar y el resto se ignora:
  * la demo nunca debe romperse porque llegue un evento nuevo.
@@ -265,7 +265,7 @@ export function DemoVoiceCall({ open, onClose, onActiveChange, niche }: DemoVoic
     intentoRef.current += 1;
     void callRef.current?.hangup();
     callRef.current = null;
-    // Cerrar el socket de Telnyx al salir: sin esto el cliente sigue vivo
+    // Cerrar el socket de WebRTC al salir: sin esto el cliente sigue vivo
     // (y reconectando) aunque el visitante haya cerrado el modal.
     void clientRef.current?.disconnect();
     clientRef.current = null;
@@ -282,8 +282,8 @@ export function DemoVoiceCall({ open, onClose, onActiveChange, niche }: DemoVoic
   }, [isClosing, onClose, resetState, teardownCall]);
 
   /**
-   * Indicador de «está hablando» medido sobre el audio real que llega de
-   * Telnyx. No hay evento de habla en el SDK, y derivarlo de la transcripción
+   * Indicador de «está hablando» medido sobre el audio real que llega de la
+   * llamada. No hay evento de habla en el SDK, y derivarlo de la transcripción
    * llega tarde y a trompicones; el nivel de la pista remota es inmediato.
    */
   const startSpeakingMeter = (stream: MediaStream) => {
@@ -377,7 +377,7 @@ export function DemoVoiceCall({ open, onClose, onActiveChange, niche }: DemoVoic
       setErrorMessage(null);
       setTranscript([]);
       // El micrófono se pide antes de nada: si el visitante lo deniega, no
-      // llegamos a molestar ni a Telnyx ni al assistant de la demo.
+      // llegamos a molestar ni al proveedor ni al assistant de la demo.
       setState("requesting-permission");
       await requestMicrophone();
       if (cancelado()) return;
@@ -395,11 +395,11 @@ export function DemoVoiceCall({ open, onClose, onActiveChange, niche }: DemoVoic
       setDemoNiche(demo.niche);
       setMaxDurationSeconds(demo.maxDurationSeconds || DEMO_MAX_DURATION_SECONDS);
 
-      // El SDK de Telnyx solo existe en el navegador y pesa lo suyo: se carga
+      // El SDK de WebRTC solo existe en el navegador y pesa lo suyo: se carga
       // cuando alguien empieza la demo, no en el bundle de la landing.
-      const { TelnyxRTC: ClienteTelnyx } = await import("@telnyx/webrtc");
+      const { TelnyxRTC: ClienteWebRTC } = await import("@telnyx/webrtc");
       if (cancelado()) return;
-      const client = new ClienteTelnyx({
+      const client = new ClienteWebRTC({
         // Llamada web sin autenticar contra el assistant de la cuenta de demo
         // (`supports_unauthenticated_web_calls`): no hay credencial SIP ni
         // token que pueda acabar en el bundle de la web pública.
@@ -499,7 +499,7 @@ export function DemoVoiceCall({ open, onClose, onActiveChange, niche }: DemoVoic
         aria-describedby="demo-voz-descripcion"
         className={`demo-call-modal flex h-[100dvh] w-full max-w-2xl flex-col overflow-hidden rounded-t-3xl border border-[#e5e5e5] bg-white shadow-[0_24px_60px_rgba(0,0,0,0.18)] sm:h-auto sm:max-h-[calc(100dvh-3rem)] sm:rounded-3xl ${isClosing ? "demo-call-modal-closing" : ""}`}
       >
-        {/* eslint-disable-next-line jsx-a11y/media-has-caption -- audio en vivo de la llamada; el SDK de Telnyx lo engancha por id. */}
+        {/* eslint-disable-next-line jsx-a11y/media-has-caption -- audio en vivo de la llamada; el SDK de WebRTC lo engancha por id. */}
         <audio id={REMOTE_AUDIO_ID} autoPlay className="hidden" />
         <div className="flex shrink-0 items-start justify-between gap-3 border-b border-[#e5e5e5] px-4 py-4 sm:px-6 sm:py-5">
           <div className="flex min-w-0 items-start gap-3">
@@ -691,7 +691,7 @@ export function DemoVoiceCall({ open, onClose, onActiveChange, niche }: DemoVoic
                     </span>
                     <p className="text-sm font-semibold">¿Quieres que atienda así en tu negocio?</p>
                   </div>
-                  <Link href="/planes" className="btn-purple justify-center" data-evento="clic_probar" data-ubicacion="demo">Ver planes</Link>
+                  <Link href="/planes" className="btn-purple justify-center" data-evento="clic_probar" data-ubicacion="demo">Probar 7 días gratis</Link>
                 </div>
               ) : null}
               <p className="mt-3 text-xs leading-5 text-white/50">Demo con una cuenta de prueba · máximo {formatDuration(maxDurationSeconds)} · no se reserva nada en tu agenda.</p>

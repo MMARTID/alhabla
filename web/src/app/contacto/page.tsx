@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Building2, CircleHelp, Mail } from "lucide-react";
+import { Building2, CircleHelp, Mail, PhoneCall } from "lucide-react";
 import { BotonWhatsappEquipo } from "@/components/boton-whatsapp-equipo";
 import { FormularioDeContacto } from "@/components/formulario-de-contacto";
 import { SiteFooter } from "@/components/site-footer";
@@ -15,7 +15,7 @@ import {
 
 const contactoTitle = "Hablar con nosotros";
 const contactoDescription =
-  "¿Varias sedes, una franquicia o dudas antes de elegir plan? Cuéntanos tu caso y te contesta una persona del equipo de Alhabla.";
+  "Te enseñamos Alhabla funcionando con tu negocio o te resolvemos las dudas antes de elegir plan. Te contesta una persona del equipo.";
 
 export const metadata: Metadata = {
   title: contactoTitle,
@@ -56,18 +56,24 @@ const contactoStructuredData = {
   ],
 };
 
-// Nada de funciones que el producto no tenga: con varias sedes se habla del
-// caso, no se promete un panel multi-sede.
+// Primero lo que más convence: verla funcionando. Nada de funciones que el
+// producto no tenga: con varias sedes se habla del caso, no se promete un
+// panel multi-sede.
 const motivos = [
   {
-    titulo: "Varias sedes o una franquicia",
-    texto: "Cuéntanos cómo trabajáis en cada local y vemos juntos cómo encaja Alhabla antes de que pagues nada.",
-    icono: Building2,
+    titulo: "Te lo enseñamos funcionando",
+    texto: "Con los servicios y el horario de tu negocio: oyes cómo atiende una llamada y cómo le pides cambios a tu asistente por WhatsApp.",
+    icono: PhoneCall,
   },
   {
     titulo: "Dudas antes de elegir plan",
     texto: "Minutos, calendario, desvío de llamadas o qué pasa al acabar la prueba: pregúntanos lo que necesites.",
     icono: CircleHelp,
+  },
+  {
+    titulo: "Varias sedes o una franquicia",
+    texto: "Cuéntanos cómo trabajáis en cada local y vemos juntos cómo encaja Alhabla antes de que pagues nada.",
+    icono: Building2,
   },
 ] as const;
 
@@ -81,8 +87,7 @@ export default function ContactoPage() {
             <span className="badge-soft">Contacto</span>
             <h1 className="mt-4 text-4xl font-extrabold tracking-[-0.025em] sm:text-5xl">Hablar con nosotros</h1>
             <p className="mt-4 text-base leading-7 text-muted sm:text-lg">
-              Te contesta una persona del equipo, no un bot. Déjanos tus datos y te escribimos o te llamamos, como
-              prefieras.
+              Te contesta una persona del equipo. Déjanos tus datos y te escribimos o te llamamos, como prefieras.
             </p>
 
             <ul className="mt-8 space-y-6">

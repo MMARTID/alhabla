@@ -100,7 +100,7 @@ export const EJEMPLOS_DE_POLITICA: readonly { id: string; nombre: string; valore
     id: "canina",
     nombre: "Peluquería canina",
     valores: { antelacion: 24, senal: "no", ausencias: "dejar", maxAusencias: "2", retraso: "15" },
-    porQue: "Un perro grande puede ocupar la mañana: sin señal, pero con un límite claro de ausencias.",
+    porQue: "Un perro grande puede ocupar la mañana: sin señal, pero con un límite claro de veces sin venir.",
   },
 ];
 
@@ -172,7 +172,7 @@ export function generarPolitica(p: Politica) {
   };
 
   const cartel = [
-    "CANCELACIONES Y AUSENCIAS",
+    "CANCELACIONES Y CITAS SIN AVISAR",
     "",
     `· Avísanos con al menos ${plazo} de antelación si no puedes venir. Cambiar o anular con ese margen no cuesta nada.`,
     conSenal ? `· Señal ${senalDe} ${ambito}. No se devuelve si anulas tarde o no vienes.` : null,

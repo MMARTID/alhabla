@@ -61,7 +61,8 @@ describe("formatExtraMinute", () => {
 
 describe("formatIncludedMinutes", () => {
   it("formatea miles con separador español", () => {
-    expect(formatIncludedMinutes(1000)).toBe("1000");
+    expect(formatIncludedMinutes(1000)).toBe("1.000");
+    expect(formatIncludedMinutes(1500)).toBe("1.500");
     expect(formatIncludedMinutes(100)).toBe("100");
   });
 });

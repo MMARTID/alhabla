@@ -1,14 +1,15 @@
 import type { NicheSlug } from "@/lib/niche-landings";
 
 /**
- * Los guiones del Gestor en acción (`components/gestor-simulacion.tsx`): la
- * conversación del dueño con Alhabla por WhatsApp y lo que el panel del
- * portátil enseña a cada cambio, uno por landing (la portada general y
- * cada sector). Lo que cambia de un negocio a otro —nombres, servicios,
- * cómo se llama a quien reserva, qué dos situaciones cuenta cada landing
- * además de la ausencia— vive aquí; `ausenciaDe` arma la ausencia, que es
- * la misma cadena en los seis, con el vocabulario de cada uno. Es la única
- * copia: el mockup quieto de la página del Gestor (`owner-assistant-chat.tsx`
+ * Los guiones de tu asistente en acción (`components/gestor-simulacion.tsx`;
+ * en el backend, «el Gestor»): la conversación del dueño con Alhabla por
+ * WhatsApp y lo que el panel del portátil enseña a cada cambio, uno por
+ * landing (la portada general y cada sector). Lo que cambia de un negocio a
+ * otro —nombres, servicios, cómo se llama a quien reserva, qué dos
+ * situaciones cuenta cada landing además de la ausencia— vive aquí;
+ * `ausenciaDe` arma la ausencia, que es la misma cadena en los seis, con el
+ * vocabulario de cada uno. Es la única copia: el mockup quieto de la página
+ * de tu asistente (`owner-assistant-chat.tsx`
  * en /agenda-por-whatsapp) pinta la ausencia de peluquería de aquí.
  *
  * Honestidad (2026-10-22, contrastado con backend/src/modules/gestor/ y
@@ -107,7 +108,7 @@ export type VistaAgenda = {
 
 export type DiaEspecial = { fecha: [string, string]; titulo: string; detalle: string; chip: string };
 
-/** «Tu agente» › Disponibilidad: la semana y los días especiales. */
+/** «Tu recepcionista» › Disponibilidad: la semana y los días especiales. */
 export type VistaHorario = {
   tipo: "horario";
   desdeHito?: Hito;
@@ -118,7 +119,7 @@ export type VistaHorario = {
 
 export type ServicioFila = { nombre: string; duracion: number; precio: number };
 
-/** «Tu agente» › Catálogo: los servicios con duración y precio. */
+/** «Tu recepcionista» › Catálogo: los servicios con duración y precio. */
 export type VistaServicios = {
   tipo: "servicios";
   desdeHito?: Hito;
@@ -129,7 +130,7 @@ export type VistaServicios = {
   nuevo?: ServicioFila & { hito: Hito };
 };
 
-/** «Tu agente» › Información del negocio: lo que la recepcionista sabe. */
+/** «Tu recepcionista» › Información del negocio: lo que la recepcionista sabe. */
 export type VistaInformacion = {
   tipo: "informacion";
   desdeHito?: Hito;
@@ -599,7 +600,7 @@ export const GUIONES_GESTOR: Record<NicheSlug, GuionGestor> = {
           hora: "11:00",
           otra: "Laura",
           cliente: "Rosa",
-          telefono: "+34 791 32 55 57",
+          telefono: "+34 791 58 06 33",
         }),
         vistas: [
           agendaDePeluqueria({
@@ -623,7 +624,7 @@ export const GUIONES_GESTOR: Record<NicheSlug, GuionGestor> = {
         reloj: "13:20",
         diaCorto: "Mié",
         turnos: [
-          { de: "dueno", texto: "Apunta a Rosa el jueves 29 a las 5, mechas. Su móvil: 791 32 55 57" },
+          { de: "dueno", texto: "Apunta a Rosa el jueves 29 a las 5, mechas. Su móvil: 791 58 06 33" },
           {
             de: "gestor",
             texto: "¿Confirmas? Apuntar a Rosa el jueves 29 de octubre a las 17:00, Mechas (120 min) con Marta.",
@@ -636,12 +637,12 @@ export const GUIONES_GESTOR: Record<NicheSlug, GuionGestor> = {
           },
           {
             de: "gestor",
-            texto: "¿Le mando a Rosa la confirmación por WhatsApp al +34 791 32 55 57?",
+            texto: "¿Le mando a Rosa la confirmación por WhatsApp al +34 791 58 06 33?",
             botones: ["Sí, mándasela", "No"],
             seguido: true,
           },
           { de: "boton", texto: "Sí, mándasela", hito: "confirmada" },
-          { de: "gestor", texto: "Le mando a Rosa la confirmación al +34 791 32 55 57." },
+          { de: "gestor", texto: "Le mando a Rosa la confirmación al +34 791 58 06 33." },
         ],
         vistas: [
           {
@@ -696,7 +697,7 @@ export const GUIONES_GESTOR: Record<NicheSlug, GuionGestor> = {
           hora: "12:00",
           otra: "Elena",
           cliente: "Inés",
-          telefono: "+34 794 27 93 51",
+          telefono: "+34 794 52 18 60",
         }),
         vistas: [
           {
@@ -749,12 +750,12 @@ export const GUIONES_GESTOR: Record<NicheSlug, GuionGestor> = {
           },
           {
             de: "gestor",
-            texto: "¿Le aviso a Beatriz por WhatsApp de la nueva hora? Si prefieres llamarle tú: +34 794 27 93 51.",
+            texto: "¿Le aviso a Beatriz por WhatsApp de la nueva hora? Si prefieres llamarle tú: +34 794 61 08 25.",
             botones: ["Sí, avísale", "Le llamo yo"],
             seguido: true,
           },
           { de: "boton", texto: "Sí, avísale", hito: "avisada" },
-          { de: "gestor", texto: "Le aviso a Beatriz al +34 794 27 93 51." },
+          { de: "gestor", texto: "Le aviso a Beatriz al +34 794 61 08 25." },
         ],
         vistas: [
           {
@@ -827,7 +828,7 @@ export const GUIONES_GESTOR: Record<NicheSlug, GuionGestor> = {
           hora: "11:00",
           otra: "Noa",
           cliente: "Carla",
-          telefono: "+34 793 66 21 08",
+          telefono: "+34 793 40 72 19",
         }),
         vistas: [
           {

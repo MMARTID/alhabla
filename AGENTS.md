@@ -108,7 +108,7 @@ Most modules are a folder containing a `routes.ts` file (and optionally `service
 Since 2026-09-21 (`docs/historico/PLAN-APP-DOMINIO.md`) there are **two** Next.js projects:
 `frontend/` is the authenticated app (`app.alhabla.ai`) and `web/` is the public site
 (`alhabla.ai`: landing, niche pages, plans, legal, registration and blog). Marketing components
-(`SiteLanding`, `LandingHero`, `RevenueLossCalculator`, `PlansWithRoi`, `DemoVoiceCall`,
+(`MainLanding`, `SiteLanding`, `LandingHero`, `PlansWithRoi`, `DemoVoiceCall`, `PaginaGuia`,
 `LegalPage`…) and `roi-context.ts` live only in `web/src/`; the few files used by both are copied
 into each (list under Key Components). The component and lib notes below say which project holds
 each file.
@@ -182,42 +182,59 @@ each page's image explicitly from its `openGraph`/`twitter` metadata.
 
 **Public site (`web/src/components/`):**
 
-- `SiteLanding` — Shell of the five niche landings (`/peluqueria`, `/barberia`…): `LandingHero`,
-  `SectorDataSection` (only when the niche has `sectorData`), `TeamRoutingSection`,
-  `OwnerAssistantSection`, `WhatsAppBenefitsTable`, benefits, `LlamadaScroll` +
-  `EnTuNegocioScroll` (the same iPhone → laptop story as the home page, with the niche's
-  script from `web/src/lib/relato-guiones.ts` and its accent; replaced
-  `HowItWorksScrollytelling` on 2026-10-02), `RevenueLossCalculator`, plans and FAQ. Without `content` (the generic `/`) it returns
-  `MainLanding`, a shorter home page with its own hero over `HeroHilos` plus `LlamadaScroll`,
-  `EnTuNegocioScroll` (the owner's panel on a three.js laptop; three and the glTF model
-  `web/public/modelos/macbook.glb` load lazily when the section approaches. The model is
+- `MainLanding` — The home page (`/`, imported straight by `app/page.tsx`): its own hero over
+  `HeroHilos`, `LlamadaScroll` + `EnTuNegocioScroll` (the iPhone → laptop story with the script
+  from `web/src/lib/relato-guiones.ts`; the owner's panel on a three.js laptop, three and the glTF
+  model `web/public/modelos/macbook.glb` load lazily when the section approaches. The model is
   «macbook pro M3 16 inch 2024» by jackbaeten, CC BY 4.0: the credit line under the scene is
   required by the license, don't remove it. Rebuild it with `web/scripts/preparar-macbook.mjs`,
-  which strips the lid logo), `PuntosFuertesSection`, `WhatsAppClientesSection`,
-  `GestorSimulacionSection` (the Gestor in action, replacing `OwnerAssistantSection` on the
-  home only: the owner's WhatsApp on the iPhone render plus the panel on the same 3D laptop,
-  reacting to each change; a timed simulation, not scroll-driven, that cycles through three
-  real Gestor actions — `marcar_ausencia` + `mover_cita` + `avisar_cliente`, `cerrar_dia`,
-  `editar_servicio`. The laptop helpers shared by both scenes live in
-  `web/src/lib/portatil-3d.ts`; on phones only the iPhone is shown), `EnMarchaSection`,
-  the sector accordion, plans and FAQ. Niche pages add `SectorCiudadesIdiomas` (figures per big
-  city from `lib/sector-ciudades.ts` + languages) right after `SectorDataSection`; the 30
-  `/<niche>/[ciudad]` pages were merged into them on 2026-10-20 (301 in `next.config.mjs`).
-- `SectorDataSection` — Third-party figures about the niche, each rendered with its source
-  (`Citation`: «Dato de terceros», publisher, link). Every published figure needs an external
-  cited source (see Evidence rules).
-- `LandingHero` — Single-column hero: centred headline over `HeroHilos` (canvas of voice "threads"
-  whose pulses take the niche accent; the section needs `relative isolate` and no background of
-  its own, or the `-z-10` canvas disappears). The primary CTA «Escuchar la demo» opens
-  `DemoVoiceCall`; the secondary one goes to `/planes` (with `?niche=`).
-- `RevenueLossCalculator` — Interactive sliders (ticket, lost calls/week) with ROI math. The CTA
-  always calls `activateRoiContext`, touched or not: the button names a figure and `/planes` has
-  to receive it.
+  which strips the lid logo), `GestorSimulacionSection` (tu asistente in action: the owner's
+  WhatsApp on the iPhone render plus the panel on the same 3D laptop, reacting to each change; a
+  timed simulation, not scroll-driven, that cycles through three real assistant actions —
+  `marcar_ausencia` + `mover_cita` + `avisar_cliente`, `cerrar_dia`, `editar_servicio`. The
+  laptop helpers shared by both scenes live in `web/src/lib/portatil-3d.ts`; on phones only the
+  iPhone is shown), `PuntosFuertesSection`, `WhatsAppClientesSection`, `EnMarchaSection`, the
+  sector accordion, plans and FAQ (`home-faqs.ts`).
+- `SiteLanding` — The eight sector landings (`/peluqueria`, `/barberia`, `/centro-de-estetica`,
+  `/salon-de-unas`, `/fisioterapia`, `/pestanas-y-cejas`, `/spa-y-masajes`,
+  `/peluqueria-canina`), template «Las preguntas de la dueña» since 2026-10-29
+  (`PLAN-WEB-CONTENIDO.md`; direction contract in
+  `.impeccable/surfaces/web-src-components-site-landing-tsx.md`). Eight fixed blocks, ~800 words:
+  `LandingHero`; three `Pregunta` blocks (`components/sector/pregunta.tsx`), each a two-line
+  answer proven with a product piece — the call transcribed (`TranscripcionLlamada`), the chat
+  with tu asistente (`OwnerAssistantChatMockup`, turns built with `ausenciaDe` from
+  `lib/gestor-guiones.ts`) plus the trust rule «Con tus clientes manda Alhabla. Con tu agenda
+  mandas tú.», and the WhatsApp the customer gets (`WhatsappDelCliente`, the approved `confirmacion_cita_v3`
+  verbatim); `OficioDelSector`, a fourth `Pregunta` whose proof is the app's services table
+  drawn (`ServiciosDelOficio`: duration and the Especialista / Lo hace / No sugerir pill per
+  professional; the typical calls are folded into its two-line answer), then the split by
+  speciality full width and,
+  in fisioterapia, the short health note;
+  `PreciosDelSector` (three compact plans; the founder pill takes the sector accent); five
+  folded questions; the black close with «Empezar ahora». Motion: one moment only, the call
+  transcript unfolding line by line when it scrolls in (`DesplieguePorLineas`, one
+  IntersectionObserver, visible without JS or with reduced motion); no `Reveal` on the sections
+  or the chats (`entrada={false}`). Everything that changes per sector is
+  in `web/src/lib/sectores/` (see Frontend Lib). Removed on 2026-10-29: third-party sector data
+  and press quotes, the per-city figures (`SectorCiudadesIdiomas`, `lib/sector-ciudades.ts`; the
+  30 `/<niche>/[ciudad]` pages had been merged into the sector page on 2026-10-20, 301 in
+  `next.config.mjs`), `TeamRoutingSection`, `WhatsAppBenefitsTable`, the 1,300-word guide, the
+  articles block and the landing calculator (`RevenueLossCalculator`). The iPhone → laptop story
+  stays on the home page only.
+- `LandingHero` — Single-column hero of the sector landings: H1 «Recepcionista de IA para
+  {paraQuien}» over `HeroHilos` (canvas of voice "threads" whose pulses take the sector accent;
+  the section needs `relative isolate` and no background of its own, or the `-z-10` canvas
+  disappears), one size smaller when `paraQuien` is longer than 12 characters so it stays on two
+  lines on desktop and three on a phone. Then the street phrase, «Probar 7 días gratis» (to
+  `/planes?niche=`), «Escuchar una llamada» (`DemoVoiceCall` with the sector demo, or the general
+  one for the three sectors without it) and «Tu número de siempre · Sin permanencia».
 - `PlansWithRoi` / `PlansHeadline` — Pricing cards, ROI-aware copy. Reads `?plan=` from the URL to
   flag the card the visitor already chose, and renders the value contrast from
   `calculatePlanValueContrast` only when the visitor's own estimate covers the plan. Each card's
   button (`PlanSelectionLink`) jumps to the app's `/elegir-plan?plan=&niche=`: the web cannot see
-  the session, so the app decides between checkout and registration.
+  the session, so the app decides between checkout and registration. Since the landing
+  calculator went away (2026-10-29) nothing calls `activateRoiContext`: the ROI copy only shows an
+  estimate saved before, and the tools calculator does not feed it.
 - `DemoVoiceCall` — Real voice demo over **Telnyx WebRTC** (`@telnyx/webrtc`, loaded with a dynamic
   `import()` so it stays out of the landing bundle) with live transcription from the
   `telnyx.ai.conversation` events. The browser asks the backend which assistant to call via
@@ -335,11 +352,26 @@ the content: each project keeps what it needs.
 - `app-url.ts` — `appUrl()` (`NEXT_PUBLIC_APP_URL`): every link from the web to the app.
 - `register.ts` — `buildAppEntryUrl` (the jump to the app's `/auth/entrar?pase=` with plan and
   sector) and `describeRegisterError`.
-- `niche-landings.ts` — The SEO copy of each niche: hero, benefits, FAQ, cited `sectorData`,
-  `teamRouting`, `ownerAssistant`, metadata and JSON-LD, plus `generalOwnerAssistant` for the
-  generic landing (it has no team-routing block since the six-block home page, `9d4abef`). Accents in `niche-accents.ts`, per-city figures in
-  `sector-ciudades.ts`, home FAQ in `home-faqs.ts`. SEO wording rule (owner, 2026-10-20): titles and
-  H1 say «recepcionista de IA» / «IA para…», never «recepcionista virtual».
+- `sectores/` — The copy of the eight sector landings, one file per sector (`peluqueria.ts`…):
+  hero phrase, the example call, the absence chat, the customer's WhatsApp, three typical calls,
+  five questions and the close. `tipos.ts` holds `SectorLanding` (each field says its word
+  limit) and `index.ts` `SECTORES`, `tituloDeSector`, `metadatosDeSector` and
+  `datosEstructuradosDeSector`. `tests/lib/sectores.test.ts` guards the limits and the
+  vocabulary. The demo dates («jueves 5 de noviembre») must match the real calendar: weekday
+  and day of the same year.
+- `niche-landings.ts` — What is left of the old niche data: `NicheSlug` (the five sectors with a
+  voice demo and their own scripts), `NicheAccent`, the `OwnerAssistant` type of the home
+  simulation, `nicheLandings` (name and accent of those five, for the blog and the script tests)
+  and `nicheLinks` (the eight sector links, from `PAGINAS`). Accents in `niche-accents.ts`, home
+  FAQ in `home-faqs.ts`.
+- **Vocabulary of the public site** (owner, 2026-10-29; `PLAN-WEB-CONTENIDO.md`): titles and H1
+  say «recepcionista de IA», the body «la recepcionista»; never «recepcionista virtual», «de voz»
+  or «agente de voz» for Alhabla (only as the category of Retell, Vapi and the like). The owner's
+  side is «tu asistente», feminine; «el Gestor» is the code name and never appears in visible
+  copy. Never «agenda real», «calendario real», «24/7», «competitividad», «productividad»,
+  «ventaja competitiva» or «llenar la agenda». The trial action is «Probar 7 días gratis» and the
+  close «Empezar ahora». The voice provider is never named on the site, except in the processors
+  list that the law requires in `/legal/privacidad`.
 - `roi-context.ts` — ROI calculation, plan value contrast and the calculator → `/planes` hand-off
   (`activateRoiContext` / `getActiveRoiContext`).
 - `seo.ts` — Site metadata, structured data (JSON-LD), absolute URL builder, OG image list.
@@ -3327,10 +3359,10 @@ any user-facing copy:
 
 - Never fabricate testimonials, customer logos, "X negocios confían" counts, own product metrics,
   awards or press mentions about Alhabla. None exist.
-- Every published figure needs an external, verifiable source rendered on screen, the way
-  `SectorDataSection` does. The stats in `web/src/lib/niche-landings.ts` follow this.
-- The quotes in `niche-landings.ts` are business owners interviewed in the press **about the
-  problem**, not Alhabla customers. Do not present them as testimonials.
+- Every published figure needs an external, verifiable source rendered on screen, the way the
+  comparisons do (`Fuentes`, with the date they were checked). The sector landings carry no
+  third-party figures or press quotes since 2026-10-29; if a quote comes back, it is a business
+  owner interviewed in the press **about the problem**, never presented as a testimonial.
 - Do not promise capabilities that do not ship. As of 2026-09 there **is** a real voice picker —
   `AgentSettingsEditor` in `/agente` lets the business choose `femenina`/`masculina`
   (`AgentSettings.voiceGender`, see Agent Configuration below) — but it is exactly two options,
@@ -3455,28 +3487,28 @@ npx prisma studio
 
 The landing lives in `web/`; the backend (demo) and the app (redirect) need a small change each.
 
-1. **Content:** add the slug to `NicheSlug` and its entry to `nicheLandings` in
-   `web/src/lib/niche-landings.ts` (hero, benefits, FAQ, `teamRouting`, `ownerAssistant`,
-   metadata, and `sectorData` only with a cited source for every figure — see § Content &
-   Evidence Rules), plus its accent in `NICHE_ACCENTS` (`web/src/lib/niche-accents.ts`; `deep`
-   must pass AA as text on `soft`). The sectors menu (`SectorsMenu`), `MobileNav` and the
-   calculator's links read `nicheLinks`, derived from `nicheLandings`, so they need nothing.
-2. **Maps TypeScript enforces:** with the slug in `NicheSlug`, `npx tsc --noEmit` flags the other
-   `Record<NicheSlug, …>` that need an entry: `COMO_FUNCIONA_EJEMPLOS`
-   (`components/site-landing.tsx`), `SINGULAR_POR_NICHO` and `ENTRADA_POR_NICHO`
-   (`components/sector-ciudades-idiomas.tsx`) and `CITY_NICHE_STATS` (`lib/sector-ciudades.ts`, one
-   sourced figure per city).
-3. **Pages:** copy an existing niche folder — `web/src/app/<niche>/page.tsx` (`SiteLanding` +
-   JSON-LD) and `opengraph-image.tsx` (`imagenOg`) — and add the sector photo `web/public/heroes/<niche>.jpg`,
-   used by the OG image and the home accordion.
-4. **Lists nothing type-checks:** its entry in `PAGINAS` (`web/src/lib/paginas.ts`, the single
-   registry the sitemap, `/llms.txt` and the tests read; `tests/lib/paginas.test.ts` fails if a
-   `page.tsx` is missing from it); `SECTORES` in
-   `components/main-landing.tsx` (home accordion) and `components/site-footer.tsx`; the blog CTA
-   targets (`DESTINOS` in `components/blog/bloques.tsx` and `lib/keystatic/bloques.tsx`) and
-   article sectors (`SECTORES` in `web/keystatic.config.tsx`). Optionally a plural alias in
-   `web/next.config.mjs` (`/peluquerias` → `/peluqueria`).
-5. **Demo (backend):** add the slug to `DEMO_NICHES` in `backend/src/modules/demo/routes.ts` —
+1. **Content:** a file `web/src/lib/sectores/<sector>.ts` that fills `SectorLanding` (copy an
+   existing one; every field in `tipos.ts` says its limit), its slug in `SectorSlug` and its entry
+   in `SECTORES` (`index.ts`), plus its accent in `NICHE_ACCENTS` (`web/src/lib/niche-accents.ts`;
+   `deep` must pass AA as text on `soft`). The absence chat is built with `ausenciaDe`
+   (`lib/gestor-guiones.ts`), so it matches what the assistant really does. Only if it gets its own
+   voice demo and scripts does it also go into `NicheSlug` (`lib/niche-landings.ts`), and
+   `npx tsc --noEmit` then flags the `Record<NicheSlug, …>` that need an entry
+   (`GUIONES_SECTOR` in `relato-guiones.ts`, `GUIONES_GESTOR` in `gestor-guiones.ts`).
+2. **Pages:** copy an existing sector folder — `web/src/app/<sector>/page.tsx` (`SiteLanding` +
+   `datosEstructuradosDeSector`, metadata from `metadatosDeSector`) and `opengraph-image.tsx`
+   (`imagenOg`) — and add the sector photo `web/public/heroes/<sector>.jpg` if the OG image or the
+   home accordion use it.
+3. **Lists nothing type-checks:** its entry in `PAGINAS` (`web/src/lib/paginas.ts`, section
+   `sectores`: the single registry the sitemap, `/llms.txt`, the menus (`nicheLinks`) and the
+   tests read; `tests/lib/paginas.test.ts` fails if a `page.tsx` is missing from it);
+   `SECTORES` in `components/main-landing.tsx` (home accordion) and `components/site-footer.tsx`;
+   the blog CTA targets (`DESTINOS` in `components/blog/bloques.tsx` and
+   `lib/keystatic/bloques.tsx`) and article sectors (`SECTORES` in `web/keystatic.config.tsx`).
+   Optionally a plural alias in `web/next.config.mjs` (`/peluquerias` → `/peluqueria`).
+4. **Similarity:** after `npm run build`, `npm run seo:similitud` must stay under 0,50 against
+   the other sector pages: the sector's own copy has to carry the page.
+5. **Demo (backend, only with its own demo):** add the slug to `DEMO_NICHES` in `backend/src/modules/demo/routes.ts` —
    `POST /demo/web-call` validates `niche` with a closed `z.enum`, so the new landing's demo
    answers 400 until it is there — and map it in `DEMO_ASSISTANT_ENV_BY_NICHE` to a
    `TELNYX_DEMO_<NICHO>_ASSISTANT_ID` for its isolated demo assistant (see the `demo` module
@@ -3513,24 +3545,33 @@ fusionar o descartar una rama, quita su fila de esta tabla.
 Por qué: Google indexó 2 de las 30 páginas sector × ciudad (se parecían más de un 50 %) y las cinco
 landings de sector compartían el 55–58 % del texto de `<main>`. Desde el 2026-10-20:
 
-- **Registro único** `web/src/lib/paginas.ts` (`PAGINAS`): ruta, nombre, resumen, sección, prioridad,
-  `actualizado` (fecha real de la última revisión de fondo, va al `lastmod`; sin ella no se publica) y
-  `foto` (catálogo `web/src/lib/fotos.ts`, Unsplash con licencia libre y crédito). De ahí leen
+- **Registro único** `web/src/lib/paginas.ts` (`PAGINAS`): ruta, nombre, resumen, sección e
+  `actualizado` (fecha real de la última revisión de fondo, va al `lastmod`; sin ella no se publica).
+  Las fotos de banco de cabecera (`lib/fotos.ts`) salieron el 2026-10-29: las páginas enseñan el
+  producto (`pieza`) o nada. De ahí leen
   `app/sitemap.ts` (con sitemap de imágenes), `app/llms.txt/route.ts`, los índices de sección
   (`paginasBajo("/integraciones")`…) y `tests/lib/paginas.test.ts`, que falla si una ruta del registro no
   tiene `page.tsx` o si un `page.tsx` indexable no está en el registro.
 - **Plantilla** `web/src/components/pagina-guia.tsx` (`PaginaGuia` + bloques `Seccion`, `Texto`,
   `Tarjetas`, `Pasos`, `Tabla`, `Conversacion`, `Nota`, `Fuentes`, `IndiceDePaginas`): migas, cabecera con
-  la foto del registro, FAQ, relacionadas, cierre y JSON-LD (WebPage/Article + BreadcrumbList +
+  una pieza del producto al lado (`pieza`: el chat con tu asistente, la cita en el calendario, el
+  WhatsApp del cliente) o sola, CTA «Probar 7 días gratis», FAQ y «Sigue leyendo» (5 y 3 como mucho:
+  regla del plan, el código no la impone), cierre y JSON-LD (WebPage/Article + BreadcrumbList +
   FAQPage). La plantilla no lleva texto de relleno: el cuerpo es de cada página. Metadata con
   `metadataDePagina` (`lib/seo.ts`) y un `opengraph-image.tsx` por página.
 - **Familias**: `/integraciones/*`, `/desvio-de-llamadas/*` (datos de la ayuda oficial de cada
-  operador, con fuentes), `/comparativa/*` (con nombre solo HeyDiga y fonio; datos publicados y
-  fechados por el art. 10 de la Ley 3/1991; lo que no publican se escribe «no consta en su web»),
+  operador, con fuentes), `/comparativa/*` (desde el 2026-10-29, «Alhabla frente a montarte tu
+  agente de voz»: el índice y una página por plataforma — Retell AI, Vapi, Bland AI, Synthflow y
+  ElevenLabs —, con PolyAI y Voiceflow solo en la tabla del índice. Eje: plataforma para construir
+  tu agente frente a recepcionista hecha; no se pelea el precio por minuto. Datos publicados por
+  cada una, con fuente y fecha (`lib/comparativas.ts`, art. 10 de la Ley 3/1991); lo que no
+  publican se escribe «No consta en su web». Nunca se nombra al proveedor de voz de Alhabla. Las
+  viejas contra HeyDiga, fonio y personas redirigen con 301 en `next.config.mjs`),
   `/herramientas/*`, `/guias/ley-y-recepcionista-de-ia`, `/recepcionista-ia-en-{catalan,euskera,gallego}`,
   `/glosario` (una página con anclas y `DefinedTermSet`, no una por término), `/sobre-alhabla`,
-  `/prensa`, `/novedades` (añadir cada mes) y los sectores sin datos de salud `/pestanas-y-cejas`,
-  `/spa-y-masajes`, `/peluqueria-canina` (podología y osteopatía quedan fuera: datos de salud, RGPD art. 9).
+  `/prensa`, `/novedades` (añadir cada mes), `/agenda-por-whatsapp` (tu asistente) y las ocho landings
+  de sector (`SiteLanding`, ver Key Components; podología y osteopatía quedan fuera: datos de salud,
+  RGPD art. 9).
 - **Auditoría de parecido**: `npm run seo:similitud` (`web/scripts/auditar-similitud.mjs`) lee el HTML
   prerenderizado de `.next/server/app` tras el build (o, con `BASE_URL=https://alhabla.ai`, producción) y
   mide, para cada par de páginas del sitemap, qué parte del texto de `<main>` de la más corta aparece en

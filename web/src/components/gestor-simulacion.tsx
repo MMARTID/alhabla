@@ -51,8 +51,8 @@ import type { PortatilMontado } from "./gestor-mac-escena";
 import styles from "./gestor-simulacion.module.css";
 
 /**
- * «Y cuando algo cambia, se lo dices por WhatsApp» (2026-09-30; por sector
- * y a otro ritmo desde el 2026-10-22): el Gestor en acción. A la derecha,
+ * Tu asistente en acción (2026-09-30; por sector y a otro ritmo desde el
+ * 2026-10-22; en el código y el backend, «el Gestor»). A la derecha,
  * el iPhone con el WhatsApp del dueño (el mismo render de «En tu bolsillo»);
  * detrás, el portátil 3D de «En tu negocio» con el panel reaccionando a
  * cada cambio. La conversación se reproduce sola en cuanto el teléfono se
@@ -104,7 +104,7 @@ export function GestorSimulacionSection({
   guion: GuionGestor;
   /** El color de la landing de sector; la portada va con el morado. */
   accent?: NicheAccent;
-  /** Enlace a la página del Gestor; solo lo pasan las páginas de sector. */
+  /** Enlace a la página de tu asistente (/agenda-por-whatsapp). */
   masInfoHref?: string;
 }) {
   // Con movimiento reducido, la versión quieta llega tras montar: el servidor
@@ -378,7 +378,7 @@ export function GestorSimulacionSection({
           <p className={styles.cierre}>{data.closing}</p>
           {masInfoHref ? (
             <Link href={masInfoHref} className={styles.masInfo}>
-              Todo lo que puedes pedirle a tu Gestor
+              Todo lo que puedes pedirle a tu asistente
               <ArrowRight className="h-4 w-4" aria-hidden="true" />
             </Link>
           ) : null}
@@ -407,7 +407,7 @@ export function GestorSimulacionSection({
           <li key={esc.id}>
             <strong>{data.examples[i].title}.</strong>{" "}
             {esc.turnos
-              .map((t) => (t.de === "gestor" ? `Alhabla: ${t.texto}` : t.de === "boton" ? `Pulsas «${t.texto}».` : `Tú: ${t.texto}`))
+              .map((t) => (t.de === "gestor" ? `Tu asistente: ${t.texto}` : t.de === "boton" ? `Pulsas «${t.texto}».` : `Tú: ${t.texto}`))
               .join(" ")}
           </li>
         ))}
@@ -566,11 +566,11 @@ function PantallaMac({
             Agenda
           </Item>
           <Item icono={PhoneCall}>Llamadas</Item>
-          <p className={styles.grupo}>RECEPCIONISTA</p>
+          <p className={styles.grupo}>TU EQUIPO DE IA</p>
           <Item icono={Bot} activo={!enAgenda && !enPanel}>
-            Agente
+            Recepcionista
           </Item>
-          <Item icono={MessageSquareText}>Gestor</Item>
+          <Item icono={MessageSquareText}>Tu asistente</Item>
           <div className={styles.pie}>
             <p className={styles.grupo}>CUENTA</p>
             <Item icono={Settings}>Ajustes</Item>
@@ -724,7 +724,7 @@ function VistaAgendaDelDia({ vista, hitos }: { vista: VistaAgenda; hitos: Hito[]
   );
 }
 
-/* 2 · «Tu agente»: el horario, el catálogo o la información del negocio. */
+/* 2 · «Tu recepcionista»: el horario, el catálogo o la información del negocio. */
 
 function VistaAgente({ vista, hitos }: { vista: VistaHorario | VistaServicios | VistaInformacion; hitos: Hito[] }) {
   return (
@@ -734,10 +734,10 @@ function VistaAgente({ vista, hitos }: { vista: VistaHorario | VistaServicios | 
           <Bot strokeWidth={2} />
         </span>
         <div>
-          <p className={styles.h1}>Tu agente</p>
+          <p className={styles.h1}>Tu recepcionista</p>
           <p>Configura cómo atiende, qué puede reservar y qué información utiliza al hablar con tus clientes.</p>
         </div>
-        <span className={styles.botonPanel}>Probar el agente</span>
+        <span className={styles.botonPanel}>Probar la recepcionista</span>
       </header>
       {vista.tipo === "horario" ? (
         <VistaDelHorario vista={vista} cerrado={hitos.includes(vista.nuevo.hito)} />

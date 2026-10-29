@@ -1,18 +1,20 @@
 import { Mail } from "lucide-react";
-import { Fuentes, Nota, PaginaGuia, Pasos, Seccion, Tabla, Tarjetas, Texto } from "@/components/pagina-guia";
+import { CitaEnElCalendario, Fuentes, PaginaGuia, Pasos, Seccion, Texto } from "@/components/pagina-guia";
 import { metadataDePagina } from "@/lib/seo";
+import { IconoMicrosoft } from "../iconos-de-calendario";
 
 /**
- * Outlook / Microsoft 365 (2026-10-20). Microsoft Graph con el punto de
- * entrada `common` (cuentas personales y de empresa) y los permisos de
- * backend/src/lib/microsoftGraph.ts: User.Read + Calendars.ReadWrite +
- * offline_access. Ocupado: día completo siempre; con hora, todo salvo lo
- * marcado como «Disponible» (showAs: free) o cancelado.
+ * Outlook / Microsoft 365 (2026-10-20; recortada a guía de pasos el
+ * 2026-10-29). Microsoft Graph con el punto de entrada `common` (cuentas
+ * personales y de empresa) y los permisos de backend/src/lib/microsoftGraph.ts:
+ * User.Read + Calendars.ReadWrite + offline_access. Ocupado: día completo
+ * siempre; con hora, todo salvo lo marcado como «Disponible» (showAs: free)
+ * o cancelado.
  */
 const ruta = "/integraciones/outlook";
 const titulo = "Outlook y Microsoft 365 con tu recepcionista";
 const descripcion =
-  "Conecta tu calendario de Outlook, Hotmail o Microsoft 365 y elige en cuál entran las citas que reserva tu recepcionista de IA por teléfono.";
+  "Conecta tu calendario de Outlook, Hotmail o Microsoft 365: tu recepcionista de IA mira tus horas libres y deja ahí cada cita que reserva por teléfono.";
 
 export const metadata = metadataDePagina({ ruta, titulo, descripcion });
 
@@ -30,116 +32,90 @@ export default function OutlookPage() {
       ubicacion="integracion_outlook"
       entradilla={
         <p>
-          Hay clínicas y centros que llevan la agenda en el Outlook del ordenador de recepción desde hace años. No hace
-          falta cambiarlo: Alhabla se conecta a ese mismo calendario, consulta tus horas libres y deja la cita apuntada
-          para que la veas en el ordenador y en el móvil.
+          Vale con Outlook.com, Hotmail y Microsoft 365. Si tu clínica lleva la agenda en el Outlook del ordenador de
+          recepción, la recepcionista usa ese mismo calendario: mira las horas libres y deja la cita apuntada.
         </p>
+      }
+      pieza={
+        <CitaEnElCalendario
+          calendario={{ icono: <IconoMicrosoft className="h-4 w-4" />, nombre: "Fisioterapia Ribera" }}
+          dia="Martes, 10 de noviembre"
+          desde={9}
+          hasta={12}
+          ocupado={{ inicio: 9, fin: 10, titulo: "Reunión de equipo" }}
+          cita={{
+            inicio: 10.5,
+            fin: 11.25,
+            titulo: "Sesión de fisioterapia — Javier Ortega",
+            detalle: [
+              ["Cliente", "Javier Ortega"],
+              ["Teléfono", "+34 791 45 67 89"],
+              ["Servicio", "Sesión de fisioterapia"],
+              ["Profesional", "Laura"],
+            ],
+          }}
+        />
       }
       faqs={[
         {
-          question: "¿Funciona con Hotmail, Outlook.com y con cuentas de empresa?",
-          answer:
-            "Sí. La conexión acepta cuentas personales de Microsoft (Outlook.com, Hotmail, Live) y cuentas de trabajo de Microsoft 365. En una cuenta de empresa, el administrador puede exigir que apruebe él el acceso de apps externas.",
-        },
-        {
           question: "Uso Outlook en el ordenador con un correo de otro proveedor. ¿Vale?",
           answer:
-            "Depende de dónde se guarde el calendario. Si el calendario está en una cuenta de Microsoft (lo ves también en outlook.com o en la app de Outlook del móvil), vale. Si es un calendario local del ordenador, Alhabla no puede verlo.",
+            "Depende de dónde se guarde el calendario. Si lo ves también en outlook.com o en la app de Outlook del móvil, vale. Si es un calendario local del ordenador, Alhabla no puede verlo.",
         },
         {
           question: "¿Tengo que volver a conectarlo cada cierto tiempo?",
           answer:
-            "No. Microsoft renueva el acceso en cada uso y Alhabla guarda la renovación. Solo tendrás que reconectar si revocas el permiso o un administrador lo retira.",
+            "No. Solo si revocas el permiso o un administrador lo retira; entonces el panel te pide reconectar.",
         },
         {
-          question: "¿Qué permisos le doy exactamente?",
+          question: "Tenemos un calendario compartido. ¿Puedo elegirlo?",
           answer:
-            "Leer y escribir en tus calendarios, ver tu nombre y correo para identificar la cuenta, y mantener el acceso sin que tengas que entrar cada vez. No pide permiso sobre tu correo ni tus contactos.",
-        },
-        {
-          question: "Tengo un calendario compartido con el equipo. ¿Puedo elegirlo?",
-          answer:
-            "Al conectar te enseñamos la lista de calendarios de tu cuenta y eliges uno. Si el compartido aparece en esa lista, puedes elegirlo; si no, crea un calendario propio del negocio y compártelo tú con el equipo.",
-        },
-        {
-          question: "¿Y si marco una reunión como «Provisional»?",
-          answer:
-            "Cuenta como ocupado. Para que una franja con hora no bloquee la agenda, márcala como «Disponible» en Outlook.",
+            "Si aparece en la lista de calendarios de tu cuenta, sí. Si no, crea uno del negocio y compártelo tú con el equipo.",
         },
       ]}
       relacionadas={[
         { href: "/integraciones/google-calendar", titulo: "Google Calendar" },
         { href: "/integraciones/icloud", titulo: "Calendario de Apple (iCloud)" },
-        { href: "/fisioterapia", titulo: "Recepcionista de IA para fisioterapia", texto: "Primeras visitas y sesiones de seguimiento, reservadas sin dejar al paciente." },
-        { href: "/centro-de-estetica", titulo: "Recepcionista de IA para centros de estética" },
+        { href: "/fisioterapia", titulo: "Recepcionista de IA para fisioterapia" },
       ]}
-      cierre="Tu Outlook de siempre, con citas que entran solas."
+      cierre="Tu Outlook de siempre, con las citas del teléfono ya dentro."
     >
-      <Seccion titulo="Conectarlo, paso a paso" entradilla={<p>Al darte de alta o más tarde desde «Agente» en el panel.</p>}>
+      <Seccion
+        titulo="Conectarlo, paso a paso"
+        entradilla={<p>Al darte de alta o más tarde desde «Agente» en el panel.</p>}
+      >
         <Pasos
           pasos={[
-            { titulo: "Pulsa «Conectar Outlook»", texto: "Se abre la página de inicio de sesión de Microsoft." },
+            { titulo: "Pulsa «Outlook / Microsoft 365»", texto: "Se abre el inicio de sesión de Microsoft." },
             { titulo: "Entra con la cuenta del negocio", texto: "La personal o la de Microsoft 365 donde vive tu agenda." },
-            { titulo: "Acepta los permisos", texto: "Microsoft te enseña la lista. Si tu empresa exige aprobación de un administrador, te lo dirá en esa pantalla." },
-            { titulo: "Elige el calendario de la lista", texto: "De vuelta en Alhabla aparece la lista de calendarios de esa cuenta. El que elijas es donde entran las citas." },
+            {
+              titulo: "Acepta los permisos",
+              texto:
+                "Leer y escribir en tus calendarios y ver tu nombre y correo para saber qué cuenta es. Nada sobre tus correos ni tus contactos.",
+            },
+            { titulo: "Elige el calendario", texto: "Alhabla te enseña los de esa cuenta; en el que elijas entran las citas." },
           ]}
         />
       </Seccion>
 
-      <Seccion fondo titulo="Lo que Outlook marca y lo que entiende Alhabla">
-        <Tabla
-          cabecera={["Estado en Outlook", "¿Bloquea la hora?"]}
-          filas={[
-            ["Ocupado", "Sí"],
-            ["Provisional", "Sí"],
-            ["Fuera de la oficina", "Sí"],
-            ["Trabajando en otro lugar", "Sí"],
-            ["Disponible (evento con hora)", "No"],
-            ["Evento de todo el día, sea cual sea su estado", "Sí, el día entero"],
-            ["Reunión cancelada", "No"],
-          ]}
-          nota="Outlook crea los eventos de todo el día como «Disponible» por defecto. Alhabla los trata como cierre igualmente: un «Vacaciones» de todo el día nunca deja reservar ese día."
-        />
-      </Seccion>
-
-      <Seccion titulo="Para qué negocios encaja mejor Outlook">
-        <Tarjetas
-          columnas={2}
-          items={[
-            {
-              titulo: "Centros con ordenador en recepción",
-              texto: "Si la agenda se lleva en el Outlook del mostrador, las citas por teléfono aparecen ahí mismo, junto a las que apunta tu equipo.",
-            },
-            {
-              titulo: "Clínicas con Microsoft 365",
-              texto: "Si ya pagas Microsoft 365 para el correo de la clínica, usa su calendario: no necesitas una cuenta de Google solo para esto.",
-            },
-            {
-              titulo: "Varios profesionales, una agenda",
-              texto: "Cada cita lleva el nombre del profesional. Con un solo calendario del negocio, todos ven el día completo de un vistazo.",
-            },
-            {
-              titulo: "Si prefieres el móvil",
-              texto: "La app de Outlook en el móvil enseña las mismas citas. Y para cambios rápidos, el Gestor por WhatsApp: lo que mueve o cancela, cambia también en tu Outlook.",
-            },
-          ]}
-        />
-      </Seccion>
-
-      <Seccion fondo titulo="Cómo quitarle el acceso" estrecha>
+      <Seccion fondo titulo="Qué bloquea una hora">
         <Texto>
           <p>
-            Con una cuenta personal, entra en la página de privacidad de tu cuenta de Microsoft y quita a Alhabla de las
-            aplicaciones con acceso. Con una cuenta de empresa, lo hace el administrador desde el centro de Microsoft
-            Entra. En cuanto se revoca, la recepcionista deja de reservar en ese calendario y el panel te pide
-            reconectar.
+            Todo lo que tenga hora y no esté marcado como «Disponible»: «Ocupado», «Provisional», «Fuera de la oficina» y
+            «Trabajando en otro lugar». Lo cancelado, no. Un evento de todo el día cierra el día entero, aunque Outlook lo
+            cree como disponible.
           </p>
         </Texto>
-        <div className="mt-6">
-          <Nota titulo="Tus correos quedan fuera">
-            El permiso de calendarios no da acceso al correo. Alhabla no lee ni envía emails desde tu cuenta de Outlook.
-          </Nota>
-        </div>
+      </Seccion>
+
+      <Seccion titulo="Con una cuenta de empresa">
+        <Texto>
+          <p>
+            El administrador puede exigir que apruebe él el acceso de apps externas; si es tu caso, Microsoft te lo dice
+            al aceptar los permisos. Para quitarle el acceso a Alhabla, con una cuenta personal lo haces en la privacidad
+            de tu cuenta de Microsoft; con una de empresa, el administrador desde Microsoft Entra.
+          </p>
+        </Texto>
       </Seccion>
 
       <Fuentes

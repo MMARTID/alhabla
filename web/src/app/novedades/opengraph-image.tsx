@@ -9,7 +9,7 @@ export default function OpenGraphImage() {
   return imagenOg({
     etiqueta: "Novedades",
     titulo: "Lo que ha cambiado en Alhabla, mes a mes",
-    subtitulo: "Idiomas, aviso de IA, grabación con permiso y precios.",
+    subtitulo: "La agenda de Alhabla, tu asistente por WhatsApp, idiomas y aviso de IA.",
     derecha: { tipo: "panel", grande: "Octubre 2026" },
   });
 }

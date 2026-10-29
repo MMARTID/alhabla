@@ -19,8 +19,7 @@ import {
 /**
  * Calculadora de /herramientas/calculadora-de-llamadas-perdidas.
  *
- * No es la de las landings (revenue-loss-calculator.tsx, dos deslizadores y
- * «citas perdidas» a ojo): aquí la cuenta parte de las llamadas sin coger y
+ * La cuenta parte de las llamadas sin coger (no de «citas perdidas» a ojo) y
  * separa las dos incertidumbres que la gente suele mezclar (cuántas eran
  * para pedir cita y cuántas acabaron en otro sitio). La página explica el
  * método; aquí solo vive la cuenta.
