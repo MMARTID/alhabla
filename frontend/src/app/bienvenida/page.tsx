@@ -13,7 +13,12 @@ import {
   Search,
   Smartphone,
 } from "lucide-react";
+import { DEFAULT_BUSINESS_SCHEDULE } from "@/components/business-hours-editor";
 import { LottieAnimation } from "@/components/lottie-animation";
+import {
+  SemanaDelHorario,
+  diasConErrores,
+} from "@/components/semana-del-horario";
 import { TarjetasDeLinea } from "@/components/tarjetas-de-linea";
 import {
   getPlaceDetails,
@@ -45,6 +50,8 @@ const DETECTED_BUSINESS_TYPE_KEY = "alhabla_detected_business_type";
 const AVISO_MOVIL_NO_GUARDADO_MS = 4_000;
 const AVISO_MOVIL_NO_GUARDADO =
   "No se pudo guardar tu móvil. Añádelo más tarde en Ajustes › Teléfono.";
+
+const ERROR_NOMBRE_VACIO = "Escribe el nombre de tu negocio.";
 
 const ERROR_MOVIL_INVALIDO =
   "Escribe un móvil válido, por ejemplo 600 123 456 o +34 600 123 456.";
@@ -142,8 +149,19 @@ export default function RegisterBusinessPage() {
   const [selected, setSelected] = useState<PlaceDetails | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  // Qué botón se pulsó: «Guardando…» va en ese, no siempre en el primario.
-  const [accion, setAccion] = useState<"confirmar" | "omitir" | null>(null);
+  // «No encontré mi negocio»: el nombre y el horario se escriben a mano. Sin
+  // ellos el negocio se quedaba como «Negocio de <email>», la recepcionista
+  // saludaba con el email y, con el horario vacío, no ofrecía ninguna cita
+  // (docs/auditorias/2026-10-28-auditoria-de-producto.md, hallazgo 1).
+  const [modoManual, setModoManual] = useState(false);
+  const [nombreManual, setNombreManual] = useState("");
+  const [errorNombre, setErrorNombre] = useState("");
+  // El horario que se guarda cuando no llega uno de Google Places: el que se
+  // escribe a mano o, si la ficha de Google no trae horario, el que se corrige
+  // aquí. Empieza en L–V 9:00–18:00, a la vista y editable.
+  const [horario, setHorario] = useState<BusinessSchedule>(() =>
+    JSON.parse(JSON.stringify(DEFAULT_BUSINESS_SCHEDULE))
+  );
   const [error, setError] = useState("");
   // Los fallos de la búsqueda se enseñan bajo el buscador, no al pie de la
   // tarjeta (en móvil quedaban dos pantallas más abajo).
@@ -292,6 +310,7 @@ export default function RegisterBusinessPage() {
   }, [debouncedQuery, locationStatus, coords, country]);
 
   const handleSelect = async (place: PlaceSearchResult) => {
+    setModoManual(false);
     setLoading(true);
     setErrorBusqueda("");
     setResults([]);
@@ -403,8 +422,13 @@ export default function RegisterBusinessPage() {
   const lineaErrorVisible = lineaError || lineaFijoError;
   // Con los avisos al mismo móvil el campo del móvil no se ve: lo que quedara
   // escrito en él no puede bloquear los botones.
+  // El horario se pide cuando se escribe el negocio a mano o cuando la ficha
+  // de Google no trae uno que sirva.
+  const pideHorario =
+    modoManual || (selected !== null && !isBusinessSchedule(selected.schedule));
+  const horarioValido = !pideHorario || diasConErrores(horario) === 0;
   const formularioValido =
-    lineaIsValid && (avisosAlMismoMovil || ownerMobileIsValid);
+    lineaIsValid && (avisosAlMismoMovil || ownerMobileIsValid) && horarioValido;
 
   /**
    * Los campos de telefonía del PATCH y el móvil del dueño que toca activar.
@@ -486,31 +510,42 @@ export default function RegisterBusinessPage() {
     window.setTimeout(redirectToNextStep, AVISO_MOVIL_NO_GUARDADO_MS);
   };
 
+  /** Lo que se guarda del negocio: el elegido en Google Places o el escrito
+   * a mano. `false` si falta el nombre (el error ya está a la vista). */
+  const construirNegocio = (): Partial<Business> | false => {
+    if (selected) {
+      // placeId y dirección van aparte de businessDetails: el backend los
+      // usa para el botón «Cómo llegar» de la confirmación al cliente.
+      return {
+        name: selected.name,
+        businessDetails: [selected.name, selected.address]
+          .filter(Boolean)
+          .join("\n"),
+        schedule: pideHorario ? horario : selected.schedule,
+        placeId: selected.placeId,
+        address: selected.address || null,
+      };
+    }
+    const nombre = nombreManual.trim();
+    if (!nombre) {
+      setErrorNombre(ERROR_NOMBRE_VACIO);
+      return false;
+    }
+    return { name: nombre, schedule: horario };
+  };
+
   const handleConfirm = async () => {
-    if (!selected) return;
+    if (!selected && !modoManual) return;
+    const negocio = construirNegocio();
     const telefonia = construirTelefonia();
-    if (!telefonia) return;
+    if (!negocio || !telefonia) return;
 
     setSaving(true);
-    setAccion("confirmar");
     setError("");
 
     try {
-      const businessDetails = [selected.name, selected.address]
-        .filter(Boolean)
-        .join("\n");
-
-      // placeId y dirección van aparte de businessDetails: el backend los
-      // usa para el botón «Cómo llegar» de la confirmación al cliente.
       const movilGuardado = await saveAndActivate(
-        {
-          name: selected.name,
-          businessDetails,
-          schedule: selected.schedule,
-          placeId: selected.placeId,
-          address: selected.address || null,
-          ...telefonia.campos,
-        },
+        { ...negocio, ...telefonia.campos },
         telefonia.movil
       );
 
@@ -527,34 +562,19 @@ export default function RegisterBusinessPage() {
     }
   };
 
-  const handleSkip = async () => {
-    const telefonia = construirTelefonia();
-    if (!telefonia) return;
-    if (!telefonia.movil && Object.keys(telefonia.campos).length === 0) {
-      redirectToNextStep();
-      return;
-    }
-
-    // Sin negocio elegido solo se guarda la telefonía y el móvil; si eso
-    // falla, se enseña el error y NO se redirige: la persona lo escribió
-    // para algo.
-    setSaving(true);
-    setAccion("omitir");
+  const escribirAMano = () => {
+    // Lo escrito en el buscador suele ser el nombre: se aprovecha.
+    if (!nombreManual.trim() && !selected) setNombreManual(query.trim());
+    setSelected(null);
+    setResults([]);
     setError("");
-    try {
-      const movilGuardado = await saveAndActivate(
-        telefonia.campos,
-        telefonia.movil
-      );
-      if (!movilGuardado) {
-        continueAfterMobileWarning();
-        return;
-      }
-      redirectToNextStep();
-    } catch (err) {
-      handleSaveError(err);
-      setSaving(false);
-    }
+    setModoManual(true);
+  };
+
+  const volverABuscar = () => {
+    setModoManual(false);
+    setErrorNombre("");
+    setError("");
   };
 
   const redirectToNextStep = () => {
@@ -596,11 +616,14 @@ export default function RegisterBusinessPage() {
             ¿Cuál es tu negocio?
           </h1>
           <p className="mx-auto max-w-md text-sm leading-6 text-muted">
-            Busca tu negocio para rellenar automáticamente dirección, teléfono y
-            horario. Puedes cambiarlo luego en ajustes.
+            {modoManual
+              ? "Escribe cómo se llama y cuándo abre: tu recepcionista saludará con ese nombre y solo ofrecerá citas dentro de ese horario. Puedes cambiarlo luego en Agente."
+              : "Busca tu negocio para rellenar automáticamente dirección, teléfono y horario. Puedes cambiarlo luego en ajustes."}
           </p>
         </div>
 
+        {modoManual ? null : (
+        <>
         {locationStatus === "detecting" ? (
           <div className="mt-8 flex items-center justify-center gap-2 rounded-2xl border border-linea bg-relleno px-4 py-3 text-sm text-muted">
             <LoaderCircle className="h-4 w-4 animate-spin text-morado" />
@@ -717,6 +740,59 @@ export default function RegisterBusinessPage() {
                 ? "Buscando…"
                 : "")}
         </p>
+        </>
+        )}
+
+        {modoManual && (
+          <div className="mt-8 rounded-2xl border border-linea p-5">
+            <div className="flex items-start gap-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-lavado text-morado">
+                <Building2 className="h-5 w-5" aria-hidden="true" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <label
+                  htmlFor="register-business-name"
+                  className="text-sm font-semibold text-tinta-2"
+                >
+                  Nombre del negocio
+                </label>
+                <input
+                  id="register-business-name"
+                  type="text"
+                  value={nombreManual}
+                  onChange={(event) => {
+                    setNombreManual(event.target.value);
+                    if (errorNombre) setErrorNombre("");
+                  }}
+                  placeholder="Peluquería Lola"
+                  autoComplete="organization"
+                  aria-describedby={
+                    errorNombre
+                      ? "register-business-name-hint register-business-name-error"
+                      : "register-business-name-hint"
+                  }
+                  aria-invalid={Boolean(errorNombre)}
+                  className="field mt-2 w-full"
+                />
+                <p
+                  id="register-business-name-hint"
+                  className="mt-1 text-xs leading-5 text-muted"
+                >
+                  Con este nombre saluda tu recepcionista al contestar.
+                </p>
+                {errorNombre ? (
+                  <p
+                    id="register-business-name-error"
+                    role="alert"
+                    className="mt-1 text-xs leading-5 text-error"
+                  >
+                    {errorNombre}
+                  </p>
+                ) : null}
+              </div>
+            </div>
+          </div>
+        )}
 
         {selected && (
           <div className="mt-6 space-y-4 rounded-2xl border border-linea bg-relleno p-5">
@@ -750,9 +826,43 @@ export default function RegisterBusinessPage() {
                     ))}
                   </ul>
                 ) : (
-                  <p>Horario no disponible</p>
+                  <p>Google no tiene tu horario: indícalo abajo.</p>
                 )}
               </div>
+            </div>
+          </div>
+        )}
+
+        {pideHorario && (
+          <div className="mt-6 rounded-2xl border border-linea p-5">
+            <div className="flex items-start gap-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-lavado text-morado">
+                <CalendarClock className="h-5 w-5" aria-hidden="true" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <h3
+                  id="register-schedule-title"
+                  className="text-sm font-semibold text-tinta-2"
+                >
+                  ¿Cuándo abres?
+                </h3>
+                <p className="mt-1 text-xs leading-5 text-muted">
+                  Tu recepcionista solo ofrecerá citas dentro de este horario.
+                  Los festivos y los días cerrados se añaden luego en Agente ›
+                  Horario.
+                </p>
+              </div>
+            </div>
+            <div
+              className="mt-4"
+              role="group"
+              aria-labelledby="register-schedule-title"
+            >
+              <SemanaDelHorario
+                horario={horario}
+                onCambiar={setHorario}
+                claseDelDia="rounded-2xl border border-linea bg-superficie"
+              />
             </div>
           </div>
         )}
@@ -958,22 +1068,30 @@ export default function RegisterBusinessPage() {
           <button
             type="button"
             onClick={handleConfirm}
-            disabled={!selected || saving || !formularioValido}
+            disabled={(!selected && !modoManual) || saving || !formularioValido}
             className="btn-primary w-full"
           >
-            {saving && accion === "confirmar" ? "Guardando…" : "Confirmar y continuar"}
+            {saving ? "Guardando…" : "Confirmar y continuar"}
           </button>
-          <button
-            type="button"
-            onClick={handleSkip}
-            disabled={saving || !formularioValido}
-            className="btn-secondary w-full"
-          >
-            {saving && accion === "omitir" ? (
-              <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />
-            ) : null}
-            No encontré mi negocio / configurar después
-          </button>
+          {modoManual ? (
+            <button
+              type="button"
+              onClick={volverABuscar}
+              disabled={saving}
+              className="btn-secondary w-full"
+            >
+              Volver a buscar mi negocio
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={escribirAMano}
+              disabled={saving}
+              className="btn-secondary w-full"
+            >
+              No encontré mi negocio: lo escribo yo
+            </button>
+          )}
         </div>
       </div>
     </main>
