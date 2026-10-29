@@ -12,6 +12,19 @@ import { webUrl } from "@/lib/web-url";
 
 const REGISTRATION_NICHE_KEY = "alhabla_registration_niche";
 
+// En desarrollo React monta los efectos dos veces: el segundo canje del mismo
+// pase llegaba cuando el primero ya lo había gastado y la página decía «ya se
+// ha usado». Un solo canje por pase en cada carga de la página.
+const canjes = new Map<string, Promise<string>>();
+function canjearUnaVez(pase: string): Promise<string> {
+  let canje = canjes.get(pase);
+  if (!canje) {
+    canje = redeemPass(pase);
+    canjes.set(pase, canje);
+  }
+  return canje;
+}
+
 /**
  * Llegada desde la web pública tras crear la cuenta
  * (docs/historico/PLAN-APP-DOMINIO.md
@@ -33,7 +46,7 @@ function EntrarContent() {
       return;
     }
     let cancelado = false;
-    redeemPass(pase)
+    canjearUnaVez(pase)
       .then((token) => {
         if (cancelado) return;
         window.localStorage.setItem("alhabla_token", token);
