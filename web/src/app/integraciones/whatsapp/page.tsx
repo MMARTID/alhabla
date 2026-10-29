@@ -79,7 +79,7 @@ export default function WhatsappIntegracionPage() {
             ["Antes de la cita", "Un recordatorio con los botones «Cambiar» y «Cancelar».", "Pro y Scale"],
             ["Si responde para cambiarla", "La recepcionista le ofrece otra hora libre y mueve la cita en tu calendario.", "Todos"],
             ["Si cancela", "Confirmación de la anulación; el hueco queda libre para otro cliente.", "Todos"],
-            ["Si estaba en lista de espera", "Aviso del hueco libre con «Sí, resérvala» o «Ya no».", "Todos"],
+            ["Si estaba en lista de espera", "Si la hora que pidió se libera por una cancelación, un aviso con «Sí, resérvala» o «Ya no».", "Todos"],
           ]}
         />
       </Seccion>

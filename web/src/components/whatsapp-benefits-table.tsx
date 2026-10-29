@@ -11,8 +11,8 @@ const FALLBACK_ACCENT: NicheAccent = { strong: "#8b5cf6", soft: "#f3eeff", deep:
 const PARA_CLIENTE = [
   "Recibe confirmación y recordatorio de su cita por WhatsApp",
   "Puede cambiar o cancelar su cita respondiendo al mensaje, sin llamar",
-  "Si no hay hueco, entra en lista de espera y le avisan al liberarse uno",
-  "Puede reservar o mover su cita hablando por WhatsApp con la recepcionista",
+  "Si la hora que quiere está ocupada, se apunta a la lista de espera y le avisan por WhatsApp si esa hora se libera por una cancelación",
+  "Si ya ha reservado antes con el negocio, puede pedir o mover su cita por WhatsApp con la recepcionista",
 ] as const;
 
 /**

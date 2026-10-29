@@ -28,12 +28,12 @@ const VENTAJAS = [
   {
     Icono: ListOrdered,
     titulo: "Lista de espera",
-    texto: "Si no hay hueco, se apunta. Cuando alguien cancela, le avisa para que lo coja.",
+    texto: "Si la hora que quiere está ocupada, se apunta. Si esa hora se libera por una cancelación, le avisa por WhatsApp para que la coja.",
   },
   {
     Icono: MessagesSquare,
-    titulo: "Reservar escribiendo",
-    texto: "Quien prefiere escribir a llamar habla con la misma recepcionista por WhatsApp.",
+    titulo: "Escribir en vez de llamar",
+    texto: "Si ya ha reservado antes contigo, puede pedir o mover su cita escribiendo a la misma recepcionista por WhatsApp.",
   },
 ] as const;
 

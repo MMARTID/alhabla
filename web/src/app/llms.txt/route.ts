@@ -65,7 +65,7 @@ Comprobado en el producto el ${ACTUALIZADO}:
 - Catalán, euskera o gallego según el código postal del negocio, en todos los planes.
 - Aviso de inteligencia artificial en la primera frase de cada llamada (art. 50 del Reglamento europeo de IA) y grabación solo con permiso de quien llama.
 - Guías de desvío de llamadas para 14 operadores españoles y la función «Comprobar desvío», que hace una llamada real para ver si el desvío funciona.
-- Lista de espera por WhatsApp, confirmación de cada cita por WhatsApp y, en los planes Pro y Scale, recordatorio 24 horas antes con botones para confirmar, cambiar o cancelar.
+- Lista de espera: si la hora que pide un cliente está ocupada, puede apuntarse y, si esa hora se libera por una cancelación, se le avisa por WhatsApp para reservarla. Confirmación de cada cita por WhatsApp y, en los planes Pro y Scale, recordatorio 24 horas antes con botones para confirmar, cambiar o cancelar.
 
 ## Precios (sin permanencia, ${TRIAL_DAYS} días de prueba)
 
