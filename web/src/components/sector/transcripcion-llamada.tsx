@@ -44,7 +44,7 @@ export function TranscripcionLlamada({
   const todas: LineaDeLlamada[] = [
     {
       de: "recepcionista",
-      texto: `${negocio}, te atiende su asistente de inteligencia artificial. ¿En qué te ayudo?`,
+      texto: `${negocio}, te atiende su recepcionista de IA. ¿En qué te ayudo?`,
     },
     ...lineas,
   ];

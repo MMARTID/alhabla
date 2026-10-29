@@ -81,13 +81,12 @@ export const peluqueriaCanina: SectorLanding = {
   asistente: {
     pregunta: "¿Y si a mediodía falta una peluquera?",
     respuesta:
-      "Se lo dices a tu asistente por WhatsApp. Marca la ausencia, te dice qué perros tenía citados, los pasa a quien tú digas y avisa a cada dueño. Nada cambia hasta que pulsas «Confirmar».",
+      "Se lo dices a tu asistente por WhatsApp. Marca la ausencia, te dice qué perros tenía citados y te propone a la compañera libre que mejor hace cada servicio. Nada cambia hasta que pulsas «Confirmar».",
     turnos: ausenciaDe({
       aviso:
         "Rosa se ha tenido que ir al veterinario con su perra. Esta tarde no vuelve",
       profesional: "Rosa",
       cuando: "esta tarde",
-      respuesta: "El deslanado de las 4, pásaselo a Álex",
       cita: "la cita de Diego F.",
       servicio: "Deslanado perro grande",
       hora: "16:00",

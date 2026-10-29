@@ -46,7 +46,7 @@ describe("resolverContextoDeLlamada", () => {
 
     expect(contexto).toEqual({
       saludo:
-        "Peluquería Ana, te atiende su asistente de inteligencia artificial. ¿En qué te ayudo?",
+        "Peluquería Ana, te atiende su recepcionista de IA. ¿En qué te ayudo?",
       grabar: false,
       voz: null,
       variables: {
@@ -86,7 +86,7 @@ describe("resolverContextoDeLlamada", () => {
     });
 
     expect(contexto.saludo).toBe(
-      "Peluquería Ana, te atiende su nueva asistente de inteligencia artificial. ¿En qué te ayudo?"
+      "Peluquería Ana, te atiende su nueva recepcionista de IA. ¿En qué te ayudo?"
     );
     // Los chats de WhatsApp no cuentan como primera llamada.
     expect(mockedCallFindFirst).toHaveBeenCalledWith({
@@ -105,7 +105,7 @@ describe("resolverContextoDeLlamada", () => {
       ahora: AHORA,
     });
 
-    expect(contexto.saludo).toContain("su nueva asistente");
+    expect(contexto.saludo).toContain("su nueva recepcionista");
   });
 
   it("a un cliente de peluquería que deja grabar: su nombre, su servicio, el aviso y se graba", async () => {
@@ -126,7 +126,7 @@ describe("resolverContextoDeLlamada", () => {
 
     expect(contexto).toEqual({
       saludo:
-        "Hola, Lucía, soy la asistente de inteligencia artificial de Peluquería Ana. La llamada se graba; si prefieres que no, dímelo. ¿Quieres repetir Corte o prefieres algo nuevo?",
+        "Hola, Lucía, soy la recepcionista de IA de Peluquería Ana. La llamada se graba; si prefieres que no, dímelo. ¿Quieres repetir Corte o prefieres algo nuevo?",
       grabar: true,
       voz: null,
       variables: {
@@ -214,7 +214,7 @@ describe("resolverContextoDeLlamada", () => {
       });
 
       expect(contexto.saludo).toBe(
-        "Hi Lucía, this is the artificial intelligence assistant at Peluquería Ana. Would you like the same as last time, or something new?"
+        "Hi Lucía, this is the AI receptionist at Peluquería Ana. Would you like the same as last time, or something new?"
       );
       expect(contexto.voz).toBeNull();
       expect(contexto.variables.ultimo_servicio).toBe("Peinado");
@@ -282,7 +282,7 @@ describe("resolverContextoDeLlamada", () => {
       });
 
       expect(contexto.saludo).toMatch(/^Peluquería Ana/);
-      expect(contexto.saludo).toContain("artificial intelligence");
+      expect(contexto.saludo).toContain("AI receptionist");
     });
   });
 
@@ -324,7 +324,7 @@ describe("resolverContextoDeLlamada", () => {
     expect(contexto.saludo).not.toContain("se graba");
   });
 
-  it("con voz masculina, «el asistente»", async () => {
+  it("con voz masculina, «el recepcionista»", async () => {
     mockedBookingFindFirst.mockResolvedValue({
       clientName: "Lucía",
       serviceIds: [],
@@ -339,7 +339,7 @@ describe("resolverContextoDeLlamada", () => {
     });
 
     expect(contexto.saludo).toBe(
-      "Hola, Lucía, soy el asistente de inteligencia artificial de Peluquería Ana. ¿Quieres repetir lo de la última vez o prefieres algo nuevo?"
+      "Hola, Lucía, soy el recepcionista de IA de Peluquería Ana. ¿Quieres repetir lo de la última vez o prefieres algo nuevo?"
     );
   });
 

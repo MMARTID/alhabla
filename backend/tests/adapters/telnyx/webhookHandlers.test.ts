@@ -139,7 +139,7 @@ const mockedProgramarRecuperacion = vi.mocked(
 /** Lo que el contexto devuelve por defecto en estos tests: quien no se
  * conoce, sin grabar. */
 const CONTEXTO = {
-  saludo: "Negocio, te atiende su asistente de inteligencia artificial. ¿En qué te ayudo?",
+  saludo: "Negocio, te atiende su recepcionista de IA. ¿En qué te ayudo?",
   grabar: false,
   voz: null,
   variables: {
@@ -310,7 +310,7 @@ describe("handleCallInitiated", () => {
     mockedBusinessFindUnique.mockResolvedValue(negocio as any);
     mockedCallUpsert.mockResolvedValue({} as any);
     const conocido = {
-      saludo: "Hola, Lucía, soy la asistente de inteligencia artificial de Peluquería Ana. La llamada se graba; si prefieres que no, dímelo. ¿Quieres repetir Corte o prefieres algo nuevo?",
+      saludo: "Hola, Lucía, soy la recepcionista de IA de Peluquería Ana. La llamada se graba; si prefieres que no, dímelo. ¿Quieres repetir Corte o prefieres algo nuevo?",
       grabar: true,
       voz: null,
       variables: {

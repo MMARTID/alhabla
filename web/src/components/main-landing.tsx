@@ -36,7 +36,7 @@ const ASISTENTE_PORTADA: OwnerAssistant = {
     {
       title: "Si alguien del equipo falta",
       description:
-        "«Marta está de baja hoy»: deja de recibir citas y te dice cuántas tenía. Tú dices a quién pasar cada una; ella la mueve y avisa al cliente por WhatsApp.",
+        "«Marta está de baja hoy»: deja de recibir citas y tu asistente te propone pasar cada una a quien mejor la hace de los que están libres. Confirmas, la mueve y avisa al cliente por WhatsApp.",
     },
     {
       title: "Si cierras un día",

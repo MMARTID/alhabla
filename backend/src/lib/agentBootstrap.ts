@@ -50,7 +50,7 @@ export const DEFAULT_AGENT_CONFIG: AgentTemplateConfig = {
   llmTemperature: 0.3,
   sttProvider: "deepgram",
   sttModel: "nova-2",
-  firstMessage: "Hola, soy la recepcionista virtual. ¿En qué te ayudo?",
+  firstMessage: "Hola, soy la recepcionista de IA. ¿En qué te ayudo?",
   firstMessageMode: "assistant-speaks-first",
 };
 

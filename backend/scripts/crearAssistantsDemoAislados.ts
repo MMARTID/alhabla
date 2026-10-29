@@ -147,7 +147,7 @@ async function main() {
       instructions: instrucciones(nicho),
       // Reglamento europeo de IA, art. 50: dice que es una IA desde el
       // principio. Sin aviso de grabación: la demo no graba.
-      greeting: `${nicho.negocio}, te atiende su asistente de inteligencia artificial. ¿En qué te ayudo?`,
+      greeting: `${nicho.negocio}, te atiende su recepcionista de IA. ¿En qué te ayudo?`,
       // Sin una sola tool: este assistant no puede escribir en ninguna parte.
       tools: [],
       post_conversation_settings: { enabled: false },

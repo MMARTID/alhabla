@@ -27,7 +27,11 @@ import type { NicheSlug } from "@/lib/niche-landings";
  * - marcar_ausencia: «marcar a X como ausente <tramo> (motivo): la
  *   recepcionista no le reservará nada en ese tramo. Ojo: ya tiene N citas
  *   ahí, que no se mueven solas» → «Hecho: X no está <tramo>; … Tiene N
- *   citas en ese tramo: dime si las movemos o las cancelamos.»
+ *   citas en ese tramo: si quieres, te propongo pasarlas, a la misma hora,
+ *   a quien mejor hace el servicio de los que están libres.»
+ * - mover_cita sin profesional y con quien la tenía ausente: «pasar la cita
+ *   de C del <fecha> (servicio) con P a Q, a la misma hora: P falta y Q es
+ *   especialista en ese servicio».
  * - mover_cita: «mover la cita de C del <fecha> (servicio) con P al <fecha>
  *   con Q» → «Hecho: la cita de C … pasa al <fecha> con Q. El calendario ya
  *   está al día.» + «¿Le aviso a C por WhatsApp de la nueva hora? Si
@@ -317,8 +321,9 @@ function mayuscula(texto: string): string {
 
 /**
  * La cadena entera de una ausencia (PRODUCT.md § «Mañana falta Marta»):
- * `marcar_ausencia` → «dime si las movemos» → el dueño dice a quién →
- * `mover_cita` → «¿Le aviso…?» → `avisar_cliente`. Tres «Confirmar», uno
+ * `marcar_ausencia` → «te propongo pasarla» → el dueño dice que sí →
+ * `mover_cita` sin profesional (propone a quien mejor hace el servicio de
+ * los libres) → «¿Le aviso…?» → `avisar_cliente`. Tres «Confirmar», uno
  * por acción; nada se reparte ni se avisa solo.
  */
 export function ausenciaDe(c: {
@@ -329,13 +334,16 @@ export function ausenciaDe(c: {
   cuando: string;
   /** El motivo que dio el dueño, si lo dio; va entre paréntesis. */
   motivo?: string;
-  /** A quién se pasa, como lo diría el dueño. */
-  respuesta: string;
   /** La cita, como la describe el Gestor: «la cita de Rosa M.». */
   cita: string;
   servicio: string;
   hora: string;
+  /** A quién propone pasarla tu asistente: la que mejor lo hace de las
+   * libres. */
   otra: string;
+  /** Si `otra` es especialista en el servicio (por defecto) o solo la
+   * mejor de las libres. */
+  especialista?: boolean;
   /** El nombre con el que se avisa al cliente y su móvil. */
   cliente: string;
   telefono: string;
@@ -350,12 +358,12 @@ export function ausenciaDe(c: {
     { de: "boton", texto: "Confirmar", hito: "ausente" },
     {
       de: "gestor",
-      texto: `Hecho: ${c.profesional} no está ${c.cuando}. Tiene 1 cita en ese tramo: dime si las movemos o las cancelamos.`,
+      texto: `Hecho: ${c.profesional} no está ${c.cuando}. Tiene 1 cita en ese tramo: si quieres, te propongo pasarla, a la misma hora, a quien mejor hace el servicio de los que están libres.`,
     },
-    { de: "dueno", texto: c.respuesta },
+    { de: "dueno", texto: "Sí, pásala" },
     {
       de: "gestor",
-      texto: `¿Confirmas? Mover ${c.cita} de ${c.cuando} a las ${c.hora} (${c.servicio}) con ${c.profesional}, a la misma hora con ${c.otra}.`,
+      texto: `¿Confirmas? Pasar ${c.cita} de ${c.cuando} a las ${c.hora} (${c.servicio}) con ${c.profesional} a ${c.otra}, a la misma hora: ${c.profesional} falta y ${c.otra} ${c.especialista === false ? "es quien mejor lo hace de los que están libres" : "es especialista en ese servicio"}.`,
       botones: ["Confirmar", "Cancelar"],
     },
     { de: "boton", texto: "Confirmar", hito: "movida" },
@@ -530,7 +538,6 @@ export const GUION_GESTOR_GENERAL: GuionGestor = {
         profesional: "Marta",
         cuando: "hoy",
         motivo: "baja",
-        respuesta: "La de las 11, pásasela a Lucía",
         cita: "la cita de Carmen R.",
         servicio: "Corte y color",
         hora: "11:00",
@@ -594,7 +601,6 @@ export const GUIONES_GESTOR: Record<NicheSlug, GuionGestor> = {
           profesional: "Marta",
           cuando: "hoy",
           motivo: "baja",
-          respuesta: "Las mechas de las 11, pásaselas a Laura",
           cita: "la cita de Rosa M.",
           servicio: "Mechas",
           hora: "11:00",
@@ -691,7 +697,6 @@ export const GUIONES_GESTOR: Record<NicheSlug, GuionGestor> = {
           aviso: "Sara no puede venir hoy",
           profesional: "Sara",
           cuando: "hoy",
-          respuesta: "El facial de las 12, a Elena",
           cita: "la cita de Inés G.",
           servicio: "Facial con peeling",
           hora: "12:00",
@@ -822,7 +827,6 @@ export const GUIONES_GESTOR: Record<NicheSlug, GuionGestor> = {
           profesional: "Laura",
           cuando: "hoy",
           motivo: "día libre",
-          respuesta: "La semipermanente de las 11, que la haga Noa",
           cita: "la cita de Carla D.",
           servicio: "Semipermanente",
           hora: "11:00",
@@ -938,7 +942,6 @@ export const GUIONES_GESTOR: Record<NicheSlug, GuionGestor> = {
           profesional: "Luis",
           cuando: "hoy",
           motivo: "está malo",
-          respuesta: "El de las 12, pásaselo a Dani",
           cita: "la cita de Javier M.",
           servicio: "Corte y barba",
           hora: "12:00",
@@ -1052,7 +1055,6 @@ export const GUIONES_GESTOR: Record<NicheSlug, GuionGestor> = {
           profesional: "Pablo",
           cuando: "hoy",
           motivo: "baja",
-          respuesta: "La sesión de las 11, que la lleve Irene",
           cita: "la cita de Andrés L.",
           servicio: "Sesión de seguimiento",
           hora: "11:00",

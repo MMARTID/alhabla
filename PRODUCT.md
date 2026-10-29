@@ -63,10 +63,11 @@ Lo que cambia en el día de la dueña, casi en sus palabras:
 
 1. Deja de decidir entre coger el teléfono y dejar a su cliente a medias, o no cogerlo.
 2. Resuelve los cambios de cita al momento: si a mediodía un trabajador se va por una emergencia,
-   sus citas se reorganizan con el profesional más cualificado disponible. (A 29-10-2026 es
-   visión, no producto: tu asistente marca la ausencia, dice qué citas tenía y ayuda a
-   recolocarlas y a avisar a cada cliente, pero a quién pasarlas lo dice el dueño. La web no
-   promete la elección automática: ver `PLAN-WEB-CONTENIDO.md` › Pendientes.)
+   sus citas se reorganizan con el profesional más cualificado disponible. Tu asistente marca la
+   ausencia, dice qué citas tenía y propone pasar cada una, a la misma hora, a quien mejor hace
+   ese servicio de los que están libres (el especialista y, entre iguales, quien tenga menos
+   citas ese día: la misma regla con la que reserva la recepcionista). El dueño confirma y avisa
+   al cliente con un botón; si dice otro nombre, manda el suyo.
 3. Deja de educar a sus clientes para que descarguen aplicaciones de terceros o escriban o llamen
    por un canal concreto: todo el mundo usa WhatsApp. El negocio se adapta al cliente, no al revés.
 

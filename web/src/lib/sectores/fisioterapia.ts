@@ -77,13 +77,12 @@ export const fisioterapia: SectorLanding = {
   asistente: {
     pregunta: "¿Y si a mediodía falta un fisio?",
     respuesta:
-      "Escríbeselo a tu asistente entre paciente y paciente. Marca la ausencia, te enseña qué sesiones tenía, las pasa al fisio que tú digas y avisa a cada paciente. Todo, con tu «Confirmar».",
+      "Escríbeselo a tu asistente entre paciente y paciente. Marca la ausencia, te enseña qué sesiones tenía y propone pasarlas al fisio libre que mejor lleva cada tratamiento. Avisa a cada paciente cuando confirmas.",
     turnos: ausenciaDe({
       aviso: "Clara se ha puesto mala y se va a casa",
       profesional: "Clara",
       cuando: "esta tarde",
       motivo: "enferma",
-      respuesta: "El seguimiento de las 5, que lo lleve Irene",
       cita: "la cita de Jorge A.",
       servicio: "Sesión de seguimiento",
       hora: "17:00",

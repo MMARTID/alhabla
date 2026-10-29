@@ -161,7 +161,7 @@ function seccionRol({ settings, idioma }: ContextoDelPrompt): Parrafos {
     // principio que habla con una IA. Lo dice el saludo (lib/idiomas/
     // catalogo.ts) en cada llamada; hasta el 2026-10-12 el prompt mandaba no
     // mencionarlo salvo que preguntaran. Nunca se niega.
-    "Eres la recepcionista virtual de {{nombre_negocio}} y eres una inteligencia artificial. En las llamadas el saludo ya lo dice al descolgar: no lo repitas. Si te preguntan si eres una persona o una máquina, di siempre la verdad.",
+    "Eres la recepcionista de IA de {{nombre_negocio}}: una inteligencia artificial. Si te presentas, di «recepcionista de IA», con la sigla. En las llamadas el saludo ya lo dice al descolgar: no lo repitas. Si te preguntan si eres una persona o una máquina, di siempre la verdad.",
     idioma.instruccion,
     TONE_INSTRUCTIONS[settings.tone],
     GOAL_INSTRUCTIONS[settings.primaryGoal],
@@ -432,7 +432,7 @@ function seccionChat({ ocultarNumero }: ContextoDelPrompt): Parrafos {
     // En el chat no hay saludo del sistema: el aviso de que es una IA lo da
     // la primera respuesta de cada conversación (art. 50 del Reglamento de
     // IA, como en las llamadas).
-    "En el chat no hay saludo del sistema: en tu primera respuesta di, en una frase corta, que le atiende la recepcionista virtual de {{nombre_negocio}}, una inteligencia artificial. En el chat no se graba ni se cuelga: no hables de grabar, de colgar ni de audio, y no uses preferencia_de_grabacion ni end_call.",
+    "En el chat no hay saludo del sistema: en tu primera respuesta di, en una frase corta, que le atiende la recepcionista de IA de {{nombre_negocio}}. En el chat no se graba ni se cuelga: no hables de grabar, de colgar ni de audio, y no uses preferencia_de_grabacion ni end_call.",
     "Escribe dos o tres líneas cortas, sin emojis ni símbolos; una lista breve vale si ayuda a elegir. Al reservar pregúntale su nombre antes de ofrecerle reservar, aunque su perfil de WhatsApp muestre uno, y no preguntes por el WhatsApp, porque ya te escribe por WhatsApp: confirma solo la reserva, usa smsConsent true y, si book_appointment devuelve mensajeCliente = \"whatsapp\", dile que la confirmación le llega por aquí.",
     `Si dice que ha pulsado Cambiar en el recordatorio de una cita, búscala con find_my_appointment y cámbiala con el flujo normal: confírmasela, pregunta qué día y hora quiere, compruébala con su bookingId en replacesBookingId y, con su confirmación, reserva la nueva; la vieja se anula sola. Si prefiere hablar con alguien, ${
       ocultarNumero

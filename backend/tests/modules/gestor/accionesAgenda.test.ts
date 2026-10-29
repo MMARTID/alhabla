@@ -575,6 +575,101 @@ describe("mover_cita", () => {
     ).toContain("No encuentro esa cita");
   });
 
+  it("si quien la tenía falta, propone a quien mejor hace el servicio de los libres, también a la misma hora", async () => {
+    vi.mocked(prisma.professionalAbsence.findFirst).mockResolvedValue({
+      id: "aus_1",
+    } as never);
+    mockedCheckAvailability.mockResolvedValue({
+      available: true,
+      message: "",
+      capacityUsed: 0,
+      capacityTotal: 2,
+      availableProfessionals: [{ id: "pro_marta", name: "Marta" }],
+      specialistIds: ["pro_marta"],
+    });
+    const r = await comprobar("mover_cita", {
+      cita: "b_1",
+      fechaHora: "2026-11-12T11:00",
+    });
+    expect(r).toMatchObject({
+      ok: true,
+      descripcion:
+        "pasar la cita de Marta García del jueves 12 de noviembre a las 11:00 (Corte) con Laura a Marta, a la misma hora: Laura falta y Marta es especialista en ese servicio (móvil del cliente: +34600111222, por si prefieres llamarle antes; la propuesta sigue vigente 24 h)",
+      parametros: { profesional: "pro_marta" },
+    });
+    // Se busca entre todos (sin profesional), no en la agenda de Laura.
+    expect(mockedCheckAvailability).toHaveBeenCalledWith(
+      expect.objectContaining({ professionalId: null })
+    );
+    expect(prisma.professionalAbsence.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          businessId: "biz_1",
+          professionalId: "pro_laura",
+        }),
+      })
+    );
+
+    // A otra hora, y quien la cubre no es especialista.
+    mockedCheckAvailability.mockResolvedValue({
+      available: true,
+      message: "",
+      capacityUsed: 0,
+      capacityTotal: 2,
+      availableProfessionals: [{ id: "pro_marta", name: "Marta" }],
+    });
+    const otra = await comprobar("mover_cita", {
+      cita: "b_1",
+      fechaHora: HORA_LOCAL,
+    });
+    expect(otra).toMatchObject({
+      ok: true,
+      descripcion: expect.stringContaining(
+        "al jueves 12 de noviembre a las 17:00 con Marta: Laura falta a esa hora y Marta es quien mejor lo hace de los que están libres"
+      ),
+      parametros: { profesional: "pro_marta" },
+    });
+  });
+
+  it("si quien la tenía falta y nadie más puede, lo dice y deja que el dueño elija a alguien", async () => {
+    vi.mocked(prisma.professionalAbsence.findFirst).mockResolvedValue({
+      id: "aus_1",
+    } as never);
+    mockedCheckAvailability.mockResolvedValue({
+      available: false,
+      code: "NO_AVAILABLE_PROFESSIONAL",
+      message: "No hay nadie libre a esa hora.",
+    });
+    const r = await comprobar("mover_cita", {
+      cita: "b_1",
+      fechaHora: "2026-11-12T11:00",
+    });
+    expect(r.ok).toBe(false);
+    expect(r.motivo).toContain(
+      "Laura falta a esa hora y no hay nadie más libre que haga ese servicio. No hay nadie libre a esa hora."
+    );
+    expect(r.motivo).toContain("con su nombre en profesional");
+  });
+
+  it("a la misma hora y sin ausencia no hay nada que mover; con el dueño eligiendo a alguien, no se busca sustituto", async () => {
+    expect(
+      (
+        await comprobar("mover_cita", {
+          cita: "b_1",
+          fechaHora: "2026-11-12T11:00",
+        })
+      ).motivo
+    ).toBe("La cita ya está a esa hora.");
+    vi.mocked(prisma.professionalAbsence.findFirst).mockClear();
+    const r = await comprobar("mover_cita", {
+      cita: "b_1",
+      fechaHora: "2026-11-12T11:00",
+      profesional: "Marta",
+    });
+    expect(r).toMatchObject({ ok: true, parametros: { profesional: "pro_marta" } });
+    expect(prisma.professionalAbsence.findFirst).not.toHaveBeenCalled();
+  });
+
   it("al confirmar: evento nuevo, reserva actualizada, evento viejo borrado, recordatorio reprogramado y pregunta de aviso", async () => {
     mockedBook.mockResolvedValue({ id: "evt_nuevo" } as never);
     mockedBookingUpdateMany.mockResolvedValue({ count: 1 });
@@ -995,7 +1090,7 @@ describe("marcar_ausencia", () => {
     });
     expect(r.ok).toBe(true);
     expect(r.mensaje).toBe(
-      "Hecho: Laura no está el lunes, 9 de noviembre de 09:00 a 14:00; la recepcionista no le reservará nada ahí. Tiene 1 cita en ese tramo: dime si las movemos o las cancelamos."
+      "Hecho: Laura no está el lunes, 9 de noviembre de 09:00 a 14:00; la recepcionista no le reservará nada ahí. Tiene 1 cita en ese tramo: si quieres, te propongo pasarla, a la misma hora, a quien mejor hace el servicio de los que están libres."
     );
   });
 });

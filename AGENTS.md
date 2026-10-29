@@ -1322,7 +1322,14 @@ hablando por el que elige `identificarRemitente`.
   bloquea a sí misma ni por su propio evento), crea el evento nuevo → `updateMany` condicional
   (`isCancelled: false`) → borra el viejo (best-effort) → `programarMensajesAlCliente({
   confirmacion: false })` para el recordatorio de la hora nueva (el de la vieja se descarta
-  solo por `HORA_CAMBIADA`); pone `confirmedByClientAt` a null. `cancelar_cita` usa
+  solo por `HORA_CAMBIADA`); pone `confirmedByClientAt` a null. **Ausencias (desde el
+  2026-10-29):** si no se le pasa `profesional` y quien tenía la cita tiene una ausencia que pisa
+  la hora nueva (`faltaEnElTramo`), comprueba sin profesional y propone a
+  `availableProfessionals[0]` (especialista antes que «lo hace»; entre iguales, menos citas ese
+  día: el orden de `checkAvailability`), también a la misma hora, y deja su id en `parametros`
+  para que `ejecutar` mueva a esa persona. La descripción dice por qué («Laura falta y Marta es
+  especialista en ese servicio»). Si nadie puede, el motivo le pide al dueño un nombre. Tras
+  `marcar_ausencia` con citas, el mensaje ofrece pasarlas así. `cancelar_cita` usa
   `cancelarReserva` con `cancelledBy: "owner_chat"`, que **no manda el aviso #4 al propio
   dueño** y avisa a la lista de espera con origen `cancelacion_dueno`.
 - **«¿Le mando la confirmación?» / «¿Le aviso?»**: `ResultadoDeEjecucion` gana `siguiente`
@@ -1874,7 +1881,7 @@ is now a **Cloud Scheduler** job hitting the same kind of endpoint every
        recepcionista.
    - **Aviso de IA, saludo por cliente y grabación con permiso (2026-10-12/13).**
      - **Saludo y aviso de IA.** Al entrar la llamada, `lib/contextoDeLlamada.ts` mira tres cosas: si ese teléfono ya reservó en el negocio (nombre y último servicio, sacados de `Booking`), si deja grabar (`ClienteDelNegocio`) y si el negocio está en su primera semana desde su primera llamada. Con eso `handleCallInitiated` contesta con `answer`, pasando el saludo de esa llamada (`assistant.greeting`) y las variables del prompt (`nombre_cliente`, `ultimo_servicio`). El assistant guarda unos valores por defecto para el chat.
-       - Las piezas del saludo están en `lib/idiomas/catalogo.ts` (10 idiomas). Todas dicen «inteligencia artificial» (Reglamento europeo de IA, art. 50; Alhabla es el proveedor).
+       - Las piezas del saludo están en `lib/idiomas/catalogo.ts` (10 idiomas). Todas dicen que es una IA (Reglamento europeo de IA, art. 50; Alhabla es el proveedor): en español y en inglés «su recepcionista de IA» / «AI receptionist», con la sigla (decisión del usuario del 2026-10-29); el resto, «inteligencia artificial» en su idioma.
        - En fisioterapia, estética y «otro», el saludo no nombra el servicio anterior.
        - **En el idioma del cliente (2026-10-14).** El informe final (`informar_al_negocio`) lleva `idioma_del_cliente` (enum del catálogo), y `lib/idiomaDelCliente.ts` lo guarda en `ClienteDelNegocio.idioma`/`idiomaAt`: siempre el de su última llamada. En la siguiente, si la recepcionista habla ese idioma (`perfil.idiomas`, con la cooficial de la zona sacada de la dirección), el saludo va en él. Si es la cooficial de la zona, `answer` lleva además `assistant.voice_settings` con Marta o Sergio (`vozDeLaCooficial`, la misma del nodo «cooficial» del flujo): toda esa llamada habla con esa voz, que también habla castellano. El servicio solo se nombra si el saludo va en castellano en un negocio que atiende en castellano. El aviso de IA que el backend antepone en el chat usa el mismo idioma (`idiomaGuardadoDelCliente`).
      - **Grabación con permiso.** El assistant no graba por su cuenta (`recording_settings.enabled: false`).

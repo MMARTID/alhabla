@@ -59,7 +59,7 @@ function PrimeraFrase() {
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-tenue">Por teléfono</p>
             <p className="mt-1 text-sm leading-6 text-tinta">
-              «Peluquería Sol, te atiende su asistente de inteligencia artificial. ¿En qué te ayudo?»
+              «Peluquería Sol, te atiende su recepcionista de IA. ¿En qué te ayudo?»
             </p>
           </div>
         </div>
@@ -70,7 +70,7 @@ function PrimeraFrase() {
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-tenue">Por WhatsApp</p>
             <p className="mt-1 text-sm leading-6 text-tinta">
-              «Peluquería Sol, te atiende su asistente de inteligencia artificial.»
+              «Peluquería Sol, te atiende su recepcionista de IA.»
             </p>
           </div>
         </div>
@@ -150,8 +150,8 @@ export default function LeyPage() {
           </p>
           <p>
             Alhabla lo dice en la primera frase de cada llamada, con el nombre de tu negocio y en el idioma en que
-            saluda. A quien ya ha reservado le saluda por su nombre sin quitar el aviso: «Hola, Laura, soy la asistente de
-            inteligencia artificial de Peluquería Sol».
+            saluda. A quien ya ha reservado le saluda por su nombre sin quitar el aviso: «Hola, Laura, soy la recepcionista de IA de
+            Peluquería Sol».
           </p>
         </Texto>
         <LaNorma>

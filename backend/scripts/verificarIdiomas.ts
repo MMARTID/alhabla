@@ -60,7 +60,7 @@ const CASOS: Caso[] = [
       transcripcion: "deepgram/flux",
       idiomaDeTranscripcion: "multi",
       saludo:
-        "Verificación de idiomas, te atiende su asistente de inteligencia artificial. La llamada se graba; si no quieres, dímelo. ¿En qué te ayudo?",
+        "Verificación de idiomas, te atiende su recepcionista de IA. La llamada se graba; si no quieres, dímelo. ¿En qué te ayudo?",
     },
   },
   {
@@ -117,7 +117,7 @@ const CASOS: Caso[] = [
       transcripcion: "deepgram/flux",
       idiomaDeTranscripcion: "multi",
       saludo:
-        "Verificación de idiomas, te atiende su asistente de inteligencia artificial. La llamada se graba; si no quieres, dímelo. ¿En qué te ayudo?",
+        "Verificación de idiomas, te atiende su recepcionista de IA. La llamada se graba; si no quieres, dímelo. ¿En qué te ayudo?",
     },
   },
 ];

@@ -61,7 +61,7 @@ const faqs = [
   {
     question: "Si falta alguien, ¿reparte ella sus citas?",
     answer:
-      "Te dice qué citas tenía y te pregunta qué hacer con cada una. Tú le dices a quién pasarla o a qué hora moverla; ella comprueba que cabe, la cambia en tu agenda y te pregunta si avisa al cliente.",
+      "Te dice qué citas tenía y te propone pasar cada una, a la misma hora, a quien mejor hace ese servicio de los que están libres. Si prefieres a otra persona u otra hora, se lo dices. Nada cambia hasta que confirmas, y luego te pregunta si avisa al cliente.",
   },
   {
     question: "¿Se entera el cliente de los cambios?",
@@ -91,7 +91,7 @@ export default function AgendaPorWhatsappPage() {
         <>
           <p>
             Si un día falta alguien, se lo escribes como a una persona: «Marta está de baja hoy». Ella te dice qué
-            citas tenía, tú le dices a quién pasarlas, comprueba que caben y avisa a cada cliente por WhatsApp.
+            citas tenía y te propone pasarlas a quien mejor hace cada servicio de los que están libres. Con tu «Confirmar», las mueve y avisa a cada cliente por WhatsApp.
           </p>
           <p className="text-base leading-7">
             Va en todos los planes, desde {desde} € + IVA al mes, y lo que hablas con ella no gasta minutos.

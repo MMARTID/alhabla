@@ -209,7 +209,7 @@ export function relato(g: GuionRelato) {
   const [c0, c1, c2, c3] = g.otrosClientes;
   // El saludo real (backend/src/lib/idiomas/catalogo.ts, `presentacion`):
   // avisa de que es una IA, como pide el art. 50 del Reglamento de IA.
-  const saludo = `${g.negocio}, te atiende su asistente de inteligencia artificial. ¿En qué te ayudo?`;
+  const saludo = `${g.negocio}, te atiende su recepcionista de IA. ¿En qué te ayudo?`;
   // La recepcionista solo menciona la duración si es una cita larga.
   const ofrece =
     servicio.minutos > 80

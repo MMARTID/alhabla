@@ -30,9 +30,10 @@ con HeyDiga y fonio, donde se pierde, y no tuvieron ni una visita. El fundador l
 «Agentes de voz» solo vale como nombre de la categoría de Retell, Vapi y compañía.
 
 **Verdad del producto (no prometer de más):** cuando alguien del equipo falta, tu asistente marca
-la ausencia, te dice qué citas tenía y te ayuda a recolocarlas una a una (busca dónde caben) y a
-avisar a cada cliente; **tú dices a quién pasarlas**. No elige sola «al más cualificado» (ver
-Pendientes). Conectar un calendario es opcional desde el 28-10: si no usas Google, Outlook ni
+la ausencia, te dice qué citas tenía y te propone pasar cada una, a la misma hora, a quien mejor
+hace ese servicio de los que están libres (especialista primero; entre iguales, quien tenga menos
+citas ese día). **Tú confirmas** cada cambio y el aviso al cliente; si prefieres a otra persona,
+lo dices (desde el 29-10). Conectar un calendario es opcional desde el 28-10: si no usas Google, Outlook ni
 iCloud, la cita entra en la agenda de Alhabla.
 
 ## Sitemap nuevo (74 URLs → 74)
@@ -140,11 +141,11 @@ móvil de cada página del sitemap; revisión de diseño de Impeccable sobre las
 
 ## Pendientes y decisiones abiertas
 
-- **Producto**: que tu asistente proponga sola a quién pasar cada cita de una ausencia (por
-  especialidad y hueco). Hoy lo decide el dueño. Hasta que exista, la web no lo promete.
-- **Nombre**: la recepcionista saluda como «su asistente de inteligencia artificial» (aviso legal
-  del backend, `lib/idiomas/catalogo.ts`), y la web reserva «tu asistente» para el papel del
-  dueño. Valorar cambiar el saludo a «la recepcionista de inteligencia artificial».
+- ~~**Producto**: que tu asistente proponga a quién pasar cada cita de una ausencia~~. Hecho el
+  29-10: `mover_cita` sin profesional, cuando quien la tenía falta, propone al mejor libre.
+- ~~**Nombre**: el saludo decía «su asistente de inteligencia artificial»~~. Desde el 29-10 dice
+  «su recepcionista de IA» (con la sigla; en inglés «AI receptionist»), y la web reserva «tu
+  asistente» para el papel del dueño.
 - **Nombre propio** para tu asistente: aplazado.
 - **Riesgo competitivo**: Fresha (AI Concierge) y Treatwell (AI Receptionist, Reino Unido) meten
   una recepcionista dentro del programa de reservas. Comprobar si llegan a España.

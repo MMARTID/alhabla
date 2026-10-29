@@ -207,10 +207,10 @@ describe("syncAgentNameWithBusinessType", () => {
 describe("componerSaludo", () => {
   it("saluda en el idioma principal", () => {
     expect(componerSaludo("es-ES", "Peluquería Ana")).toBe(
-      "Peluquería Ana, te atiende su asistente de inteligencia artificial. ¿En qué te ayudo?"
+      "Peluquería Ana, te atiende su recepcionista de IA. ¿En qué te ayudo?"
     );
     expect(componerSaludo("en-GB", "Ana's Salon")).toBe(
-      "Ana's Salon, you're speaking with an artificial intelligence assistant. How can I help?"
+      "Ana's Salon, you're speaking with an AI receptionist. How can I help?"
     );
     expect(componerSaludo("fr-FR", "Salon Anne")).toBe(
       "Salon Anne, vous êtes en ligne avec une intelligence artificielle. Comment puis-je vous aider ?"
