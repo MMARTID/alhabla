@@ -2,6 +2,8 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import {
   featuresParaLaApp,
   getPlanLimits,
+  haTenidoSuscripcion,
+  maxProfesionalesDelNegocio,
   nextPlanId,
   planAllows,
   planesQueIncluyen,
@@ -107,5 +109,75 @@ describe("PlanLimitError", () => {
     expect(error.code).toBe("PLAN_LIMIT_PROFESSIONALS");
     expect(error.planId).toBe("inicio");
     expect(error.limit).toBe(3);
+  });
+});
+
+// Hallazgo 6 de docs/auditorias/2026-10-28-auditoria-de-producto.md: el
+// paso del equipo del alta va antes del pago y `plan` vale «basic» por
+// defecto; quien venía a por Pro o Scale se quedaba en 3.
+describe("maxProfesionalesDelNegocio", () => {
+  it("sin suscripción nunca (el alta, antes del checkout) no limita, sea cual sea `plan`", () => {
+    for (const plan of ["basic", "pro", "enterprise", null]) {
+      expect(
+        maxProfesionalesDelNegocio({
+          plan,
+          stripePriceId: null,
+          stripeSubscriptionId: null,
+          subscriptionStatus: null,
+        }),
+        String(plan)
+      ).toBeNull();
+    }
+  });
+
+  it("con suscripción, el límite de su plan, como siempre", () => {
+    const conSuscripcion = {
+      stripePriceId: null,
+      stripeSubscriptionId: "sub_1",
+      subscriptionStatus: "ACTIVE",
+    };
+    expect(
+      maxProfesionalesDelNegocio({ ...conSuscripcion, plan: "basic" })
+    ).toBe(3);
+    expect(maxProfesionalesDelNegocio({ ...conSuscripcion, plan: "pro" })).toBe(
+      10
+    );
+    expect(
+      maxProfesionalesDelNegocio({ ...conSuscripcion, plan: "enterprise" })
+    ).toBeNull();
+  });
+
+  it("una suscripción cancelada sigue limitando por su plan (darse de baja no quita el límite)", () => {
+    expect(
+      maxProfesionalesDelNegocio({
+        plan: "basic",
+        stripePriceId: null,
+        stripeSubscriptionId: "sub_1",
+        subscriptionStatus: "CANCELED",
+      })
+    ).toBe(3);
+  });
+});
+
+describe("haTenidoSuscripcion", () => {
+  it("basta con el id o con el estado de Stripe", () => {
+    expect(
+      haTenidoSuscripcion({
+        stripeSubscriptionId: null,
+        subscriptionStatus: null,
+      })
+    ).toBe(false);
+    expect(
+      haTenidoSuscripcion({
+        stripeSubscriptionId: "sub_1",
+        subscriptionStatus: null,
+      })
+    ).toBe(true);
+    expect(
+      haTenidoSuscripcion({
+        stripeSubscriptionId: null,
+        subscriptionStatus: "INCOMPLETE_EXPIRED",
+      })
+    ).toBe(true);
   });
 });

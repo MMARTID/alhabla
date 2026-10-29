@@ -1,6 +1,7 @@
 import type { WhatsAppContactCard } from "../../adapters/whatsapp/WhatsAppAdapter.js";
 import { nombreParaElCliente } from "../../lib/nombreProfesional.js";
 import { prisma } from "../../lib/prisma.js";
+import { nombreDelNegocioDecible } from "../../lib/nombreDelNegocio.js";
 import { errorMessage } from "../../lib/logUtils.js";
 import { reclamarEnvio } from "../../lib/messageIdempotency.js";
 import { claveDeMensajeAlCliente } from "../../lib/clavesDeMensajes.js";
@@ -101,10 +102,8 @@ const MINIMO_RECORDATORIO_MS = 60 * 60 * 1000;
  * leería «gestiono las reservas de tu negocio»).
  */
 export function nombreParaCliente(negocio: { name: string }): string {
-  const limpio = negocio.name.replace(/\s+/g, " ").trim();
-  if (!limpio || limpio.startsWith("Negocio de ") || limpio.includes("@")) {
-    return "el negocio";
-  }
+  const limpio = nombreDelNegocioDecible(negocio.name);
+  if (!limpio) return "el negocio";
   return limpio.length > 60 ? limpio.slice(0, 60).trimEnd() : limpio;
 }
 

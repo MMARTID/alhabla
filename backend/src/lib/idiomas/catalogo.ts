@@ -25,6 +25,7 @@
  */
 import { VOCES_ULTRA } from "./vocesUltra.js";
 import type { IdiomaConVocesUltra } from "./curacionDeVoces.js";
+import { nombreDelNegocioDecible } from "../nombreDelNegocio.js";
 
 /**
  * Orden canónico de los idiomas. Los seis primeros no se mueven: alimentan,
@@ -110,6 +111,12 @@ export interface PartesDelSaludo {
   /** Cierre del saludo a un cliente sin nombrar el servicio (fisioterapia,
    * estética…: puede ser un dato de salud y el teléfono, de otra persona). */
   repetirLoDeLaUltimaVez: string;
+  /** Las presentaciones cuando el negocio aún no tiene un nombre que se
+   * pueda decir (el «Negocio de <email>» del registro; ver
+   * lib/nombreDelNegocio.ts): sin `{negocio}` y sin género. Sustituyen a
+   * `presentacion` y `presentacionNueva` (la primera) y a
+   * `presentacionAlCliente` (la segunda). */
+  sinNombre: { presentacion: string; presentacionAlCliente: string };
 }
 
 export interface IdiomaDelCatalogo {
@@ -224,6 +231,11 @@ export const IDIOMAS: Record<CodigoDeIdioma, IdiomaDelCatalogo> = {
       repetir: "¿Quieres repetir {servicio} o prefieres algo nuevo?",
       repetirLoDeLaUltimaVez:
         "¿Quieres repetir lo de la última vez o prefieres algo nuevo?",
+      sinNombre: {
+        presentacion: "Hola, estás hablando con una inteligencia artificial.",
+        presentacionAlCliente:
+          "Hola, {nombre}, estás hablando con una inteligencia artificial.",
+      },
     },
     transcripcion: { flux: "es", soniox: "es" },
     cooficial: false,
@@ -246,6 +258,12 @@ export const IDIOMAS: Record<CodigoDeIdioma, IdiomaDelCatalogo> = {
       repetir: "Would you like {servicio} again, or something new?",
       repetirLoDeLaUltimaVez:
         "Would you like the same as last time, or something new?",
+      sinNombre: {
+        presentacion:
+          "Hello, you're speaking with an artificial intelligence assistant.",
+        presentacionAlCliente:
+          "Hi {nombre}, you're speaking with an artificial intelligence assistant.",
+      },
     },
     transcripcion: { flux: "en", soniox: "en" },
     cooficial: false,
@@ -268,6 +286,12 @@ export const IDIOMAS: Record<CodigoDeIdioma, IdiomaDelCatalogo> = {
       repetir: "Vous souhaitez reprendre {servicio}, ou autre chose ?",
       repetirLoDeLaUltimaVez:
         "Vous souhaitez la même chose que la dernière fois, ou autre chose ?",
+      sinNombre: {
+        presentacion:
+          "Bonjour, vous êtes en ligne avec une intelligence artificielle.",
+        presentacionAlCliente:
+          "Bonjour {nombre}, vous êtes en ligne avec une intelligence artificielle.",
+      },
     },
     transcripcion: { flux: "fr", soniox: "fr" },
     cooficial: false,
@@ -288,6 +312,11 @@ export const IDIOMAS: Record<CodigoDeIdioma, IdiomaDelCatalogo> = {
       repetir: "Vols repetir {servicio} o prefereixes una altra cosa?",
       repetirLoDeLaUltimaVez:
         "Vols repetir el de l'última vegada o prefereixes una altra cosa?",
+      sinNombre: {
+        presentacion: "Hola, t'atén una intel·ligència artificial.",
+        presentacionAlCliente:
+          "Hola, {nombre}, t'atén una intel·ligència artificial.",
+      },
     },
     transcripcion: { flux: null, soniox: "ca" },
     cooficial: true,
@@ -316,6 +345,10 @@ export const IDIOMAS: Record<CodigoDeIdioma, IdiomaDelCatalogo> = {
       repetir: "{servicio} berriro nahi duzu, ala beste zerbait?",
       repetirLoDeLaUltimaVez:
         "Azken aldikoa berriro nahi duzu, ala beste zerbait?",
+      sinNombre: {
+        presentacion: "Kaixo. Adimen artifizial bat naiz.",
+        presentacionAlCliente: "Kaixo, {nombre}. Adimen artifizial bat naiz.",
+      },
     },
     transcripcion: { flux: null, soniox: "eu" },
     cooficial: true,
@@ -336,6 +369,11 @@ export const IDIOMAS: Record<CodigoDeIdioma, IdiomaDelCatalogo> = {
       repetir: "Queres repetir {servicio} ou prefires outra cousa?",
       repetirLoDeLaUltimaVez:
         "Queres repetir o da última vez ou prefires outra cousa?",
+      sinNombre: {
+        presentacion: "Ola, atendete unha intelixencia artificial.",
+        presentacionAlCliente:
+          "Ola, {nombre}, atendete unha intelixencia artificial.",
+      },
     },
     transcripcion: { flux: null, soniox: "gl" },
     cooficial: true,
@@ -358,6 +396,11 @@ export const IDIOMAS: Record<CodigoDeIdioma, IdiomaDelCatalogo> = {
       repetir: "Möchten Sie wieder {servicio} oder etwas anderes?",
       repetirLoDeLaUltimaVez:
         "Möchten Sie dasselbe wie beim letzten Mal oder etwas anderes?",
+      sinNombre: {
+        presentacion: "Hallo, Sie sprechen mit einer künstlichen Intelligenz.",
+        presentacionAlCliente:
+          "Hallo {nombre}, Sie sprechen mit einer künstlichen Intelligenz.",
+      },
     },
     transcripcion: { flux: "de", soniox: "de" },
     cooficial: false,
@@ -379,6 +422,12 @@ export const IDIOMAS: Record<CodigoDeIdioma, IdiomaDelCatalogo> = {
       repetir: "Vuole ripetere {servicio} o preferisce qualcos'altro?",
       repetirLoDeLaUltimaVez:
         "Vuole ripetere come l'ultima volta o preferisce qualcos'altro?",
+      sinNombre: {
+        presentacion:
+          "Buongiorno, sta parlando con un'intelligenza artificiale.",
+        presentacionAlCliente:
+          "Buongiorno {nombre}, sta parlando con un'intelligenza artificiale.",
+      },
     },
     transcripcion: { flux: "it", soniox: "it" },
     cooficial: false,
@@ -401,6 +450,11 @@ export const IDIOMAS: Record<CodigoDeIdioma, IdiomaDelCatalogo> = {
       repetir: "Quer repetir {servicio} ou prefere outra coisa?",
       repetirLoDeLaUltimaVez:
         "Quer repetir o da última vez ou prefere outra coisa?",
+      sinNombre: {
+        presentacion: "Olá, está a falar com uma inteligência artificial.",
+        presentacionAlCliente:
+          "Olá {nombre}, está a falar com uma inteligência artificial.",
+      },
     },
     transcripcion: { flux: "pt", soniox: "pt" },
     cooficial: false,
@@ -422,6 +476,11 @@ export const IDIOMAS: Record<CodigoDeIdioma, IdiomaDelCatalogo> = {
       repetir: "Wilt u weer {servicio} of liever iets anders?",
       repetirLoDeLaUltimaVez:
         "Wilt u hetzelfde als de vorige keer of liever iets anders?",
+      sinNombre: {
+        presentacion: "Hallo, u spreekt met een kunstmatige intelligentie.",
+        presentacionAlCliente:
+          "Hallo {nombre}, u spreekt met een kunstmatige intelligentie.",
+      },
     },
     transcripcion: { flux: "nl", soniox: "nl" },
     cooficial: false,
@@ -448,6 +507,11 @@ export const IDIOMAS: Record<CodigoDeIdioma, IdiomaDelCatalogo> = {
       repetir: "Хотите повторить {servicio} или что-то другое?",
       repetirLoDeLaUltimaVez:
         "Хотите повторить то же, что в прошлый раз, или что-то другое?",
+      sinNombre: {
+        presentacion: "Здравствуйте, с вами говорит искусственный интеллект.",
+        presentacionAlCliente:
+          "Здравствуйте, {nombre}! С вами говорит искусственный интеллект.",
+      },
     },
     transcripcion: { flux: "ru", soniox: "ru" },
     cooficial: false,
@@ -598,7 +662,16 @@ export function componerSaludo(
   negocio: string
 ): string {
   const partes = IDIOMAS[codigo].saludo;
-  return rellenar(`${partes.presentacion} ${partes.pregunta}`, { negocio });
+  // El nombre provisional del registro lleva el email del dueño: la
+  // recepcionista no lo dice nunca (hallazgo 1 de
+  // docs/auditorias/2026-10-28-auditoria-de-producto.md).
+  const nombre = nombreDelNegocioDecible(negocio);
+  if (nombre === null) {
+    return `${partes.sinNombre.presentacion} ${partes.pregunta}`;
+  }
+  return rellenar(`${partes.presentacion} ${partes.pregunta}`, {
+    negocio: nombre,
+  });
 }
 
 /**
@@ -635,23 +708,30 @@ export function componerSaludoDeLlamada(
   }
 ): string {
   const partes = IDIOMAS[codigo].saludo;
+  // Sin un nombre que se pueda decir (el provisional del registro), las
+  // presentaciones sin `{negocio}`: ver componerSaludo.
+  const negocio = nombreDelNegocioDecible(entrada.negocio);
   const piezas = entrada.cliente
     ? [
-        conGenero(partes.presentacionAlCliente, entrada.genero),
+        negocio === null
+          ? partes.sinNombre.presentacionAlCliente
+          : conGenero(partes.presentacionAlCliente, entrada.genero),
         entrada.grabando ? partes.avisoDeGrabacion : null,
         entrada.cliente.servicio
           ? partes.repetir
           : partes.repetirLoDeLaUltimaVez,
       ]
     : [
-        entrada.primeraSemana
-          ? conGenero(partes.presentacionNueva, entrada.genero)
-          : partes.presentacion,
+        negocio === null
+          ? partes.sinNombre.presentacion
+          : entrada.primeraSemana
+            ? conGenero(partes.presentacionNueva, entrada.genero)
+            : partes.presentacion,
         entrada.grabando ? partes.avisoDeGrabacion : null,
         partes.pregunta,
       ];
   return rellenar(piezas.filter(Boolean).join(" "), {
-    negocio: entrada.negocio,
+    negocio: negocio ?? "",
     nombre: entrada.cliente?.nombre ?? "",
     servicio: entrada.cliente?.servicio ?? "",
   });
