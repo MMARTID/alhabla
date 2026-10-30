@@ -119,6 +119,7 @@ Fuentes que sincroniza, siempre con ruta, ancla y commit:
 - Un borrador solo puede afirmar cosas de Alhabla citando claves vigentes. El backend lo comprueba.
 - Si cambia una fuente, el siguiente run resincroniza **antes** de redactar y los borradores en cola con claves obsoletas pasan a `bloqueado`.
 - Las **limitaciones** son afirmaciones de primera clase, para que el borrador no prometa lo que Alhabla no hace.
+- **No se ingieren** `docs/investigacion-nichos.md` ni `docs/auditorias/*` (cifras de terceros o hallazgos fechados), ni `precio.fundador.*` (el cupo es dinámico), ni `funcion.lista_de_espera`; `multi_sede` queda excluida.
 
 ### 3.2 Comprobaciones de cumplimiento (módulo 6)
 
@@ -240,32 +241,37 @@ Los avisos al móvil, si los quieres, van por la notificación de Claude (sin co
 
 ## 6. Estructura del repositorio
 
+Estado tras la Fase 1b (lo que NO existe aún está marcado):
+
 ```
-growth/                              # nueva web Next 16 → growth.alhabla.ai (dev :3003, vista previa :3103)
+growth/                              # web Next 16 → growth.alhabla.ai (dev :3003, vista previa :3103 en demostración)
   src/app/(panel)/
-    bandeja/ · oportunidad/[id]/ · borradores/ · revision/ · historial/
-    analitica/ · backlinks/ · seo-geo/ · nichos/ · conocimiento/
-    ejecuciones/ · ajustes/
-  src/components/ · src/lib/api.ts
+    bandeja/ · oportunidad/[id]/ (la Revisión) · borradores/ · historial/
+    conocimiento/ · ejecuciones/ · ajustes/
+    (aún no: analitica/ · backlinks/ · seo-geo/ · nichos/)
+  src/components/ · src/lib/{api,cliente,cliente-http,crear-cliente,consultas,sesion,gis,config,types,etiquetas,formato,url-segura}.ts · src/lib/demo/
   agentes/
-    orquestador.md                   # lo que lee la Scheduled Task
-    reglas/{voz-de-marca.md, afirmaciones-prohibidas.md, politica-de-enlaces.md}
+    reglas/afirmaciones-prohibidas.md   # tabla parseable de la que sale lo prohibido
+    (aún no: orquestador.md, voz-de-marca.md, politica-de-enlaces.md)
 backend/src/modules/growth/
-  routes.ts                          # /growth/admin/* y /growth/agente/*
-  service.ts · estados.ts · puntuacion.ts · cumplimiento.ts · similitud.ts
-  conocimiento/sincronizar.ts        # lee plans.ts, PRODUCT.md, sectores, paginas, comparativas
-  fuentes/{FuenteDeOportunidades.ts, busquedaWeb.ts, entradaManual.ts}
-  analitica/{searchConsole.ts, utm.ts}
-backend/mcp/growth/                  # MCP stdio «alhabla-growth»
-.claude/agents/growth-{discovery,qualification,research,knowledge,response,compliance,backlinks,seo-geo}.md
-.claude/settings.json                # hook que deniega reddit.com y redd.it en la tarea
-backend/prisma/schema.prisma         # modelos Growth* + migración
-backend/tests/growth/                # estados, cumplimiento, similitud, sincronización, alcances del token
+  routes.ts                          # índice: no-store, errores, registro
+  routesAdmin.ts · routesAdminExtra.ts · routesAgente.ts · routesAgenteExtra.ts · routesConocimiento.ts
+  service.ts · servicioAdmin.ts · servicioAgente.ts · ajustes.ts · ejecuciones.ts
+  estados.ts · cumplimiento.ts · contextoDeCumplimiento.ts · esquemas.ts · similitud.ts · tokens.ts
+  conocimiento/                      # servidor del sincronizador (planificar, sincronizar, términos)
+  (aún no: analitica/{searchConsole.ts, utm.ts}, fuentes/ como carpeta)
+backend/mcp/growth/                  # MCP stdio «alhabla-growth» (15 herramientas)
+backend/mcp/growth/conocimiento/     # extractor y CLI del sincronizador (no puede vivir en backend/src: la imagen de Cloud Run no lleva web/ ni PRODUCT.md)
+backend/src/jobs/{caducarAprobadasDeGrowth,purgarRetencionDeGrowth}.ts · backend/scripts/growth/crearToken.ts
+.claude/agents/growth-*.md           # aún no (Fase 2)
+.claude/settings.json                # hook que deniega reddit.com y redd.it en la tarea (aún no, Fase 2)
+backend/prisma/schema.prisma         # modelos Growth* (migración 20261030120000_alhabla_growth)
+backend/tests/{modules/growth,mcp,jobs,scripts,integration/growth}/
 docs/growth/{registro-de-decisiones.md, fase-0-protocolo.md, fase-0-muestreo-backlinks.md}
 PLAN-GROWTH.md
 ```
 
-Convenciones: todo en español; imports `.js`; Zod en bodies y params; logs `[Growth]`. **Excepción explícita al aislamiento multi-tenant**: las tablas `Growth*` no son de ningún negocio y solo las abre el administrador o el token de agente; se documenta en `AGENTS.md` y un test comprueba que un JWT de cliente recibe 403 en `/growth/*`. Proyecto nuevo en Vercel (`alhabla-growth`, root `growth`); CI con su job.
+Convenciones: todo en español; imports `.js`; Zod en bodies y params; logs `[Growth]`. **Excepción explícita al aislamiento multi-tenant**: las tablas `Growth*` no son de ningún negocio y solo las abre el administrador o el token de agente; se documenta en `AGENTS.md` y un test comprueba que un JWT de cliente recibe 401 en `/growth/*`. Proyecto nuevo en Vercel (`alhabla-growth`, root `growth`); CI con su job.
 
 ---
 
@@ -486,9 +492,7 @@ model GrowthTokenAgente {
 }
 ```
 
-Retención: una tarea de Cloud Scheduler borra los `extracto` pasados 180 días; las decisiones y
-métricas se conservan sin texto de terceros. **No se guardan nombres ni correos de personas**:
-el tope de contacto se controla por dominio y canal.
+Retención (job `growth-mantenimiento`, diario): pasados 180 días la fila se borra entera si no tiene decisiones, enlaces ni gestión; si no, se vacía `extracto` (cadena vacía) y `quienEdita` pasa a null. Las oportunidades `aprobada` con `expiraEn` vencido caducan por el sistema, con la decisión `caducar`. No se guardan nombres ni correos de personas: el tope de contacto se controla por dominio y canal.
 
 ---
 
@@ -509,6 +513,8 @@ Estética: la de Alhabla (tokens `tinta`, `morado`, `lavado`, `linea`; modo clar
 | **Conocimiento** | Qué sabe el sistema | Afirmaciones por tipo con fuente y commit, antigüedad del snapshot, limitaciones y lista de «prohibido decir» |
 | **Ejecuciones** | Salud del sistema | Runs, duración por módulo, errores, versión de prompts, descartes por motivo (para calibrar umbrales) |
 | **Ajustes** | Control | Umbrales por objetivo, topes de contacto, retención, fuentes activas, interruptor general de pausa |
+
+**Notas de la implementación (Fase 1b).** La Revisión vive en `/oportunidad/[id]` y no hay `/login`: la propia puerta de sesión envuelve el panel. En móvil la navegación son 4 pestañas (Bandeja, Borradores, Historial, Conocimiento) más «Más» (Ejecuciones, Ajustes, apariencia y cerrar sesión). `sin_respuesta` se muestra como «Cerrada sin éxito» y la acción `rechazado` también termina ahí. El estado vacío de la Bandeja usa los descartes de la última semana por motivo de `GET /growth/admin/resumen`. El aviso «similitud con la versión anterior» es la regla blanda `similitud_con_version_anterior`. El dashboard trae un modo demostración solo para desarrollo (`npm run dev:demo`) con datos de prueba, para verificar la interfaz sin Google ni backend.
 
 Esbozo de **Revisión**:
 

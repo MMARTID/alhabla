@@ -1,0 +1,146 @@
+{
+  "id": "cmvutefa7004orar0u5khjz9f",
+  "disparador": "programada",
+  "inicio": "2026-10-30T10:13:49.662Z",
+  "fin": "2026-10-30T10:16:59.047Z",
+  "estado": "parcial",
+  "resumen": {
+    "notas": "Run de prueba",
+    "bloqueadas": 0,
+    "borradores": 7,
+    "candidatas": 7,
+    "calificadas": 2,
+    "descartadas": 5,
+    "descartesPorMotivo": {
+      "otro": 1,
+      "competidor": 1,
+      "bajo_umbral": 1,
+      "irrelevante": 1,
+      "baja_calidad": 1
+    },
+    "declaradoPorElAgente": {
+      "bloqueadas": 1,
+      "borradores": 5,
+      "candidatas": 8,
+      "calificadas": 7,
+      "descartadas": 2,
+      "descartesPorMotivo": {
+        "competidor": 1,
+        "bajo_umbral": 1
+      }
+    }
+  },
+  "modulos": {
+    "discovery": {
+      "fin": "2026-10-30T10:16:59.040Z",
+      "estado": "ok",
+      "inicio": "2026-10-30T10:15:59.040Z"
+    },
+    "compliance": {
+      "error": "Falló la revisión del modelo",
+      "estado": "error"
+    },
+    "qualification": {
+      "estado": "ok"
+    }
+  },
+  "versionPrompts": "5743b5ee9ac70b6843dbbea68874bd22a5654713",
+  "error": null,
+  "duracionSegundos": 189,
+  "oportunidadesPorEstado": {
+    "detectada": 0,
+    "calificada": 0,
+    "investigada": 0,
+    "con_borrador": 0,
+    "pendiente_aprobacion": 0,
+    "aprobada": 1,
+    "gestionada": 0,
+    "conseguida": 1,
+    "sin_respuesta": 0,
+    "devuelta": 0,
+    "bloqueada": 0,
+    "descartada": 5,
+    "caducada": 0
+  },
+  "descartesPorMotivo": [
+    {
+      "codigo": "baja_calidad",
+      "n": 1
+    },
+    {
+      "codigo": "bajo_umbral",
+      "n": 1
+    },
+    {
+      "codigo": "competidor",
+      "n": 1
+    },
+    {
+      "codigo": "irrelevante",
+      "n": 1
+    },
+    {
+      "codigo": "otro",
+      "n": 1
+    }
+  ],
+  "borradores": 7,
+  "oportunidades": [
+    {
+      "id": "cmvuth9a8007qrar0xtym3cn2",
+      "titulo": "Magazine Salón",
+      "dominio": "magazine-salon.example.net",
+      "estado": "aprobada",
+      "objetivoPrincipal": "BACKLINKS",
+      "codigoDescarte": null
+    },
+    {
+      "id": "cmvuth99h007krar024pnlmq5",
+      "titulo": "Blog Estética Pro",
+      "dominio": "blog-estetica-pro.example.es",
+      "estado": "descartada",
+      "objetivoPrincipal": "BACKLINKS",
+      "codigoDescarte": "otro"
+    },
+    {
+      "id": "cmvutefbg004yrar0cfz4ik82",
+      "titulo": "Asociación de estética",
+      "dominio": "asociacion-estetica.example.es",
+      "estado": "descartada",
+      "objetivoPrincipal": "BACKLINKS",
+      "codigoDescarte": "irrelevante"
+    },
+    {
+      "id": "cmvutefb3004wrar0om85z9e3",
+      "titulo": "Blog de moda",
+      "dominio": "blog-de-moda-random.example.org",
+      "estado": "descartada",
+      "objetivoPrincipal": "LEADS",
+      "codigoDescarte": "bajo_umbral"
+    },
+    {
+      "id": "cmvutefay004urar0rom215st",
+      "titulo": "Partners de Retell",
+      "dominio": "retellai.com",
+      "estado": "descartada",
+      "objetivoPrincipal": "BACKLINKS",
+      "codigoDescarte": "competidor"
+    },
+    {
+      "id": "cmvutefau004srar0jkhm2reo",
+      "titulo": "Directorio de barberías",
+      "dominio": "directorio-barberos.example.com",
+      "estado": "descartada",
+      "objetivoPrincipal": "TRAFICO_MARCA",
+      "codigoDescarte": "baja_calidad"
+    },
+    {
+      "id": "cmvutefal004qrar0bnrlg9xy",
+      "titulo": "Guía de peluquerías de Madrid",
+      "dominio": "guia-peluquerias-madrid.es",
+      "estado": "conseguida",
+      "objetivoPrincipal": "BACKLINKS",
+      "codigoDescarte": null
+    }
+  ]
+}
