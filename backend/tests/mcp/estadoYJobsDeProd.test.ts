@@ -270,22 +270,22 @@ describe("webs de Vercel", () => {
 
   it("el último despliegue de producción; si falló, también el último que salió bien y su comparación con main", async () => {
     const { rutas, ghApiFn } = ghFalso({
-      "repos/MMARTID/botbook/deployments?environment=Production%20%E2%80%93%20alhabla-web":
+      "repos/MMARTID/alhabla/deployments?environment=Production%20%E2%80%93%20alhabla-web":
         [
           { id: 2, sha: "b".repeat(40), created_at: "2026-10-29T01:06:09Z" },
           { id: 1, sha: "a".repeat(40), created_at: "2026-10-28T21:07:50Z" },
         ],
-      "repos/MMARTID/botbook/deployments/2/statuses": [
+      "repos/MMARTID/alhabla/deployments/2/statuses": [
         { state: "error", created_at: "2026-10-29T01:07:00Z" },
       ],
-      "repos/MMARTID/botbook/deployments/1/statuses": [
+      "repos/MMARTID/alhabla/deployments/1/statuses": [
         {
           state: "success",
           created_at: "2026-10-28T21:09:00Z",
           environment_url: "https://alhabla-x.vercel.app",
         },
       ],
-      [`repos/MMARTID/botbook/compare/${"a".repeat(40)}...${MAIN}`]: {
+      [`repos/MMARTID/alhabla/compare/${"a".repeat(40)}...${MAIN}`]: {
         ahead_by: 2,
         archivos: ["web/src/app/page.tsx"],
       },
@@ -322,16 +322,16 @@ describe("webs de Vercel", () => {
 
   it("desplieguesDeLasWebs: main y las dos webs, cada una por separado", async () => {
     const { ghApiFn } = ghFalso({
-      "repos/MMARTID/botbook/commits/main": {
+      "repos/MMARTID/alhabla/commits/main": {
         sha: MAIN,
         fecha: "2026-10-29T01:04:00Z",
       },
-      "repos/MMARTID/botbook/deployments?environment=Production%20%E2%80%93%20alhabla-frontend":
+      "repos/MMARTID/alhabla/deployments?environment=Production%20%E2%80%93%20alhabla-frontend":
         [{ id: 7, sha: MAIN, created_at: "2026-10-29T01:05:09Z" }],
-      "repos/MMARTID/botbook/deployments/7/statuses": [
+      "repos/MMARTID/alhabla/deployments/7/statuses": [
         { state: "success", created_at: "2026-10-29T01:06:00Z" },
       ],
-      "repos/MMARTID/botbook/deployments?environment=Production%20%E2%80%93%20alhabla-web":
+      "repos/MMARTID/alhabla/deployments?environment=Production%20%E2%80%93%20alhabla-web":
         [],
     });
     const resultado = await desplieguesDeLasWebs(ghApiFn);

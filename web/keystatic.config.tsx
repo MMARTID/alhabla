@@ -42,7 +42,7 @@ export default config({
   storage: enProduccion
     ? {
         kind: "github",
-        repo: { owner: "MMARTID", name: "botbook" },
+        repo: { owner: "MMARTID", name: "alhabla" },
         // La web vive en `web/` dentro del monorepo.
         pathPrefix: "web",
         // Cada artículo nuevo va en su rama (blog/…) y se publica con el PR,

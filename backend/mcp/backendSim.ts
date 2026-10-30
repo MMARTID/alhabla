@@ -190,7 +190,7 @@ async function resolverRama(pedida: string): Promise<string> {
       "view",
       limpia,
       "--repo",
-      "MMARTID/botbook",
+      "MMARTID/alhabla",
       "--json",
       "headRefName",
       "-q",

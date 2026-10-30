@@ -7,7 +7,7 @@ name: Deploy backend
 #
 # Autenticación sin claves de larga duración: Workload Identity Federation.
 # La service account github-actions-ci solo puede ser asumida por workflows
-# de este repo exacto (MMARTID/botbook) — ver el binding
+# de este repo exacto (MMARTID/alhabla) — ver el binding
 # roles/iam.workloadIdentityUser con condición de repositorio. Detalle
 # completo del pool/provider y de qué permisos tiene esa SA y por qué, en la
 # memoria de Claude Code "ci-cd-pipeline-setup" y en el runbook de despliegue
