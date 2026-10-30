@@ -41,6 +41,11 @@ jobs:
       - run: npm run typecheck
       - run: npm run lint
       - run: npm run test
+      # Alhabla Growth: el extractor de conocimiento lee PRODUCT.md, plans.ts y
+      # paginas.ts. Si alguno cambia de forma que el mapa no cubra algo, falla
+      # aquí y no cuando alguien sincroniza. Sin red, sin base de datos y sin
+      # git profundo (el checkout trae el monorepo entero).
+      - run: npm run growth:conocimiento -- --comprobar
 
   integration:
     name: Backend — tests de integración

@@ -1427,10 +1427,10 @@ model GrowthDecision {
   oportunidad   GrowthOportunidad? @relation(fields: [oportunidadId], references: [id])
   borradorId    String?
   borrador      GrowthBorrador?    @relation(fields: [borradorId], references: [id])
-  /// aprobar | devolver | descartar | marcar_gestionado | conseguido | sin_respuesta | anular
+  /// aprobar | devolver | descartar | marcar_gestionado | conseguido | sin_respuesta | anular | editar | rechazado | caducar | anadir_url | calificar | investigar | bloquear_por_reglas | bloquear_por_conocimiento | conocimiento_sincronizado | ajustes
   accion        String
   motivo        String?
-  /// Correo del administrador.
+  /// Correo del administrador, `agente:<nombre del token>` o `sistema` (lo que hacen los jobs y el sincronizador).
   por           String
   en            DateTime           @default(now())
 

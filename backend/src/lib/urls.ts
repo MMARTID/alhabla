@@ -49,11 +49,22 @@ export function webUrl(ruta = ""): string {
   )}${ruta}`;
 }
 
-/** Orígenes que admite CORS: app, web y el extra opcional (túneles). */
+/**
+ * Origen del dashboard de Alhabla Growth (`GROWTH_URL`, growth.alhabla.ai; en
+ * local :3003). Es interno: solo entra en CORS, el backend no enlaza a él.
+ */
+export function growthUrl(ruta = ""): string {
+  return `${primera("http://localhost:3003", process.env.GROWTH_URL)}${ruta}`;
+}
+
+/** Orígenes que admite CORS: app, web, dashboard de Growth y el extra opcional (túneles). */
 export function origenesPermitidos(): Set<string> {
   return new Set(
-    [appUrl(), webUrl(), process.env.EXTRA_ALLOWED_ORIGIN?.trim()].filter(
-      (o): o is string => !!o
-    )
+    [
+      appUrl(),
+      webUrl(),
+      growthUrl(),
+      process.env.EXTRA_ALLOWED_ORIGIN?.trim(),
+    ].filter((o): o is string => !!o)
   );
 }

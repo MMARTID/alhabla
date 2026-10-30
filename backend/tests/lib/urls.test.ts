@@ -1,7 +1,18 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { appUrl, origenesPermitidos, webUrl } from "../../src/lib/urls.js";
+import {
+  appUrl,
+  growthUrl,
+  origenesPermitidos,
+  webUrl,
+} from "../../src/lib/urls.js";
 
-const VARS = ["APP_URL", "WEB_URL", "FRONTEND_URL", "EXTRA_ALLOWED_ORIGIN"];
+const VARS = [
+  "APP_URL",
+  "WEB_URL",
+  "FRONTEND_URL",
+  "GROWTH_URL",
+  "EXTRA_ALLOWED_ORIGIN",
+];
 const previas: Record<string, string | undefined> = {};
 
 beforeEach(() => {
@@ -40,19 +51,45 @@ describe("urls", () => {
     expect(webUrl("/blog")).toBe("https://alhabla.ai/blog");
   });
 
-  it("CORS admite app, web y el origen extra, sin duplicados ni vacíos", () => {
+  it("el dashboard de Growth, sin variable, está en localhost:3003", () => {
+    expect(growthUrl()).toBe("http://localhost:3003");
+    expect(growthUrl("/oportunidades")).toBe(
+      "http://localhost:3003/oportunidades"
+    );
+  });
+
+  it("GROWTH_URL se lee sin barra final y no depende de APP_URL ni FRONTEND_URL", () => {
+    process.env.FRONTEND_URL = "https://alhabla.ai";
+    process.env.APP_URL = "https://app.alhabla.ai";
+    process.env.GROWTH_URL = " https://growth.alhabla.ai/ ";
+    expect(growthUrl()).toBe("https://growth.alhabla.ai");
+  });
+
+  it("CORS admite app, web, Growth y el origen extra, sin duplicados ni vacíos", () => {
     process.env.APP_URL = "https://app.alhabla.ai";
     process.env.WEB_URL = "https://alhabla.ai";
+    process.env.GROWTH_URL = "https://growth.alhabla.ai";
     process.env.EXTRA_ALLOWED_ORIGIN = " ";
     expect([...origenesPermitidos()]).toEqual([
       "https://app.alhabla.ai",
       "https://alhabla.ai",
+      "https://growth.alhabla.ai",
     ]);
     process.env.EXTRA_ALLOWED_ORIGIN = "https://tunel.trycloudflare.com";
     expect(origenesPermitidos().has("https://tunel.trycloudflare.com")).toBe(
       true
     );
     delete process.env.WEB_URL;
-    expect(origenesPermitidos().size).toBe(2);
+    // WEB_URL cae a APP_URL: app, Growth y el extra.
+    expect(origenesPermitidos().size).toBe(3);
+  });
+
+  it("CORS no admite el origen del dashboard con otra escritura", () => {
+    process.env.GROWTH_URL = "https://growth.alhabla.ai";
+    const permitidos = origenesPermitidos();
+    expect(permitidos.has("https://growth.alhabla.ai")).toBe(true);
+    expect(permitidos.has("https://growth.alhabla.ai/")).toBe(false);
+    expect(permitidos.has("http://growth.alhabla.ai")).toBe(false);
+    expect(permitidos.has("https://evil-growth.alhabla.ai")).toBe(false);
   });
 });

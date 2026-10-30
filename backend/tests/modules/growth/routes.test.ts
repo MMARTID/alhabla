@@ -1,35 +1,26 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import Fastify from "fastify";
+import growthAuthPlugin from "../../../src/plugins/growthAuth.js";
 import { growthRoutes } from "../../../src/modules/growth/routes.js";
-import { hashDeToken } from "../../../src/modules/growth/tokens.js";
+import type { PrismaMock } from "./ayudas.js";
+import {
+  ADMIN,
+  TOKEN,
+  comoAdmin,
+  comoAgente,
+  registroDeToken,
+} from "./ayudas.js";
 
-const { prismaMock, mockVerifyIdToken } = vi.hoisted(() => {
-  const modelo = () => ({
-    findUnique: vi.fn(),
-    findUniqueOrThrow: vi.fn(),
-    findMany: vi.fn(),
-    create: vi.fn(),
-    update: vi.fn(),
-    updateMany: vi.fn(),
-    upsert: vi.fn(),
-    count: vi.fn(),
-  });
-  const prismaMock = {
-    growthTokenAgente: modelo(),
-    growthOportunidad: modelo(),
-    growthInvestigacion: modelo(),
-    growthBorrador: modelo(),
-    growthRevisionCumplimiento: modelo(),
-    growthDecision: modelo(),
-    growthGestion: modelo(),
-    growthAfirmacion: modelo(),
-    growthCompetidor: modelo(),
-    growthAjuste: modelo(),
-    growthFuente: modelo(),
-    growthNicho: modelo(),
-    $transaction: vi.fn(),
-  };
-  return { prismaMock, mockVerifyIdToken: vi.fn() };
+/**
+ * Lo que es común a todas las rutas de /growth/*: quién entra, que nada se
+ * cachea y que todos los errores tienen la misma forma. Las rutas del agente
+ * y del administrador, cada una con sus casos, están en routesAgente.test.ts y
+ * routesAdmin.test.ts.
+ */
+
+const { prismaMock, mockVerifyIdToken } = await vi.hoisted(async () => {
+  const { crearPrismaMock } = await import("./ayudas.js");
+  return { prismaMock: crearPrismaMock(), mockVerifyIdToken: vi.fn() };
 });
 
 vi.mock("../../../src/lib/prisma.js", () => ({ prisma: prismaMock }));
@@ -40,45 +31,36 @@ vi.mock("google-auth-library", () => ({
   }),
 }));
 
-const TOKEN = "gta_token-de-prueba";
-const ADMIN = "admin@alhabla.ai";
+const mock = prismaMock as PrismaMock;
 
-function registroDeToken(cambios: Record<string, unknown> = {}) {
-  return {
-    id: "tok_1",
-    nombre: "agente-semanal",
-    hashToken: hashDeToken(TOKEN),
-    alcances: ["leer", "escribir"],
-    revocadoEn: null,
-    ultimoUso: new Date(),
-    ...cambios,
-  };
-}
-
-function comoAgente(token = TOKEN) {
-  return { authorization: `Bearer ${token}` };
-}
-
-function comoAdmin() {
-  return { authorization: "Bearer id-token-de-google" };
+/** Responde, sin datos, a todo lo que lee el contexto del agente. */
+function contextoVacio() {
+  mock.growthAjuste.findMany.mockResolvedValue([]);
+  mock.growthAjuste.findUnique.mockResolvedValue(null);
+  mock.growthAfirmacion.findMany.mockResolvedValue([]);
+  mock.growthCompetidor.findMany.mockResolvedValue([]);
+  mock.growthNicho.findMany.mockResolvedValue([]);
+  mock.growthFuente.findMany.mockResolvedValue([]);
+  mock.growthGestion.count.mockResolvedValue(0);
+  mock.growthGestion.findMany.mockResolvedValue([]);
+  mock.growthOportunidad.count.mockResolvedValue(0);
+  mock.growthOportunidad.findMany.mockResolvedValue([]);
 }
 
 describe("rutas de Alhabla Growth", () => {
   let fastify: ReturnType<typeof Fastify>;
 
   beforeEach(async () => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     process.env.GROWTH_GOOGLE_CLIENT_ID =
       "cliente-growth.apps.googleusercontent.com";
     process.env.GROWTH_ADMIN_EMAILS = ADMIN;
 
-    prismaMock.$transaction.mockImplementation(
+    mock.$transaction.mockImplementation(
       async (cb: (tx: typeof prismaMock) => unknown) => cb(prismaMock)
     );
-    prismaMock.growthTokenAgente.findUnique.mockResolvedValue(
-      registroDeToken()
-    );
-    prismaMock.growthTokenAgente.update.mockResolvedValue({});
+    mock.growthTokenAgente.findUnique.mockResolvedValue(registroDeToken());
+    mock.growthTokenAgente.update.mockResolvedValue({});
     mockVerifyIdToken.mockResolvedValue({
       getPayload: () => ({ email: ADMIN, email_verified: true }),
     });
@@ -112,7 +94,7 @@ describe("rutas de Alhabla Growth", () => {
         headers: comoAgente("eyJhbGciOiJIUzI1NiJ9.cliente.firma"),
       });
       expect(response.statusCode).toBe(401);
-      expect(prismaMock.growthTokenAgente.findUnique).not.toHaveBeenCalled();
+      expect(mock.growthTokenAgente.findUnique).not.toHaveBeenCalled();
     });
 
     it("un JWT de cliente no abre las rutas del administrador", async () => {
@@ -125,7 +107,7 @@ describe("rutas de Alhabla Growth", () => {
         headers: { authorization: "Bearer eyJhbGciOiJIUzI1NiJ9.cliente.firma" },
       });
       expect(response.statusCode).toBe(401);
-      expect(prismaMock.growthOportunidad.findMany).not.toHaveBeenCalled();
+      expect(mock.growthOportunidad.findMany).not.toHaveBeenCalled();
     });
 
     it("un token de agente no abre las rutas del administrador", async () => {
@@ -139,7 +121,7 @@ describe("rutas de Alhabla Growth", () => {
         payload: { accion: "aprobar", borradorId: "b1" },
       });
       expect(response.statusCode).toBe(401);
-      expect(prismaMock.$transaction).not.toHaveBeenCalled();
+      expect(mock.$transaction).not.toHaveBeenCalled();
     });
 
     it("un ID token de Google no abre las rutas del agente", async () => {
@@ -152,7 +134,7 @@ describe("rutas de Alhabla Growth", () => {
     });
 
     it("rechaza un token de agente revocado o desconocido", async () => {
-      prismaMock.growthTokenAgente.findUnique.mockResolvedValueOnce(
+      mock.growthTokenAgente.findUnique.mockResolvedValueOnce(
         registroDeToken({ revocadoEn: new Date() })
       );
       const revocado = await fastify.inject({
@@ -162,7 +144,7 @@ describe("rutas de Alhabla Growth", () => {
       });
       expect(revocado.statusCode).toBe(401);
 
-      prismaMock.growthTokenAgente.findUnique.mockResolvedValueOnce(null);
+      mock.growthTokenAgente.findUnique.mockResolvedValueOnce(null);
       const desconocido = await fastify.inject({
         method: "GET",
         url: "/growth/agente/contexto",
@@ -172,7 +154,7 @@ describe("rutas de Alhabla Growth", () => {
     });
 
     it("un token que solo lee no puede escribir", async () => {
-      prismaMock.growthTokenAgente.findUnique.mockResolvedValue(
+      mock.growthTokenAgente.findUnique.mockResolvedValue(
         registroDeToken({ alcances: ["leer"] })
       );
       const response = await fastify.inject({
@@ -182,7 +164,19 @@ describe("rutas de Alhabla Growth", () => {
         payload: {},
       });
       expect(response.statusCode).toBe(403);
-      expect(prismaMock.growthOportunidad.create).not.toHaveBeenCalled();
+      expect(mock.growthOportunidad.create).not.toHaveBeenCalled();
+    });
+
+    it("un token que solo escribe no puede leer el contexto", async () => {
+      mock.growthTokenAgente.findUnique.mockResolvedValue(
+        registroDeToken({ alcances: ["escribir"] })
+      );
+      const response = await fastify.inject({
+        method: "GET",
+        url: "/growth/agente/contexto",
+        headers: comoAgente(),
+      });
+      expect(response.statusCode).toBe(403);
     });
 
     it("un administrador verificado pero fuera de la lista recibe 403", async () => {
@@ -221,499 +215,506 @@ describe("rutas de Alhabla Growth", () => {
     });
 
     it("anota el último uso del token si hace mucho que no se anotaba", async () => {
-      prismaMock.growthTokenAgente.findUnique.mockResolvedValue(
+      mock.growthTokenAgente.findUnique.mockResolvedValue(
         registroDeToken({ ultimoUso: new Date(Date.now() - 60 * 60 * 1000) })
       );
-      for (const modelo of [
-        prismaMock.growthAjuste,
-        prismaMock.growthAfirmacion,
-        prismaMock.growthCompetidor,
-        prismaMock.growthNicho,
-        prismaMock.growthFuente,
-      ]) {
-        modelo.findMany.mockResolvedValue([]);
-      }
+      contextoVacio();
       const response = await fastify.inject({
         method: "GET",
         url: "/growth/agente/contexto",
         headers: comoAgente(),
       });
       expect(response.statusCode).toBe(200);
-      expect(prismaMock.growthTokenAgente.update).toHaveBeenCalledOnce();
+      expect(mock.growthTokenAgente.update).toHaveBeenCalledOnce();
+    });
+
+    it("no anota el uso dos veces seguidas", async () => {
+      contextoVacio();
+      await fastify.inject({
+        method: "GET",
+        url: "/growth/agente/contexto",
+        headers: comoAgente(),
+      });
+      expect(mock.growthTokenAgente.update).not.toHaveBeenCalled();
     });
   });
 
-  describe("oportunidades (agente)", () => {
-    const cuerpo = {
-      fuenteId: "f1",
-      url: "https://www.Ejemplo.com/mejores-recepcionistas/?utm_source=x#top",
-      titulo: "Las mejores recepcionistas de IA",
-      extracto: "Comparativa de recepcionistas de IA en España.",
-      objetivoPrincipal: "BACKLINKS",
-      puntBacklinks: 80,
-    };
+  describe("alcance `conocimiento`", () => {
+    let app: ReturnType<typeof Fastify>;
 
-    it("crea una oportunidad nueva con la URL normalizada y su retención", async () => {
-      prismaMock.growthOportunidad.findUnique.mockResolvedValue(null);
-      prismaMock.growthOportunidad.create.mockResolvedValue({
-        id: "o1",
-        estado: "detectada",
-      });
-
-      const response = await fastify.inject({
-        method: "POST",
-        url: "/growth/agente/oportunidades",
-        headers: comoAgente(),
-        payload: cuerpo,
-      });
-
-      expect(response.statusCode).toBe(201);
-      expect(response.json()).toEqual({
-        creada: true,
-        id: "o1",
-        estado: "detectada",
-      });
-      const datos = prismaMock.growthOportunidad.create.mock.calls[0]![0].data;
-      expect(datos.url).toBe("https://ejemplo.com/mejores-recepcionistas");
-      expect(datos.dominio).toBe("ejemplo.com");
-      expect(datos.claveExterna).toMatch(/^[0-9a-f]{64}$/);
-      expect(datos.retencionHasta.getTime()).toBeGreaterThan(Date.now());
+    beforeEach(async () => {
+      // Ruta de prueba con el alcance nuevo: la real la registra el
+      // sincronizador. Lo que se prueba es la puerta.
+      app = Fastify();
+      await app.register(growthAuthPlugin);
+      app.post(
+        "/probar/conocimiento",
+        { onRequest: app.autenticarAgenteGrowth("conocimiento") },
+        async (request) => ({ nombre: request.growthAgente?.nombre })
+      );
+      app.get(
+        "/probar/leer",
+        { onRequest: app.autenticarAgenteGrowth("leer") },
+        async () => ({ ok: true })
+      );
     });
 
-    it("la misma página con otro seguimiento no se duplica", async () => {
-      prismaMock.growthOportunidad.findUnique.mockResolvedValue({
-        id: "o1",
-        estado: "calificada",
-      });
-      const response = await fastify.inject({
+    afterEach(async () => {
+      await app.close();
+    });
+
+    it("un token [leer, escribir] recibe 403 en una ruta de conocimiento", async () => {
+      const response = await app.inject({
         method: "POST",
-        url: "/growth/agente/oportunidades",
+        url: "/probar/conocimiento",
         headers: comoAgente(),
-        payload: cuerpo,
+        payload: {},
+      });
+      expect(response.statusCode).toBe(403);
+      expect(response.json().error).toContain("conocimiento");
+    });
+
+    it("un token con el alcance conocimiento entra, y deja su nombre para la auditoría", async () => {
+      mock.growthTokenAgente.findUnique.mockResolvedValue(
+        registroDeToken({ nombre: "sincronizador", alcances: ["conocimiento"] })
+      );
+      const response = await app.inject({
+        method: "POST",
+        url: "/probar/conocimiento",
+        headers: comoAgente(),
+        payload: {},
       });
       expect(response.statusCode).toBe(200);
-      expect(response.json()).toMatchObject({ creada: false, id: "o1" });
-      expect(prismaMock.growthOportunidad.create).not.toHaveBeenCalled();
+      expect(response.json()).toEqual({ nombre: "sincronizador" });
     });
 
-    it("rechaza una URL inválida con 400", async () => {
-      const response = await fastify.inject({
-        method: "POST",
-        url: "/growth/agente/oportunidades",
-        headers: comoAgente(),
-        payload: { ...cuerpo, url: "esto no es una url" },
-      });
-      expect(response.statusCode).toBe(400);
-    });
-
-    it("el agente no puede aprobar: ese estado ni se acepta", async () => {
-      const response = await fastify.inject({
-        method: "POST",
-        url: "/growth/agente/oportunidades/o1/estado",
-        headers: comoAgente(),
-        payload: { a: "aprobada" },
-      });
-      expect(response.statusCode).toBe(400);
-      expect(prismaMock.growthOportunidad.update).not.toHaveBeenCalled();
-    });
-
-    it("descartar exige un motivo", async () => {
-      prismaMock.growthOportunidad.findUnique.mockResolvedValue({
-        estado: "detectada",
-      });
-      const response = await fastify.inject({
-        method: "POST",
-        url: "/growth/agente/oportunidades/o1/estado",
-        headers: comoAgente(),
-        payload: { a: "descartada" },
-      });
-      expect(response.statusCode).toBe(400);
-    });
-
-    it("no deja saltar de detectada a investigada", async () => {
-      prismaMock.growthOportunidad.findUnique.mockResolvedValue({
-        estado: "detectada",
-      });
-      const response = await fastify.inject({
-        method: "POST",
-        url: "/growth/agente/oportunidades/o1/estado",
-        headers: comoAgente(),
-        payload: { a: "investigada" },
-      });
-      expect(response.statusCode).toBe(409);
-      expect(prismaMock.growthOportunidad.update).not.toHaveBeenCalled();
-    });
-
-    it("califica una detectada", async () => {
-      prismaMock.growthOportunidad.findUnique.mockResolvedValue({
-        estado: "detectada",
-      });
-      prismaMock.growthOportunidad.update.mockResolvedValue({
-        id: "o1",
-        estado: "calificada",
-      });
-      const response = await fastify.inject({
-        method: "POST",
-        url: "/growth/agente/oportunidades/o1/estado",
-        headers: comoAgente(),
-        payload: { a: "calificada" },
-      });
-      expect(response.statusCode).toBe(200);
-      expect(response.json()).toEqual({ id: "o1", estado: "calificada" });
-    });
-  });
-
-  describe("borradores (agente)", () => {
-    const borrador = {
-      tipo: "email",
-      asunto: "Una recepcionista de IA para vuestro listado",
-      texto:
-        "Hola, soy el fundador de Alhabla. Hemos hecho una recepcionista de IA para peluquerías que atiende las llamadas y reserva en el calendario del negocio. Si os encaja, nos gustaría aparecer en vuestro listado. Un saludo.",
-      enlaceUrl: "https://alhabla.ai/peluqueria?utm_source=listado",
-      afirmaciones: ["funcion.reserva_en_calendario"],
-    };
-
-    beforeEach(() => {
-      prismaMock.growthOportunidad.findUnique.mockResolvedValue({
-        id: "o1",
-        estado: "investigada",
-        dominio: "ejemplo.com",
-        objetivoPrincipal: "BACKLINKS",
-      });
-      prismaMock.growthAfirmacion.findMany.mockResolvedValue([
-        {
-          clave: "funcion.reserva_en_calendario",
-          tipo: "funcion",
-          texto: "Reserva en el calendario del negocio",
-          valor: null,
-        },
-        {
-          clave: "prohibida.telnyx",
-          tipo: "prohibida",
-          texto: "No se nombra al proveedor de telefonía",
-          valor: { terminos: ["Telnyx"] },
-        },
-      ]);
-      prismaMock.growthCompetidor.findMany.mockResolvedValue([]);
-      prismaMock.growthAjuste.findMany.mockResolvedValue([]);
-      prismaMock.growthBorrador.findMany.mockResolvedValue([]);
-      prismaMock.growthGestion.findMany.mockResolvedValue([]);
-      prismaMock.growthGestion.count.mockResolvedValue(0);
-      prismaMock.growthBorrador.count.mockResolvedValue(0);
-      prismaMock.growthBorrador.create.mockImplementation(
-        async ({ data }: { data: { estado: string } }) => ({
-          id: "b1",
-          version: 1,
-          estado: data.estado,
-        })
+    it("el alcance conocimiento no da lectura ni escritura", async () => {
+      mock.growthTokenAgente.findUnique.mockResolvedValue(
+        registroDeToken({ alcances: ["conocimiento"] })
       );
-      prismaMock.growthRevisionCumplimiento.create.mockResolvedValue({});
-      prismaMock.growthOportunidad.update.mockResolvedValue({});
-    });
-
-    it("un borrador que cumple queda pendiente de tu aprobación", async () => {
-      const response = await fastify.inject({
-        method: "POST",
-        url: "/growth/agente/oportunidades/o1/borradores",
+      const leer = await app.inject({
+        method: "GET",
+        url: "/probar/leer",
         headers: comoAgente(),
-        payload: borrador,
       });
-
-      expect(response.statusCode).toBe(201);
-      expect(response.json().resultado).toBe("pasa");
-      expect(response.json().borrador.estado).toBe("pendiente_aprobacion");
-      expect(prismaMock.growthOportunidad.update).toHaveBeenCalledWith({
-        where: { id: "o1" },
-        data: { estado: "pendiente_aprobacion" },
-      });
-      const revision =
-        prismaMock.growthRevisionCumplimiento.create.mock.calls[0]![0].data;
-      expect(revision.revisor).toBe("reglas");
-      expect(revision.resultado).toBe("pasa");
+      expect(leer.statusCode).toBe(403);
     });
 
-    it("un borrador con una afirmación inventada queda bloqueado, no pendiente", async () => {
-      const response = await fastify.inject({
-        method: "POST",
-        url: "/growth/agente/oportunidades/o1/borradores",
-        headers: comoAgente(),
-        payload: { ...borrador, afirmaciones: ["funcion.inventada"] },
-      });
-
-      expect(response.statusCode).toBe(201);
-      expect(response.json().resultado).toBe("bloquea");
-      expect(response.json().borrador.estado).toBe("bloqueado");
-      expect(prismaMock.growthOportunidad.update).toHaveBeenCalledWith({
-        where: { id: "o1" },
-        data: { estado: "bloqueada" },
-      });
-    });
-
-    it("un término prohibido que viene en `valor.terminos` bloquea el borrador", async () => {
-      const response = await fastify.inject({
-        method: "POST",
-        url: "/growth/agente/oportunidades/o1/borradores",
-        headers: comoAgente(),
-        payload: {
-          ...borrador,
-          texto: `${borrador.texto} Funciona sobre Telnyx.`,
-        },
-      });
-      expect(response.json().resultado).toBe("bloquea");
-      expect(response.json().borrador.estado).toBe("bloqueado");
-    });
-
-    it("no se redacta sobre una oportunidad que ya espera tu aprobación", async () => {
-      prismaMock.growthOportunidad.findUnique.mockResolvedValue({
-        id: "o1",
-        estado: "pendiente_aprobacion",
-        dominio: "ejemplo.com",
-        objetivoPrincipal: "BACKLINKS",
-      });
-      const response = await fastify.inject({
-        method: "POST",
-        url: "/growth/agente/oportunidades/o1/borradores",
-        headers: comoAgente(),
-        payload: borrador,
-      });
-      expect(response.statusCode).toBe(409);
-      expect(prismaMock.growthBorrador.create).not.toHaveBeenCalled();
-    });
-
-    it("un dominio contactado hace poco bloquea el borrador", async () => {
-      prismaMock.growthGestion.findMany.mockResolvedValue([
-        { hechaEn: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000) },
-      ]);
-      const response = await fastify.inject({
-        method: "POST",
-        url: "/growth/agente/oportunidades/o1/borradores",
-        headers: comoAgente(),
-        payload: borrador,
-      });
-      expect(response.json().resultado).toBe("bloquea");
-      const reglas = response
-        .json()
-        .comprobaciones.filter((c: { ok: boolean }) => !c.ok)
-        .map((c: { regla: string }) => c.regla);
-      expect(reglas).toContain("un_contacto_por_dominio");
-    });
-  });
-
-  describe("decisiones (administrador)", () => {
-    function oportunidad(estado: string, borradores: unknown[] = []) {
-      return {
-        id: "o1",
-        estado,
-        dominio: "ejemplo.com",
-        borradores,
-      };
-    }
-
-    beforeEach(() => {
-      prismaMock.growthBorrador.update.mockResolvedValue({});
-      prismaMock.growthBorrador.updateMany.mockResolvedValue({ count: 1 });
-      prismaMock.growthOportunidad.update.mockResolvedValue({});
-      prismaMock.growthDecision.create.mockResolvedValue({});
-      prismaMock.growthGestion.create.mockResolvedValue({});
-      prismaMock.growthGestion.update.mockResolvedValue({});
-    });
-
-    it("aprueba un borrador pendiente y lo deja escrito con tu correo", async () => {
-      prismaMock.growthOportunidad.findUnique.mockResolvedValue(
-        oportunidad("pendiente_aprobacion", [
-          { id: "b1", estado: "pendiente_aprobacion", gestion: null },
-        ])
+    it("un token revocado con el alcance sigue sin entrar", async () => {
+      mock.growthTokenAgente.findUnique.mockResolvedValue(
+        registroDeToken({ alcances: ["conocimiento"], revocadoEn: new Date() })
       );
-      const response = await fastify.inject({
+      const response = await app.inject({
         method: "POST",
-        url: "/growth/admin/oportunidades/o1/decision",
-        headers: comoAdmin(),
-        payload: { accion: "aprobar", borradorId: "b1" },
+        url: "/probar/conocimiento",
+        headers: comoAgente(),
+        payload: {},
       });
-
-      expect(response.statusCode).toBe(200);
-      expect(response.json()).toEqual({ id: "o1", estado: "aprobada" });
-      expect(prismaMock.growthBorrador.update).toHaveBeenCalledWith({
-        where: { id: "b1" },
-        data: { estado: "aprobado" },
-      });
-      expect(prismaMock.growthDecision.create).toHaveBeenCalledWith({
-        data: {
-          oportunidadId: "o1",
-          borradorId: "b1",
-          accion: "aprobar",
-          motivo: undefined,
-          por: ADMIN,
-        },
-      });
+      expect(response.statusCode).toBe(401);
     });
 
-    it("no aprueba una oportunidad que no ha pasado por la revisión", async () => {
-      prismaMock.growthOportunidad.findUnique.mockResolvedValue(
-        oportunidad("detectada")
-      );
-      const response = await fastify.inject({
-        method: "POST",
-        url: "/growth/admin/oportunidades/o1/decision",
-        headers: comoAdmin(),
-        payload: { accion: "aprobar", borradorId: "b1" },
-      });
-      expect(response.statusCode).toBe(409);
-      expect(prismaMock.growthDecision.create).not.toHaveBeenCalled();
-    });
-
-    it("no aprueba un borrador bloqueado", async () => {
-      prismaMock.growthOportunidad.findUnique.mockResolvedValue(
-        oportunidad("pendiente_aprobacion", [
-          { id: "b1", estado: "bloqueado", gestion: null },
-        ])
-      );
-      const response = await fastify.inject({
-        method: "POST",
-        url: "/growth/admin/oportunidades/o1/decision",
-        headers: comoAdmin(),
-        payload: { accion: "aprobar", borradorId: "b1" },
-      });
-      expect(response.statusCode).toBe(409);
-      expect(prismaMock.growthBorrador.update).not.toHaveBeenCalled();
-    });
-
-    it("devolver y descartar exigen un motivo", async () => {
-      for (const accion of ["devolver", "descartar"]) {
-        const response = await fastify.inject({
+    it("un ID token de Google o un JWT no valen para el alcance conocimiento", async () => {
+      for (const authorization of [
+        "Bearer id-token-de-google",
+        "Bearer eyJhbGciOiJIUzI1NiJ9.cliente.firma",
+        TOKEN.replace("gta_", ""),
+      ]) {
+        const response = await app.inject({
           method: "POST",
-          url: "/growth/admin/oportunidades/o1/decision",
-          headers: comoAdmin(),
-          payload: { accion },
+          url: "/probar/conocimiento",
+          headers: { authorization },
+          payload: {},
         });
-        expect(response.statusCode).toBe(400);
+        expect(response.statusCode).toBe(401);
       }
     });
+  });
 
-    it("descartar guarda el motivo y cierra los borradores abiertos", async () => {
-      prismaMock.growthOportunidad.findUnique.mockResolvedValue(
-        oportunidad("pendiente_aprobacion", [])
-      );
-      const response = await fastify.inject({
-        method: "POST",
-        url: "/growth/admin/oportunidades/o1/decision",
-        headers: comoAdmin(),
-        payload: { accion: "descartar", motivo: "Es de un competidor" },
-      });
-      expect(response.statusCode).toBe(200);
-      expect(prismaMock.growthOportunidad.update).toHaveBeenCalledWith({
-        where: { id: "o1" },
-        data: { estado: "descartada", motivoDescarte: "Es de un competidor" },
-      });
-      expect(prismaMock.growthBorrador.updateMany).toHaveBeenCalled();
-    });
+  describe("sin caché", () => {
+    type Escenario = [
+      string,
+      () => Promise<{ statusCode: number; headers: Record<string, unknown> }>,
+    ];
 
-    it("marcar como gestionado registra la gestión con el dominio de la oportunidad", async () => {
-      prismaMock.growthOportunidad.findUnique.mockResolvedValue(
-        oportunidad("aprobada", [
-          { id: "b1", estado: "aprobado", gestion: null },
-        ])
-      );
-      const response = await fastify.inject({
-        method: "POST",
-        url: "/growth/admin/oportunidades/o1/decision",
-        headers: comoAdmin(),
-        payload: { accion: "marcar_gestionado", canal: "email" },
-      });
-      expect(response.statusCode).toBe(200);
-      expect(response.json().estado).toBe("gestionada");
-      const gestion = prismaMock.growthGestion.create.mock.calls[0]![0].data;
-      expect(gestion).toMatchObject({
-        borradorId: "b1",
-        canal: "email",
-        dominio: "ejemplo.com",
-      });
-      expect(gestion.hechaEn).toBeInstanceOf(Date);
-    });
-
-    it("sin borrador aprobado no hay nada que marcar como gestionado", async () => {
-      prismaMock.growthOportunidad.findUnique.mockResolvedValue(
-        oportunidad("aprobada", [])
-      );
-      const response = await fastify.inject({
-        method: "POST",
-        url: "/growth/admin/oportunidades/o1/decision",
-        headers: comoAdmin(),
-        payload: { accion: "marcar_gestionado", canal: "email" },
-      });
-      expect(response.statusCode).toBe(409);
-    });
-
-    it("el enlace conseguido guarda su URL en la gestión", async () => {
-      prismaMock.growthOportunidad.findUnique.mockResolvedValue(
-        oportunidad("gestionada", [
-          { id: "b1", estado: "gestionado", gestion: { id: "g1" } },
-        ])
-      );
-      const response = await fastify.inject({
-        method: "POST",
-        url: "/growth/admin/oportunidades/o1/decision",
-        headers: comoAdmin(),
-        payload: {
-          accion: "conseguido",
-          urlConseguida: "https://ejemplo.com/listado",
+    const escenarios: Escenario[] = [
+      [
+        "200 del agente",
+        async () => {
+          contextoVacio();
+          return fastify.inject({
+            method: "GET",
+            url: "/growth/agente/contexto",
+            headers: comoAgente(),
+          });
         },
+      ],
+      [
+        "201 del agente",
+        async () => {
+          mock.growthOportunidad.findUnique.mockResolvedValue(null);
+          mock.growthAjuste.findUnique.mockResolvedValue(null);
+          mock.growthFuente.upsert.mockResolvedValue({
+            id: "fuente_web",
+            tipo: "web",
+            nombre: "Web",
+            activa: true,
+          });
+          mock.growthOportunidad.create.mockResolvedValue({
+            id: "o1",
+            estado: "detectada",
+          });
+          return fastify.inject({
+            method: "POST",
+            url: "/growth/agente/oportunidades",
+            headers: comoAgente(),
+            payload: {
+              url: "https://ejemplo.com/p",
+              titulo: "t",
+              extracto: "e",
+              objetivoPrincipal: "BACKLINKS",
+            },
+          });
+        },
+      ],
+      [
+        "200 del administrador",
+        async () => {
+          mock.growthOportunidad.findMany.mockResolvedValue([]);
+          mock.growthOportunidad.count.mockResolvedValue(0);
+          mock.growthOportunidad.groupBy.mockResolvedValue([]);
+          return fastify.inject({
+            method: "GET",
+            url: "/growth/admin/oportunidades",
+            headers: comoAdmin(),
+          });
+        },
+      ],
+      [
+        "400 de validación",
+        async () => {
+          mock.growthAjuste.findUnique.mockResolvedValue(null);
+          return fastify.inject({
+            method: "POST",
+            url: "/growth/agente/oportunidades",
+            headers: comoAgente(),
+            payload: {},
+          });
+        },
+      ],
+      [
+        "401 del agente",
+        async () =>
+          fastify.inject({ method: "GET", url: "/growth/agente/contexto" }),
+      ],
+      [
+        "401 del administrador",
+        async () =>
+          fastify.inject({ method: "GET", url: "/growth/admin/oportunidades" }),
+      ],
+      [
+        "403",
+        async () => {
+          mock.growthTokenAgente.findUnique.mockResolvedValue(
+            registroDeToken({ alcances: [] })
+          );
+          return fastify.inject({
+            method: "GET",
+            url: "/growth/agente/contexto",
+            headers: comoAgente(),
+          });
+        },
+      ],
+      [
+        "404",
+        async () => {
+          mock.growthOportunidad.findUnique.mockResolvedValue(null);
+          return fastify.inject({
+            method: "GET",
+            url: "/growth/admin/oportunidades/nada",
+            headers: comoAdmin(),
+          });
+        },
+      ],
+      [
+        "409 de pausa",
+        async () => {
+          mock.growthAjuste.findUnique.mockResolvedValue({
+            clave: "pausa",
+            valor: true,
+          });
+          return fastify.inject({
+            method: "POST",
+            url: "/growth/agente/oportunidades",
+            headers: comoAgente(),
+            payload: {},
+          });
+        },
+      ],
+      [
+        "500",
+        async () => {
+          mock.growthOportunidad.findUnique.mockRejectedValue(
+            new Error("boom")
+          );
+          return fastify.inject({
+            method: "GET",
+            url: "/growth/admin/oportunidades/o1",
+            headers: comoAdmin(),
+          });
+        },
+      ],
+      [
+        "503 sin configurar",
+        async () => {
+          delete process.env.GROWTH_ADMIN_EMAILS;
+          return fastify.inject({
+            method: "GET",
+            url: "/growth/admin/oportunidades",
+            headers: comoAdmin(),
+          });
+        },
+      ],
+      [
+        "JSON mal formado",
+        async () =>
+          fastify.inject({
+            method: "POST",
+            url: "/growth/agente/oportunidades",
+            headers: { ...comoAgente(), "content-type": "application/json" },
+            payload: '{"url": ',
+          }),
+      ],
+    ];
+
+    it.each(escenarios)(
+      "%s lleva Cache-Control: no-store",
+      async (_nombre, ejecutar) => {
+        const response = await ejecutar();
+        expect(response.headers["cache-control"]).toBe("no-store");
+      }
+    );
+
+    it("no hay ETag ni Last-Modified en lo que sale de /growth/*", async () => {
+      contextoVacio();
+      const response = await fastify.inject({
+        method: "GET",
+        url: "/growth/agente/contexto",
+        headers: comoAgente(),
       });
-      expect(response.statusCode).toBe(200);
-      expect(response.json().estado).toBe("conseguida");
-      expect(prismaMock.growthGestion.update).toHaveBeenCalledWith({
-        where: { id: "g1" },
-        data: expect.objectContaining({
-          resultado: "aceptado",
-          urlConseguida: "https://ejemplo.com/listado",
-        }),
-      });
+      expect(response.headers.etag).toBeUndefined();
+      expect(response.headers["last-modified"]).toBeUndefined();
     });
 
-    it("una oportunidad inexistente da 404", async () => {
-      prismaMock.growthOportunidad.findUnique.mockResolvedValue(null);
-      const response = await fastify.inject({
-        method: "POST",
-        url: "/growth/admin/oportunidades/nada/decision",
-        headers: comoAdmin(),
-        payload: { accion: "sin_respuesta" },
-      });
-      expect(response.statusCode).toBe(404);
+    it("lo suyo no se contagia al resto de la API", async () => {
+      const raiz = Fastify();
+      await raiz.register(growthRoutes);
+      raiz.get("/fuera", async () => ({ ok: true }));
+      const response = await raiz.inject({ method: "GET", url: "/fuera" });
+      expect(response.headers["cache-control"]).toBeUndefined();
+      await raiz.close();
     });
   });
 
-  describe("listado (administrador)", () => {
-    it("devuelve la puntuación más alta de cada oportunidad", async () => {
-      prismaMock.growthOportunidad.findMany.mockResolvedValue([
-        {
-          id: "o1",
-          puntTrafico: 10,
-          puntLeads: 30,
-          puntBacklinks: 70,
-        },
-      ]);
+  describe("un solo formato de error", () => {
+    it("una validación fallida es 400 con la lista de fallos", async () => {
+      mock.growthAjuste.findUnique.mockResolvedValue(null);
       const response = await fastify.inject({
+        method: "POST",
+        url: "/growth/agente/oportunidades",
+        headers: comoAgente(),
+        payload: { url: "no es una url" },
+      });
+      expect(response.statusCode).toBe(400);
+      const { error } = response.json();
+      expect(Array.isArray(error)).toBe(true);
+      expect(error[0]).toHaveProperty("path");
+      expect(error[0]).toHaveProperty("message");
+    });
+
+    it("un error de dominio es `{ error: string }` y, si procede, con un `codigo`", async () => {
+      mock.growthOportunidad.findUnique.mockResolvedValue(null);
+      const noExiste = await fastify.inject({
         method: "GET",
-        url: "/growth/admin/oportunidades?estado=pendiente_aprobacion&objetivo=BACKLINKS",
+        url: "/growth/admin/oportunidades/nada",
         headers: comoAdmin(),
       });
-      expect(response.statusCode).toBe(200);
-      expect(response.json()[0].puntuacion).toBe(70);
-      expect(
-        prismaMock.growthOportunidad.findMany.mock.calls[0]![0].where
-      ).toEqual({
-        estado: "pendiente_aprobacion",
-        objetivoPrincipal: "BACKLINKS",
+      expect(noExiste.statusCode).toBe(404);
+      expect(noExiste.json()).toEqual({ error: "La oportunidad no existe." });
+
+      mock.growthAjuste.findUnique.mockResolvedValue({
+        clave: "pausa",
+        valor: true,
+      });
+      const pausa = await fastify.inject({
+        method: "POST",
+        url: "/growth/agente/oportunidades",
+        headers: comoAgente(),
+        payload: {},
+      });
+      expect(pausa.json()).toEqual({
+        error: "Growth está en pausa.",
+        codigo: "pausa",
       });
     });
 
-    it("rechaza un estado que no existe", async () => {
+    it("un fallo interno es 500 con un mensaje fijo: no se filtra el error ni los datos", async () => {
+      mock.growthOportunidad.findUnique.mockRejectedValue(
+        new Error("connect ECONNREFUSED 10.0.0.5:5432 password=hunter2")
+      );
       const response = await fastify.inject({
         method: "GET",
-        url: "/growth/admin/oportunidades?estado=inventado",
+        url: "/growth/admin/oportunidades/o1",
         headers: comoAdmin(),
       });
+      expect(response.statusCode).toBe(500);
+      expect(response.json()).toEqual({ error: "Error interno." });
+      expect(response.body).not.toContain("hunter2");
+      expect(response.body).not.toContain("10.0.0.5");
+    });
+
+    it("un error de Prisma que no se esperaba tampoco se filtra", async () => {
+      mock.growthOportunidad.findMany.mockRejectedValue(
+        Object.assign(
+          new Error("Invalid `prisma.growthOportunidad.findMany()`"),
+          {
+            code: "P2021",
+            meta: { table: "growth_oportunidades" },
+          }
+        )
+      );
+      const response = await fastify.inject({
+        method: "GET",
+        url: "/growth/admin/oportunidades",
+        headers: comoAdmin(),
+      });
+      expect(response.statusCode).toBe(500);
+      expect(response.json()).toEqual({ error: "Error interno." });
+    });
+
+    it("un JSON mal formado es 400 con `{ error: string }` y no con la forma de Fastify", async () => {
+      const response = await fastify.inject({
+        method: "POST",
+        url: "/growth/agente/oportunidades",
+        headers: { ...comoAgente(), "content-type": "application/json" },
+        payload: '{"url": ',
+      });
       expect(response.statusCode).toBe(400);
+      const cuerpo = response.json();
+      expect(typeof cuerpo.error).toBe("string");
+      expect(cuerpo).not.toHaveProperty("statusCode");
+      expect(cuerpo).not.toHaveProperty("message");
+    });
+
+    it("un tipo de contenido que no es JSON es 415 con el mismo formato", async () => {
+      const response = await fastify.inject({
+        method: "POST",
+        url: "/growth/agente/oportunidades",
+        headers: { ...comoAgente(), "content-type": "application/xml" },
+        payload: "<a>hola</a>",
+      });
+      expect(response.statusCode).toBe(415);
+      expect(response.json()).toEqual({
+        error: "El tipo de contenido no es compatible.",
+      });
+    });
+
+    it("un cuerpo demasiado grande es 413 con el mismo formato", async () => {
+      const response = await fastify.inject({
+        method: "POST",
+        url: "/growth/agente/oportunidades",
+        headers: { ...comoAgente(), "content-type": "application/json" },
+        payload: JSON.stringify({ relleno: "x".repeat(2 * 1024 * 1024) }),
+      });
+      expect(response.statusCode).toBe(413);
+      expect(response.json()).toEqual({
+        error: "La petición es demasiado grande.",
+      });
+    });
+
+    it("los errores de autenticación mantienen su forma `{ error: string }`", async () => {
+      const response = await fastify.inject({
+        method: "GET",
+        url: "/growth/admin/oportunidades",
+      });
+      expect(response.json()).toEqual({
+        error: "Inicia sesión para continuar.",
+      });
+    });
+
+    it("un POST sin cuerpo se trata como `{}` y falla la validación, no con un 500", async () => {
+      mock.growthAjuste.findUnique.mockResolvedValue(null);
+      const response = await fastify.inject({
+        method: "POST",
+        url: "/growth/agente/oportunidades",
+        headers: comoAgente(),
+      });
+      expect(response.statusCode).toBe(400);
+    });
+  });
+  describe("choques entre transacciones: 409 conflicto, nunca 500", () => {
+    const decision = () =>
+      fastify.inject({
+        method: "POST",
+        url: "/growth/admin/oportunidades/o1/decision",
+        headers: comoAdmin(),
+        payload: { accion: "aprobar", borradorId: "b1" },
+      });
+
+    it.each([
+      [
+        "un deadlock de Postgres (40P01) que llega en el mensaje",
+        Object.assign(
+          new Error(
+            "Invalid `prisma.growthBorrador.updateMany()` invocation: ... deadlock detected (SQLSTATE 40P01)"
+          ),
+          {
+            code: "P2010",
+            meta: { code: "40P01", message: "deadlock detected" },
+          }
+        ),
+      ],
+      [
+        "el código de Prisma P2034 (conflicto de escritura o deadlock)",
+        Object.assign(new Error("Transaction failed due to a write conflict"), {
+          code: "P2034",
+        }),
+      ],
+      [
+        "un fallo de serialización (40001)",
+        Object.assign(new Error("could not serialize access"), {
+          meta: { code: "40001" },
+        }),
+      ],
+      [
+        "una transacción que no llegó a tiempo (P2028)",
+        Object.assign(new Error("Transaction API error: timeout"), {
+          code: "P2028",
+        }),
+      ],
+      [
+        "solo el texto 40P01 en el mensaje",
+        new Error("ERROR: 40P01 deadlock detected"),
+      ],
+    ])("%s", async (_nombre, error) => {
+      mock.$transaction.mockRejectedValue(error);
+      const response = await decision();
+      expect(response.statusCode).toBe(409);
+      expect(response.json()).toEqual({
+        error:
+          "Otra operación estaba cambiando lo mismo. Vuelve a cargarlo y repítelo.",
+        codigo: "conflicto",
+      });
+    });
+
+    it("un error cualquiera de la base de datos sigue siendo un 500 sin filtrar el mensaje", async () => {
+      mock.$transaction.mockRejectedValue(
+        Object.assign(new Error('relation "x" does not exist'), {
+          code: "P2021",
+        })
+      );
+      const response = await decision();
+      expect(response.statusCode).toBe(500);
+      expect(response.json()).toEqual({ error: "Error interno." });
     });
   });
 });

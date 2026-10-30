@@ -7,6 +7,15 @@ import { createHash, randomBytes } from "node:crypto";
  */
 export const PREFIJO_DE_TOKEN = "gta_";
 
+/**
+ * Lo que un token de agente puede hacer. `leer` y `escribir` son los del
+ * flujo normal; `conocimiento` solo sirve para sincronizar la base de
+ * conocimiento, de la que cuelgan las reglas duras, y se da aparte: un token
+ * que lee y escribe borradores no cambia sus propias reglas.
+ */
+export const ALCANCES_DE_AGENTE = ["leer", "escribir", "conocimiento"] as const;
+export type AlcanceDeAgente = (typeof ALCANCES_DE_AGENTE)[number];
+
 /** Lo único que se guarda del token: su SHA-256. */
 export function hashDeToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");

@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  ALCANCES_DE_AGENTE,
   PREFIJO_DE_TOKEN,
   administradoresDeGrowth,
   generarTokenDeAgente,
@@ -20,6 +21,16 @@ describe("tokens de agente de Growth", () => {
     expect(hash).toBe(hashDeToken(token));
     expect(hash).toMatch(/^[0-9a-f]{64}$/);
     expect(hash).not.toContain(token);
+  });
+});
+
+describe("alcances de un token de agente", () => {
+  it("son tres y `conocimiento` es aparte de leer y escribir", () => {
+    expect([...ALCANCES_DE_AGENTE]).toEqual([
+      "leer",
+      "escribir",
+      "conocimiento",
+    ]);
   });
 });
 

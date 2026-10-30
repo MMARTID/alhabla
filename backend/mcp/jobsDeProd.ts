@@ -33,6 +33,8 @@ export const JOBS_QUE_NO: Record<string, string> = {
   "send-weekly-summaries": "manda el resumen semanal por correo a los dueños",
   "recordar-desvio-sin-comprobar": "manda WhatsApp a los dueños",
   "purge-old-recordings": "borra grabaciones",
+  "growth-mantenimiento":
+    "caduca oportunidades aprobadas de Growth y borra datos de terceros pasada su retención",
   "suspend-overdue-calls":
     "suspende las llamadas de cuentas con pagos atrasados",
   "retry-usage-reports": "reporta minutos a Stripe",
