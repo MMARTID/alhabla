@@ -161,6 +161,41 @@ export class TelnyxAdapter {
   }
 
   /**
+   * Todos los números de la cuenta (paginado por el SDK), para el inventario
+   * del panel de desarrollo (backend/mcp/inventario.ts). La cuenta es la
+   * misma para dev y producción.
+   */
+  async listNumbers(): Promise<
+    Array<{
+      id: string;
+      phoneNumber: string;
+      status: string;
+      connectionId: string | null;
+      messagingProfileId: string | null;
+      tags: string[];
+      createdAt: string | null;
+    }>
+  > {
+    const client = getTelnyxClient();
+    const numeros = [];
+    for await (const numero of client.phoneNumbers.list({
+      "page[size]": 250,
+    })) {
+      if (!numero.id || !numero.phone_number) continue;
+      numeros.push({
+        id: numero.id,
+        phoneNumber: numero.phone_number,
+        status: numero.status ?? "",
+        connectionId: numero.connection_id ?? null,
+        messagingProfileId: numero.messaging_profile_id ?? null,
+        tags: numero.tags ?? [],
+        createdAt: numero.created_at ?? null,
+      });
+    }
+    return numeros;
+  }
+
+  /**
    * Resuelve el id REAL y persistente del recurso PhoneNumber a partir del
    * número en sí — a diferencia de `NumberOrderResult.phoneNumberId` (el
    * `phone_numbers[0].id` que devuelve `numberOrders.create`/`retrieve`),

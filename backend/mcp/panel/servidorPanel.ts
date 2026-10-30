@@ -7,9 +7,24 @@ import {
 } from "node:http";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { estadoDeBackendSim } from "../backendSim.js";
+import { verColasDeProd } from "../colasDeProd.js";
+import { diagnosticarMcp } from "../diagnostico.js";
 import { leerEnviosSimulados } from "../enviosSimulados.js";
+import { leerErroresDeProd } from "../erroresDeProd.js";
 import { estadoDeProd } from "../estadoDeProd.js";
-import { leerLogsDeProd } from "../logsDeProd.js";
+import {
+  ErrorDeInventario,
+  borrarFantasma,
+  buscarFantasmas,
+  editar,
+  enlaceDeEntrada,
+  leerInventario,
+  simularBorrado,
+  urlDeBdDelEntorno,
+} from "../inventario.js";
+import { panoramaDePlataforma } from "../panoramaDePlataforma.js";
+import { visitasWeb } from "../visitasWeb.js";
 import {
   DIR_HERRAMIENTAS,
   HERRAMIENTAS,
@@ -27,7 +42,9 @@ import {
 /**
  * Panel de desarrollo (http://localhost:3005): qué enseña el entorno fijo y
  * si cada pieza responde, los PR abiertos con «Ver en dev», producción de un
- * vistazo y los envíos que backend-sim no mandó. Lo arranca launchd
+ * vistazo (errores agrupados, colas, panorama de la plataforma, visitas), los
+ * envíos que backend-sim no mandó y el inventario de cuentas, números y
+ * assistants de Telnyx (/inventario, inventario.ts). Lo arranca launchd
  * (scripts/dev/servir.sh panel) desde las herramientas (~/.alhabla-mcp).
  *
  * Solo escucha en 127.0.0.1 y, aun así, cualquier web abierta en el
@@ -65,7 +82,34 @@ export type Dependencias = {
   ultimasLineasDelRegistro: typeof ultimasLineasDelRegistro;
   produccion: () => Promise<unknown>;
   envios: () => Promise<unknown>;
+  plataforma: () => Promise<unknown>;
+  visitas: () => Promise<unknown>;
+  diagnostico: () => Promise<unknown>;
+  sim: () => Promise<unknown>;
+  inventario: (entorno: "dev" | "prod") => Promise<unknown>;
+  fantasmas: () => Promise<unknown>;
+  simularBorrado: (id: string) => Promise<unknown>;
+  borrarFantasma: (cuerpo: {
+    id: string;
+    confirmacion: string;
+    cuentaCompartida: boolean;
+  }) => Promise<unknown>;
+  editar: (cuerpo: unknown) => Promise<unknown>;
+  entrar: (businessId: string) => Promise<unknown>;
 };
+
+/** Lo que falla en una parte no tumba la sección entera. */
+function aparte<T>(trabajo: () => Promise<T>) {
+  return trabajo().catch((error: Error) => ({
+    error: error.message.replace(/^\[MCP\] /, ""),
+  }));
+}
+
+/** Sin el systemPrompt: va en el inventario, no en la lista de fantasmas. */
+async function fantasmasParaLaPagina() {
+  const { referencias: _referencias, ...fantasmas } = await buscarFantasmas();
+  return fantasmas;
+}
 
 const DEPENDENCIAS: Dependencias = {
   estadoDelEntorno,
@@ -74,15 +118,25 @@ const DEPENDENCIAS: Dependencias = {
   reiniciar,
   ultimasLineasDelRegistro,
   produccion: async () => {
-    const [estado, errores] = await Promise.all([
+    const [estado, errores, colas] = await Promise.all([
       estadoDeProd(),
-      leerLogsDeProd({ soloErrores: true, desde: "24h", limite: 15 }).catch(
-        (error: Error) => ({ error: error.message })
-      ),
+      aparte(() => leerErroresDeProd({ desde: "24h" })),
+      aparte(() => verColasDeProd({})),
     ]);
-    return { ...estado, errores };
+    return { ...estado, errores, colasDetalle: colas };
   },
   envios: () => leerEnviosSimulados({ desde: "24h", limite: 30 }),
+  plataforma: async () =>
+    panoramaDePlataforma(await urlDeBdDelEntorno("prod"), { dias: 14 }),
+  visitas: () => visitasWeb({ desde: "7d" }),
+  diagnostico: () => diagnosticarMcp(),
+  sim: () => estadoDeBackendSim(),
+  inventario: (entorno) => leerInventario(entorno),
+  fantasmas: fantasmasParaLaPagina,
+  simularBorrado: (id) => simularBorrado(id),
+  borrarFantasma: (cuerpo) => borrarFantasma(cuerpo),
+  editar: (cuerpo) => editar(cuerpo),
+  entrar: (businessId) => enlaceDeEntrada(businessId),
 };
 
 function enviar(res: ServerResponse, codigo: number, cuerpo: unknown) {
@@ -99,7 +153,8 @@ async function leerJson(
   let texto = "";
   for await (const trozo of req) {
     texto += trozo;
-    if (texto.length > 10_000) throw new Error("Cuerpo demasiado grande");
+    // Un systemPrompt entero (inventario) pasa de 15 000 caracteres.
+    if (texto.length > 300_000) throw new Error("Cuerpo demasiado grande");
   }
   const valor = JSON.parse(texto || "{}") as unknown;
   return valor && typeof valor === "object"
@@ -107,7 +162,11 @@ async function leerJson(
     : {};
 }
 
-const PAGINA = join(dirname(fileURLToPath(import.meta.url)), "pagina.html");
+const AQUI = dirname(fileURLToPath(import.meta.url));
+const PAGINAS: Record<string, string> = {
+  "/": join(AQUI, "pagina.html"),
+  "/inventario": join(AQUI, "inventario.html"),
+};
 
 export function crearServidorDelPanel(
   deps: Dependencias = DEPENDENCIAS,
@@ -117,16 +176,18 @@ export function crearServidorDelPanel(
     if (!hostPermitido(req.headers.host, puerto)) {
       return enviar(res, 403, { error: "Host no permitido" });
     }
-    const ruta = new URL(req.url ?? "/", "http://localhost").pathname;
+    const url = new URL(req.url ?? "/", "http://localhost");
+    const ruta = url.pathname;
     try {
       if (req.method === "GET") {
+        if (PAGINAS[ruta]) {
+          res.writeHead(200, {
+            "Content-Type": "text/html; charset=utf-8",
+            "Cache-Control": "no-store",
+          });
+          return res.end(readFileSync(PAGINAS[ruta]));
+        }
         switch (ruta) {
-          case "/":
-            res.writeHead(200, {
-              "Content-Type": "text/html; charset=utf-8",
-              "Cache-Control": "no-store",
-            });
-            return res.end(readFileSync(PAGINA));
           case "/api/estado":
             return enviar(res, 200, await deps.estadoDelEntorno());
           case "/api/prs":
@@ -139,6 +200,23 @@ export function crearServidorDelPanel(
             return enviar(res, 200, {
               lineas: deps.ultimasLineasDelRegistro(),
             });
+          case "/api/plataforma":
+            return enviar(res, 200, await deps.plataforma());
+          case "/api/visitas":
+            return enviar(res, 200, await deps.visitas());
+          case "/api/diagnostico":
+            return enviar(res, 200, await deps.diagnostico());
+          case "/api/sim":
+            return enviar(res, 200, await deps.sim());
+          case "/api/inventario": {
+            const entorno = url.searchParams.get("entorno") ?? "dev";
+            if (entorno !== "dev" && entorno !== "prod") {
+              return enviar(res, 400, { error: "entorno: dev o prod" });
+            }
+            return enviar(res, 200, await deps.inventario(entorno));
+          }
+          case "/api/fantasmas":
+            return enviar(res, 200, await deps.fantasmas());
         }
         return enviar(res, 404, { error: "No existe" });
       }
@@ -168,11 +246,42 @@ export function crearServidorDelPanel(
             mensaje: await deps.reiniciar(pieza as PiezaReiniciable),
           });
         }
+        if (ruta === "/api/fantasmas/simular") {
+          return enviar(
+            res,
+            200,
+            await deps.simularBorrado(String(cuerpo.id ?? ""))
+          );
+        }
+        if (ruta === "/api/fantasmas/borrar") {
+          return enviar(
+            res,
+            200,
+            await deps.borrarFantasma({
+              id: String(cuerpo.id ?? ""),
+              confirmacion: String(cuerpo.confirmacion ?? ""),
+              cuentaCompartida: cuerpo.cuentaCompartida === true,
+            })
+          );
+        }
+        if (ruta === "/api/inventario/editar") {
+          return enviar(res, 200, await deps.editar(cuerpo));
+        }
+        if (ruta === "/api/entrar") {
+          return enviar(
+            res,
+            200,
+            await deps.entrar(String(cuerpo.businessId ?? ""))
+          );
+        }
         return enviar(res, 404, { error: "No existe" });
       }
       return enviar(res, 405, { error: "Método no permitido" });
     } catch (error) {
-      return enviar(res, 500, { error: (error as Error).message });
+      const codigo = error instanceof ErrorDeInventario ? error.codigo : 500;
+      return enviar(res, codigo, {
+        error: (error as Error).message.replace(/^\[MCP\] /, ""),
+      });
     }
   });
 }

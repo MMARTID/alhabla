@@ -8,6 +8,7 @@ import {
   it,
   vi,
 } from "vitest";
+import { ErrorDeInventario } from "../../mcp/inventario.js";
 import { ramaValida, resumirPrs } from "../../mcp/panel/entornoDev.js";
 import {
   accionPermitida,
@@ -145,6 +146,18 @@ describe("servidor del panel", () => {
     ultimasLineasDelRegistro: vi.fn(() => ["una línea"]),
     produccion: vi.fn(async () => ({})),
     envios: vi.fn(async () => ({ envios: [] })),
+    plataforma: vi.fn(async () => ({ negocios: 3 })),
+    visitas: vi.fn(async () => ({})),
+    diagnostico: vi.fn(async () => ({ comprobaciones: [] })),
+    sim: vi.fn(async () => ({ enMarcha: false })),
+    inventario: vi.fn(async (entorno) => ({ entorno, cuentas: [] })),
+    fantasmas: vi.fn(async () => ({ assistants: [], numeros: [] })),
+    simularBorrado: vi.fn(async (id) => ({ esFantasma: false, id })),
+    borrarFantasma: vi.fn(async () => {
+      throw new ErrorDeInventario("Escribe el id exacto para confirmar", 400);
+    }),
+    editar: vi.fn(async () => ({ mensaje: "Guardado en dev" })),
+    entrar: vi.fn(async () => ({ url: "http://localhost:3001/auth/entrar" })),
   };
   let servidor: Server;
 
@@ -249,5 +262,68 @@ describe("servidor del panel", () => {
     });
     expect(ok.estado).toBe(200);
     expect(deps.reiniciar).toHaveBeenCalledWith("app");
+  });
+
+  it("sirve el inventario y valida el entorno", async () => {
+    const pagina = await pedir("GET", "/inventario");
+    expect(pagina.estado).toBe(200);
+    expect(pagina.texto).toContain("<title>Alhabla · Inventario</title>");
+    expect(
+      JSON.parse((await pedir("GET", "/api/inventario?entorno=prod")).texto)
+    ).toEqual({ entorno: "prod", cuentas: [] });
+    expect((await pedir("GET", "/api/inventario?entorno=x")).estado).toBe(400);
+    expect(deps.inventario).toHaveBeenCalledTimes(1);
+  });
+
+  it("borrar o editar sin el Origin del panel no hace nada", async () => {
+    for (const ruta of [
+      "/api/fantasmas/borrar",
+      "/api/fantasmas/simular",
+      "/api/inventario/editar",
+      "/api/entrar",
+    ]) {
+      const respuesta = await pedir("POST", ruta, {
+        headers: { "content-type": "application/json" },
+        cuerpo: '{"id":"assistant-x","confirmacion":"assistant-x"}',
+      });
+      expect(respuesta.estado, ruta).toBe(403);
+    }
+    expect(deps.borrarFantasma).not.toHaveBeenCalled();
+    expect(deps.editar).not.toHaveBeenCalled();
+  });
+
+  it("el dry-run y el borrado pasan id, confirmación y la marca", async () => {
+    const simulado = await pedir("POST", "/api/fantasmas/simular", {
+      headers: json,
+      cuerpo: '{"id":"assistant-x"}',
+    });
+    expect(JSON.parse(simulado.texto)).toEqual({
+      esFantasma: false,
+      id: "assistant-x",
+    });
+    const borrado = await pedir("POST", "/api/fantasmas/borrar", {
+      headers: json,
+      cuerpo:
+        '{"id":"assistant-x","confirmacion":"otro","cuentaCompartida":"true"}',
+    });
+    // El error del inventario sale con su código, no como un 500.
+    expect(borrado.estado).toBe(400);
+    expect(deps.borrarFantasma).toHaveBeenCalledWith({
+      id: "assistant-x",
+      confirmacion: "otro",
+      // Solo el booleano true cuenta como marcada.
+      cuentaCompartida: false,
+    });
+  });
+
+  it("acepta un systemPrompt largo", async () => {
+    const respuesta = await pedir("POST", "/api/inventario/editar", {
+      headers: json,
+      cuerpo: JSON.stringify({
+        tipo: "agente",
+        systemPrompt: "x".repeat(40_000),
+      }),
+    });
+    expect(respuesta.estado).toBe(200);
   });
 });

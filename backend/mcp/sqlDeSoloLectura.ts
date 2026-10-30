@@ -30,7 +30,15 @@ export async function ejecutarSoloLectura(
     parametros = [],
     limiteFilas = 200,
     timeoutMs = 15_000,
-  }: { parametros?: unknown[]; limiteFilas?: number; timeoutMs?: number } = {}
+    maxCaracteresPorValor = MAX_CARACTERES_POR_VALOR,
+  }: {
+    parametros?: unknown[];
+    limiteFilas?: number;
+    timeoutMs?: number;
+    /** Las cadenas más largas se recortan (un prompt entero, para el
+     * inventario del panel, necesita más). */
+    maxCaracteresPorValor?: number;
+  } = {}
 ): Promise<ResultadoDeConsulta> {
   const cliente = new pg.Client({
     connectionString: urlDeConexion,
@@ -48,7 +56,9 @@ export async function ejecutarSoloLectura(
     } as pg.QueryConfig);
     return {
       columnas: resultado.fields.map((campo) => campo.name),
-      filas: resultado.rows.slice(0, limiteFilas).map(serializarFila),
+      filas: resultado.rows
+        .slice(0, limiteFilas)
+        .map((fila) => serializarFila(fila, maxCaracteresPorValor)),
       totalFilas: resultado.rowCount ?? resultado.rows.length,
       truncado: resultado.rows.length > limiteFilas,
     };
@@ -58,18 +68,24 @@ export async function ejecutarSoloLectura(
   }
 }
 
-function serializarFila(fila: Record<string, unknown>): Record<string, unknown> {
+function serializarFila(
+  fila: Record<string, unknown>,
+  maximo: number
+): Record<string, unknown> {
   return Object.fromEntries(
-    Object.entries(fila).map(([columna, valor]) => [columna, serializar(valor)])
+    Object.entries(fila).map(([columna, valor]) => [
+      columna,
+      serializar(valor, maximo),
+    ])
   );
 }
 
-function serializar(valor: unknown): unknown {
+function serializar(valor: unknown, maximo: number): unknown {
   if (valor instanceof Date) return valor.toISOString();
   if (typeof valor === "bigint") return valor.toString();
   if (Buffer.isBuffer(valor)) return `<${valor.length} bytes>`;
-  if (typeof valor === "string" && valor.length > MAX_CARACTERES_POR_VALOR) {
-    return `${valor.slice(0, MAX_CARACTERES_POR_VALOR)}… (${valor.length} caracteres)`;
+  if (typeof valor === "string" && valor.length > maximo) {
+    return `${valor.slice(0, maximo)}… (${valor.length} caracteres)`;
   }
   return valor;
 }

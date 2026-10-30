@@ -335,6 +335,24 @@ export class TelnyxAiAdapter {
     return toTelnyxAssistant(response);
   }
 
+  /**
+   * Todos los assistants de la cuenta, sin instrucciones ni tools (el
+   * inventario del panel de desarrollo, backend/mcp/inventario.ts). La cuenta
+   * es la misma para dev y producción: quien cruce esta lista con una BD
+   * tiene que cruzarla con las dos.
+   */
+  async listAssistants(): Promise<
+    Array<{ id: string; name: string; createdAt: string | null }>
+  > {
+    const client = getTelnyxClient();
+    const response = await client.ai.assistants.list();
+    return response.data.map((assistant) => ({
+      id: assistant.id,
+      name: assistant.name,
+      createdAt: assistant.created_at ?? null,
+    }));
+  }
+
   async deleteAssistant(assistantId: string): Promise<void> {
     const client = getTelnyxClient();
     await client.ai.assistants.delete(assistantId);

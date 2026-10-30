@@ -12,6 +12,12 @@
       "runtimeExecutable": "sh",
       "runtimeArgs": ["-c", "cd web && exec npx next dev -p 3102"],
       "port": 3102
+    },
+    {
+      "name": "panel-dev",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": ["-c", "cd backend && ALHABLA_PANEL_PUERTO=3105 exec node_modules/.bin/tsx mcp/panel/servidorPanel.ts"],
+      "port": 3105
     }
   ]
 }
