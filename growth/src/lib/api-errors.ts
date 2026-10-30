@@ -32,17 +32,24 @@ export class ErrorDeCliente extends Error {
   readonly estado: number;
   readonly codigo: string | null;
   readonly comprobaciones: Comprobacion[] | null;
+  /** El `id` del cuerpo, si lo lleva (un 409 `competidor_existente` dice cuál). */
+  readonly id: string | null;
 
   constructor(
     estado: number,
     mensaje: string,
-    extra: { codigo?: string; comprobaciones?: Comprobacion[] } = {}
+    extra: {
+      codigo?: string;
+      comprobaciones?: Comprobacion[];
+      id?: string;
+    } = {}
   ) {
     super(mensaje);
     this.name = "ErrorDeCliente";
     this.estado = estado;
     this.codigo = extra.codigo ?? null;
     this.comprobaciones = extra.comprobaciones ?? null;
+    this.id = extra.id ?? null;
   }
 }
 
@@ -138,6 +145,19 @@ export function mensajeDeError(error: unknown, respaldo: string): string {
 /** El `codigo` del cuerpo de un fallo (`tope_semanal`, `caducada`…), si hay. */
 export function codigoDeError(error: unknown): string | null {
   return analizarError(error, "").codigo;
+}
+
+/**
+ * El `id` que lleva el cuerpo de un fallo, si lo hay: el `409
+ * competidor_existente` dice cuál es el competidor que ya existe.
+ */
+export function idDeLaRespuesta(error: unknown): string | null {
+  if (error instanceof ErrorDeCliente) return error.id;
+  if (!axios.isAxiosError(error)) return null;
+  const cuerpo: unknown = error.response?.data;
+  if (cuerpo === null || typeof cuerpo !== "object") return null;
+  const id = (cuerpo as Record<string, unknown>).id;
+  return typeof id === "string" && id !== "" && id.length <= 100 ? id : null;
 }
 
 /** ¿El backend ha cortado por el límite de peticiones por minuto? */

@@ -1,5 +1,6 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "../../lib/prisma.js";
+import { COMPETIDOR_CONFIRMADO } from "./competidores.js";
 import {
   DIAS_ENTRE_CONTACTOS_AL_MISMO_DOMINIO,
   evaluarCumplimiento,
@@ -416,7 +417,10 @@ export async function contextoDeCumplimiento(opciones: OpcionesDeContexto) {
       where: { vigenteHasta: null },
       select: { clave: true, tipo: true, texto: true, valor: true },
     }),
+    // Regla 3: solo los competidores confirmados. Un `propuesto` (lo sugiere
+    // el agente) no bloquea un borrador hasta que el administrador lo acepta.
     cliente.growthCompetidor.findMany({
+      where: COMPETIDOR_CONFIRMADO,
       select: { nombre: true, dominio: true },
     }),
     leerAjustesEfectivos(cliente),

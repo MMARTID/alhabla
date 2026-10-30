@@ -23,9 +23,12 @@ import type { PrepararCarga } from "./sincronizar.js";
  *   guardar_investigacion: el embudo hasta «investigada».
  * - evaluar_borrador / crear_borrador / registrar_cumplimiento: el borrador y
  *   sus reglas de cumplimiento.
+ * - listar_competidores / guardar_analisis_de_competidor / proponer_competidor:
+ *   la competencia (análisis interno que revisa el fundador; los propuestos
+ *   los acepta o rechaza él).
  *
- * No hay herramienta para aprobar, marcar como gestionado ni cambiar un
- * estado a mano. El token (GROWTH_AGENT_TOKEN o el llavero de macOS) se lee
+ * No hay herramienta para aprobar, marcar como gestionado, cambiar un estado
+ * a mano ni aceptar o quitar un competidor. El token (GROWTH_AGENT_TOKEN o el llavero de macOS) se lee
  * en la primera llamada, no al arrancar, y no sale nunca en una respuesta.
  * stdout es el canal del protocolo: todo log va a stderr.
  */

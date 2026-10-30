@@ -61,8 +61,39 @@ async function escribir(
 }
 
 describe("Ajustes · lectura", () => {
-  it("enseña los valores guardados, lo fijo y los competidores", async () => {
-    montar();
+  it("enseña los valores guardados, lo fijo y el resumen de la competencia", async () => {
+    montar(crearAjustes(), {
+      competidores: async () => ({
+        data: [
+          competidor({ id: "a", estado: "propuesto", origen: "agente" }),
+          competidor({ id: "b", estado: "por_analizar" }),
+          competidor({
+            id: "c",
+            estado: "analizado",
+            analisis: {
+              id: "an-1",
+              version: 2,
+              creadoEn: "2026-10-01T09:00:00.000Z",
+              revisadoEn: null,
+              numDatos: 4,
+              caducado: false,
+            },
+          }),
+          competidor({
+            id: "d",
+            estado: "revisado",
+            analisis: {
+              id: "an-2",
+              version: 1,
+              creadoEn: "2026-05-01T09:00:00.000Z",
+              revisadoEn: "2026-05-02T09:00:00.000Z",
+              numDatos: 3,
+              caducado: true,
+            },
+          }),
+        ],
+      }),
+    });
 
     expect(await screen.findByLabelText("Contactos por semana")).toHaveValue(
       "5"
@@ -78,9 +109,25 @@ describe("Ajustes · lectura", () => {
     expect(fijo).toHaveTextContent("180 días");
     expect(fijo).toHaveTextContent("90 días");
 
-    expect(await screen.findByText("Competidor ficticio")).toBeInTheDocument();
-    expect(screen.getByText("competidor-ficticio.example")).toBeInTheDocument();
-    expect(screen.getByText("2 oportunidades")).toBeInTheDocument();
+    const competencia = (
+      await screen.findByRole("heading", { name: "Competencia" })
+    ).closest("section") as HTMLElement;
+    const cifra = (nombre: string) =>
+      within(competencia).getByText(nombre).nextElementSibling;
+    await waitFor(() => expect(cifra("Competidores")).toHaveTextContent("4"));
+    expect(cifra("Propuestos por el agente, sin aceptar")).toHaveTextContent(
+      "1"
+    );
+    expect(cifra("Por analizar")).toHaveTextContent("1");
+    expect(cifra("Análisis pendientes de revisión")).toHaveTextContent("1");
+    expect(cifra("Con el análisis caducado")).toHaveTextContent("1");
+    expect(
+      within(competencia).getByRole("link", {
+        name: /Gestionar la competencia/,
+      })
+    ).toHaveAttribute("href", "/competencia");
+    // Ya no es una lista de solo lectura: ni nombres ni dominios.
+    expect(screen.queryByText("competidor-ficticio.example")).toBeNull();
   });
 
   it("las claves sistema.* se enseñan pero no se pueden editar", async () => {
@@ -142,9 +189,12 @@ describe("Ajustes · lectura", () => {
         /la regla de comparativas con fuente no tiene con qué comparar/
       )
     ).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: /Ir a Competencia/ })
+    ).toHaveAttribute("href", "/competencia");
   });
 
-  it("los textos de los competidores son texto: ni enlaces ni HTML", async () => {
+  it("el resumen no pinta ni nombres ni notas de competidores: solo cifras y un enlace a su vista", async () => {
     const cliente = clienteFalso({
       ajustes: async () => crearAjustes(),
       competidores: async () => ({
@@ -158,8 +208,14 @@ describe("Ajustes · lectura", () => {
       }),
     });
     const { container } = renderConCliente(<VistaDeAjustes />, cliente);
-    await screen.findByText("<b>Rival</b>");
-    expect(container.querySelector("a, img, b")).toBeNull();
+    await screen.findByText("Gestionar la competencia");
+    expect(screen.queryByText("<b>Rival</b>")).toBeNull();
+    expect(container.querySelector("img, b")).toBeNull();
+    // El único enlace del resumen es el de la vista de Competencia.
+    const enlaces = container.querySelectorAll("a");
+    expect([...enlaces].map((a) => a.getAttribute("href"))).toEqual([
+      "/competencia",
+    ]);
   });
 
   it("si los competidores fallan, los ajustes siguen a la vista", async () => {

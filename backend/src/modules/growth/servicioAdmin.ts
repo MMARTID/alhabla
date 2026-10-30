@@ -38,7 +38,8 @@ import {
 /**
  * Lo que el dashboard lee y edita además de la Bandeja y la Revisión (que
  * viven en `service.ts`): el resumen, los borradores, el historial de
- * decisiones y gestiones, la base de conocimiento y los competidores.
+ * decisiones y gestiones y la base de conocimiento. (Los competidores viven
+ * en `servicioCompetenciaAdmin.ts`.)
  *
  * Este fichero es también donde viven las piezas pequeñas que comparten
  * `ejecuciones.ts` y `servicioAgente.ts` (paginar, el código de descarte,
@@ -1063,42 +1064,4 @@ export async function historialDeAfirmacion(clave: string) {
     throw new ErrorDeGrowth(404, "Esa afirmación no existe.");
   }
   return { clave, versiones };
-}
-
-// ── Competidores ─────────────────────────────────────────────────────────
-
-/**
- * `GET /growth/admin/competidores`. La regla dura de comparativas es vacua
- * mientras la tabla esté vacía: la siembra el sincronizador (solo altas).
- */
-export async function listarCompetidores() {
-  const competidores = await prisma.growthCompetidor.findMany({
-    orderBy: [{ nombre: "asc" }, { id: "asc" }],
-    select: { id: true, nombre: true, dominio: true, notas: true },
-  });
-  if (competidores.length === 0) return { data: [] };
-
-  // Una sola consulta para todos: cuenta los dominios de los competidores y
-  // sus subdominios, igual que la puerta dura al calificar.
-  const grupos = await prisma.growthOportunidad.groupBy({
-    by: ["dominio"],
-    where: {
-      OR: competidores.flatMap((c) => [
-        { dominio: c.dominio },
-        { dominio: { endsWith: `.${c.dominio}` } },
-      ]),
-    },
-    _count: { _all: true },
-  });
-
-  return {
-    data: competidores.map((c) => ({
-      ...c,
-      oportunidades: grupos
-        .filter(
-          (g) => g.dominio === c.dominio || g.dominio.endsWith(`.${c.dominio}`)
-        )
-        .reduce((suma, g) => suma + g._count._all, 0),
-    })),
-  };
 }

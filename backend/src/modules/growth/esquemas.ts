@@ -119,6 +119,9 @@ export const ENLACES_ESPERADOS = [
   "desconocido",
 ] as const;
 export const DIFICULTADES = ["baja", "media", "alta"] as const;
+
+/** Cuántos competidores puede mencionar una misma oportunidad. */
+export const MAXIMO_DE_COMPETIDORES_MENCIONADOS = 10;
 export const VIAS_DE_CONTACTO = [
   "formulario",
   "email_editorial",
@@ -460,6 +463,15 @@ export const DatosDeOportunidad = z
     enlaceEsperado: z.enum(ENLACES_ESPERADOS).optional(),
     dificultad: z.enum(DIFICULTADES).optional(),
     nota: sano(z.string().trim().max(500)).optional(),
+    /**
+     * Dominios de los competidores que esa página menciona o lista (por
+     * ejemplo, un «mejores recepcionistas de IA» que cita a HeyDiga). El
+     * backend los normaliza y comprueba que existan (y no sean `propuesto`).
+     */
+    competidoresMencionados: z
+      .array(dominioNormalizado)
+      .max(MAXIMO_DE_COMPETIDORES_MENCIONADOS)
+      .optional(),
   })
   .strict();
 export type DatosDeOportunidad = z.infer<typeof DatosDeOportunidad>;
@@ -1129,6 +1141,8 @@ export const ListadoDeOportunidadesQuery = Paginacion.extend({
   fuente: z.enum(TIPOS_DE_FUENTE).optional(),
   ejecucionId: idDe.optional(),
   dominio: dominioDeFiltro.optional(),
+  /** Solo las que mencionan a ese competidor (`datos.competidoresMencionados`). */
+  menciona: dominioDeFiltro.optional(),
   q: textoDeBusqueda.optional(),
   orden: z.enum(["puntuacion", "recientes", "caducan"]).default("recientes"),
 });
@@ -1200,3 +1214,205 @@ export const ConocimientoDelAgenteQuery = z.object({
   q: textoDeBusqueda.optional(),
   limite: z.coerce.number().int().min(1).max(500).default(200),
 });
+
+// ── Competencia ──────────────────────────────────────────────────────────
+
+/**
+ * propuesto: lo sugiere el agente y NO aplica reglas duras hasta que lo aceptas;
+ * por_analizar: confirmado, el agente aún no lo ha leído (o pediste volver a hacerlo);
+ * analizado: hay un análisis pendiente de tu revisión;
+ * revisado: lo diste por bueno.
+ */
+export const ESTADOS_DE_COMPETIDOR = [
+  "propuesto",
+  "por_analizar",
+  "analizado",
+  "revisado",
+] as const;
+export type EstadoDeCompetidor = (typeof ESTADOS_DE_COMPETIDOR)[number];
+
+/** Quién lo dio de alta. Solo se quitan los que no son `repo`. */
+export const ORIGENES_DE_COMPETIDOR = ["repo", "manual", "agente"] as const;
+export type OrigenDeCompetidor = (typeof ORIGENES_DE_COMPETIDOR)[number];
+
+export const TIPOS_DE_DATO_DE_COMPETIDOR = [
+  "producto",
+  "servicio",
+  "precio",
+  "plan",
+  "integracion",
+  "sector",
+  "idioma",
+  "canal",
+  "limite",
+  "diferencia",
+  "otro",
+] as const;
+export type TipoDeDatoDeCompetidor =
+  (typeof TIPOS_DE_DATO_DE_COMPETIDOR)[number];
+
+export const MONEDAS_DE_PRECIO = ["EUR", "USD", "GBP"] as const;
+export const PERIODOS_DE_PRECIO = ["mes", "anio", "uso", "unico"] as const;
+
+/** Pasado este tiempo el análisis se considera caducado y el agente lo repite. */
+export const DIAS_PARA_CADUCAR_UN_ANALISIS = 90;
+/** Un análisis nuevo antes de este plazo (sin haber pedido volver a analizar) se rechaza. */
+export const DIAS_MINIMOS_ENTRE_ANALISIS = 7;
+export const MAXIMO_DE_DATOS_POR_ANALISIS = 60;
+export const MAXIMO_DE_VERSIONES_POR_COMPETIDOR = 10;
+export const MAXIMO_DE_PROPUESTAS_PENDIENTES = 20;
+const LIMITE_DE_ANALISIS_EN_BYTES = 40 * 1024;
+
+/** Cuánto puede adelantarse el reloj del agente a el del servidor al fechar una consulta. */
+const MARGEN_DE_RELOJ_EN_MS = 5 * 60 * 1000;
+const DIAS_MAXIMOS_DE_UNA_CONSULTA = 30;
+
+/** Fecha en que el agente leyó la página: ni en el futuro ni de hace más de 30 días. */
+const fechaDeConsulta = z
+  .string()
+  .datetime({ offset: true })
+  .refine((valor) => {
+    const instante = Date.parse(valor);
+    const ahora = Date.now();
+    return (
+      instante <= ahora + MARGEN_DE_RELOJ_EN_MS &&
+      instante >= ahora - DIAS_MAXIMOS_DE_UNA_CONSULTA * 24 * 60 * 60 * 1000
+    );
+  }, "La fecha de consulta no puede estar en el futuro ni ser de hace más de 30 días.");
+
+/** Un precio estructurado; solo lo llevan los datos de tipo `precio` y `plan`. */
+export const ValorDePrecioDeCompetidor = z
+  .object({
+    importe: z.number().min(0).max(1_000_000),
+    moneda: z.enum(MONEDAS_DE_PRECIO),
+    periodo: z.enum(PERIODOS_DE_PRECIO),
+    ivaIncluido: z.boolean().optional(),
+    /** «minuto», «usuario», «agente»… lo que se cobra por unidad. */
+    unidad: sano(z.string().trim().min(1).max(40)).optional(),
+  })
+  .strict();
+
+/**
+ * Un hecho público sobre un competidor, con la página de la que sale y el día
+ * que se leyó. Sin fuente y fecha no se guarda: es el mismo estándar que
+ * `comparativas.ts` (art. 10 Ley 3/1991), aunque aquí no se publique.
+ */
+export const DatoDeCompetidor = z
+  .object({
+    tipo: z.enum(TIPOS_DE_DATO_DE_COMPETIDOR),
+    /** «Plan Pro», «Integración con Google Calendar»… */
+    etiqueta: sano(z.string().trim().min(1).max(120)),
+    texto: sano(z.string().trim().min(1).max(600)),
+    valor: ValorDePrecioDeCompetidor.optional(),
+    urlFuente: urlHttp,
+    consultadoEn: fechaDeConsulta,
+  })
+  .strict()
+  .superRefine((v, ctx) => {
+    if (v.valor && v.tipo !== "precio" && v.tipo !== "plan") {
+      ctx.addIssue({
+        code: "custom",
+        path: ["valor"],
+        message: "Solo los datos de tipo precio o plan llevan valor.",
+      });
+    }
+    if (v.tipo === "precio" && !v.valor) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["valor"],
+        message:
+          "Un precio lleva valor (importe, moneda y periodo). Si no lo publican, descríbelo con tipo «otro».",
+      });
+    }
+    const textos = [v.etiqueta, v.texto, v.valor?.unidad ?? ""];
+    if (textos.some(contieneCorreo) || textos.some(contieneTelefono)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["texto"],
+        message: "Un dato de competidor no puede incluir correos ni teléfonos.",
+      });
+    }
+  });
+export type DatoDeCompetidor = z.infer<typeof DatoDeCompetidor>;
+
+/** `POST /growth/agente/competidores/:id/analisis`. */
+export const AnalisisDeCompetidorBodyBase = z
+  .object({
+    resumen: sano(z.string().trim().min(1).max(2000)),
+    datos: z.array(DatoDeCompetidor).min(1).max(MAXIMO_DE_DATOS_POR_ANALISIS),
+    ejecucionId: idDe.optional(),
+  })
+  .strict();
+export const AnalisisDeCompetidorBody =
+  AnalisisDeCompetidorBodyBase.superRefine((v, ctx) => {
+    if (contieneCorreo(v.resumen) || contieneTelefono(v.resumen)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["resumen"],
+        message: "El resumen no puede incluir correos ni teléfonos.",
+      });
+    }
+    if (bytesDe(v.datos) > LIMITE_DE_ANALISIS_EN_BYTES) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["datos"],
+        message: "El análisis es demasiado grande (máximo 40 KB).",
+      });
+    }
+  });
+export type AnalisisDeCompetidorBody = z.infer<typeof AnalisisDeCompetidorBody>;
+
+/** `POST /growth/agente/competidores`: el agente sugiere uno; tú lo aceptas. */
+export const PropuestaDeCompetidorBody = z
+  .object({
+    url: urlHttp,
+    nombre: sano(z.string().trim().min(1).max(120)),
+    /** Por qué parece un competidor (va a `notas`, marcado como del agente). */
+    motivo: sano(z.string().trim().min(1).max(500)),
+    /** Página donde lo has visto mencionado, si la hay. */
+    fuenteUrl: urlHttp.optional(),
+  })
+  .strict();
+export type PropuestaDeCompetidorBody = z.infer<
+  typeof PropuestaDeCompetidorBody
+>;
+
+/** `POST /growth/admin/competidores`: pegas una URL y el agente la analiza en el siguiente run. */
+export const AltaDeCompetidorBody = z
+  .object({
+    url: urlHttp,
+    nombre: sano(z.string().trim().min(1).max(120)).optional(),
+    notas: sano(z.string().trim().max(500)).optional(),
+  })
+  .strict();
+export type AltaDeCompetidorBody = z.infer<typeof AltaDeCompetidorBody>;
+
+/** `PATCH /growth/admin/competidores/:id`. El dominio no se cambia. */
+export const CambioDeCompetidorBody = z
+  .object({
+    nombre: sano(z.string().trim().min(1).max(120)).optional(),
+    notas: sano(z.string().trim().max(500)).nullable().optional(),
+    url: urlHttp.nullable().optional(),
+  })
+  .strict()
+  .refine(
+    (v) =>
+      v.nombre !== undefined || v.notas !== undefined || v.url !== undefined,
+    { message: "Indica al menos un campo que cambiar." }
+  );
+export type CambioDeCompetidorBody = z.infer<typeof CambioDeCompetidorBody>;
+
+/** Parámetros de `/growth/admin/competidores/:id/analisis/:analisisId`. */
+export const AnalisisDeCompetidorParams = z.object({
+  id: idDe,
+  analisisId: idDe,
+});
+export type AnalisisDeCompetidorParams = z.infer<
+  typeof AnalisisDeCompetidorParams
+>;
+
+/** `POST /growth/admin/competidores/:id/analisis/:analisisId/revisar`. */
+export const RevisionDeAnalisisBody = z
+  .object({ nota: sano(z.string().trim().max(500)).optional() })
+  .strict();
+export type RevisionDeAnalisisBody = z.infer<typeof RevisionDeAnalisisBody>;

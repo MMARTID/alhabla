@@ -28,6 +28,7 @@ import {
   paginar,
   saltoDe,
 } from "./servicioAdmin.js";
+import { competidoresPorAnalizarParaElContexto } from "./servicioCompetenciaAgente.js";
 
 /**
  * Lo que lee y escribe el agente además de lo básico de `service.ts`:
@@ -60,11 +61,20 @@ export const AVISO_DE_TERCEROS =
  * tokens en cada llamada): se leen con `GET /growth/agente/conocimiento`.
  */
 export async function contextoCompactoParaElAgente() {
-  const [contexto, abierta] = await Promise.all([
+  const [contexto, abierta, porAnalizar] = await Promise.all([
     contextoParaElAgente({ sinAfirmaciones: true }),
     ejecucionAbierta(),
+    competidoresPorAnalizarParaElContexto(),
   ]);
-  return { ...contexto, ejecucionAbierta: abierta ?? null };
+  return {
+    ...contexto,
+    ejecucionAbierta: abierta ?? null,
+    // Los competidores que el agente tiene que leer en este run (máximo 10):
+    // los que pidió el administrador y los de análisis caducado. Su nombre y
+    // su URL pueden venir de una propuesta del propio agente: el MCP los
+    // entrega bajo `terceros`.
+    competidoresPorAnalizar: porAnalizar,
+  };
 }
 
 // ── Conocimiento ─────────────────────────────────────────────────────────

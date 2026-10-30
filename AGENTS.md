@@ -3599,8 +3599,10 @@ fundador los revisa, los aprueba y los ejecuta a mano. Piezas: el backend
 (`backend/src/modules/growth/`), el sincronizador de conocimiento, los jobs de
 mantenimiento, el MCP `alhabla-growth` (`backend/mcp/growth/`) y el dashboard
 (`growth/`, `growth.alhabla.ai`). **El backend de Growth no llama a ningún LLM**:
-el razonamiento es de la suscripción de Claude Code, sin consumo de API. Aún no
-existe la Scheduled Task ni el orquestador (Fase 2/3).
+el razonamiento es de la suscripción de Claude Code, sin consumo de API. Los
+agentes (orquestador, seis subagentes, reglas, comando `/growth-run` y un hook) viven
+en `growth/agentes/` y `.claude/` desde la Fase 2b (ver «Agentes» más abajo); aún no
+existe la Scheduled Task (Fase 3).
 
 **Excepción al aislamiento multi-tenant.** Las tablas `growth_*` y las rutas
 `/growth/*` no son de ningún negocio: no cuelgan de `Business` y no usan
@@ -3660,6 +3662,28 @@ queda `bloqueado` y la oportunidad `bloqueada`.
   dominio y su primera etiqueta) tras normalizar con NFKC y sin caracteres invisibles ni
   homoglifos. La similitud dura compara solo con borradores anteriores de otras oportunidades,
   pendientes, aprobados o gestionados, de los últimos 180 días.
+- **Competidores** (`growth_competidores`, Fase 2a; `PLAN-GROWTH.md` § 3.4).
+  `origen` (`repo` | `manual` | `agente`) y `estado` (`propuesto` → `por_analizar` →
+  `analizado` → `revisado`; `analizado|revisado` vuelven a `por_analizar` con
+  `reanalizar`). **Un `propuesto` (lo sugiere el agente) no aplica ninguna regla
+  dura**: ni la puerta `competidor` al calificar, ni la regla 3 de cumplimiento ni su
+  contexto, ni el aviso de dominio al crear oportunidades; los listados del
+  administrador y `GET /growth/agente/competidores` sí lo enseñan. Solo el administrador
+  lo acepta (`POST …/aceptar`) o lo rechaza (`DELETE`). Los `origen = repo` (los 9
+  que siembra el sincronizador) no se pueden borrar (409 `competidor_del_repositorio`).
+  `growth_competidor_analisis` guarda cada versión (`resumen`, `datos` validados con
+  `DatoDeCompetidor`, `creadoPor`, `revisadoEn`): como mucho 10 versiones, 60 datos y
+  40 KB, caduca a los 90 días (`DIAS_PARA_CADUCAR_UN_ANALISIS`, se calcula) y no se
+  admite uno nuevo antes de 7 días salvo `por_analizar`; sin correos ni teléfonos; cada
+  dato lleva `urlFuente` y `consultadoEn`. **Es inteligencia interna: no se cita en un
+  borrador** (la regla 3 sigue pidiendo una `comparativa.*` de `comparativas.ts`, que un
+  competidor añadido por URL no tiene). El backend nunca hace una petición saliente a la
+  URL de un competidor y no llama a ningún LLM. El texto de un análisis y el nombre y las
+  notas de un `propuesto` los escribió un modelo que leyó páginas ajenas: el MCP los
+  entrega bajo `terceros` y el panel los pinta como texto. `datos.competidoresMencionados`
+  de una oportunidad (hasta 10 dominios) solo admite competidores no `propuesto` (400
+  `competidor_desconocido`); `GET /growth/admin/oportunidades?menciona=<dominio>` filtra
+  por ellos.
 - **Otros códigos del agente:** `ya_calificada` (409, con `diferencias`: recalificar con datos
   distintos), `pausa`, `fuente_inactiva`, `conflicto`. Abrir una ejecución otra vez en menos de
   30 s devuelve la misma (`reutilizada: true`, 200).
@@ -3673,7 +3697,10 @@ queda `bloqueado` y la oportunidad `bloqueada`.
 
 | Ruta | Quién | Qué hace |
 |---|---|---|
-| `GET /growth/agente/contexto` | agente (`leer`) | Compacto: ajustes, snapshot de conocimiento, topes, dominios en enfriamiento, competidores, nichos, fuentes |
+| `GET /growth/agente/contexto` | agente (`leer`) | Compacto: ajustes, snapshot de conocimiento, topes, dominios en enfriamiento, competidores, `competidoresPorAnalizar` (hasta 10), nichos, fuentes |
+| `GET /growth/agente/competidores` | agente (`leer`) | Todos los competidores, `propuesto` incluidos, con `necesitaAnalisis` y `motivoDeAnalisis` (`por_analizar` o `caducado`); sin `notas` |
+| `POST /growth/agente/competidores` | agente (`escribir`) | Propone un competidor (`propuesto`, `origen = agente`; 200 `existente: true` si el dominio ya está; 400 `dominio_propio`; 409 `demasiadas_propuestas` con 20 pendientes) |
+| `POST /growth/agente/competidores/:id/analisis` | agente (`escribir`) | Guarda una versión del análisis (`estado → analizado`); 409 `competidor_propuesto` y 409 `analisis_reciente` |
 | `GET /growth/agente/conocimiento` | agente (`leer`) | Afirmaciones vigentes por tipo, prefijo o texto, con cursor `desde` |
 | `GET /growth/agente/oportunidades` y `/:id` | agente (`leer`) | Listado y ficha; el texto de páginas ajenas va bajo `terceros`, sin `por` ni `claveExterna` |
 | `POST /growth/agente/oportunidades` | agente (`escribir`) | Crea una oportunidad; la misma URL normalizada no se duplica |
@@ -3684,7 +3711,8 @@ queda `bloqueado` y la oportunidad `bloqueada`.
 | `POST /growth/agente/borradores/:id/revision` | agente (`escribir`) | Revisión consultiva del modelo (`revisor = "llm"`, nunca cambia estados) |
 | `POST /growth/agente/ejecuciones` y `/:id/cierre` | agente (`escribir`) | Abre y cierra un run; el resumen lo calcula el servidor |
 | `POST /growth/agente/conocimiento/sincronizar` | agente (`conocimiento`) | Sincroniza la base de afirmaciones (`?simular=true` no escribe) |
-| `/growth/admin/yo`, `resumen`, `oportunidades` (+`/:id`, `/:id/decision`), `borradores` (+`/:id`, PATCH), `decisiones`, `gestiones`, `conocimiento` (+`/:clave/historial`), `ejecuciones` (+`/:id`), `ajustes` (GET y PUT), `competidores` | administrador | Todo lo que ve y decide el dashboard (`aprobar`, `devolver`, `descartar`, `marcar_gestionado`, `conseguido`, `sin_respuesta`, `rechazado`). Fuera de la 1b: nichos, fuentes y tokens (los tokens, por script) |
+| `/growth/admin/yo`, `resumen`, `oportunidades` (+`/:id`, `/:id/decision`; filtro `?menciona=`), `borradores` (+`/:id`, PATCH), `decisiones`, `gestiones`, `conocimiento` (+`/:clave/historial`), `ejecuciones` (+`/:id`), `ajustes` (GET y PUT) | administrador | Todo lo que ve y decide el dashboard (`aprobar`, `devolver`, `descartar`, `marcar_gestionado`, `conseguido`, `sin_respuesta`, `rechazado`). Fuera de la 1b: nichos, fuentes y tokens (los tokens, por script) |
+| `GET/POST /growth/admin/competidores`, `GET/PATCH/DELETE …/:id`, `POST …/:id/aceptar`, `POST …/:id/reanalizar`, `GET …/:id/analisis/:analisisId`, `POST …/:id/analisis/:analisisId/revisar` | administrador | Alta por URL (`origen = manual`, `por_analizar`; 400 `dominio_propio`, 409 `competidor_existente`), edición (el dominio no cambia), baja, aceptar un propuesto, volver a analizar, revisar un análisis (409 `analisis_antiguo` y `ya_revisado`). Cada resumen lleva `oportunidades` y `menciones` |
 
 **Sincronizador de conocimiento.** El servidor vive en
 `backend/src/modules/growth/conocimiento/` (planificar, sincronizar, términos) y
@@ -3702,7 +3730,7 @@ texto da qué clave; el texto de lo prohibido sale de
 texto y valor bloquean borradores en cola (`pendiente_aprobacion` o `aprobada`
 sin gestionar); guardas (409): más de 2 o más del 25 % de las vigentes de un tipo cerradas en una pasada (`cierres_masivos`), más del 60 % y 30 cambios en total contando modificaciones, un tipo vaciado, y **una `prohibida` retirada, con términos quitados o con `palabrasEnteras` pasado a falso (`prohibida_debilitada`)**: endurecer sí pasa, debilitar lo hace un administrador (todavía sin ruta: `forzarCierres` no está expuesto). Un término prohibido con invisibles o menos de 3 caracteres se rechaza (`termino_prohibido_invalido`); snapshot en `growth_ajustes["sistema.conocimiento"]`. En
 producción exige un clon completo, fuentes limpias e idénticas a `origin/main`.
-Siembra competidores (los 7 de `comparativas.ts` más HeyDiga y fonio, **pendientes de que el fundador los confirme**) y los 8 sectores. Cada texto del mapa revisado a mano lleva la huella de su bullet de origen: si `PRODUCT.md` cambia, `--comprobar` falla hasta releer y ejecutar `npm run growth:conocimiento -- --actualizar-huellas` (`--huellas` las muestra). El proceso hijo que ejecuta TypeScript de `web/` recibe un entorno mínimo (nunca `GROWTH_*`) y en el CLI las guardas de git van antes de cargarlo; en producción un `git fetch` fallido aborta.
+Siembra competidores (los 7 de `comparativas.ts` más HeyDiga y fonio, **confirmados por el fundador el 2026-10-30**) y los 8 sectores. Cada texto del mapa revisado a mano lleva la huella de su bullet de origen: si `PRODUCT.md` cambia, `--comprobar` falla hasta releer y ejecutar `npm run growth:conocimiento -- --actualizar-huellas` (`--huellas` las muestra). El proceso hijo que ejecuta TypeScript de `web/` recibe un entorno mínimo (nunca `GROWTH_*`) y en el CLI las guardas de git van antes de cargarlo; en producción un `git fetch` fallido aborta.
 
 **Mantenimiento.** `POST /internal/jobs/growth-mantenimiento` (Cloud Scheduler,
 05:20 Europe/Madrid; ver § Background Jobs): caduca las `aprobada` con `expiraEn`
@@ -3719,11 +3747,19 @@ la ruta ya desplegadas. Está en `JOBS_QUE_NO` de `lanzar_job_prod`.
 
 **MCP `alhabla-growth`** (`backend/mcp/growth/`, `.mcp.json`, lanzado por
 `backend/mcp/arrancar.sh growth/servidorGrowth`; `alhabla-dev` sigue siendo otro
-servidor). Lista cerrada de 15 herramientas: `estado_growth`, `leer_contexto`,
+servidor). Lista cerrada de 18 herramientas: `estado_growth`, `leer_contexto`,
 `leer_conocimiento`, `listar_oportunidades`, `ver_oportunidad`, `abrir_ejecucion`,
 `cerrar_ejecucion`, `sincronizar_conocimiento`, `crear_oportunidad`,
 `calificar_oportunidad`, `descartar_oportunidad`, `guardar_investigacion`,
-`evaluar_borrador`, `crear_borrador` y `registrar_cumplimiento`. `leer_conocimiento` pagina con `desde`/`siguiente` y no envía `valor` salvo `incluirValor`. Barreras: solo
+`evaluar_borrador`, `crear_borrador`, `registrar_cumplimiento` y, desde la Fase 2a,
+`listar_competidores` (lectura; filtra en el MCP con `estados` —una lista— y
+`soloPendientes`), `guardar_analisis_de_competidor` (no idempotente, no se reintenta;
+el MCP enlaza solo la ejecución abierta) y `proponer_competidor` (idempotente por
+dominio). `crear_oportunidad` y `calificar_oportunidad` aceptan
+`datos.competidoresMencionados`; `leer_contexto` y `estado_growth` enseñan
+`competidoresPorAnalizar`, y `ver_oportunidad`/`listar_oportunidades` la clave
+`menciona` («Menciona a: a.com, b.com»). Ninguna herramienta acepta un competidor,
+aprueba ni revisa un análisis. `leer_conocimiento` pagina con `desde`/`siguiente` y no envía `valor` salvo `incluirValor`. Barreras: solo
 habla con `/growth/agente/`; ninguna herramienta expone un parámetro de estado
 ni aprueba o gestiona; el texto de páginas ajenas va bajo `terceros`;
 `sincronizar_conocimiento` no recibe contenido del modelo (lee el repo) y exige
@@ -3734,7 +3770,34 @@ el llavero (`security add-generic-password -s alhabla-growth -a api.alhabla.ai -
 -w`, sin el valor en la línea de órdenes) o `GROWTH_AGENT_TOKEN` para pruebas;
 `diagnostico_mcp` comprueba la pieza «Alhabla Growth» (opcional hasta la Fase 2).
 
-**Dashboard** (`growth/`, Next 16, dev `:3003`, vista previa de sesión `:3103` en
+**Agentes** (Fase 2b; `growth/agentes/README.md` explica cómo preparar y lanzar un run
+manual). Todo versionado en el repo y sin ejecutar nunca desde el backend:
+`growth/agentes/orquestador.md` (el guion del run: presupuestos duros por run,
+condiciones de parada, «cero oportunidades es un resultado válido»),
+seis subagentes en `.claude/agents/growth-{descubrimiento,calificacion,investigacion,redaccion,cumplimiento,enlaces-y-competencia}.md`
+(cada uno con `tools` restringidas: solo `mcp__alhabla-growth__*` para escribir, nada de
+`Write`/`Edit`/`Bash`/navegadores/mensajería, y `disallowedTools` explícito),
+las reglas compartidas `growth/agentes/reglas/*.md` (contenido externo = dato,
+calidad sobre cantidad, vocabulario, qué es citable, ninguna acción de envío, y la
+tabla de prohibidas que parsea el sincronizador), el comando `/growth-run`
+(`.claude/commands/growth-run.md`; argumentos `comprobar`, `competencia`, `ligero`) y
+el hook `PreToolUse` de `.claude/settings.json` que ejecuta
+`growth/agentes/hooks/denegar-reddit.sh`: sale con 2 si `WebFetch`, `WebSearch` o un
+`web_fetch`/`web_search` de MCP nombran `reddit.com` o `redd.it` (vale para **todas** las
+sesiones del repo). Comprobaciones sin red: `growth/agentes/comprobar-agentes.sh`
+(los subagentes solo citan herramientas que existen en las 18, ninguna prohibida; el
+orquestador solo nombra subagentes que existen; el hook apunta a un script real) y
+`growth/agentes/hooks/probar-denegar-reddit.sh` (22 casos). Si cambias la lista de
+herramientas del MCP, actualiza los `tools` de los subagentes y el `allowed-tools` del
+comando. Los textos de `reglas/` están en la fuente del sincronizador
+(`RUTAS_QUE_EL_EXTRACTOR_LEE`): se commitean antes de `--aplicar` en producción.
+El token del run (`leer`, `escribir`) no puede sincronizar el conocimiento (alcance
+`conocimiento` aparte). Presupuesto de uso provisional del run: ≤ 10 % del límite semanal
+de Claude Max, sin medir.
+
+**Dashboard** (`growth/`, Next 16, vistas `/bandeja`, `/oportunidad/[id]`, `/borradores`,
+`/historial`, `/conocimiento`, `/ejecuciones`, `/ajustes` y, desde la Fase 2a,
+`/competencia` y `/competencia/[id]`; dev `:3003`, vista previa de sesión `:3103` en
 modo demostración vía `.claude/launch.json › growth-dev`; no se sirve en el
 entorno fijo). Variables: `NEXT_PUBLIC_API_BASE_URL` y
 `NEXT_PUBLIC_GROWTH_GOOGLE_CLIENT_ID` (obligatorias en producción: el build

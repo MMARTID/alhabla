@@ -21,6 +21,8 @@ export function crearPrismaMock() {
     update: vi.fn(),
     updateMany: vi.fn(),
     upsert: vi.fn(),
+    delete: vi.fn(),
+    deleteMany: vi.fn(),
     count: vi.fn(),
     groupBy: vi.fn(),
   });
@@ -34,6 +36,7 @@ export function crearPrismaMock() {
     growthGestion: modelo(),
     growthAfirmacion: modelo(),
     growthCompetidor: modelo(),
+    growthCompetidorAnalisis: modelo(),
     growthAjuste: modelo(),
     growthFuente: modelo(),
     growthNicho: modelo(),

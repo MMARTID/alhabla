@@ -20,6 +20,7 @@ const DESTINOS = [
   ["Borradores", "/borradores"],
   ["Historial", "/historial"],
   ["Conocimiento", "/conocimiento"],
+  ["Competencia", "/competencia"],
   ["Ejecuciones", "/ejecuciones"],
   ["Ajustes", "/ajustes"],
 ] as const;
@@ -44,7 +45,7 @@ afterEach(() => {
 });
 
 describe("PanelShell", () => {
-  it("la barra lateral enlaza a las seis vistas y marca la actual", async () => {
+  it("la barra lateral enlaza a las siete vistas y marca la actual", async () => {
     ruta = "/historial";
     montar();
     const [lateral] = screen.getAllByRole("navigation", { name: "Principal" });
@@ -98,7 +99,7 @@ describe("PanelShell", () => {
     );
   });
 
-  it("«Más» abre Ejecuciones, Ajustes, la apariencia y cerrar sesión; Escape lo cierra", async () => {
+  it("«Más» abre Competencia, Ejecuciones, Ajustes, la apariencia y cerrar sesión; Escape lo cierra", async () => {
     const user = userEvent.setup();
     montar();
     const mas = screen.getByRole("button", { name: "Más" });
@@ -106,6 +107,9 @@ describe("PanelShell", () => {
 
     expect(mas).toHaveAttribute("aria-expanded", "true");
     const menu = document.getElementById("menu-mas")!;
+    expect(
+      within(menu).getByRole("link", { name: "Competencia" })
+    ).toHaveAttribute("href", "/competencia");
     expect(
       within(menu).getByRole("link", { name: "Ejecuciones" })
     ).toHaveAttribute("href", "/ejecuciones");
@@ -143,6 +147,26 @@ describe("PanelShell", () => {
     ruta = "/ajustes";
     montar();
     const barra = screen.getAllByRole("navigation", { name: "Principal" })[1];
+    expect(
+      within(barra).getByRole("button", { name: "Más" }).className
+    ).toContain("text-morado-tinta");
+  });
+
+  it("la ficha de un competidor cuelga de Competencia, que en el móvil vive en «Más»", () => {
+    ruta = "/competencia/demo-co-3";
+    montar();
+    const [lateral, barra] = screen.getAllByRole("navigation", {
+      name: "Principal",
+    });
+    expect(
+      within(lateral).getByRole("link", { name: "Competencia" })
+    ).toHaveAttribute("aria-current", "page");
+    // No es una de las cuatro pestañas: la marca «Más».
+    expect(
+      within(barra)
+        .getAllByRole("link")
+        .map((l) => l.textContent)
+    ).not.toContain("Competencia");
     expect(
       within(barra).getByRole("button", { name: "Más" }).className
     ).toContain("text-morado-tinta");

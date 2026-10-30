@@ -115,7 +115,7 @@ function BarraLateral({
 
 /**
  * La barra inferior del móvil (bajo `lg`): cuatro pestañas y «Más», que
- * agrupa Ejecuciones, Ajustes, la apariencia y cerrar sesión.
+ * agrupa Competencia, Ejecuciones, Ajustes, la apariencia y cerrar sesión.
  */
 function BarraDePestanas({
   pathname,

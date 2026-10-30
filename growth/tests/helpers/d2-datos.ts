@@ -1,7 +1,7 @@
 import type {
   Afirmacion,
   Ajustes,
-  Competidor,
+  CompetidorResumen,
   DecisionDelHistorial,
   DetalleDeEjecucion,
   EjecucionResumen,
@@ -329,13 +329,22 @@ export function ajustes(cambios: Partial<Ajustes> = {}): Ajustes {
   };
 }
 
-export function competidor(cambios: Partial<Competidor> = {}): Competidor {
+export function competidor(
+  cambios: Partial<CompetidorResumen> = {}
+): CompetidorResumen {
   return {
     id: "co-1",
     nombre: "Competidor ficticio",
     dominio: "competidor-ficticio.example",
+    url: null,
     notas: null,
+    origen: "repo",
+    estado: "por_analizar",
+    creadoEn: "2026-10-01T09:00:00.000Z",
+    analisisSolicitadoEn: null,
     oportunidades: 2,
+    menciones: 0,
+    analisis: null,
     ...cambios,
   };
 }

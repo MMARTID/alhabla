@@ -992,10 +992,26 @@ describe("administración de Alhabla Growth: resumen, historial, conocimiento y 
   // ── competidores ───────────────────────────────────────────────────────
 
   describe("competidores", () => {
+    const base = {
+      url: null,
+      origen: "repo",
+      estado: "por_analizar",
+      creadoEn: new Date("2026-10-01T10:00:00.000Z"),
+      analisisSolicitadoEn: null,
+      analisis: [],
+    };
+
     it("lista por nombre con cuántas oportunidades hay de su dominio y de sus subdominios", async () => {
       mock.growthCompetidor.findMany.mockResolvedValue([
-        { id: "c1", nombre: "fonio", dominio: "fonio.ai", notas: null },
         {
+          ...base,
+          id: "c1",
+          nombre: "fonio",
+          dominio: "fonio.ai",
+          notas: null,
+        },
+        {
+          ...base,
           id: "c2",
           nombre: "HeyDiga",
           dominio: "heydiga.ai",
@@ -1007,26 +1023,29 @@ describe("administración de Alhabla Growth: resumen, historial, conocimiento y 
         { dominio: "blog.heydiga.ai", _count: { _all: 1 } },
         { dominio: "fonio.ai", _count: { _all: 4 } },
       ]);
+      mock.growthOportunidad.count.mockResolvedValue(0);
       const response = await pedir("/growth/admin/competidores");
 
       expect(response.statusCode).toBe(200);
-      expect(response.json()).toEqual({
-        data: [
-          {
-            id: "c1",
-            nombre: "fonio",
-            dominio: "fonio.ai",
-            notas: null,
-            oportunidades: 4,
-          },
-          {
-            id: "c2",
-            nombre: "HeyDiga",
-            dominio: "heydiga.ai",
-            notas: "Directo",
-            oportunidades: 3,
-          },
-        ],
+      const { data } = response.json();
+      expect(
+        data.map((c: { id: string; oportunidades: number }) => [
+          c.id,
+          c.oportunidades,
+        ])
+      ).toEqual([
+        ["c1", 4],
+        ["c2", 3],
+      ]);
+      expect(data[1]).toMatchObject({
+        id: "c2",
+        nombre: "HeyDiga",
+        dominio: "heydiga.ai",
+        notas: "Directo",
+        origen: "repo",
+        estado: "por_analizar",
+        menciones: 0,
+        analisis: null,
       });
       expect(
         mock.growthCompetidor.findMany.mock.calls[0]![0].orderBy[0]
@@ -1037,11 +1056,18 @@ describe("administración de Alhabla Growth: resumen, historial, conocimiento y 
 
     it("un dominio que solo termina igual no cuenta (xheydiga.ai no es heydiga.ai)", async () => {
       mock.growthCompetidor.findMany.mockResolvedValue([
-        { id: "c2", nombre: "HeyDiga", dominio: "heydiga.ai", notas: null },
+        {
+          ...base,
+          id: "c2",
+          nombre: "HeyDiga",
+          dominio: "heydiga.ai",
+          notas: null,
+        },
       ]);
       mock.growthOportunidad.groupBy.mockResolvedValue([
         { dominio: "xheydiga.ai", _count: { _all: 9 } },
       ]);
+      mock.growthOportunidad.count.mockResolvedValue(0);
       const cuerpo = (await pedir("/growth/admin/competidores")).json();
       expect(cuerpo.data[0].oportunidades).toBe(0);
     });
@@ -1053,10 +1079,9 @@ describe("administración de Alhabla Growth: resumen, historial, conocimiento y 
       expect(mock.growthOportunidad.groupBy).not.toHaveBeenCalled();
     });
 
-    it("solo hay lectura: no se puede dar de alta ni de baja desde la API", async () => {
+    it("sobre un competidor concreto no hay PUT ni POST sueltos: solo PATCH, DELETE y las acciones con nombre", async () => {
       for (const [metodo, url] of [
-        ["POST", "/growth/admin/competidores"],
-        ["DELETE", "/growth/admin/competidores/c1"],
+        ["POST", "/growth/admin/competidores/c1"],
         ["PUT", "/growth/admin/competidores/c1"],
       ] as const) {
         const response = await fastify.inject({

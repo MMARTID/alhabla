@@ -1,3 +1,7 @@
+import {
+  DIAS_MINIMOS_ENTRE_ANALISIS,
+  MAXIMO_DE_PROPUESTAS_PENDIENTES,
+} from "../../src/modules/growth/esquemas.js";
 import { censurar, type Credenciales } from "./credenciales.js";
 
 /**
@@ -33,6 +37,21 @@ export const AYUDA_POR_CODIGO_409: Readonly<Record<string, string>> = {
     "El servidor frenó la sincronización porque cerraría de golpe demasiadas afirmaciones vigentes (guarda de cierres masivos). Suele ser un repo atrasado o un extractor roto, no un cambio real. No la reintentes ni intentes forzarla (forzar es cosa de un administrador): avisa al fundador.",
   prohibida_debilitada:
     "El servidor rechazó la sincronización porque quitaría o debilitaría términos prohibidos de las reglas duras de cumplimiento: una sincronización no puede reducir las prohibiciones. No la reintentes: avisa al fundador para que revise growth/agentes/reglas/afirmaciones-prohibidas.md y el extractor.",
+  competidor_propuesto:
+    "Ese competidor está «propuesto»: aún no lo ha aceptado el fundador y no se analiza hasta entonces. No reintentes ni busques otra vía; pasa al siguiente (listar_competidores con soloPendientes=true dice cuáles toca analizar).",
+  analisis_reciente: `Ese competidor ya tiene un análisis de hace menos de ${DIAS_MINIMOS_ENTRE_ANALISIS} días y el fundador no ha pedido repetirlo: no lo repitas ni lo reintentes. Pasa al siguiente (listar_competidores con soloPendientes=true dice cuáles toca analizar).`,
+  demasiadas_propuestas: `Ya hay ${MAXIMO_DE_PROPUESTAS_PENDIENTES} competidores propuestos esperando la decisión del fundador: no propongas más en este run (los pendientes se ven con listar_competidores, estados [«propuesto»]) y avisa de ello al cerrar la ejecución.`,
+};
+
+/**
+ * Qué hacer ante un 400 con código (los de validación de Zod no llevan). Como
+ * en los 409, se añade al mensaje del backend.
+ */
+export const AYUDA_POR_CODIGO_400: Readonly<Record<string, string>> = {
+  competidor_desconocido:
+    "Solo se pueden marcar competidores que el fundador ya confirmó (los de leer_contexto o los de listar_competidores que no están «propuesto»). Quita esos dominios de datos.competidoresMencionados y vuelve a llamar. Si crees que es un competidor nuevo, propónlo con proponer_competidor (lo decide el fundador) y deja su mención para otro run.",
+  dominio_propio:
+    "Ese dominio es de Alhabla (alhabla.ai o un subdominio): no es un competidor ni se propone.",
 };
 
 export type ValorDeConsulta =
@@ -133,7 +152,21 @@ function construirUrl(
   return url.toString();
 }
 
-type CuerpoDeError = { error?: unknown; codigo?: unknown };
+type CuerpoDeError = { error?: unknown; codigo?: unknown; dominios?: unknown };
+
+const DOMINIO_DE_UN_ERROR = /^[a-z0-9]([a-z0-9.-]{0,251}[a-z0-9])?$/i;
+
+/** Los dominios que el backend señala en un error (como mucho 10, solo si parecen un dominio). */
+function dominiosDelCuerpo(cuerpo: unknown): string[] {
+  if (!cuerpo || typeof cuerpo !== "object") return [];
+  const { dominios } = cuerpo as CuerpoDeError;
+  if (!Array.isArray(dominios)) return [];
+  return dominios
+    .filter(
+      (d): d is string => typeof d === "string" && DOMINIO_DE_UN_ERROR.test(d)
+    )
+    .slice(0, 10);
+}
 
 function leerJson(texto: string): unknown {
   if (!texto) return null;
@@ -182,7 +215,13 @@ export function errorDeRespuesta(
 
   let mensaje: string;
   if (status === 400) {
-    mensaje = `La API rechazó los datos: ${detalle || "petición no válida"}.`;
+    const ayuda = codigo ? AYUDA_POR_CODIGO_400[codigo] : undefined;
+    const motivo = detalle || "petición no válida";
+    // Los dominios que el motivo ya nombra no se repiten.
+    const dominios = ayuda
+      ? dominiosDelCuerpo(cuerpo).filter((d) => !motivo.includes(d))
+      : [];
+    mensaje = `La API rechazó los datos${ayuda ? conCodigo : ""}: ${motivo}${/[.!?]$/.test(motivo) ? "" : "."}${dominios.length > 0 ? ` Dominios rechazados: ${dominios.join(", ")}.` : ""}${ayuda ? ` ${ayuda}` : ""}`;
   } else if (status === 401) {
     mensaje =
       "Token de agente no válido o revocado (HTTP 401). Crea otro con el script de tokens y guárdalo en el llavero (te pide el valor por terminal): " +
@@ -208,7 +247,7 @@ export function errorDeRespuesta(
   const puedeHaberSeAplicado = status >= 500 && !opciones.idempotente;
   if (puedeHaberSeAplicado) {
     mensaje +=
-      " No se sabe si se llegó a aplicar: compruébalo (ver_oportunidad o listar_oportunidades) antes de repetirlo.";
+      " No se sabe si se llegó a aplicar: compruébalo (ver_oportunidad, listar_oportunidades o listar_competidores) antes de repetirlo.";
   }
   return new ErrorDeGrowthApi(mensaje, {
     status,
@@ -321,7 +360,7 @@ export function crearClienteDeGrowth(
           `${agotado ? "La API no respondió a tiempo" : "No responde"} ${destino.base}.` +
             (idempotente
               ? ""
-              : " No se sabe si se llegó a aplicar: compruébalo (ver_oportunidad o listar_oportunidades) antes de repetirlo."),
+              : " No se sabe si se llegó a aplicar: compruébalo (ver_oportunidad, listar_oportunidades o listar_competidores) antes de repetirlo."),
           { status: null, puedeHaberSeAplicado: !idempotente }
         );
       }

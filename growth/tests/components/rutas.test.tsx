@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import Ajustes from "@/app/(panel)/ajustes/page";
 import Bandeja from "@/app/(panel)/bandeja/page";
 import Borradores from "@/app/(panel)/borradores/page";
+import Competencia from "@/app/(panel)/competencia/page";
 import Conocimiento from "@/app/(panel)/conocimiento/page";
 import Ejecuciones from "@/app/(panel)/ejecuciones/page";
 import Historial from "@/app/(panel)/historial/page";
@@ -20,6 +21,7 @@ const RUTAS: Array<[string, string, () => ReactElement]> = [
   ["/borradores", "Borradores", () => <Borradores />],
   ["/historial", "Historial", () => <Historial />],
   ["/conocimiento", "Conocimiento", () => <Conocimiento />],
+  ["/competencia", "Competencia", () => <Competencia />],
   ["/ejecuciones", "Ejecuciones", () => <Ejecuciones />],
   ["/ajustes", "Ajustes", () => <Ajustes />],
 ];

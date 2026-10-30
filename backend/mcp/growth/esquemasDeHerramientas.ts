@@ -1,15 +1,21 @@
 import { z, ZodFirstPartyTypeKind as Tipo } from "zod";
 import {
+  AnalisisDeCompetidorBodyBase,
   BorradorBody,
   CalificacionBody,
   CodigoDescarte,
   DISPARADORES_DE_EJECUCION,
+  DatosDeOportunidad,
   ESTADOS_DE_CIERRE_DE_EJECUCION,
+  ESTADOS_DE_COMPETIDOR,
   ESTADOS_DE_OPORTUNIDAD,
   EvaluarBorradorBody,
   InvestigacionBaseBody,
+  MAXIMO_DE_COMPETIDORES_MENCIONADOS,
+  MAXIMO_DE_DATOS_POR_ANALISIS,
   OBJETIVOS,
   OportunidadBaseBody,
+  PropuestaDeCompetidorBody,
   ResumenDeEjecucion,
   RevisionLlmBody,
   TIPOS_DE_AFIRMACION,
@@ -35,6 +41,13 @@ const id = z
   .regex(IDENTIFICADOR, "Identificador no válido.")
   .describe(
     "Identificador de la oportunidad: el «id» que devuelven listar_oportunidades o crear_oportunidad"
+  );
+
+const competidorId = z
+  .string()
+  .regex(IDENTIFICADOR, "Identificador no válido.")
+  .describe(
+    "Identificador del competidor: el «id» que devuelve listar_competidores"
   );
 
 /**
@@ -78,6 +91,23 @@ function describir<T extends z.ZodTypeAny>(
 ) {
   return opcional.unwrap().describe(texto).optional();
 }
+
+/**
+ * `datos` de una oportunidad (al crearla y al calificarla): lo mismo que acepta
+ * el backend, con la descripción de `competidoresMencionados`, cuyos dominios
+ * el backend comprueba contra los competidores confirmados en las dos
+ * llamadas.
+ */
+const datosConCompetidores = DatosDeOportunidad.extend({
+  competidoresMencionados: describir(
+    DatosDeOportunidad.shape.competidoresMencionados,
+    `Dominios de los competidores CONFIRMADOS que esta página menciona, lista o compara (p. ej. heydiga.ai en un «mejores recepcionistas de IA»), hasta ${MAXIMO_DE_COMPETIDORES_MENCIONADOS}. Solo valen los que salen en leer_contexto (competidores) o en listar_competidores sin estado «propuesto»: un dominio desconocido o aún propuesto se rechaza con 400 competidor_desconocido`
+  ),
+})
+  .optional()
+  .describe(
+    "Datos opcionales de la página: tipoDestino, enlaceEsperado, dificultad, nota (hasta 500 caracteres; es texto de la página y sale bajo «terceros») y competidoresMencionados"
+  );
 
 const DESCRIPCION_DEL_ENLACE =
   "Enlace a alhabla.ai que va en el mensaje. El UTM de medición va AQUÍ, dentro de la URL, con al menos utm_source (p. ej. https://alhabla.ai/peluquerias?utm_source=medio-x&utm_medium=email): la regla blanda enlace_con_utm lo busca en esta URL y avisa si no está";
@@ -240,6 +270,7 @@ const ENTRADAS_ORIGINALES = {
     puntBacklinks: oportunidadNueva.puntBacklinks.describe(
       "Opcional aquí (se fija al calificar): valor del enlace, de 0 a 100"
     ),
+    datos: datosConCompetidores,
     expiraEn: fechaIso().optional(),
   },
 
@@ -261,7 +292,7 @@ const ENTRADAS_ORIGINALES = {
     ),
     titulo: CalificacionBody.shape.titulo,
     extracto: CalificacionBody.shape.extracto,
-    datos: CalificacionBody.shape.datos,
+    datos: datosConCompetidores,
     expiraEn: fechaIso().optional(),
   },
 
@@ -309,6 +340,50 @@ const ENTRADAS_ORIGINALES = {
   registrar_cumplimiento: {
     borradorId: id.describe("El «borradorId» que devolvió crear_borrador"),
     comprobaciones: RevisionLlmBody.shape.comprobaciones,
+  },
+
+  listar_competidores: {
+    estados: z
+      .array(z.enum(ESTADOS_DE_COMPETIDOR))
+      .min(1)
+      .max(ESTADOS_DE_COMPETIDOR.length)
+      .optional()
+      .describe(
+        "Solo los que estén en alguno de estos estados (filtro; no cambia nada): propuesto, por_analizar, analizado o revisado"
+      ),
+    soloPendientes: z
+      .boolean()
+      .optional()
+      .describe(
+        "true: solo los que hay que analizar ahora (por_analizar, o con el último análisis caducado)"
+      ),
+  },
+
+  // Sin `ejecucionId`: lo enlaza el MCP solo, como en crear_oportunidad.
+  guardar_analisis_de_competidor: {
+    competidorId,
+    resumen: AnalisisDeCompetidorBodyBase.shape.resumen.describe(
+      "Resumen de lo que hace el competidor y cómo se posiciona, hasta 2000 caracteres, solo con lo que publica su web. Sin correos ni teléfonos"
+    ),
+    datos: AnalisisDeCompetidorBodyBase.shape.datos.describe(
+      `De 1 a ${MAXIMO_DE_DATOS_POR_ANALISIS} hechos PÚBLICOS, cada uno con la página de la que sale (urlFuente) y el momento en que la leíste (consultadoEn: entre ahora y hace 30 días). tipo: producto, servicio, precio, plan, integracion, sector, idioma, canal, limite, diferencia u otro. Los de tipo precio llevan valor (importe, moneda, periodo); si no publican el precio, usa tipo «otro». Un hecho sin URL y fecha no se guarda`
+    ),
+  },
+
+  proponer_competidor: {
+    url: PropuestaDeCompetidorBody.shape.url.describe(
+      "URL (http o https) de la web del competidor: su portada o su página de producto"
+    ),
+    nombre: PropuestaDeCompetidorBody.shape.nombre.describe(
+      "Nombre comercial del competidor, hasta 120 caracteres"
+    ),
+    motivo: PropuestaDeCompetidorBody.shape.motivo.describe(
+      "Una o dos frases: por qué parece un competidor de Alhabla (recepcionista de IA que atiende llamadas y reserva citas de pequeños negocios), hasta 500 caracteres"
+    ),
+    fuenteUrl: describir(
+      PropuestaDeCompetidorBody.shape.fuenteUrl,
+      "Página donde lo has visto mencionado, p. ej. la lista «alternativas a …» (http o https)"
+    ),
   },
 } as const;
 
