@@ -911,11 +911,16 @@ describe("TelnyxAiAdapter", () => {
           name: "Marta",
         })
       ).toBe("Hola, ¿en qué te ayudo?");
-      expect(mockAssistantsChat).toHaveBeenCalledWith("assistant-1", {
-        content: "[WhatsApp · +34600000000 · hoy] hola",
-        conversation_id: "conv_9",
-        name: "Marta",
-      });
+      expect(mockAssistantsChat).toHaveBeenCalledWith(
+        "assistant-1",
+        {
+          content: "[WhatsApp · +34600000000 · hoy] hola",
+          conversation_id: "conv_9",
+          name: "Marta",
+        },
+        // Un turno con tools pasa de los 10 s del cliente.
+        { timeout: 30_000 }
+      );
 
       mockAssistantsChat.mockResolvedValueOnce({});
       expect(

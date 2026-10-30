@@ -855,11 +855,19 @@ export class TelnyxAiAdapter {
     input: { content: string; conversationId: string; name?: string }
   ): Promise<string> {
     const client = getTelnyxClient();
-    const response = await client.ai.assistants.chat(assistantId, {
-      content: input.content,
-      conversation_id: input.conversationId,
-      name: input.name,
-    });
+    // Un turno de chat incluye las tools que llame el modelo: con dos
+    // seguidas pasa de los 10 s del cliente (pensados para los webhooks de
+    // voz; en producción ya se vio un turno de 9,6 s el 13-10). 30 s, como
+    // el plazo por turno del chat de clientes (TIMEOUT_TURNO_MS).
+    const response = await client.ai.assistants.chat(
+      assistantId,
+      {
+        content: input.content,
+        conversation_id: input.conversationId,
+        name: input.name,
+      },
+      { timeout: 30_000 }
+    );
     return typeof response?.content === "string" ? response.content : "";
   }
 
