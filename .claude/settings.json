@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "^(WebFetch|WebSearch|mcp__.*__(web_fetch|web_search))$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PROJECT_DIR}/growth/agentes/hooks/denegar-reddit.sh\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}
