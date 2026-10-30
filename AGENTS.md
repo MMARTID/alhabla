@@ -108,8 +108,8 @@ Most modules are a folder containing a `routes.ts` file (and optionally `service
 Since 2026-09-21 (`docs/historico/PLAN-APP-DOMINIO.md`) there are **two** Next.js projects:
 `frontend/` is the authenticated app (`app.alhabla.ai`) and `web/` is the public site
 (`alhabla.ai`: landing, niche pages, plans, legal, registration and blog). Marketing components
-(`MainLanding`, `SiteLanding`, `LandingHero`, `PlansWithRoi`, `DemoVoiceCall`, `PaginaGuia`,
-`LegalPage`…) and `roi-context.ts` live only in `web/src/`; the few files used by both are copied
+(`MainLanding`, `SiteLanding`, `LandingHero`, `TarjetasDePlanes`, `DemoVoiceCall`, `PaginaGuia`,
+`LegalPage`…) live only in `web/src/`; the few files used by both are copied
 into each (list under Key Components). The component and lib notes below say which project holds
 each file.
 
@@ -227,9 +227,10 @@ each page's image explicitly from its `openGraph`/`twitter` metadata.
   lines on desktop and three on a phone. Then the street phrase, «Probar 7 días gratis» (to
   `/planes?niche=`), «Escuchar una llamada» (`DemoVoiceCall` with the sector demo, or the general
   one for the three sectors without it) and «Tu número de siempre · Sin permanencia».
-- `PlansWithRoi` / `PlansHeadline` — Pricing cards, ROI-aware copy. Reads `?plan=` from the URL to
-  flag the card the visitor already chose, and renders the value contrast from
-  `calculatePlanValueContrast` only when the visitor's own estimate covers the plan. Each card's
+- `TarjetasDePlanes` — The three pricing cards of `/planes`. Reads `?plan=` from the URL to
+  flag the card the visitor already chose. (The ROI-aware headline and value contrast fed by
+  the old landing calculator through `roi-context.ts` were removed on 2026-10-30: nothing wrote
+  that estimate any more; the lost-calls calculator lives in `components/herramientas/`.) Each card's
   button (`PlanSelectionLink`) jumps to the app's `/elegir-plan?plan=&niche=`: the web cannot see
   the session, so the app decides between checkout and registration. Since the landing
   calculator went away (2026-10-29) nothing calls `activateRoiContext`: the ROI copy only shows an
@@ -371,8 +372,6 @@ the content: each project keeps what it needs.
   «ventaja competitiva» or «llenar la agenda». The trial action is «Probar 7 días gratis» and the
   close «Empezar ahora». The voice provider is never named on the site, except in the processors
   list that the law requires in `/legal/privacidad`.
-- `roi-context.ts` — ROI calculation, plan value contrast and the calculator → `/planes` hand-off
-  (`activateRoiContext` / `getActiveRoiContext`).
 - `seo.ts` — Site metadata, structured data (JSON-LD), absolute URL builder, OG image list.
 - `blog.ts` — MDX articles in `web/content/blog`, read at build time. Next to it: `keystatic/`
   (editor blocks), `preview/` (draft preview redirects) and `og/plantilla.tsx` (the Open Graph
