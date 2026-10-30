@@ -245,7 +245,7 @@ export async function prsAbiertos() {
       "pr",
       "list",
       "--repo",
-      "MMARTID/botbook",
+      "MMARTID/alhabla",
       "--state",
       "open",
       "--limit",

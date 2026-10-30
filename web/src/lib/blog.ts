@@ -184,7 +184,7 @@ export async function leerArticuloDePrevisualizacion(
 ): Promise<Articulo | null> {
   if (!SLUG.test(slug) || !esRamaDePrevisualizacion(rama) || !tokenDeGitHub) return null;
   const ruta = `web/content/blog/${slug}.mdx`;
-  const url = new URL(`https://api.github.com/repos/MMARTID/botbook/contents/${ruta}`);
+  const url = new URL(`https://api.github.com/repos/MMARTID/alhabla/contents/${ruta}`);
   url.searchParams.set("ref", rama);
   const respuesta = await fetch(url, {
     headers: {

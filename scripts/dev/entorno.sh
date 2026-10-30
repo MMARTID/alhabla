@@ -220,7 +220,7 @@ actualizar_herramientas() {
 resolver_rama() {
   local pedida=${1#\#}
   if [[ "$pedida" =~ ^[0-9]+$ ]]; then
-    gh pr view "$pedida" --repo MMARTID/botbook --json headRefName -q .headRefName
+    gh pr view "$pedida" --repo MMARTID/alhabla --json headRefName -q .headRefName
   else
     echo "$pedida"
   fi

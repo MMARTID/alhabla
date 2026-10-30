@@ -28,7 +28,7 @@ dos veces una visita.
 
 - `KEYSTATIC_GITHUB_CLIENT_ID`, `KEYSTATIC_GITHUB_CLIENT_SECRET`, `KEYSTATIC_SECRET`,
   `NEXT_PUBLIC_KEYSTATIC_GITHUB_APP_SLUG` — el editor del blog (`/keystatic`, Keystatic con una
-  GitHub App instalada en `MMARTID/botbook`). Sin ellas la web se construye igual y `/api/keystatic`
+  GitHub App instalada en `MMARTID/alhabla`). Sin ellas la web se construye igual y `/api/keystatic`
   responde 503. En dev no hacen falta: Keystatic escribe en disco.
 
 Artículos: ficheros `content/blog/<slug>.mdx` con frontmatter y fotos en `public/blog/<slug>/`.

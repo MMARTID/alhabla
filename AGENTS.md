@@ -3537,7 +3537,7 @@ partir vacía de `main` como marcador.
 
 | Rama | Componente | Issue | Notas |
 |------|-----------|-------|-------|
-| `step-followups-landing` | Sección "Cómo funciona" de la landing: desde el 2026-10-02, `LlamadaScroll` + `EnTuNegocioScroll` en todas las landings (`HowItWorksScrollytelling` ya no existe) | [#12](https://github.com/MMARTID/botbook/issues/12) | Pulir y/o rediseñar el recorrido de 3 pasos. |
+| `step-followups-landing` | Sección "Cómo funciona" de la landing: desde el 2026-10-02, `LlamadaScroll` + `EnTuNegocioScroll` en todas las landings (`HowItWorksScrollytelling` ya no existe) | [#12](https://github.com/MMARTID/alhabla/issues/12) | Pulir y/o rediseñar el recorrido de 3 pasos. |
 | `demo-modal-landing` | Modal/experiencia de "Escuchar una llamada" del hero (`DemoVoiceCall`) | — | Pulir y/o rediseñar la demo de llamada de voz que se abre desde la landing. Sin Issue todavía. |
 | `telnyx-whatsapp-calls` | Llamadas de voz por WhatsApp vía Telnyx — distinto de la mensajería de texto ya existente (`WhatsAppAdapter`, `jobs/sendWhatsapp.ts`, plantillas de confirmación/recordatorio) | — | **Descartado** el 2026-09-19 (ver `PLAN-CANAL-DUENO.md` v3). `docs/historico/PLAN-WHATSAPP-LLAMADAS.md` queda en `main` solo como referencia. Rama sin trabajo; borrar cuando se confirme. |
 
@@ -3709,7 +3709,7 @@ landings de sector compartían el 55–58 % del texto de `<main>`. Desde el 2026
   (`github-actions-ci@project-84381467-a606-4b71-a6e.iam.gserviceaccount.com`, least-privilege —
   deliberately *not* the default Compute Engine SA that Cloud Run/Cloud Build use for everything
   else) is impersonated via a WIF pool (`github-pool`) + OIDC provider (`github-provider`)
-  restricted to the `MMARTID/botbook` repo (`attribute.repository` condition on the IAM binding,
+  restricted to the `MMARTID/alhabla` repo (`attribute.repository` condition on the IAM binding,
   plus `attribute_condition: assertion.repository_owner == 'MMARTID'` on the provider itself —
   belt and suspenders). No GitHub secret holds a GCP key. Exact roles granted and why: Second
   Brain "Runbook de despliegue a producción" § CI/CD automático and memory `ci-cd-pipeline-setup`.

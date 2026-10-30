@@ -7,7 +7,7 @@ const ejecutar = promisify(execFile);
 export const PROYECTO = "project-84381467-a606-4b71-a6e";
 export const REGION = "europe-west1";
 export const SERVICIO = "alhabla-api";
-export const REPOSITORIO = "MMARTID/botbook";
+export const REPOSITORIO = "MMARTID/alhabla";
 
 /**
  * Lo que dicen gcloud y cloud-sql-proxy cuando la sesión de Google del Mac ha
