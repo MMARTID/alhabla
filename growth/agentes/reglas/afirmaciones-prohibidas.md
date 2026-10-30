@@ -63,8 +63,10 @@ Lo que el repo NO dice y no se ha añadido a la tabla:
   `growth_competidores`, no con esta lista. El sincronizador los siembra desde
   `backend/mcp/growth/conocimiento/mapa.ts` (`COMPETIDORES_ADICIONALES`:
   HeyDiga, `heydiga.ai`, y fonio, `fonio.ai`), además de las siete plataformas
-  de `comparativas.ts`; **la lista está pendiente de confirmar por el
-  fundador**. Con ellos sembrados, la regla dura 3 bloquea cualquier borrador
-  que los nombre sin citar un dato comparativo suyo, y no hay ninguno.
+  de `comparativas.ts`; **el fundador confirmó HeyDiga y fonio el
+  2026-10-30**. Con ellos sembrados, la regla dura 3 bloquea cualquier borrador
+  que los nombre sin citar un dato comparativo suyo, y no hay ninguno. Un
+  competidor que propone el agente (`propuesto`) no aplica la regla hasta que
+  el fundador lo acepta en el panel.
 - Si la jerga técnica se aplica a todos los tipos de borrador o solo a las
   fichas de directorio.
