@@ -4197,7 +4197,13 @@ describe("executeVoiceTool informar_al_negocio (post-conversación)", () => {
 
     expect(result).toEqual({
       success: true,
-      result: { success: true, outcome: "guardado" },
+      result: {
+        success: true,
+        outcome: "guardado",
+        siguiente_paso: expect.stringContaining(
+          "No vuelvas a llamar a informar_al_negocio"
+        ),
+      },
     });
     expect(procesarInformeFinal).toHaveBeenCalledWith({
       business: expect.objectContaining({ id: "business_123" }),

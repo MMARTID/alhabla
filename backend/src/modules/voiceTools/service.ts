@@ -3544,6 +3544,20 @@ async function conPreguntaDeGrabacion(
   };
 }
 
+/**
+ * `siguiente_paso` de informar_al_negocio. En el chat de WhatsApp no hay
+ * post-conversación: el modelo informa al despedirse y, con una respuesta
+ * muda, repetía la tool con los mismos argumentos en el mismo turno; Telnyx
+ * cortaba entonces con su texto fijo en inglés («I'm stuck in a loop…»), que
+ * el backend habría mandado al cliente (laboratorio del 30-10, E17).
+ */
+export function siguientePasoTrasElInforme(outcome: string): string {
+  const inicio = outcome.startsWith("duplicado")
+    ? "Ya estaba informado. "
+    : "Informe recibido. ";
+  return `${inicio}No vuelvas a llamar a informar_al_negocio en esta conversación. Si el cliente se ha despedido, despídete con una frase breve.`;
+}
+
 export async function executeVoiceTool(
   input: ExecuteVoiceToolInput
 ): Promise<ResultadoDeTool> {
@@ -3626,7 +3640,14 @@ export async function executeVoiceTool(
         idioma: params.idioma_del_cliente,
         etiqueta: callLabel,
       });
-      return { success: true, result: { success: true, outcome: informe.outcome } };
+      return {
+        success: true,
+        result: {
+          success: true,
+          outcome: informe.outcome,
+          siguiente_paso: siguientePasoTrasElInforme(informe.outcome),
+        },
+      };
     }
     default:
       console.warn(`[VoiceTools] Tool desconocida: ${toolName}`);

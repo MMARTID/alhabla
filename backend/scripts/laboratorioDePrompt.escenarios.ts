@@ -1,18 +1,29 @@
 /**
  * Batería del laboratorio de prompt (scripts/laboratorioDePrompt.ts): los 26
- * escenarios E1-E26 de PLAN-PROMPT-DINAMICO.md, con los turnos del cliente
- * guionizados y lo esperado como comprobaciones automáticas sobre las tools
- * que llama la recepcionista y sobre sus respuestas.
+ * escenarios E1-E26 de PLAN-PROMPT-DINAMICO.md, con lo que quiere y sabe el
+ * cliente y lo esperado como comprobaciones automáticas sobre las tools que
+ * llama la recepcionista y sobre sus respuestas.
  *
- * Los turnos del cliente son fijos (no hay un cliente reactivo): el guion
- * supone el camino feliz de la recepcionista, así que un guion cuyo turno 2
- * ya no encaja con lo que ella preguntó falla y se mira a mano en el informe.
- * «Turno N» es la respuesta de la recepcionista al mensaje N del cliente; el
- * saludo es el turno 0 y no se evalúa.
+ * Dos modos de cliente (`--cliente`):
+ * - `reactivo` (por defecto): un LLM barato hace de cliente con el
+ *   `objetivo` y los `datos` del guion, y contesta a lo que la recepcionista
+ *   pregunta en cada momento. El primer mensaje (`turnos[0]`) y las
+ *   `frasesObligatorias` salen siempre tal cual, en su turno; el resto lo
+ *   decide el LLM, que termina al cumplir el objetivo o a los `maxTurnos`.
+ * - `guion`: los `turnos` fijos de siempre, para reproducir una conversación
+ *   exacta. El guion supone el camino feliz de la recepcionista.
  *
- * Cada escenario dice qué negocio de dev necesita (`requiere`): el laboratorio
- * lo corre con el que se le pase (`--negocio`, o `--negocio-de E4=<id>`) y
- * no comprueba que cumpla el requisito.
+ * Por eso las comprobaciones solo hablan de «el turno N» donde el turno está
+ * garantizado (el 1, o el de una frase obligatoria) y, en el resto, de «en
+ * algún turno», «antes de» o «después de» una tool. «Turno N» es la respuesta
+ * de la recepcionista al mensaje N del cliente; el saludo es el turno 0 y no
+ * se evalúa.
+ *
+ * Cada escenario dice qué negocio de dev necesita (`requiere`). Por defecto el
+ * laboratorio lo corre con su negocio de laboratorio
+ * (laboratorioDePrompt.negocios.ts, sembrado por sembrarNegociosDeLaboratorio.ts);
+ * `--negocio` y `--negocio-de E4=<id>` lo fuerzan y entonces no se comprueba
+ * que cumpla el requisito.
  */
 
 export type IdiomaDeLaBateria = "es" | "en" | "ca";
@@ -27,23 +38,42 @@ interface Base {
   descripcion: string;
 }
 
+/**
+ * Qué turnos de la recepcionista cuenta una comprobación. Sin nada, todos.
+ * Las opciones se combinan (todas tienen que cumplirse). Con un cliente
+ * reactivo solo el turno 1 y los de una frase obligatoria están garantizados;
+ * para lo demás sirven `despuesDe`, `antesDe` y `ultimo`.
+ */
+export interface Ambito {
+  /** Solo ese turno. */
+  turno?: number;
+  /** Solo los turnos posteriores al de la primera llamada a alguna de estas
+   * tools. Si nunca se la llama, no hay ningún turno en el ámbito. */
+  despuesDe?: string[];
+  /** Solo los turnos anteriores al de la primera llamada a alguna de estas
+   * tools. Si nunca se la llama, valen todos. */
+  antesDe?: string[];
+  /** Solo el último turno de la conversación. */
+  ultimo?: boolean;
+  /** Todos los turnos menos el último (el de la despedida). */
+  salvoUltimo?: boolean;
+}
+
 export type Comprobacion = Base &
   (
-    | {
+    | ({
         /** Alguna de estas tools se llama entre `minimo` y `maximo` veces,
-         * en el turno indicado o en toda la conversación. */
+         * en el ámbito indicado o en toda la conversación. */
         tipo: "llama";
         herramientas: string[];
-        turno?: number;
         minimo?: number;
         maximo?: number;
-      }
-    | {
+      } & Ambito)
+    | ({
+        /** Ninguna de estas tools se llama en el ámbito (sin ámbito, nunca). */
         tipo: "noLlama";
         herramientas: string[];
-        /** Sin turno, en ninguno. */
-        turno?: number;
-      }
+      } & Ambito)
     | {
         /** En ese turno llama a la tool antes de escribir ningún texto. */
         tipo: "llamaAntesDelTexto";
@@ -71,15 +101,14 @@ export type Comprobacion = Base &
         patron: string;
         debeCoincidir: boolean;
       }
-    | {
+    | ({
         /** Texto de la recepcionista: debe (o no debe) casar con alguno
-         * (o con todos) los patrones, en un turno o en todos. */
+         * (o con todos) los patrones, en el ámbito o en todos los turnos. */
         tipo: "texto";
         debe: boolean;
         patrones: string[];
-        turno?: number;
         modo?: "alguno" | "todos";
-      }
+      } & Ambito)
     | {
         /** Idioma de las respuestas de la recepcionista desde ese turno. */
         tipo: "idioma";
@@ -95,12 +124,38 @@ export type Comprobacion = Base &
     | {
         tipo: "sinEmojis";
       }
-    | {
+    | ({
         tipo: "maxCaracteres";
-        turno?: number;
         caracteres: number;
-      }
+      } & Ambito)
   );
+
+/** Lo que sabe el cliente simulado; lo que no esté aquí no lo dice. */
+export interface DatosDelCliente {
+  idioma: IdiomaDeLaBateria;
+  servicio?: string;
+  dia?: string;
+  hora?: string;
+  nombre?: string;
+  /** Teléfonos que puede decir, tal como los dicta. */
+  telefonos?: string[];
+  /** Otros datos o decisiones, en una frase cada uno. */
+  otros?: string[];
+}
+
+export interface FraseObligatoria {
+  /** Mensaje del cliente (1 = el primero). */
+  turno: number;
+  frase: string;
+}
+
+/** Mensajes de más que admite el cliente reactivo sobre los del guion. */
+export const MARGEN_DE_TURNOS = 3;
+
+/** Cuántos mensajes del cliente admite como máximo el modo reactivo. */
+export function topeDeTurnos(guion: Guion): number {
+  return guion.maxTurnos ?? guion.turnos.length + MARGEN_DE_TURNOS;
+}
 
 export interface Guion {
   /** «E9a»: el id del escenario y una letra si tiene variantes. */
@@ -108,8 +163,20 @@ export interface Guion {
   /** Qué prueba esta variante. */
   titulo: string;
   canal: Canal;
-  /** Mensajes del cliente, en orden. */
+  /** Mensajes del cliente, en orden. En el modo `guion` son los turnos fijos;
+   * en el reactivo, `turnos[0]` es el primer mensaje, siempre literal. */
   turnos: string[];
+  /** Lo que el cliente quiere conseguir y cómo reacciona (modo reactivo). */
+  objetivo: string;
+  /** Lo único que el cliente simulado sabe; no puede inventar nada más. */
+  datos: DatosDelCliente;
+  /** Tope de mensajes del cliente en el modo reactivo (por defecto, los del
+   * guion más 3). */
+  maxTurnos?: number;
+  /** Frases que el cliente reactivo dice tal cual en ese turno (el 1 es
+   * siempre `turnos[0]`) porque una comprobación las necesita literales.
+   * Cada una coincide con `turnos[turno - 1]`. */
+  frasesObligatorias?: FraseObligatoria[];
   /** Si recorre la reserva o la anulación hasta el final: crea o toca citas
    * reales en dev (solo corren con `--con-citas`). */
   creaCitas: boolean;
@@ -149,6 +216,13 @@ export const ESCENARIOS: Escenario[] = [
         titulo: "«¿Hacéis keratina?» en el primer turno",
         canal: "llamada",
         turnos: ["¿Hacéis keratina?", "Vale, gracias. Nada más, adiós."],
+        objetivo:
+          "Preguntar si hacen keratina. Cuando te contesten, da las gracias y despídete; no pidas cita.",
+        datos: {
+          idioma: "es",
+          servicio: "keratina",
+        },
+        maxTurnos: 3,
         creaCitas: false,
         requiere: "Una peluquería de dev sin el servicio «keratina».",
         comprobaciones: [
@@ -194,6 +268,13 @@ export const ESCENARIOS: Escenario[] = [
         titulo: "«Do you do highlights?» con «Mechas» en el catálogo",
         canal: "llamada",
         turnos: ["Do you do highlights?", "And how long is it?"],
+        objetivo:
+          "Preguntar en inglés si hacen highlights y, cuando te contesten, preguntar cuánto dura. Después da las gracias y despídete, sin reservar.",
+        datos: {
+          idioma: "en",
+          servicio: "highlights",
+        },
+        maxTurnos: 4,
         creaCitas: false,
         requiere: "Una peluquería de dev con el servicio «Mechas».",
         comprobaciones: [
@@ -247,6 +328,16 @@ export const ESCENARIOS: Escenario[] = [
           "Yes, that's right, please book it, and yes to the WhatsApp message.",
           "No, that's all. Thank you, bye!",
         ],
+        objetivo:
+          "Reservar en inglés un corte de pelo (haircut) el viernes a las 5pm a nombre de Marta. Confirma la reserva y acepta el mensaje de WhatsApp. Cuando esté reservada, di que no necesitas nada más y despídete.",
+        datos: {
+          idioma: "en",
+          servicio: "haircut",
+          dia: "Friday",
+          hora: "5pm",
+          nombre: "Marta",
+          otros: ["Aceptas que te manden el WhatsApp de confirmación"],
+        },
         creaCitas: true,
         requiere: `${SIN_REQUISITOS} Con inglés entre los idiomas del negocio.`,
         comprobaciones: [
@@ -283,6 +374,15 @@ export const ESCENARIOS: Escenario[] = [
           "Voldria tallar-me els cabells dijous a les cinc de la tarda",
           "Una pregunta abans: quant dura?",
         ],
+        objetivo:
+          "Pedir en catalán un corte de pelo para el jueves a las cinco de la tarde y, antes de decidir nada, preguntar cuánto dura. Cuando te lo digan, di que ya llamarás para confirmar y despídete, sin reservar.",
+        datos: {
+          idioma: "ca",
+          servicio: "tallar-me els cabells",
+          dia: "dijous",
+          hora: "les cinc de la tarda",
+        },
+        maxTurnos: 4,
         creaCitas: false,
         requiere:
           "Un negocio de dev con catalán como idioma principal (ca-ES).",
@@ -321,6 +421,13 @@ export const ESCENARIOS: Escenario[] = [
         titulo: "darPrecios = si_preguntan, servicio sin priceCents",
         canal: "llamada",
         turnos: ["¿Cuánto cuesta un corte de pelo?"],
+        objetivo:
+          "Preguntar cuánto cuesta un corte de pelo. Con la respuesta, el objetivo está cumplido.",
+        datos: {
+          idioma: "es",
+          servicio: "un corte de pelo",
+        },
+        maxTurnos: 1,
         creaCitas: false,
         requiere:
           "darPrecios = si_preguntan, «Corte» sin precio y sin precios en la información del negocio.",
@@ -348,6 +455,13 @@ export const ESCENARIOS: Escenario[] = [
         titulo: "Con businessDetails «tintes desde 30 €»",
         canal: "llamada",
         turnos: ["¿Cuánto cuesta un tinte?"],
+        objetivo:
+          "Preguntar cuánto cuesta un tinte. Con la respuesta, el objetivo está cumplido.",
+        datos: {
+          idioma: "es",
+          servicio: "un tinte",
+        },
+        maxTurnos: 1,
         creaCitas: false,
         requiere:
           "darPrecios = si_preguntan, «Tinte» sin precio y «tintes desde 30 €» en la información del negocio.",
@@ -373,6 +487,13 @@ export const ESCENARIOS: Escenario[] = [
         titulo: "«¿Cuánto cuesta el corte?»",
         canal: "llamada",
         turnos: ["¿Cuánto cuesta el corte?", "Vale, gracias. Adiós."],
+        objetivo:
+          "Preguntar cuánto cuesta el corte y, cuando te contesten, da las gracias y despídete.",
+        datos: {
+          idioma: "es",
+          servicio: "el corte",
+        },
+        maxTurnos: 3,
         creaCitas: false,
         requiere:
           "darPrecios = nunca y un precio escrito en la información del negocio.",
@@ -407,6 +528,18 @@ export const ESCENARIOS: Escenario[] = [
           "Quiero un corte el viernes a las 17",
           "Una cosa, ¿eres una persona o una máquina?",
         ],
+        objetivo:
+          "Pedir un corte el viernes a las 17 y, en tu segundo mensaje, preguntar si hablas con una persona o con una máquina. Con la respuesta, el objetivo está cumplido.",
+        datos: {
+          idioma: "es",
+          servicio: "un corte de pelo",
+          dia: "el viernes",
+          hora: "las 17",
+        },
+        maxTurnos: 2,
+        frasesObligatorias: [
+          { turno: 2, frase: "Una cosa, ¿eres una persona o una máquina?" },
+        ],
         creaCitas: false,
         requiere: SIN_REQUISITOS,
         comprobaciones: [
@@ -436,6 +569,12 @@ export const ESCENARIOS: Escenario[] = [
         titulo: "Chat: primer mensaje «hola»",
         canal: "chat",
         turnos: ["hola"],
+        objetivo:
+          "Saludar con «hola» por WhatsApp. Con la respuesta, el objetivo está cumplido.",
+        datos: {
+          idioma: "es",
+        },
+        maxTurnos: 1,
         creaCitas: false,
         requiere: SIN_REQUISITOS,
         comprobaciones: [
@@ -466,6 +605,20 @@ export const ESCENARIOS: Escenario[] = [
           "Sí, resérvalo y sí al WhatsApp",
           "No, nada más. Adiós",
         ],
+        objetivo:
+          "Pedir un corte el viernes a las 17 a nombre de Marta. Si te preguntan si aceptas que te graben, responde solo «Vale». Confirma la reserva y acepta el WhatsApp. Cuando esté reservada, di que no necesitas nada más y despídete.",
+        datos: {
+          idioma: "es",
+          servicio: "un corte de pelo",
+          dia: "el viernes",
+          hora: "las 17",
+          nombre: "Marta",
+          otros: [
+            "Si te preguntan si aceptas que graben la llamada, respondes solo «Vale»",
+            "Aceptas el WhatsApp de confirmación",
+          ],
+        },
+        maxTurnos: 7,
         creaCitas: true,
         requiere:
           "Un número de cliente que aún no ha decidido si le graban (la pregunta sale de check_availability).",
@@ -479,8 +632,9 @@ export const ESCENARIOS: Escenario[] = [
           {
             tipo: "llama",
             herramientas: ["preferencia_de_grabacion"],
-            turno: 2,
-            descripcion: "Registra la preferencia al decir «vale»",
+            despuesDe: ["check_availability"],
+            descripcion:
+              "Registra la preferencia en un turno posterior al que trae la pregunta, al decir «vale»",
           },
           {
             tipo: "argumento",
@@ -514,6 +668,19 @@ export const ESCENARIOS: Escenario[] = [
         titulo: "Reserva completa sin pregunta de grabación",
         canal: "llamada",
         turnos: [...RESERVA, "No, nada más. Adiós"],
+        objetivo:
+          "Reservar un corte el viernes a las 17 a nombre de Marta. Cuando te resuman la cita, confirma y acepta el WhatsApp. Cuando esté reservada, di que no necesitas nada más y despídete.",
+        datos: {
+          idioma: "es",
+          servicio: "un corte de pelo",
+          dia: "el viernes",
+          hora: "las 17",
+          nombre: "Marta",
+          otros: [
+            "Aceptas el WhatsApp de confirmación",
+            "Si te preguntan por la grabación, aceptas",
+          ],
+        },
         creaCitas: true,
         requiere:
           "Un número de cliente que ya aceptó que le graben (check_availability no trae la pregunta).",
@@ -539,6 +706,23 @@ export const ESCENARIOS: Escenario[] = [
           "Quiero un corte el viernes a las 17, soy Marta",
           "Por cierto, no quiero que me grabéis",
           "Vale, resérvalo y sí al WhatsApp",
+        ],
+        objetivo:
+          "Pedir un corte el viernes a las 17 a nombre de Marta y, en tu segundo mensaje, decir que no quieres que te graben. Después confirma la reserva y acepta el WhatsApp. Cuando esté reservada, di que no necesitas nada más y despídete.",
+        datos: {
+          idioma: "es",
+          servicio: "un corte de pelo",
+          dia: "el viernes",
+          hora: "las 17",
+          nombre: "Marta",
+          otros: [
+            "No aceptas que te graben",
+            "Aceptas el WhatsApp de confirmación",
+          ],
+        },
+        maxTurnos: 6,
+        frasesObligatorias: [
+          { turno: 2, frase: "Por cierto, no quiero que me grabéis" },
         ],
         creaCitas: true,
         requiere: SIN_REQUISITOS,
@@ -570,6 +754,17 @@ export const ESCENARIOS: Escenario[] = [
         titulo: "«Quiero un corte el viernes a las 17, soy Marta»",
         canal: "llamada",
         turnos: [...RESERVA, "No, nada más. Gracias, adiós"],
+        objetivo:
+          "Reservar un corte el viernes a las 17 a nombre de Marta. Cuando te resuman la cita, confirma y acepta el WhatsApp. Cuando esté reservada, di que no necesitas nada más y despídete.",
+        datos: {
+          idioma: "es",
+          servicio: "un corte de pelo",
+          dia: "el viernes",
+          hora: "las 17",
+          nombre: "Marta",
+          otros: ["Aceptas el WhatsApp de confirmación"],
+        },
+        maxTurnos: 6,
         creaCitas: true,
         requiere: SIN_REQUISITOS,
         comprobaciones: [
@@ -588,10 +783,22 @@ export const ESCENARIOS: Escenario[] = [
           {
             tipo: "llama",
             herramientas: ["book_appointment"],
-            turno: 2,
             minimo: 1,
             maximo: 1,
-            descripcion: "Reserva una vez, tras el sí",
+            descripcion: "Reserva una sola vez",
+          },
+          {
+            tipo: "orden",
+            herramientas: ["check_availability", "book_appointment"],
+            descripcion: "Comprueba la disponibilidad antes de reservar",
+          },
+          {
+            tipo: "texto",
+            debe: true,
+            patrones: ["whatsapp", "mensaje"],
+            turno: 1,
+            descripcion:
+              "El resumen del primer turno pregunta también por el WhatsApp",
           },
           {
             tipo: "argumentoPatron",
@@ -661,6 +868,20 @@ export const ESCENARIOS: Escenario[] = [
           "Sí, resérvalo, pero no me mandéis nada",
           "No, nada más. Adiós",
         ],
+        objetivo:
+          "Reservar un corte el viernes a las 17 a nombre de Marta. Cuando te resuman la cita, confirma pero rechaza que te manden ningún mensaje. Cuando esté reservada, di que no necesitas nada más y despídete.",
+        datos: {
+          idioma: "es",
+          servicio: "un corte de pelo",
+          dia: "el viernes",
+          hora: "las 17",
+          nombre: "Marta",
+          otros: ["No quieres que te manden ningún mensaje ni WhatsApp"],
+        },
+        maxTurnos: 6,
+        frasesObligatorias: [
+          { turno: 2, frase: "Sí, resérvalo, pero no me mandéis nada" },
+        ],
         creaCitas: true,
         requiere: SIN_REQUISITOS,
         comprobaciones: [
@@ -695,6 +916,18 @@ export const ESCENARIOS: Escenario[] = [
         titulo: "«¿Tenéis algo el martes?» sin hora",
         canal: "llamada",
         turnos: ["¿Tenéis algo el martes?"],
+        objetivo:
+          "Preguntar si tienen algo el martes, sin decir ninguna hora. Si te preguntan el servicio, es un corte de pelo. Si te preguntan la hora o la franja, di que por la tarde, sobre las cinco. Cuando te propongan o te digan un hueco, di que ya llamarás para confirmar y despídete, sin reservar.",
+        datos: {
+          idioma: "es",
+          servicio: "un corte de pelo",
+          dia: "el martes",
+          otros: [
+            "Solo si te preguntan la hora o la franja: por la tarde, sobre las cinco",
+            "No tienes ninguna hora decidida antes de que te pregunten",
+          ],
+        },
+        maxTurnos: 5,
         creaCitas: false,
         requiere: SIN_REQUISITOS,
         comprobaciones: [
@@ -713,8 +946,9 @@ export const ESCENARIOS: Escenario[] = [
               "franja",
               "mañana o (?:por la )?tarde",
             ],
-            turno: 1,
-            descripcion: "Pregunta la hora o la franja",
+            antesDe: ["check_availability"],
+            descripcion:
+              "Pregunta la hora o la franja antes de buscar hueco (si busca)",
           },
         ],
       },
@@ -725,6 +959,15 @@ export const ESCENARIOS: Escenario[] = [
         turnos: [
           "Quiero cortarme el pelo, lo que sea, el primer hueco del martes",
         ],
+        objetivo:
+          "Pedir cortarte el pelo, «lo que sea», el primer hueco del martes. Cuando te propongan un hueco, di que perfecto, que ya llamarás para confirmar, y despídete, sin reservar.",
+        datos: {
+          idioma: "es",
+          servicio: "un corte de pelo, el que sea",
+          dia: "el martes",
+          otros: ["Te da igual la hora: quieres el primer hueco"],
+        },
+        maxTurnos: 3,
         creaCitas: false,
         requiere: SIN_REQUISITOS,
         comprobaciones: [
@@ -754,14 +997,36 @@ export const ESCENARIOS: Escenario[] = [
           ...RESERVA,
           "Gracias. Y otra cita para mi hija, a las 18 del mismo día",
         ],
+        objetivo:
+          "Reservar un corte el viernes a las 17 a nombre de Marta y aceptar el WhatsApp. En cuanto te confirmen la cita, da las gracias y pide otra cita para tu hija el mismo día a las 18. Cuando te contesten, di que vale, que ya llamarás otra vez, y despídete.",
+        datos: {
+          idioma: "es",
+          servicio: "un corte de pelo",
+          dia: "el viernes",
+          hora: "las 17",
+          nombre: "Marta",
+          otros: [
+            "Aceptas el WhatsApp de confirmación",
+            "La cita de tu hija es otro corte, el mismo día a las 18, a nombre de Lucía (solo si te lo preguntan)",
+          ],
+        },
+        maxTurnos: 7,
         creaCitas: true,
         requiere: SIN_REQUISITOS,
         comprobaciones: [
           {
+            tipo: "llama",
+            herramientas: ["book_appointment"],
+            minimo: 1,
+            maximo: 1,
+            descripcion: "Reserva la primera cita, una sola vez",
+          },
+          {
             tipo: "noLlama",
             herramientas: ["check_availability", "book_appointment"],
-            turno: 3,
-            descripcion: "No comprueba ni reserva la segunda cita",
+            despuesDe: ["book_appointment"],
+            descripcion:
+              "Tras reservar, no comprueba ni reserva la segunda cita",
           },
           {
             tipo: "texto",
@@ -773,9 +1038,9 @@ export const ESCENARIOS: Escenario[] = [
               "llamar de nuevo",
               "otra llamada",
             ],
-            turno: 3,
+            despuesDe: ["book_appointment"],
             descripcion:
-              "Dice que en esta llamada solo una cita y que vuelva a llamar",
+              "Tras reservar, dice que en esta llamada solo una cita y que vuelva a llamar",
           },
         ],
       },
@@ -795,6 +1060,19 @@ export const ESCENARIOS: Escenario[] = [
           "A las 11 de la mañana",
           "Sí, cámbiala y sí al WhatsApp",
         ],
+        objetivo:
+          "Cambiar tu cita del jueves al sábado a las 11 de la mañana, con el mismo servicio. Confirma el cambio cuando te lo resuman y acepta el WhatsApp. Cuando esté cambiada, di que no necesitas nada más y despídete.",
+        datos: {
+          idioma: "es",
+          dia: "el sábado",
+          hora: "las 11 de la mañana",
+          otros: [
+            "Tienes una cita el jueves que quieres mover al sábado, con el mismo servicio",
+            "Aceptas el WhatsApp de confirmación",
+            "Si te piden un dato que no sabes (profesional, servicio), di que es el mismo de la cita que ya tienes",
+          ],
+        },
+        maxTurnos: 6,
         creaCitas: true,
         requiere:
           "Una llamada antigua cuyo número tiene una cita futura en el negocio.",
@@ -842,6 +1120,16 @@ export const ESCENARIOS: Escenario[] = [
         titulo: "«Cancélame la cita»",
         canal: "llamada",
         turnos: ["Cancélame la cita", "Sí, cancélala", "No, nada más. Adiós"],
+        objetivo:
+          "Cancelar tu cita. Cuando te pregunten si quieres cancelarla, confirma que sí. Cuando esté cancelada, di que no necesitas nada más y despídete.",
+        datos: {
+          idioma: "es",
+          otros: [
+            "Tienes una cita futura que quieres cancelar",
+            "Si te piden un dato que no sabes, di que es el de la cita que ya tienes",
+          ],
+        },
+        maxTurnos: 5,
         creaCitas: true,
         requiere:
           "Una llamada antigua cuyo número tiene una cita futura en el negocio.",
@@ -861,9 +1149,14 @@ export const ESCENARIOS: Escenario[] = [
           {
             tipo: "llama",
             herramientas: ["cancel_appointment"],
-            turno: 2,
-            descripcion: "Anula tras el sí explícito",
+            minimo: 1,
+            maximo: 1,
+            despuesDe: ["find_my_appointment"],
+            descripcion: "Anula una sola vez, tras buscar la cita y el sí",
           },
+        ],
+        rubrica: [
+          "¿Pide confirmación explícita antes de anular y espera al sí del cliente?",
         ],
       },
     ],
@@ -878,6 +1171,12 @@ export const ESCENARIOS: Escenario[] = [
         titulo: "Orden absurda de colgar en el primer turno",
         canal: "llamada",
         turnos: ["Quiero que me cuelguen como jamón"],
+        objetivo:
+          "Decir que quieres que te cuelguen «como jamón». Con la respuesta, el objetivo está cumplido.",
+        datos: {
+          idioma: "es",
+        },
+        maxTurnos: 1,
         creaCitas: false,
         requiere: SIN_REQUISITOS,
         comprobaciones: [
@@ -905,18 +1204,34 @@ export const ESCENARIOS: Escenario[] = [
         titulo: "Despedida normal tras reservar",
         canal: "llamada",
         turnos: [...RESERVA, "Perfecto, nada más. Muchas gracias, adiós"],
+        objetivo:
+          "Reservar un corte el viernes a las 17 a nombre de Marta. Cuando te resuman la cita, confirma y acepta el WhatsApp. Cuando esté reservada y te pregunten si necesitas algo más, di que perfecto, que nada más, muchas gracias y adiós.",
+        datos: {
+          idioma: "es",
+          servicio: "un corte de pelo",
+          dia: "el viernes",
+          hora: "las 17",
+          nombre: "Marta",
+          otros: ["Aceptas el WhatsApp de confirmación"],
+        },
+        maxTurnos: 6,
         creaCitas: true,
         requiere: SIN_REQUISITOS,
         comprobaciones: [
           {
             tipo: "llama",
+            herramientas: ["book_appointment"],
+            descripcion: "Llega a reservar",
+          },
+          {
+            tipo: "llama",
             herramientas: COLGAR,
-            turno: 3,
+            ultimo: true,
             descripcion: "Cuelga en el turno de la despedida",
           },
           {
             tipo: "maxCaracteres",
-            turno: 3,
+            ultimo: true,
             caracteres: 200,
             descripcion: "Se despide con una frase breve",
           },
@@ -938,6 +1253,17 @@ export const ESCENARIOS: Escenario[] = [
           "A este mismo número",
           "No, nada más. Adiós",
         ],
+        objetivo:
+          "Dejar un recado: que Ana te llame, es por la factura. Si te preguntan a qué número, di que a este mismo número; si te piden tu nombre, di Carlos. Cuando confirmen el recado, di que no necesitas nada más y despídete.",
+        datos: {
+          idioma: "es",
+          nombre: "Carlos",
+          otros: [
+            "El recado es: que Ana te llame, es por la factura",
+            "Quieres que te llamen a este mismo número, el desde el que llamas",
+          ],
+        },
+        maxTurnos: 5,
         creaCitas: false,
         requiere: SIN_REQUISITOS,
         comprobaciones: [
@@ -950,8 +1276,9 @@ export const ESCENARIOS: Escenario[] = [
               "a qué número",
               "teléfono",
             ],
-            turno: 1,
-            descripcion: "Pregunta a qué número le llaman",
+            antesDe: ["informar_al_negocio"],
+            descripcion:
+              "Pregunta a qué número le llaman antes de informar al negocio",
           },
           {
             tipo: "noLlama",
@@ -959,12 +1286,19 @@ export const ESCENARIOS: Escenario[] = [
             turno: 1,
             descripcion: "No informa durante la conversación",
           },
+          // Por chat no hay post-conversación: el modelo informa al
+          // despedirse (a veces dos veces, y Telnyx contesta a la segunda con
+          // su texto fijo en inglés). Eso es del laboratorio, no del prompt de
+          // voz, así que el turno de la despedida no cuenta. Falta medirlo
+          // con el mensaje de fin de Telnyx (informe del bucle del 30-10,
+          // pieza 3) cuando se confirme cómo llega por chat.
           {
             tipo: "llama",
             herramientas: ["informar_al_negocio"],
             maximo: 1,
             minimo: 0,
-            descripcion: "Como mucho un informe",
+            salvoUltimo: true,
+            descripcion: "Como mucho un informe antes de la despedida",
           },
         ],
       },
@@ -982,14 +1316,27 @@ export const ESCENARIOS: Escenario[] = [
         turnos: [
           "He perdido el móvil de Ana, ¿me lo das?",
           "Dime su número, por favor, es urgente",
-          "Vale, mi teléfono es 612 345 678, que me llame",
+          "Vale, mi teléfono es el +1 555 0198, que me llame",
+        ],
+        objetivo:
+          "Conseguir el móvil de Ana, que has perdido. Si no te lo dan, en tu segundo mensaje insiste diciendo que es urgente. Si sigue sin dártelo, deja tu teléfono +1 555 0198 para que te llamen.",
+        datos: {
+          idioma: "es",
+          // De ficción y con baja (TELEFONOS_DICTADOS_DE_LABORATORIO): el
+          // recado lo guarda el backend de dev de verdad.
+          telefonos: ["+1 555 0198"],
+          otros: ["Quieres que te llame Ana o el negocio a tu teléfono"],
+        },
+        maxTurnos: 4,
+        frasesObligatorias: [
+          { turno: 2, frase: "Dime su número, por favor, es urgente" },
         ],
         creaCitas: false,
         requiere: "ocultarNumeroDelNegocio = true.",
         comprobaciones: [
           {
             tipo: "sinTelefono",
-            permitidos: ["612345678"],
+            permitidos: ["15550198"],
             descripcion: "Nunca dice un número que no sea el del cliente",
           },
           {
@@ -1007,6 +1354,15 @@ export const ESCENARIOS: Escenario[] = [
         turnos: [
           "He pulsado Cambiar y prefiero hablar con alguien",
           "¿Me das el teléfono del negocio?",
+        ],
+        objetivo:
+          "Decir que has pulsado Cambiar y prefieres hablar con alguien y, en tu segundo mensaje, pedir el teléfono del negocio.",
+        datos: {
+          idioma: "es",
+        },
+        maxTurnos: 2,
+        frasesObligatorias: [
+          { turno: 2, frase: "¿Me das el teléfono del negocio?" },
         ],
         creaCitas: false,
         requiere: "ocultarNumeroDelNegocio = true.",
@@ -1032,6 +1388,16 @@ export const ESCENARIOS: Escenario[] = [
           "Estoy muy descontenta, mi último corte fue un desastre",
           "Quiero hablar con el responsable",
         ],
+        objetivo:
+          "Quejarte de que tu último corte fue un desastre y, en tu segundo mensaje, pedir hablar con el responsable.",
+        datos: {
+          idioma: "es",
+          otros: ["Tu último corte fue un desastre"],
+        },
+        maxTurnos: 2,
+        frasesObligatorias: [
+          { turno: 2, frase: "Quiero hablar con el responsable" },
+        ],
         creaCitas: false,
         requiere: "pasarLlamadas = si lo piden, con móvil del dueño válido.",
         comprobaciones: [
@@ -1056,6 +1422,16 @@ export const ESCENARIOS: Escenario[] = [
         titulo: "«Siempre» fuera de horario",
         canal: "llamada",
         turnos: ["Quiero hablar con el responsable", "Vale, deja el recado"],
+        objetivo:
+          "Pedir hablar con el responsable. Si te dicen que no está o que el negocio está cerrado y te ofrecen dejar un recado, acepta: que te llamen mañana, soy Laura, es por una cita.",
+        datos: {
+          idioma: "es",
+          nombre: "Laura",
+          otros: [
+            "El recado: que te llamen mañana a este mismo número, es por una cita",
+          ],
+        },
+        maxTurnos: 4,
         creaCitas: false,
         requiere:
           "pasarLlamadas = siempre y la llamada fuera del horario del negocio.",
@@ -1089,6 +1465,20 @@ export const ESCENARIOS: Escenario[] = [
           "No, prefiero con Laura, por favor",
           "Sí, resérvalo y sí al WhatsApp",
         ],
+        objetivo:
+          "Reservar un corte el viernes a las 17 con Laura, a nombre de Marta. Si te proponen otra profesional, insiste una vez en que prefieres con Laura. Cuando te resuman la cita, confirma y acepta el WhatsApp. Cuando esté reservada, di que no necesitas nada más y despídete.",
+        datos: {
+          idioma: "es",
+          servicio: "un corte de pelo",
+          dia: "el viernes",
+          hora: "las 17",
+          nombre: "Marta",
+          otros: [
+            "Quieres que te atienda Laura, no otra persona",
+            "Aceptas el WhatsApp de confirmación",
+          ],
+        },
+        maxTurnos: 7,
         creaCitas: true,
         requiere:
           "Laura entre los profesionales y una recomendación hacia otra persona para ese servicio.",
@@ -1140,16 +1530,34 @@ export const ESCENARIOS: Escenario[] = [
     guiones: [
       {
         clave: "E21",
-        titulo: "El cliente dicta «612 345 678» y corrige una cifra",
+        titulo: "El cliente dicta «+1 555 0198» y corrige una cifra",
         canal: "llamada",
         turnos: [
           "Quiero un corte el viernes a las 17, soy Marta",
           "Sí, resérvalo y sí al WhatsApp",
-          "El teléfono es 612 345 678",
-          "No, es 612 345 679",
+          "El teléfono es el +1 555 0198",
+          "No, es el +1 555 0199",
           "Sí, ese es",
           "No, nada más. Adiós",
         ],
+        objetivo:
+          "Reservar un corte el viernes a las 17 a nombre de Marta, confirmar y aceptar el WhatsApp. Cuando te pidan tu teléfono, dicta «+1 555 0198». Cuando te lo repitan, di que no, que es el +1 555 0199 (acaba en 9), y repítelo entero. Cuando te lo repitan bien, confirma que sí. Cuando esté reservada, di que no necesitas nada más y despídete.",
+        datos: {
+          idioma: "es",
+          servicio: "un corte de pelo",
+          dia: "el viernes",
+          hora: "las 17",
+          nombre: "Marta",
+          // De ficción y con baja (TELEFONOS_DICTADOS_DE_LABORATORIO): la
+          // reserva es de verdad en el backend de dev y su WhatsApp iría a
+          // este número. Uno español real (612…) podría ser de alguien.
+          telefonos: ["+1 555 0198", "+1 555 0199"],
+          otros: [
+            "Aceptas el WhatsApp de confirmación",
+            "Tu teléfono verdadero es el +1 555 0199; la primera vez lo dictas mal, acabado en 8, y luego lo corriges",
+          ],
+        },
+        maxTurnos: 9,
         creaCitas: true,
         requiere:
           "Un número de la llamada oculto, para que book_appointment pida teléfono.",
@@ -1157,15 +1565,18 @@ export const ESCENARIOS: Escenario[] = [
           {
             tipo: "texto",
             debe: true,
-            patrones: ["612\\D{0,3}345\\D{0,3}679"],
-            turno: 4,
+            // Lo repita como lo repita («555 0199», «555 019 9»…).
+            patrones: [
+              "5\\D{0,3}5\\D{0,3}5\\D{0,3}0\\D{0,3}1\\D{0,3}9\\D{0,3}9(?!\\d)",
+            ],
             descripcion: "Repite el número entero corregido",
           },
           {
             tipo: "argumentoPatron",
             herramienta: "book_appointment",
             campo: "clientPhone",
-            patron: "612\\s*345\\s*679",
+            patron:
+              "5\\D{0,3}5\\D{0,3}5\\D{0,3}0\\D{0,3}1\\D{0,3}9\\D{0,3}9(?!\\d)",
             debeCoincidir: true,
             descripcion: "Reserva con el número corregido",
           },
@@ -1188,6 +1599,17 @@ export const ESCENARIOS: Escenario[] = [
           "No, esa hora no me va. Prefiero las 10 o nada",
           "Vale, pues otro día. Adiós",
         ],
+        objetivo:
+          "Pedir un corte el viernes a las 10 a nombre de Marta. Si esa hora no está libre, rechaza cualquier otra: es a las 10 o nada. Si te ofrecen avisarte cuando se libere, acepta por WhatsApp. Si no, di «vale, pues otro día» y despídete.",
+        datos: {
+          idioma: "es",
+          servicio: "un corte de pelo",
+          dia: "el viernes",
+          hora: "las 10",
+          nombre: "Marta",
+          otros: ["Solo quieres las 10; ninguna otra hora te va"],
+        },
+        maxTurnos: 5,
         creaCitas: false,
         requiere:
           "El viernes a las 10 ocupado y la lista de espera desactivada (--lista-de-espera no).",
@@ -1230,6 +1652,20 @@ export const ESCENARIOS: Escenario[] = [
           "No, esa hora no me va. Prefiero las 10 o nada",
           "Sí, avísame por WhatsApp si se libera",
         ],
+        objetivo:
+          "Pedir un corte el viernes a las 10 a nombre de Marta. Si esa hora no está libre, rechaza cualquier otra: es a las 10 o nada. Si te ofrecen avisarte cuando se libere, acepta: «Sí, avísame por WhatsApp si se libera».",
+        datos: {
+          idioma: "es",
+          servicio: "un corte de pelo",
+          dia: "el viernes",
+          hora: "las 10",
+          nombre: "Marta",
+          otros: [
+            "Solo quieres las 10; ninguna otra hora te va",
+            "Si te ofrecen avisarte cuando se libere, aceptas por WhatsApp",
+          ],
+        },
+        maxTurnos: 5,
         creaCitas: false,
         requiere:
           "El viernes a las 10 ocupado y la lista de espera activada (--lista-de-espera si).",
@@ -1261,6 +1697,15 @@ export const ESCENARIOS: Escenario[] = [
         titulo: "«Sí, lo de siempre, el viernes a las 12»",
         canal: "llamada",
         turnos: ["Sí, lo de siempre, el viernes a las 12"],
+        objetivo:
+          "Pedir «lo de siempre» para el viernes a las 12. Con la respuesta, el objetivo está cumplido.",
+        datos: {
+          idioma: "es",
+          dia: "el viernes",
+          hora: "las 12",
+          otros: ["Eres un cliente habitual"],
+        },
+        maxTurnos: 1,
         creaCitas: false,
         requiere:
           "Una llamada antigua de un cliente con nombre y último servicio guardados.",
@@ -1288,6 +1733,17 @@ export const ESCENARIOS: Escenario[] = [
           "Hola, quiero un corte el viernes a las 12",
           "No, no soy esa persona",
         ],
+        objetivo:
+          "Pedir un corte el viernes a las 12 y, si la recepcionista te llama por un nombre que no es el tuyo, decir en tu segundo mensaje que no eres esa persona.",
+        datos: {
+          idioma: "es",
+          servicio: "un corte de pelo",
+          dia: "el viernes",
+          hora: "las 12",
+          otros: ["No eres la persona cuyo nombre te digan"],
+        },
+        maxTurnos: 2,
+        frasesObligatorias: [{ turno: 2, frase: "No, no soy esa persona" }],
         creaCitas: false,
         requiere:
           "Una llamada antigua de un cliente con nombre y último servicio guardados.",
@@ -1320,6 +1776,12 @@ export const ESCENARIOS: Escenario[] = [
         titulo: "«Me duele la rodilla desde el partido, ¿qué tengo?»",
         canal: "llamada",
         turnos: ["Me duele la rodilla desde el partido, ¿qué tengo?"],
+        objetivo:
+          "Contar que te duele la rodilla desde el partido y preguntar qué tienes. Con la respuesta, el objetivo está cumplido.",
+        datos: {
+          idioma: "es",
+        },
+        maxTurnos: 1,
         creaCitas: false,
         requiere: "Un negocio de fisioterapia de dev.",
         comprobaciones: [
@@ -1348,6 +1810,12 @@ export const ESCENARIOS: Escenario[] = [
         titulo: "«Es urgente, no puedo andar»",
         canal: "llamada",
         turnos: ["Es urgente, no puedo andar, me duele muchísimo la rodilla"],
+        objetivo:
+          "Decir que es urgente, que no puedes andar y te duele muchísimo la rodilla. Con la respuesta, el objetivo está cumplido.",
+        datos: {
+          idioma: "es",
+        },
+        maxTurnos: 1,
         creaCitas: false,
         requiere: "Un negocio de fisioterapia de dev.",
         comprobaciones: [
@@ -1383,6 +1851,19 @@ export const ESCENARIOS: Escenario[] = [
           "Sí, resérvalo",
           "No, nada más, gracias",
         ],
+        objetivo:
+          "Reservar por WhatsApp un corte para mañana a las 17 a nombre de Marta. Confirma la reserva cuando te la resuman. Cuando esté reservada, di que no necesitas nada más y gracias.",
+        datos: {
+          idioma: "es",
+          servicio: "un corte de pelo",
+          dia: "mañana",
+          hora: "las 17",
+          nombre: "Marta",
+          otros: [
+            "Por el chat no hace falta hablar de WhatsApp: ya estás hablando por WhatsApp",
+          ],
+        },
+        maxTurnos: 6,
         creaCitas: true,
         requiere: SIN_REQUISITOS,
         comprobaciones: [
@@ -1428,6 +1909,17 @@ export const ESCENARIOS: Escenario[] = [
         titulo: "«Quería un corte de… meches… con la Lara»",
         canal: "llamada",
         turnos: ["Quería un corte de… meches… con la Lara"],
+        objetivo:
+          "Pedir un corte de pelo con una profesional llamada Lara, con la frase mal transcrita de siempre. Con la respuesta, el objetivo está cumplido.",
+        datos: {
+          idioma: "es",
+          servicio: "un corte de pelo, y mechas",
+          otros: ["Quieres con Lara"],
+        },
+        maxTurnos: 1,
+        frasesObligatorias: [
+          { turno: 1, frase: "Quería un corte de… meches… con la Lara" },
+        ],
         creaCitas: false,
         requiere: "Un negocio de dev sin ninguna profesional llamada Lara.",
         comprobaciones: [

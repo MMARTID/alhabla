@@ -8,6 +8,7 @@ import { filaDeConexion } from "../../helpers/conexionDeCalendario.js";
 import {
   executeVoiceTool,
   MAX_CARACTERES_POR_INSTRUCCION,
+  siguientePasoTrasElInforme,
 } from "../../../src/modules/voiceTools/service.js";
 import { prisma } from "../../../src/lib/prisma.js";
 import { reiniciarAlmacenEnMemoria } from "../../helpers/almacenEnMemoria.js";
@@ -1174,5 +1175,23 @@ describe("find_my_appointment: siguiente_paso", () => {
       "no prometas cambiar ni anular ninguna"
     );
     expectCamposCortos(result);
+  });
+});
+
+describe("siguiente_paso de informar_al_negocio", () => {
+  it("dice que no la repita, también si ya estaba informado, y cabe", () => {
+    for (const outcome of [
+      "guardado",
+      "actualizado",
+      "duplicado",
+      "duplicado-con-recado",
+    ]) {
+      const texto = siguientePasoTrasElInforme(outcome);
+      expect(texto).toContain("No vuelvas a llamar a informar_al_negocio");
+      expect(texto.length).toBeLessThanOrEqual(MAX_CARACTERES_POR_INSTRUCCION);
+    }
+    expect(siguientePasoTrasElInforme("duplicado")).toMatch(
+      /^Ya estaba informado/
+    );
   });
 });

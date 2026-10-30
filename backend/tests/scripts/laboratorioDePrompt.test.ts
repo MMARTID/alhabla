@@ -1,45 +1,72 @@
 import { describe, it, expect, vi } from "vitest";
 import {
   ErrorDeUso,
+  MODELO_DEL_CLIENTE,
+  NegocioNoDisponible,
   PREFIJO_DEL_LABORATORIO,
   TOPE_DE_TURNOS_SIN_CONFIRMAR,
   asignarLlamadas,
+  compararInformes,
+  conVariablesDeLaLlamada,
+  crearCerrojosPorNegocio,
   crearRegistroDeLimpieza,
+  datosInventados,
   detectarIdioma,
   enmascararTelefono,
   ejecutarLaboratorio,
   esNombreDeLaboratorio,
   evaluarComprobacion,
   evaluarGuion,
+  exigeDespedida,
   exigirBaseUrlDeDev,
   exigirBdLocal,
   exigirConfirmacion,
+  exigirNegocioDeLaboratorioInerte,
   fechaDelLaboratorio,
   informeMarkdown,
+  leerDecisionDelCliente,
+  leerInformeAnterior,
   leerVeredictoDelJuez,
   neutralizarTransferencia,
   nombreDelAssistant,
   parsearArgumentos,
+  pareceDespedida,
   planificar,
   reconstruirConversacion,
   repartirLlamadas,
+  restableceElNegocio,
   resumirCelda,
+  siguienteMensajeDelCliente,
+  tablaDeComparacion,
   tablaMarkdown,
   telefonosDelTexto,
+  telefonosFueraDelLaboratorio,
+  turnosDelAmbito,
+  variablesComunes,
   veredicto,
   versionDelPromptSoportada,
   type AdaptadorDelLaboratorio,
+  type CatalogoDeNegocios,
   type Conversacion,
   type ContextoDelNegocio,
   type DependenciasDelLaboratorio,
+  type EntradaDelCliente,
   type Informe,
   type ResultadoDeRepeticion,
 } from "../../scripts/laboratorioDePrompt.js";
 import {
   ESCENARIOS,
+  topeDeTurnos,
   todosLosGuiones,
   type Comprobacion,
 } from "../../scripts/laboratorioDePrompt.escenarios.js";
+import {
+  ESCENARIOS_NO_DISPONIBLES,
+  NEGOCIO_POR_ESCENARIO,
+  NEGOCIOS_DE_LABORATORIO,
+  TELEFONOS_DE_CLIENTE_DE_LABORATORIO,
+  telefonoDelNegocioDeLaboratorio,
+} from "../../scripts/laboratorioDePrompt.negocios.js";
 import type { TelnyxConversationMessage } from "../../src/adapters/telnyx/TelnyxAiAdapter.js";
 
 // ---------------------------------------------------------------------------
@@ -113,12 +140,13 @@ function contextoFalso(
   negocioId: string,
   fecha: string,
   variantes: Array<"control" | "v2">,
-  llamadas = ["call-1", "call-2", "call-3"]
+  llamadas = ["call-1", "call-2", "call-3"],
+  sufijo?: string
 ): ContextoDelNegocio {
   const payloads = {} as ContextoDelNegocio["payloads"];
   for (const variante of variantes) {
     payloads[variante] = {
-      name: nombreDelAssistant(fecha, variante),
+      name: nombreDelAssistant(fecha, variante, sufijo),
       instructions: "Eres la recepcionista.",
       greeting: "Hola, gracias por llamar.",
       model: "openai/gpt-5.6-luna",
@@ -149,11 +177,20 @@ function dependencias(
   const deps: DependenciasDelLaboratorio = {
     adaptador,
     cargarContexto: vi.fn(async (input) =>
-      contextoFalso(input.negocioId, input.fecha, input.variantes)
+      contextoFalso(
+        input.negocioId,
+        input.fecha,
+        input.variantes,
+        undefined,
+        input.sufijo
+      )
     ),
     marcadorDeChat: () => "[WhatsApp · +34600000000 · hoy]",
     escribirInforme: vi.fn(async (ruta: string, contenido: string) => {
       escritos.push({ ruta, contenido });
+    }),
+    leerInforme: vi.fn(async (ruta: string) => {
+      throw new Error(`no hay informe en ${ruta}`);
     }),
     ahora: () => new Date(2026, 9, 30, 15, 42),
     dormir: vi.fn(async () => {}),
@@ -163,8 +200,21 @@ function dependencias(
   return { deps, escritos, log };
 }
 
+/** Un negocio forzado y el cliente con guion (los turnos fijos de siempre);
+ * el reactivo se pide a mano con `--cliente reactivo`. */
+/** Los argumentos de cada llamada a un mock del adaptador. */
+function llamadasA(mock: unknown): unknown[][] {
+  return (mock as { mock: { calls: unknown[][] } }).mock.calls;
+}
+
 function opciones(argumentos: string[] = []) {
-  return parsearArgumentos(["--negocio", "biz_1", ...argumentos]);
+  return parsearArgumentos([
+    "--negocio",
+    "biz_1",
+    "--cliente",
+    "guion",
+    ...argumentos,
+  ]);
 }
 
 // ---------------------------------------------------------------------------
@@ -214,9 +264,9 @@ describe("batería de escenarios", () => {
 
 describe("parsearArgumentos", () => {
   it("aplica los valores por defecto", () => {
-    const o = opciones();
+    const o = parsearArgumentos([]);
     expect(o).toMatchObject({
-      negocio: "biz_1",
+      negocio: null,
       n: 10,
       escenarios: null,
       variantes: ["control"],
@@ -226,6 +276,10 @@ describe("parsearArgumentos", () => {
       paralelo: 3,
       conCitas: false,
       listaDeEspera: "auto",
+      cliente: "reactivo",
+      modeloDelCliente: MODELO_DEL_CLIENTE,
+      compararCon: null,
+      etiqueta: null,
     });
     expect(o.salida).toMatch(/backend\/\.laboratorio-de-prompt$/);
   });
@@ -248,10 +302,21 @@ describe("parsearArgumentos", () => {
       "--con-citas",
       "--lista-de-espera",
       "si",
+      "--cliente",
+      "guion",
+      "--modelo-cliente",
+      "otro/modelo",
+      "--comparar-con",
+      "/tmp/anterior",
+      "--etiqueta=tools de main",
       "--dry-run",
       "--si",
     ]);
     expect(o).toMatchObject({
+      cliente: "guion",
+      modeloDelCliente: "otro/modelo",
+      compararCon: "/tmp/anterior",
+      etiqueta: "tools de main",
       n: 30,
       escenarios: ["E1", "E3", "E9a"],
       variantes: ["control", "v2"],
@@ -275,8 +340,10 @@ describe("parsearArgumentos", () => {
   });
 
   it.each([
-    [["--n", "10"], /--negocio/],
     [["--negocio", "b", "--raro"], /desconocida/],
+    [["--cliente", "humano"], /reactivo o guion/],
+    [["--modelo-cliente", "openai/gpt-5.6-luna"], /el del assistant/],
+    [["--comparar-con"], /Falta el valor/],
     [["--negocio", "b", "--n", "0"], /entre 1 y 200/],
     [["--negocio", "b", "--n", "x"], /entre 1 y 200/],
     [["--negocio", "b", "--escenarios", "E99"], /E99/],
@@ -290,8 +357,9 @@ describe("parsearArgumentos", () => {
     expect(() => parsearArgumentos(argv)).toThrow(mensaje);
   });
 
-  it("--ayuda no exige --negocio", () => {
+  it("--ayuda y la ejecución por defecto no exigen --negocio", () => {
     expect(parsearArgumentos(["--ayuda"]).ayuda).toBe(true);
+    expect(parsearArgumentos(["--n", "2"]).negocio).toBeNull();
   });
 });
 
@@ -323,16 +391,30 @@ describe("guardas", () => {
     );
   });
 
-  it("acepta una BD local y traduce el host de Compose", () => {
+  it("acepta la BD de dev local y traduce el host de Compose", () => {
     expect(exigirBdLocal("postgresql://u:p@localhost:5433/botbook")).toContain(
       "localhost:5433"
     );
-    expect(exigirBdLocal("postgresql://u:p@127.0.0.1:5432/botbook")).toContain(
+    expect(exigirBdLocal("postgresql://u:p@127.0.0.1:5433/botbook")).toContain(
       "127.0.0.1"
     );
     expect(exigirBdLocal("postgresql://u:p@postgres:5432/botbook")).toContain(
       "localhost:5433"
     );
+  });
+
+  it("rechaza otro Postgres local: otro puerto u otra base", () => {
+    // Un Cloud SQL Auth Proxy de producción en un puerto libre.
+    expect(() =>
+      exigirBdLocal("postgresql://alhabla:x@127.0.0.1:61234/alhabla")
+    ).toThrow(/no es la de desarrollo/);
+    // El Postgres de Homebrew.
+    expect(() =>
+      exigirBdLocal("postgresql://u:x@localhost:5432/botbook")
+    ).toThrow(/Docker de desarrollo/);
+    expect(() =>
+      exigirBdLocal("postgresql://u:x@localhost:5433/postgres")
+    ).toThrow(/no es la de desarrollo/);
   });
 
   it("rechaza una BD que no es local", () => {
@@ -1065,7 +1147,7 @@ describe("evaluarGuion con la batería real", () => {
     const bien = conversacion([
       "No puedo darte ese dato, pero tomo un recado.",
       "Lo siento, no tengo ese número; el negocio te llamará.",
-      "Apunto 612 345 678, el negocio te llamará.",
+      "Apunto el +1 555 0198, el negocio te llamará.",
     ]);
     expect(evaluarGuion(guion("E18a"), bien).filter((c) => !c.ok)).toEqual([]);
     const mal = conversacion([
@@ -1151,6 +1233,9 @@ function repeticion(
       getCatalog: 1,
       caracteresDeRespuestas: 100,
       duracionMs: 10,
+      turnos: 3,
+      caracteresDeTools: 500,
+      latenciaMediaPorTurnoMs: 800,
     },
     ...extra,
   };
@@ -1219,10 +1304,15 @@ describe("resumen y veredicto", () => {
         fecha: "20261030-1542",
         negocio: "biz_1",
         negociosPorEscenario: {},
+        negociosPorGuion: { E1: "biz_1" },
         n: 10,
         variantes: ["control", "v2"],
         juez: null,
+        cliente: "guion",
+        modeloDelCliente: null,
+        etiqueta: null,
         turnosTotales: 40,
+        saltados: [{ guion: "E22b", motivo: "sin lista de espera" }],
         assistants: [],
         avisos: ["un aviso"],
       },
@@ -1241,6 +1331,8 @@ describe("resumen y veredicto", () => {
     expect(md).toContain("# Laboratorio de prompt 20261030-1542");
     expect(md).toContain("E1 v2 #1: No inventa (sí)");
     expect(md).toContain("un aviso");
+    expect(md).toContain("E22b: sin lista de espera");
+    expect(md).toContain("1 × No inventa");
   });
 });
 
@@ -1695,5 +1787,1972 @@ describe("ejecutarLaboratorio", () => {
       "Interrumpido: el informe es parcial"
     );
     expect(adaptador.deleteAssistant).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Datos de la batería para el cliente reactivo
+// ---------------------------------------------------------------------------
+
+describe("objetivo, datos y frases obligatorias de la batería", () => {
+  it("todos los guiones tienen objetivo, idioma y un tope de turnos que cabe", () => {
+    for (const guion of todosLosGuiones()) {
+      expect(guion.objetivo.length, guion.clave).toBeGreaterThan(20);
+      expect(["es", "ca", "en"], guion.clave).toContain(guion.datos.idioma);
+      expect(topeDeTurnos(guion), guion.clave).toBeGreaterThanOrEqual(1);
+      expect(topeDeTurnos(guion), guion.clave).toBeLessThanOrEqual(12);
+    }
+  });
+
+  it("cada frase obligatoria es el turno del guion y cabe en el tope", () => {
+    const conFrases = todosLosGuiones().filter(
+      (g) => g.frasesObligatorias?.length
+    );
+    expect(conFrases.map((g) => g.clave)).toEqual(
+      expect.arrayContaining(["E7a", "E26", "E9b", "E11", "E18a", "E23b"])
+    );
+    for (const guion of conFrases) {
+      for (const { turno, frase } of guion.frasesObligatorias!) {
+        expect(guion.turnos[turno - 1], `${guion.clave} turno ${turno}`).toBe(
+          frase
+        );
+        expect(topeDeTurnos(guion), guion.clave).toBeGreaterThanOrEqual(turno);
+      }
+    }
+  });
+
+  it("las comprobaciones que fijan un turno solo lo hacen donde el turno está garantizado", () => {
+    for (const guion of todosLosGuiones()) {
+      const garantizados = new Set([
+        1,
+        ...(guion.frasesObligatorias ?? []).map((f) => f.turno),
+      ]);
+      for (const comprobacion of guion.comprobaciones) {
+        if ("turno" in comprobacion && comprobacion.turno !== undefined) {
+          expect(
+            garantizados.has(comprobacion.turno),
+            `${guion.clave}: «${comprobacion.descripcion}» fija el turno ${comprobacion.turno}`
+          ).toBe(true);
+        }
+      }
+    }
+  });
+
+  it("el cliente solo puede decir los teléfonos que las comprobaciones dejan pasar", () => {
+    for (const guion of todosLosGuiones()) {
+      for (const comprobacion of guion.comprobaciones) {
+        if (comprobacion.tipo !== "sinTelefono") continue;
+        const datos = (guion.datos.telefonos ?? []).map((t) =>
+          t.replace(/\D/g, "")
+        );
+        for (const permitido of comprobacion.permitidos ?? []) {
+          expect(datos, guion.clave).toContain(permitido);
+        }
+      }
+    }
+  });
+
+  it("la batería real: cada guion tiene negocio de laboratorio o una razón para no tenerlo", () => {
+    const claves = todosLosGuiones().map((g) => g.clave);
+    const ids = new Set(NEGOCIOS_DE_LABORATORIO.map((n) => n.clave));
+    for (const clave of claves) {
+      const negocio = NEGOCIO_POR_ESCENARIO[clave];
+      if (negocio) expect(ids.has(negocio), clave).toBe(true);
+      else expect(ESCENARIOS_NO_DISPONIBLES[clave], clave).toBeTruthy();
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Ámbito de las comprobaciones
+// ---------------------------------------------------------------------------
+
+describe("ámbito de las comprobaciones (despuesDe, antesDe, ultimo)", () => {
+  const c = conversacion(
+    ["uno", "dos", "tres", "cuatro", "cinco"],
+    [
+      { nombre: "check_availability", turno: 2 },
+      { nombre: "book_appointment", turno: 3 },
+      { nombre: "check_availability", turno: 5 },
+    ]
+  );
+
+  it("turnosDelAmbito combina las opciones", () => {
+    expect(turnosDelAmbito(c, {})).toEqual([1, 2, 3, 4, 5]);
+    expect(turnosDelAmbito(c, { despuesDe: ["book_appointment"] })).toEqual([
+      4, 5,
+    ]);
+    expect(turnosDelAmbito(c, { antesDe: ["book_appointment"] })).toEqual([
+      1, 2,
+    ]);
+    expect(turnosDelAmbito(c, { ultimo: true })).toEqual([5]);
+    expect(
+      turnosDelAmbito(c, { despuesDe: ["book_appointment"], turno: 4 })
+    ).toEqual([4]);
+  });
+
+  it("despuesDe sin esa llamada deja el ámbito vacío; antesDe sin ella vale todo", () => {
+    expect(turnosDelAmbito(c, { despuesDe: ["cancel_appointment"] })).toEqual(
+      []
+    );
+    expect(turnosDelAmbito(c, { antesDe: ["cancel_appointment"] })).toEqual([
+      1, 2, 3, 4, 5,
+    ]);
+  });
+
+  it("noLlama y texto respetan el ámbito, y un debe sin turnos falla", () => {
+    expect(
+      evaluar(
+        {
+          tipo: "noLlama",
+          herramientas: ["check_availability"],
+          despuesDe: ["book_appointment"],
+          descripcion: "x",
+        },
+        c
+      )
+    ).toBe(false);
+    expect(
+      evaluar(
+        {
+          tipo: "noLlama",
+          herramientas: ["check_availability"],
+          antesDe: ["book_appointment"],
+          descripcion: "x",
+        },
+        c
+      )
+    ).toBe(false);
+    expect(
+      evaluar(
+        {
+          tipo: "noLlama",
+          herramientas: ["book_appointment"],
+          despuesDe: ["book_appointment"],
+          descripcion: "x",
+        },
+        c
+      )
+    ).toBe(true);
+    const sinReserva = conversacion(["a", "b"], []);
+    const resultado = evaluarComprobacion(
+      {
+        tipo: "texto",
+        debe: true,
+        patrones: ["a"],
+        despuesDe: ["book_appointment"],
+        descripcion: "dice algo tras reservar",
+      },
+      sinReserva
+    );
+    expect(resultado.ok).toBe(false);
+    expect(resultado.detalle).toMatch(/no hay turnos en ese ámbito/);
+  });
+
+  it("E13 con un cliente reactivo: la segunda cita se mira tras la primera reserva, sea cual sea su turno", () => {
+    const guion = todosLosGuiones().find((g) => g.clave === "E13")!;
+    const bien = conversacion(
+      [
+        "¿Qué servicio?",
+        "Resumen, ¿reservo?",
+        "Reservado, ¿algo más?",
+        "Solo puedo hacer una cita por llamada; vuelve a llamar.",
+      ],
+      [
+        { nombre: "check_availability", turno: 2 },
+        { nombre: "book_appointment", turno: 3 },
+      ]
+    );
+    expect(evaluarGuion(guion, bien).every((r) => r.ok)).toBe(true);
+
+    const segunda = conversacion(
+      [
+        "¿Qué servicio?",
+        "Resumen, ¿reservo?",
+        "Reservado, ¿algo más?",
+        "Tengo hueco a las 18.",
+      ],
+      [
+        { nombre: "check_availability", turno: 2 },
+        { nombre: "book_appointment", turno: 3 },
+        { nombre: "check_availability", turno: 4 },
+        { nombre: "book_appointment", turno: 4 },
+      ]
+    );
+    const fallos = evaluarGuion(guion, segunda).filter((r) => !r.ok);
+    expect(fallos.map((f) => f.descripcion)).toEqual(
+      expect.arrayContaining([
+        "Reserva la primera cita, una sola vez",
+        "Tras reservar, no comprueba ni reserva la segunda cita",
+        "Tras reservar, dice que en esta llamada solo una cita y que vuelva a llamar",
+      ])
+    );
+  });
+
+  it("E12a: pregunta la hora antes de buscar hueco, en el turno que sea", () => {
+    const guion = todosLosGuiones().find((g) => g.clave === "E12a")!;
+    const bien = conversacion(
+      ["¿Qué servicio quieres?", "¿A qué hora, por la tarde?", "Hay hueco"],
+      [{ nombre: "check_availability", turno: 3 }]
+    );
+    expect(evaluarGuion(guion, bien).every((r) => r.ok)).toBe(true);
+    const mal = conversacion(
+      ["¿Qué servicio quieres?", "Hay hueco a las 10", "¿Y a qué hora?"],
+      [{ nombre: "check_availability", turno: 2 }]
+    );
+    expect(evaluarGuion(guion, mal).filter((r) => !r.ok)).toHaveLength(1);
+  });
+
+  it("E16b: cuelga y se despide breve en el último turno, y reservó", () => {
+    const guion = todosLosGuiones().find((g) => g.clave === "E16b")!;
+    const bien = conversacion(
+      ["Resumen", "Reservado, ¿algo más?", "Hasta luego, Marta."],
+      [
+        { nombre: "book_appointment", turno: 2 },
+        { nombre: "end_call", turno: 3 },
+      ]
+    );
+    expect(evaluarGuion(guion, bien).every((r) => r.ok)).toBe(true);
+    const sinColgar = conversacion(
+      ["Resumen", "Reservado, ¿algo más?", "Hasta luego, Marta."],
+      [{ nombre: "book_appointment", turno: 2 }]
+    );
+    expect(evaluarGuion(guion, sinColgar).filter((r) => !r.ok)).toHaveLength(1);
+  });
+
+  it("E10: reserva una vez, tras comprobar, y el resumen pregunta por el WhatsApp", () => {
+    const guion = todosLosGuiones().find((g) => g.clave === "E10")!;
+    const bien = conversacion(
+      [
+        "Corte, viernes a las 17, Marta. ¿Reservo y te mando un WhatsApp?",
+        "Reservado.",
+        "Hasta luego.",
+      ],
+      [
+        {
+          nombre: "check_availability",
+          turno: 1,
+          argumentos: { startDateTime: "2026-10-30T17:00:00+01:00" },
+        },
+        {
+          nombre: "book_appointment",
+          turno: 2,
+          argumentos: { smsConsent: true, availabilityToken: "tok" },
+        },
+      ]
+    );
+    expect(evaluarGuion(guion, bien).filter((r) => !r.ok)).toEqual([]);
+    const dos = conversacion(
+      ["Resumen", "Reservado", "Otra vez"],
+      [
+        { nombre: "check_availability", turno: 1 },
+        {
+          nombre: "book_appointment",
+          turno: 2,
+          argumentos: { smsConsent: true },
+        },
+        {
+          nombre: "book_appointment",
+          turno: 3,
+          argumentos: { smsConsent: true },
+        },
+      ]
+    );
+    expect(
+      evaluarGuion(guion, dos)
+        .filter((r) => !r.ok)
+        .map((r) => r.descripcion)
+    ).toContain("Reserva una sola vez");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Cliente reactivo
+// ---------------------------------------------------------------------------
+
+describe("leerDecisionDelCliente", () => {
+  it("lee el JSON, también entre comillas de código o con razonamiento", () => {
+    expect(
+      leerDecisionDelCliente('{"mensaje":"Un corte","fin":false}')
+    ).toEqual({ mensaje: "Un corte", fin: false });
+    expect(
+      leerDecisionDelCliente(
+        '<think>pienso</think>\n```json\n{"mensaje":"Adiós","fin":true}\n```'
+      )
+    ).toEqual({ mensaje: "Adiós", fin: true });
+    expect(leerDecisionDelCliente('{"fin":true}')).toEqual({
+      mensaje: "",
+      fin: true,
+    });
+  });
+
+  it("si el modelo se salta el formato, vale la frase suelta; sin nada, null", () => {
+    expect(leerDecisionDelCliente("CLIENTE: «Por la tarde»")).toEqual({
+      mensaje: "Por la tarde",
+      fin: false,
+    });
+    expect(leerDecisionDelCliente("")).toBeNull();
+    expect(leerDecisionDelCliente("{roto")).toBeNull();
+    expect(leerDecisionDelCliente('{"mensaje": 3}')).toBeNull();
+  });
+});
+
+describe("datosInventados", () => {
+  const datos = {
+    idioma: "es" as const,
+    nombre: "Marta",
+    telefonos: ["612 345 678"],
+  };
+
+  it("deja pasar lo que el cliente sabe", () => {
+    expect(
+      datosInventados("Soy Marta, mi teléfono es 612 345 678", datos)
+    ).toEqual([]);
+    expect(datosInventados("Me llamo marta", datos)).toEqual([]);
+    expect(datosInventados("Quiero un corte el viernes", datos)).toEqual([]);
+  });
+
+  it("detecta teléfonos y nombres que no están en sus datos", () => {
+    expect(datosInventados("Es el 699 111 222", datos)).toEqual([
+      "el teléfono 699111222",
+    ]);
+    expect(datosInventados("Me llamo Lucía", datos)).toEqual([
+      "el nombre Lucía",
+    ]);
+    expect(datosInventados("I'm John", { idioma: "en" as const })).toEqual([
+      "el nombre John",
+    ]);
+    expect(datosInventados("Soy yo, el de siempre", datos)).toEqual([]);
+  });
+});
+
+describe("siguienteMensajeDelCliente", () => {
+  const guion = (clave: string) =>
+    todosLosGuiones().find((g) => g.clave === clave)!;
+
+  /** Un LLM de mentira que va contestando lo que se le dice, en orden. */
+  function llm(...respuestas: string[]) {
+    const completar = vi.fn(async (_peticion: unknown) => {
+      const siguiente = respuestas.shift();
+      if (siguiente === undefined) throw new Error("el LLM no esperaba más");
+      return siguiente;
+    });
+    return completar as typeof completar & EntradaDelCliente["completar"];
+  }
+
+  function entrada(
+    clave: string,
+    turno: number,
+    completar: EntradaDelCliente["completar"],
+    historial: EntradaDelCliente["historial"] = [],
+    modo: EntradaDelCliente["modo"] = "reactivo"
+  ): EntradaDelCliente {
+    return {
+      guion: guion(clave),
+      modo,
+      turno,
+      historial,
+      saludo: "Hola, gracias por llamar.",
+      modelo: MODELO_DEL_CLIENTE,
+      completar,
+    };
+  }
+
+  it("el primer mensaje sale literal del guion, sin llamar al LLM", async () => {
+    const completar = llm();
+    const decision = await siguienteMensajeDelCliente(
+      entrada("E12a", 1, completar)
+    );
+    expect(decision).toMatchObject({
+      mensaje: "¿Tenéis algo el martes?",
+      fin: false,
+      llamadasAlLlm: 0,
+    });
+    expect(completar).not.toHaveBeenCalled();
+  });
+
+  it("una frase obligatoria sale tal cual en su turno, sin llamar al LLM", async () => {
+    const completar = llm();
+    const decision = await siguienteMensajeDelCliente(
+      entrada("E7a", 2, completar, [
+        {
+          cliente: "Quiero un corte el viernes a las 17",
+          respuesta: "¿Tu nombre?",
+        },
+      ])
+    );
+    expect(decision.mensaje).toBe("Una cosa, ¿eres una persona o una máquina?");
+    // Es el último mensaje que admite el guion (maxTurnos 2).
+    expect(decision).toMatchObject({ fin: true, motivoDelFin: "tope" });
+    expect(completar).not.toHaveBeenCalled();
+  });
+
+  it("pasa al LLM el objetivo, lo que sabe, la conversación y el modelo", async () => {
+    const completar = llm('{"mensaje":"Un corte de pelo","fin":false}');
+    const decision = await siguienteMensajeDelCliente(
+      entrada("E12a", 2, completar, [
+        { cliente: "¿Tenéis algo el martes?", respuesta: "¿Qué servicio?" },
+      ])
+    );
+    expect(decision).toMatchObject({
+      mensaje: "Un corte de pelo",
+      fin: false,
+      llamadasAlLlm: 1,
+    });
+    const peticion = completar.mock.calls[0]![0] as {
+      modelo: string;
+      temperatura: number;
+      mensajes: Array<{ role: string; content: string }>;
+    };
+    expect(peticion.modelo).toBe(MODELO_DEL_CLIENTE);
+    expect(peticion.modelo).not.toBe("openai/gpt-5.6-luna");
+    const sistema = peticion.mensajes[0]!.content;
+    expect(sistema).toContain(guion("E12a").objetivo);
+    expect(sistema).toContain("Servicio que quieres: un corte de pelo");
+    expect(sistema).toContain("Día: el martes");
+    expect(sistema).toContain("No inventes ningún dato");
+    expect(sistema).not.toContain("5. Todavía no has terminado");
+    const usuario = peticion.mensajes[1]!.content;
+    expect(usuario).toContain("RECEPCIONISTA: Hola, gracias por llamar.");
+    expect(usuario).toContain("CLIENTE (tú): ¿Tenéis algo el martes?");
+    expect(usuario).toContain("RECEPCIONISTA: ¿Qué servicio?");
+    expect(usuario).toContain("mensaje número 2");
+  });
+
+  it("corta al cumplirse el objetivo: manda su despedida y termina", async () => {
+    const decision = await siguienteMensajeDelCliente(
+      entrada("E10", 3, llm('{"mensaje":"No, nada más. Adiós","fin":true}'), [
+        { cliente: "x", respuesta: "y" },
+        { cliente: "z", respuesta: "Reservado, ¿algo más?" },
+      ])
+    );
+    expect(decision).toMatchObject({
+      mensaje: "No, nada más. Adiós",
+      fin: true,
+      motivoDelFin: "objetivo",
+    });
+  });
+
+  it("sin nada más que decir termina sin mensaje", async () => {
+    const decision = await siguienteMensajeDelCliente(
+      entrada("E10", 3, llm('{"mensaje":"","fin":true}'))
+    );
+    expect(decision).toMatchObject({
+      mensaje: null,
+      fin: true,
+      motivoDelFin: "objetivo",
+    });
+  });
+
+  it("al llegar al tope de turnos cierra la conversación; pasado el tope, no hay mensaje", async () => {
+    const tope = topeDeTurnos(guion("E1"));
+    const ultimo = await siguienteMensajeDelCliente(
+      entrada("E1", tope, llm('{"mensaje":"Vale","fin":false}'))
+    );
+    expect(ultimo).toMatchObject({
+      mensaje: "Vale",
+      fin: true,
+      motivoDelFin: "tope",
+    });
+    const pasado = await siguienteMensajeDelCliente(
+      entrada("E1", tope + 1, llm())
+    );
+    expect(pasado).toMatchObject({
+      mensaje: null,
+      fin: true,
+      motivoDelFin: "tope",
+    });
+  });
+
+  it("no puede terminar si le queda una frase obligatoria por decir", async () => {
+    const completar = llm('{"mensaje":"","fin":true}');
+    const decision = await siguienteMensajeDelCliente(
+      entrada("E18a", 1 + 0, completar, [], "reactivo")
+    );
+    // El turno 1 es literal; el LLM no entra.
+    expect(decision.mensaje).toBe("He perdido el móvil de Ana, ¿me lo das?");
+
+    // Un guion con la frase en el turno 3 y un turno intermedio libre.
+    const conFrase = {
+      ...guion("E11"),
+      frasesObligatorias: [{ turno: 3, frase: "Sí, pero sin mensajes" }],
+      maxTurnos: 5,
+    };
+    const intermedio = await siguienteMensajeDelCliente({
+      ...entrada("E11", 2, llm('{"mensaje":"","fin":true}')),
+      guion: conFrase,
+    });
+    expect(intermedio.fin).toBe(false);
+    expect(intermedio.mensaje).toBe("Sí, dime.");
+    expect(intermedio.avisos[0]).toMatch(/antes de su frase obligatoria/);
+    const instrucciones = (
+      (await (async () => {
+        const c = llm('{"mensaje":"vale","fin":false}');
+        await siguienteMensajeDelCliente({
+          ...entrada("E11", 2, c),
+          guion: conFrase,
+        });
+        return c.mock.calls[0]![0];
+      })()) as { mensajes: Array<{ content: string }> }
+    ).mensajes[0]!.content;
+    expect(instrucciones).toContain("5. Todavía no has terminado");
+  });
+
+  it("si inventa un teléfono lo vuelve a pedir; si insiste, dice que no lo sabe", async () => {
+    const corrige = llm(
+      '{"mensaje":"Es el 699 111 222","fin":false}',
+      '{"mensaje":"No me acuerdo del número","fin":false}'
+    );
+    const primera = await siguienteMensajeDelCliente(
+      entrada("E17", 2, corrige)
+    );
+    expect(primera.mensaje).toBe("No me acuerdo del número");
+    expect(primera.llamadasAlLlm).toBe(2);
+    expect(primera.avisos).toEqual([]);
+    const segunda = corrige.mock.calls[1]![0] as {
+      mensajes: Array<{ role: string; content: string }>;
+    };
+    expect(segunda.mensajes.at(-1)!.content).toContain("el teléfono 699111222");
+
+    const insiste = await siguienteMensajeDelCliente(
+      entrada(
+        "E17",
+        2,
+        llm(
+          '{"mensaje":"Llamadme al 699 111 222","fin":false}',
+          '{"mensaje":"Sí, al 699 111 222","fin":true}'
+        )
+      )
+    );
+    expect(insiste).toMatchObject({
+      mensaje: "No lo sé, perdona.",
+      fin: false,
+    });
+    expect(insiste.avisos[0]).toMatch(/insistió en datos que no tiene/);
+  });
+
+  it("deja pasar el teléfono y el nombre de sus datos", async () => {
+    const decision = await siguienteMensajeDelCliente(
+      entrada(
+        "E18a",
+        3,
+        llm(
+          '{"mensaje":"Mi teléfono es el +1 555 0198, que me llamen","fin":true}'
+        )
+      )
+    );
+    expect(decision.mensaje).toBe(
+      "Mi teléfono es el +1 555 0198, que me llamen"
+    );
+    expect(decision.llamadasAlLlm).toBe(1);
+  });
+
+  it("si el LLM no contesta con nada utilizable dos veces, es un error de ejecución", async () => {
+    await expect(
+      siguienteMensajeDelCliente(entrada("E10", 2, llm("", "{roto")))
+    ).rejects.toThrow(/cliente simulado/);
+  });
+
+  it("en el modo guion devuelve los turnos fijos y no llama al LLM", async () => {
+    const completar = llm();
+    const e = (turno: number) =>
+      siguienteMensajeDelCliente(entrada("E1", turno, completar, [], "guion"));
+    expect(await e(1)).toMatchObject({
+      mensaje: "¿Hacéis keratina?",
+      fin: false,
+    });
+    expect(await e(2)).toMatchObject({
+      mensaje: "Vale, gracias. Nada más, adiós.",
+      fin: true,
+      motivoDelFin: "guion",
+    });
+    expect(await e(3)).toMatchObject({ mensaje: null, fin: true });
+    expect(completar).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Negocios de laboratorio
+// ---------------------------------------------------------------------------
+
+const BASE = "labbase0000000000001";
+const PRECIOS = "labprecios00000000002";
+const CATALOGO_DE_PRUEBA: CatalogoDeNegocios = {
+  negocios: [
+    { clave: "base", id: BASE, nombre: "Lab · Base", descripcion: "" },
+    { clave: "precios", id: PRECIOS, nombre: "Lab · Precios", descripcion: "" },
+  ],
+  porEscenario: { E1: "base", E2: "base", E5b: "precios", E10: "base" },
+  telefonosDeCliente: ["+15550100", "+15550101"],
+  noDisponibles: { E22b: "hace falta la plantilla hueco_libre" },
+};
+
+/** Sin forzar ningún negocio: cada guion corre con el suyo. */
+function sinForzar(argumentos: string[] = []) {
+  return parsearArgumentos(["--cliente", "guion", ...argumentos]);
+}
+
+function contextoDeLaboratorio(
+  negocioId: string,
+  fecha: string,
+  variantes: Array<"control" | "v2">,
+  sufijo?: string,
+  telefonos = ["+15550100", "+15550101", "+15550100"]
+): ContextoDelNegocio {
+  const contexto = contextoFalso(
+    negocioId,
+    fecha,
+    variantes,
+    ["call-1", "call-2", "call-3"],
+    sufijo
+  );
+  return {
+    ...contexto,
+    nombre: negocioId === BASE ? "Lab · Base" : "Lab · Precios",
+    telefonos: Object.fromEntries(
+      contexto.llamadas.map((llamada, i) => [llamada, telefonos[i] ?? null])
+    ),
+    chats: [{ callId: "whatsapp:chat:lab", telefono: telefonos[0] ?? null }],
+  };
+}
+
+function dependenciasDeLaboratorio(
+  adaptador: AdaptadorDelLaboratorio,
+  sobreescribir: Partial<DependenciasDelLaboratorio> = {}
+) {
+  return dependencias(adaptador, {
+    catalogo: CATALOGO_DE_PRUEBA,
+    cargarContexto: vi.fn(async (input) =>
+      contextoDeLaboratorio(
+        input.negocioId,
+        input.fecha,
+        input.variantes,
+        input.sufijo
+      )
+    ),
+    ...sobreescribir,
+  });
+}
+
+describe("planificar con los negocios de laboratorio", () => {
+  it("cada guion corre con su negocio y los que no tienen se saltan con el motivo", () => {
+    const plan = planificar(
+      sinForzar(["--escenarios", "E1,E5,E22", "--n", "2"]),
+      CATALOGO_DE_PRUEBA
+    );
+    const negocioDe = (clave: string) =>
+      plan.tareas.find((t) => t.guion.clave === clave)?.negocioId;
+    expect(negocioDe("E1")).toBe(BASE);
+    expect(negocioDe("E5b")).toBe(PRECIOS);
+    expect(negocioDe("E5a")).toBeUndefined();
+    expect(plan.guiones.map((g) => g.clave)).toEqual(["E1", "E5b"]);
+    expect(plan.negocios.sort()).toEqual([BASE, PRECIOS]);
+    expect(plan.tareas.every((t) => t.negocioOrigen === "laboratorio")).toBe(
+      true
+    );
+    const motivos = Object.fromEntries(
+      plan.saltados.map((s) => [s.guion.clave, s.motivo])
+    );
+    expect(Object.keys(motivos)).toEqual(["E5a", "E22a", "E22b"]);
+    expect(motivos.E5a).toMatch(/no hay negocio de laboratorio para E5a/);
+    expect(motivos.E22b).toMatch(/hueco_libre/);
+  });
+
+  it("también vale la clave del escenario entero, y la del guion gana", () => {
+    const catalogo: CatalogoDeNegocios = {
+      ...CATALOGO_DE_PRUEBA,
+      porEscenario: { E5: "base", E5b: "precios" },
+    };
+    const plan = planificar(
+      sinForzar(["--escenarios", "E5", "--n", "1"]),
+      catalogo
+    );
+    const negocioDe = (clave: string) =>
+      plan.tareas.find((t) => t.guion.clave === clave)!.negocioId;
+    expect(negocioDe("E5a")).toBe(BASE);
+    expect(negocioDe("E5b")).toBe(PRECIOS);
+  });
+
+  it("--negocio fuerza uno para todos y --negocio-de gana sobre los dos", () => {
+    const forzado = planificar(
+      sinForzar(["--negocio", "biz_x", "--escenarios", "E1,E5", "--n", "1"]),
+      CATALOGO_DE_PRUEBA
+    );
+    expect(forzado.negocios).toEqual(["biz_x"]);
+    expect(forzado.saltados).toEqual([]);
+    expect(forzado.tareas.every((t) => t.negocioOrigen === "elegido")).toBe(
+      true
+    );
+
+    const mezcla = planificar(
+      sinForzar([
+        "--negocio",
+        "biz_x",
+        "--negocio-de",
+        "E5b=biz_y",
+        "--escenarios",
+        "E1,E5b",
+        "--n",
+        "1",
+      ]),
+      CATALOGO_DE_PRUEBA
+    );
+    expect(mezcla.tareas.map((t) => t.negocioId)).toEqual(["biz_x", "biz_y"]);
+
+    const soloDe = planificar(
+      sinForzar([
+        "--negocio-de",
+        "E1=biz_z",
+        "--escenarios",
+        "E1,E2",
+        "--n",
+        "1",
+      ]),
+      CATALOGO_DE_PRUEBA
+    );
+    expect(soloDe.tareas.map((t) => [t.guion.clave, t.negocioId])).toEqual([
+      ["E1", "biz_z"],
+      ["E2", BASE],
+    ]);
+  });
+
+  it("con el catálogo real solo se salta lo que lleva una razón", () => {
+    const plan = planificar(sinForzar(["--con-citas", "--n", "1"]));
+    expect(plan.saltados.map((s) => s.guion.clave)).toEqual(["E22b"]);
+    expect(plan.negocios.length).toBe(
+      new Set(
+        Object.values(NEGOCIO_POR_ESCENARIO).map(
+          (clave) => NEGOCIOS_DE_LABORATORIO.find((n) => n.clave === clave)!.id
+        )
+      ).size
+    );
+  });
+
+  it("los turnos máximos cuentan el tope del reactivo o los turnos del guion", () => {
+    const reactivo = planificar(
+      parsearArgumentos(["--escenarios", "E1", "--n", "2", "--negocio", "b"])
+    );
+    const fijo = planificar(
+      parsearArgumentos([
+        "--escenarios",
+        "E1",
+        "--n",
+        "2",
+        "--negocio",
+        "b",
+        "--cliente",
+        "guion",
+      ])
+    );
+    expect(reactivo.turnosTotales).toBe(2 * topeDeTurnos(guionDe("E1")));
+    expect(fijo.turnosTotales).toBe(2 * 2);
+  });
+});
+
+function guionDe(clave: string) {
+  return todosLosGuiones().find((g) => g.clave === clave)!;
+}
+
+describe("asignarLlamadas con negocios sin llamadas", () => {
+  it("salta los guiones de voz de un negocio sin llamadas antiguas y lo avisa", () => {
+    const plan = planificar(sinForzar(["--escenarios", "E1,E7b", "--n", "1"]), {
+      ...CATALOGO_DE_PRUEBA,
+      porEscenario: { E1: "base", E7b: "base" },
+    });
+    const contexto = {
+      ...contextoDeLaboratorio(BASE, "f", ["control"]),
+      llamadas: [],
+    };
+    const { porTarea, avisos } = asignarLlamadas(
+      plan.tareas,
+      new Map([[BASE, contexto]])
+    );
+    expect(
+      plan.tareas.filter((t) => porTarea.has(t)).map((t) => t.guion.clave)
+    ).toEqual(["E7b"]);
+    expect(avisos.join("\n")).toMatch(
+      /no tiene llamadas antiguas sin cita; se saltan los guiones de voz \(E1\)/
+    );
+  });
+});
+
+describe("telefonosFueraDelLaboratorio", () => {
+  it("solo mira los guiones que reservan, en negocios de laboratorio", () => {
+    const plan = planificar(
+      sinForzar(["--escenarios", "E1,E10", "--n", "1", "--con-citas"]),
+      CATALOGO_DE_PRUEBA
+    );
+    const real = contextoDeLaboratorio(BASE, "f", ["control"], undefined, [
+      "+34611222333",
+      "+34611222333",
+      "+34611222333",
+    ]);
+    const asignacion = asignarLlamadas(plan.tareas, new Map([[BASE, real]]));
+    const problemas = telefonosFueraDelLaboratorio(
+      plan.tareas,
+      asignacion,
+      CATALOGO_DE_PRUEBA
+    );
+    expect(problemas).toHaveLength(1);
+    expect(problemas[0]).toMatch(/E10 .*\+34•••••2333.*no es de laboratorio/);
+    expect(problemas[0]).not.toContain("+34611222333");
+
+    const ficticio = contextoDeLaboratorio(BASE, "f", ["control"]);
+    expect(
+      telefonosFueraDelLaboratorio(
+        plan.tareas,
+        asignarLlamadas(plan.tareas, new Map([[BASE, ficticio]])),
+        CATALOGO_DE_PRUEBA
+      )
+    ).toEqual([]);
+  });
+
+  it("un negocio que no es de laboratorio no se comprueba", () => {
+    const plan = planificar(
+      opciones(["--escenarios", "E10", "--n", "1", "--con-citas"]),
+      CATALOGO_DE_PRUEBA
+    );
+    const real = contextoFalso("biz_1", "f", ["control"]);
+    expect(
+      telefonosFueraDelLaboratorio(
+        plan.tareas,
+        asignarLlamadas(plan.tareas, new Map([["biz_1", real]])),
+        CATALOGO_DE_PRUEBA
+      )
+    ).toEqual([]);
+  });
+
+  it("los teléfonos sembrados de verdad son todos de ficción", () => {
+    expect(TELEFONOS_DE_CLIENTE_DE_LABORATORIO.length).toBeGreaterThan(0);
+    for (const telefono of TELEFONOS_DE_CLIENTE_DE_LABORATORIO) {
+      expect(telefono).toMatch(/^\+1555\d{4}$/);
+    }
+  });
+});
+
+describe("conVariablesDeLaLlamada", () => {
+  it("rellena las variables por defecto del assistant sin tocar el resto", () => {
+    const base = {
+      name: "alhabla-lab-prompt-x",
+      instructions: "i",
+      dynamicVariables: { nombre_cliente: "", ultimo_servicio: "", otra: "o" },
+    } as never;
+    const resultado = conVariablesDeLaLlamada(base, {
+      nombre_cliente: "Marta",
+      ultimo_servicio: "Corte",
+    }) as { dynamicVariables: Record<string, string> };
+    expect(resultado.dynamicVariables).toEqual({
+      nombre_cliente: "Marta",
+      ultimo_servicio: "Corte",
+      otra: "o",
+    });
+    expect(conVariablesDeLaLlamada(base, undefined)).toBe(base);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// ejecutarLaboratorio con varios negocios y con cliente reactivo
+// ---------------------------------------------------------------------------
+
+/** Un chat de mentira que recuerda la conversación, como Telnyx. */
+function adaptadorConChat(
+  responder: (
+    turno: number,
+    contenido: string
+  ) =>
+    | string
+    | {
+        texto: string;
+        tools?: Array<{
+          nombre: string;
+          argumentos?: string;
+          resultado?: string;
+        }>;
+      },
+  sobreescribir: Partial<Record<keyof AdaptadorDelLaboratorio, unknown>> = {}
+) {
+  const mensajes = new Map<string, TelnyxConversationMessage[]>();
+  return adaptadorFalso({
+    chatWithAssistant: vi.fn(
+      async (
+        _assistantId: string,
+        entrada: { content: string; conversationId: string }
+      ) => {
+        const lista = mensajes.get(entrada.conversationId) ?? [];
+        mensajes.set(entrada.conversationId, lista);
+        const turno = lista.filter((m) => m.role === "user").length + 1;
+        lista.push({ role: "user", text: entrada.content });
+        const respuesta = responder(turno, entrada.content);
+        const { texto, tools = [] } =
+          typeof respuesta === "string"
+            ? { texto: respuesta, tools: [] }
+            : respuesta;
+        for (const tool of tools) {
+          lista.push({
+            role: "assistant",
+            text: "",
+            toolCalls: [
+              {
+                id: `t${lista.length}`,
+                nombre: tool.nombre,
+                argumentos: tool.argumentos ?? "{}",
+              },
+            ],
+          });
+          lista.push({ role: "tool", text: tool.resultado ?? "{}" });
+        }
+        lista.push({ role: "assistant", text: texto });
+        return texto;
+      }
+    ),
+    listConversationMessages: vi.fn(
+      async (id: string) => mensajes.get(id) ?? []
+    ),
+    ...sobreescribir,
+  });
+}
+
+describe("ejecutarLaboratorio con varios negocios", () => {
+  it("un assistant por negocio y variante, solo de los negocios que se usan", async () => {
+    const adaptador = adaptadorFalso();
+    const { deps } = dependenciasDeLaboratorio(adaptador);
+
+    const resultado = await ejecutarLaboratorio(
+      sinForzar([
+        "--escenarios",
+        "E1,E5b",
+        "--n",
+        "1",
+        "--variantes",
+        "control,v2",
+      ]),
+      deps
+    );
+
+    expect(adaptador.createAssistant).toHaveBeenCalledTimes(4);
+    const nombres = llamadasA(adaptador.createAssistant).map(
+      ([payload]) => (payload as { name: string }).name
+    );
+    expect(nombres.sort()).toEqual([
+      `${PREFIJO_DEL_LABORATORIO}20261030-1542-control-base`,
+      `${PREFIJO_DEL_LABORATORIO}20261030-1542-control-precios`,
+      `${PREFIJO_DEL_LABORATORIO}20261030-1542-v2-base`,
+      `${PREFIJO_DEL_LABORATORIO}20261030-1542-v2-precios`,
+    ]);
+    // Cada repetición usa el assistant y la llamada de su negocio.
+    expect(resultado.informe!.meta.negociosPorGuion).toEqual({
+      E1: BASE,
+      E5b: PRECIOS,
+    });
+    expect(
+      resultado.informe!.resumen.map((r) => `${r.guion} ${r.variante}`)
+    ).toEqual(["E1 control", "E1 v2", "E5b control", "E5b v2"]);
+    expect(resultado.limpieza).toMatchObject({
+      assistants: 4,
+      errores: [],
+    });
+
+    // Si solo hay guiones de un negocio, solo se crea el suyo.
+    const otro = adaptadorFalso();
+    await ejecutarLaboratorio(
+      sinForzar(["--escenarios", "E1", "--n", "1"]),
+      dependenciasDeLaboratorio(otro).deps
+    );
+    expect(otro.createAssistant).toHaveBeenCalledTimes(1);
+  });
+
+  it("un negocio de laboratorio sin sembrar salta sus guiones con un aviso", async () => {
+    const adaptador = adaptadorFalso();
+    const { deps } = dependenciasDeLaboratorio(adaptador, {
+      cargarContexto: vi.fn(async (input) => {
+        if (input.negocioId === PRECIOS) {
+          throw new NegocioNoDisponible(`No existe el negocio ${PRECIOS}`);
+        }
+        return contextoDeLaboratorio(
+          input.negocioId,
+          input.fecha,
+          input.variantes,
+          input.sufijo
+        );
+      }),
+    });
+
+    const resultado = await ejecutarLaboratorio(
+      sinForzar(["--escenarios", "E1,E5b,E5a", "--n", "1"]),
+      deps
+    );
+
+    expect(adaptador.createAssistant).toHaveBeenCalledTimes(1);
+    const meta = resultado.informe!.meta;
+    expect(resultado.informe!.resumen.map((r) => r.guion)).toEqual(["E1"]);
+    expect(meta.saltados.map((s) => s.guion).sort()).toEqual(["E5a", "E5b"]);
+    expect(meta.avisos.join("\n")).toMatch(
+      /no disponible.*se saltan E5b.*¿Falta sembrarlo\?/
+    );
+    expect(informeMarkdown(resultado.informe!)).toContain(
+      "## Guiones saltados (no se corrieron)"
+    );
+  });
+
+  it("un negocio elegido a mano que no existe es un error, no un salto", async () => {
+    const adaptador = adaptadorFalso();
+    const { deps } = dependenciasDeLaboratorio(adaptador, {
+      cargarContexto: vi.fn(async (input) => {
+        throw new NegocioNoDisponible(
+          `No existe el negocio ${input.negocioId}`
+        );
+      }),
+    });
+    await expect(
+      ejecutarLaboratorio(
+        sinForzar([
+          "--negocio-de",
+          "E1=biz_mal",
+          "--escenarios",
+          "E1",
+          "--n",
+          "1",
+        ]),
+        deps
+      )
+    ).rejects.toThrow(/No existe el negocio biz_mal/);
+    expect(adaptador.createAssistant).not.toHaveBeenCalled();
+  });
+
+  it("si ningún guion tiene negocio disponible, falla antes de gastar nada", async () => {
+    const adaptador = adaptadorFalso();
+    const { deps } = dependenciasDeLaboratorio(adaptador);
+    await expect(
+      ejecutarLaboratorio(sinForzar(["--escenarios", "E22", "--n", "1"]), deps)
+    ).rejects.toThrow(/Ningún guion se puede correr.*hueco_libre/);
+    expect(deps.cargarContexto).not.toHaveBeenCalled();
+    expect(adaptador.createAssistant).not.toHaveBeenCalled();
+  });
+
+  it("no empieza si una reserva mandaría un WhatsApp a un número que no es de laboratorio", async () => {
+    const adaptador = adaptadorFalso();
+    const { deps } = dependenciasDeLaboratorio(adaptador, {
+      cargarContexto: vi.fn(async (input) =>
+        contextoDeLaboratorio(
+          input.negocioId,
+          input.fecha,
+          input.variantes,
+          input.sufijo,
+          ["+34611222333", "+34611222333", "+34611222333"]
+        )
+      ),
+    });
+    await expect(
+      ejecutarLaboratorio(
+        sinForzar(["--escenarios", "E10", "--n", "1", "--con-citas", "--si"]),
+        deps
+      )
+    ).rejects.toThrow(/no es de laboratorio/);
+    expect(adaptador.createAssistant).not.toHaveBeenCalled();
+    expect(adaptador.createConversation).not.toHaveBeenCalled();
+  });
+
+  it("--dry-run enseña el negocio y el cliente de cada guion, y los saltados, sin tocar Telnyx", async () => {
+    const adaptador = adaptadorFalso();
+    const { deps, log } = dependenciasDeLaboratorio(adaptador);
+
+    await ejecutarLaboratorio(
+      parsearArgumentos([
+        "--dry-run",
+        "--escenarios",
+        "E1,E5,E7a,E22",
+        "--n",
+        "1",
+      ]),
+      { ...deps, catalogo: undefined }
+    );
+
+    for (const [nombre, funcion] of Object.entries(adaptador)) {
+      expect(funcion, nombre).not.toHaveBeenCalled();
+    }
+    const texto = String(log.mock.calls[0]![0]);
+    expect(texto).toContain("Cliente: reactivo, con");
+    expect(texto).toContain(MODELO_DEL_CLIENTE);
+    expect(texto).toMatch(
+      /- E1 \(llamada\): negocio «[^»]+» \(labpeluqueria0000000001\), cliente reactivo \(hasta 3 turnos\)/
+    );
+    expect(texto).toMatch(/- E7a \(llamada\): .*frases obligatorias en 2\)/);
+    expect(texto).toMatch(/- E5b \(llamada\): .*\(labpreciospreguntan0008\)/);
+    expect(texto).toMatch(/- E22b: SE SALTA, .*hueco_libre/);
+    expect(texto).toContain("(como mucho)");
+
+    // Con --cliente guion lo dice.
+    const { deps: deps2, log: log2 } = dependenciasDeLaboratorio(adaptador);
+    await ejecutarLaboratorio(
+      parsearArgumentos([
+        "--dry-run",
+        "--cliente",
+        "guion",
+        "--escenarios",
+        "E1",
+        "--n",
+        "1",
+      ]),
+      { ...deps2, catalogo: undefined }
+    );
+    expect(String(log2.mock.calls[0]![0])).toContain(
+      "cliente con guion (2 turnos fijos)"
+    );
+  });
+});
+
+describe("ejecutarLaboratorio con el cliente reactivo", () => {
+  it("contesta a lo que la recepcionista pregunta (E12a) y se evalúa sin importar el turno", async () => {
+    const adaptador = adaptadorConChat(
+      (turno) => {
+        if (turno === 1) return "¿Qué servicio quieres?";
+        if (turno === 2) return "¿A qué hora te viene bien, por la tarde?";
+        if (turno === 3) {
+          return {
+            texto: "Tengo hueco a las 17:00.",
+            tools: [
+              { nombre: "check_availability", resultado: "x".repeat(40) },
+            ],
+          };
+        }
+        return "Hasta luego.";
+      },
+      {
+        completarChat: vi
+          .fn()
+          .mockResolvedValueOnce('{"mensaje":"Un corte de pelo","fin":false}')
+          .mockResolvedValueOnce(
+            '{"mensaje":"Por la tarde, sobre las cinco","fin":false}'
+          )
+          .mockResolvedValueOnce(
+            '{"mensaje":"Vale, ya llamaré para confirmar. Gracias","fin":true}'
+          ),
+      }
+    );
+    const { deps } = dependencias(adaptador);
+
+    const resultado = await ejecutarLaboratorio(
+      parsearArgumentos([
+        "--negocio",
+        "biz_1",
+        "--escenarios",
+        "E12a",
+        "--n",
+        "1",
+      ]),
+      deps
+    );
+
+    const enviados = llamadasA(adaptador.chatWithAssistant).map(
+      ([, entrada]) => (entrada as { content: string }).content
+    );
+    expect(enviados).toEqual([
+      "¿Tenéis algo el martes?",
+      "Un corte de pelo",
+      "Por la tarde, sobre las cinco",
+      "Vale, ya llamaré para confirmar. Gracias",
+    ]);
+    const [celdaE12a] = resultado.informe!.repeticiones;
+    const repeticion = celdaE12a!.resultados[0]!;
+    expect(repeticion.ok).toBe(true);
+    expect(repeticion.terminoElCliente).toBe("objetivo");
+    expect(repeticion.metricas).toMatchObject({
+      turnos: 4,
+      llamadasAHerramientas: 1,
+      caracteresDeTools: 40,
+    });
+    expect(resultado.informe!.meta).toMatchObject({
+      cliente: "reactivo",
+      modeloDelCliente: MODELO_DEL_CLIENTE,
+    });
+    expect(resultado.informe!.resumen[0]).toMatchObject({
+      mediaDeTurnos: 4,
+      mediaDeCaracteresDeTools: 40,
+      ok: 1,
+      fallos: 0,
+    });
+  });
+
+  it("con --cliente guion reproduce exactamente los turnos fijos y no llama al LLM", async () => {
+    const adaptador = adaptadorConChat(() => "Entendido.");
+    const { deps } = dependencias(adaptador);
+
+    await ejecutarLaboratorio(
+      opciones(["--escenarios", "E2", "--n", "2"]),
+      deps
+    );
+
+    const enviados = llamadasA(adaptador.chatWithAssistant).map(
+      ([, entrada]) => (entrada as { content: string }).content
+    );
+    // Dos repeticiones a la vez: el orden entre ellas no importa.
+    expect(enviados.sort()).toEqual([
+      "And how long is it?",
+      "And how long is it?",
+      "Do you do highlights?",
+      "Do you do highlights?",
+    ]);
+    expect(adaptador.completarChat).not.toHaveBeenCalled();
+  });
+
+  it("un cliente que se pasa de turnos se corta en el tope, y el informe lo cuenta", async () => {
+    const adaptador = adaptadorConChat(() => "¿Algo más?", {
+      completarChat: vi.fn(async () => '{"mensaje":"Pues sí","fin":false}'),
+    });
+    const { deps } = dependencias(adaptador);
+
+    const resultado = await ejecutarLaboratorio(
+      parsearArgumentos([
+        "--negocio",
+        "biz_1",
+        "--escenarios",
+        "E1",
+        "--n",
+        "1",
+      ]),
+      deps
+    );
+
+    const repeticion = resultado.informe!.repeticiones[0]!.resultados[0]!;
+    expect(repeticion.terminoElCliente).toBe("tope");
+    expect(repeticion.metricas.turnos).toBe(topeDeTurnos(guionDe("E1")));
+  });
+
+  it("un fallo del LLM del cliente es un error de ejecución, no un fallo del prompt", async () => {
+    const adaptador = adaptadorConChat(() => "No la tenemos.", {
+      completarChat: vi.fn(async () => {
+        throw new Error("modelo caído");
+      }),
+    });
+    const { deps } = dependencias(adaptador);
+    vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const resultado = await ejecutarLaboratorio(
+      parsearArgumentos([
+        "--negocio",
+        "biz_1",
+        "--escenarios",
+        "E1",
+        "--n",
+        "2",
+      ]),
+      deps
+    );
+
+    expect(resultado.informe!.resumen[0]).toMatchObject({
+      ok: 0,
+      fallos: 0,
+      errores: 2,
+      mensajesDeError: ["modelo caído"],
+    });
+    expect(informeMarkdown(resultado.informe!)).toContain(
+      "## Errores de ejecución (no cuentan como fallos del prompt)"
+    );
+  });
+
+  it("el chat de WhatsApp lleva el marcador solo en el primer mensaje", async () => {
+    const adaptador = adaptadorConChat(
+      () => "Hola, soy la recepcionista de IA."
+    );
+    const { deps } = dependencias(adaptador, {
+      marcadorDeChat: ({ clientPhone }: { clientPhone: string }) =>
+        `[WhatsApp · ${clientPhone} · hoy]`,
+    });
+
+    await ejecutarLaboratorio(
+      parsearArgumentos([
+        "--negocio",
+        "biz_1",
+        "--escenarios",
+        "E18b",
+        "--n",
+        "1",
+      ]),
+      deps
+    );
+
+    const enviados = llamadasA(adaptador.chatWithAssistant).map(
+      ([, entrada]) => (entrada as { content: string }).content
+    );
+    expect(enviados).toEqual([
+      "[WhatsApp · +34611222333 · hoy] He pulsado Cambiar y prefiero hablar con alguien",
+      "¿Me das el teléfono del negocio?",
+    ]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Cifras del informe y comparación entre ejecuciones
+// ---------------------------------------------------------------------------
+
+describe("cifras del informe", () => {
+  const escenario = ESCENARIOS.find((e) => e.id === "E10")!;
+
+  it("cuenta fallos por comprobación, errores aparte y las medias", () => {
+    const resumen = resumirCelda(escenario.guiones[0]!, escenario, "control", [
+      repeticion(true),
+      repeticion(false, {
+        comprobaciones: [
+          { descripcion: "A", ok: false },
+          { descripcion: "B", ok: false },
+          { descripcion: "C", ok: true },
+        ],
+        metricas: {
+          llamadasAHerramientas: 4,
+          getCatalog: 1,
+          caracteresDeRespuestas: 300,
+          duracionMs: 10,
+          turnos: 5,
+          caracteresDeTools: 1500,
+          latenciaMediaPorTurnoMs: 1200,
+        },
+      }),
+      repeticion(false, {
+        comprobaciones: [{ descripcion: "A", ok: false }],
+      }),
+      repeticion(false, { error: "timeout de Telnyx" }),
+    ]);
+    expect(resumen).toMatchObject({
+      total: 4,
+      ok: 1,
+      fallos: 2,
+      errores: 1,
+      mediaDeTurnos: 3.7,
+      mediaDeCaracteresDeTools: 833.3,
+      mediaDeLatenciaPorTurnoMs: 933.3,
+      mensajesDeError: ["timeout de Telnyx"],
+    });
+    expect(resumen.fallosPorComprobacion).toEqual([
+      { descripcion: "A", fallos: 2 },
+      { descripcion: "B", fallos: 1 },
+    ]);
+  });
+});
+
+describe("comparar con otra ejecución", () => {
+  const e1 = ESCENARIOS.find((e) => e.id === "E1")!;
+  const e10 = ESCENARIOS.find((e) => e.id === "E10")!;
+  const celda = (
+    escenario: typeof e1,
+    variante: "control" | "v2",
+    ok: number,
+    fallos: number,
+    extra: Partial<ResultadoDeRepeticion["metricas"]> = {}
+  ) =>
+    resumirCelda(escenario.guiones[0]!, escenario, variante, [
+      ...Array.from({ length: ok }, () =>
+        repeticion(true, {
+          metricas: { ...repeticion(true).metricas, ...extra },
+        })
+      ),
+      ...Array.from({ length: fallos }, () =>
+        repeticion(false, {
+          metricas: { ...repeticion(false).metricas, ...extra },
+        })
+      ),
+    ]);
+
+  it("empareja guion y variante, da el veredicto y apunta lo que no tiene pareja", () => {
+    const anterior = {
+      resumen: [
+        celda(e1, "control", 10, 0),
+        celda(e10, "control", 30, 0),
+        celda(e10, "v2", 30, 0),
+      ],
+    };
+    const actual = {
+      resumen: [
+        celda(e1, "control", 9, 1, { caracteresDeTools: 900 }),
+        celda(e10, "control", 29, 1, { caracteresDeTools: 100 }),
+      ],
+    };
+    const { filas, sinPareja } = compararInformes(actual, anterior);
+    expect(filas.map((f) => [f.guion, f.variante, f.veredicto])).toEqual([
+      ["E1", "control", "FALLA"],
+      ["E10", "control", "OK"],
+    ]);
+    expect(sinPareja).toEqual(["E10 v2 (solo en la anterior)"]);
+    const tabla = tablaDeComparacion({ filas, sinPareja });
+    expect(tabla).toContain("| E1 | dura | control | 10/10 | 9/10 | FALLA |");
+    expect(tabla).toContain("500 → 900");
+    expect(tabla).toContain("500 → 100");
+  });
+
+  it("lee un informe.json viejo, sin las cifras nuevas, y rechaza lo que no lo es", () => {
+    const viejo = JSON.stringify({
+      meta: { fecha: "20261029-1000", variantes: ["control"] },
+      resumen: [
+        {
+          guion: "E1",
+          escenario: "E1",
+          regla: "dura",
+          variante: "control",
+          total: 10,
+          ok: 10,
+          fallos: 0,
+          errores: 0,
+          mediaDeHerramientas: 1,
+          mediaDeGetCatalog: 1,
+          mediaDeCaracteres: 50,
+        },
+      ],
+    });
+    const leido = leerInformeAnterior(viejo);
+    expect(leido.meta).toEqual({
+      fecha: "20261029-1000",
+      etiqueta: null,
+      variantes: ["control"],
+    });
+    expect(leido.resumen[0]).toMatchObject({
+      mediaDeTurnos: 0,
+      mediaDeCaracteresDeTools: 0,
+      fallosPorComprobacion: [],
+    });
+    expect(() => leerInformeAnterior("no json")).toThrow(ErrorDeUso);
+    expect(() => leerInformeAnterior('{"hola":1}')).toThrow(
+      /no parece un informe/
+    );
+  });
+
+  it("--comparar-con lee el informe antes de gastar nada y lo pone en el informe", async () => {
+    const adaptador = adaptadorFalso({
+      chatWithAssistant: vi.fn(async () => "No la tenemos."),
+      listConversationMessages: vi.fn(
+        async (): Promise<TelnyxConversationMessage[]> => [
+          { role: "user", text: "¿Hacéis keratina?" },
+          {
+            role: "assistant",
+            text: "",
+            toolCalls: [{ id: "1", nombre: "get_catalog", argumentos: "{}" }],
+          },
+          { role: "tool", text: "{}" },
+          { role: "assistant", text: "No la tenemos." },
+          { role: "user", text: "Vale, gracias. Nada más, adiós." },
+          { role: "assistant", text: "Hasta luego." },
+        ]
+      ),
+    });
+    const anterior = JSON.stringify({
+      meta: {
+        fecha: "20261029-1000",
+        etiqueta: "tools de main",
+        variantes: ["control"],
+      },
+      resumen: [celda(e1, "control", 10, 0)],
+    });
+    const { deps, escritos, log } = dependencias(adaptador, {
+      leerInforme: vi.fn(async () => anterior),
+    });
+
+    const resultado = await ejecutarLaboratorio(
+      opciones([
+        "--escenarios",
+        "E1",
+        "--n",
+        "2",
+        "--comparar-con",
+        "/tmp/informes/20261029-1000",
+        "--etiqueta",
+        "tools de la rama",
+        "--salida",
+        "/tmp/lab",
+      ]),
+      deps
+    );
+
+    expect(deps.leerInforme).toHaveBeenCalledWith(
+      "/tmp/informes/20261029-1000/informe.json"
+    );
+    expect(resultado.informe!.meta.etiqueta).toBe("tools de la rama");
+    expect(resultado.informe!.comparacion).toMatchObject({
+      con: "/tmp/informes/20261029-1000",
+      etiqueta: "tools de main",
+      filas: [{ guion: "E1", variante: "control", veredicto: "OK" }],
+    });
+    const md = escritos.find((e) => e.ruta.endsWith("informe.md"))!.contenido;
+    expect(md).toContain(
+      "# Laboratorio de prompt 20261030-1542 · tools de la rama"
+    );
+    expect(md).toContain("## Comparación con tools de main (20261029-1000)");
+    expect(md).toContain("| E1 | dura | control | 10/10 | 2/2 | OK |");
+    expect(
+      log.mock.calls.some(([m]) =>
+        String(m).includes("Veredicto (ahora frente a antes)")
+      )
+    ).toBe(true);
+
+    // Una ruta que no se puede leer falla antes de crear nada.
+    const otro = adaptadorFalso();
+    const { deps: sinInforme } = dependencias(otro);
+    await expect(
+      ejecutarLaboratorio(
+        opciones(["--escenarios", "E1", "--comparar-con", "/no/existe"]),
+        sinInforme
+      )
+    ).rejects.toThrow(/no hay informe en \/no\/existe\/informe.json/);
+    expect(otro.createAssistant).not.toHaveBeenCalled();
+    expect(sinInforme.cargarContexto).not.toHaveBeenCalled();
+  });
+
+  it("también vale la ruta del propio informe.json", async () => {
+    const adaptador = adaptadorFalso();
+    const { deps } = dependencias(adaptador, {
+      leerInforme: vi.fn(async () => {
+        throw new ErrorDeUso("--comparar-con: no se pudo leer");
+      }),
+    });
+    await expect(
+      ejecutarLaboratorio(
+        opciones([
+          "--escenarios",
+          "E1",
+          "--comparar-con",
+          "/tmp/x/informe.json",
+        ]),
+        deps
+      )
+    ).rejects.toThrow(/no se pudo leer/);
+    expect(deps.leerInforme).toHaveBeenCalledWith("/tmp/x/informe.json");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Revisión del 30-10: teléfonos dictados, restablecer, saludo por llamada,
+// despedida y E17
+// ---------------------------------------------------------------------------
+
+describe("teléfonos que dicta el cliente", () => {
+  it("la batería real solo dicta teléfonos de ficción", () => {
+    const plan = planificar(sinForzar(["--con-citas", "--n", "1"]));
+    const asignacion = { porTarea: new Map(), avisos: [] };
+    expect(
+      telefonosFueraDelLaboratorio(plan.tareas, asignacion, {
+        ...CATALOGO_DE_PRUEBA,
+        telefonosDeCliente: TELEFONOS_DE_CLIENTE_DE_LABORATORIO,
+      })
+    ).toEqual([]);
+  });
+
+  it("un guion que dicta un móvil real no corre, ni en un negocio elegido a mano", () => {
+    const plan = planificar(
+      opciones(["--escenarios", "E21", "--n", "1", "--con-citas"]),
+      CATALOGO_DE_PRUEBA
+    );
+    const conMovilReal = plan.tareas.map((tarea) => ({
+      ...tarea,
+      guion: {
+        ...tarea.guion,
+        datos: { ...tarea.guion.datos, telefonos: ["612 345 679"] },
+      },
+    }));
+    const problemas = telefonosFueraDelLaboratorio(
+      conMovilReal,
+      { porTarea: new Map(), avisos: [] },
+      CATALOGO_DE_PRUEBA
+    );
+    expect(problemas).toHaveLength(1);
+    expect(problemas[0]).toMatch(/E21: el cliente dicta \+34•+5679/);
+    expect(problemas[0]).not.toContain("612345679");
+  });
+
+  it("el teléfono de un negocio sembrado lo ve «sinTelefono»", () => {
+    const telefono = telefonoDelNegocioDeLaboratorio(9).replace(
+      /^\+1(\d{3})(\d{3})(\d{4})$/,
+      "+1 $1 $2 $3"
+    );
+    expect(telefonosDelTexto(`Llámanos al ${telefono}`)).toHaveLength(1);
+    expect(
+      evaluarGuion(
+        guionDe("E18a"),
+        conversacion([`El número del negocio es ${telefono}.`, "-", "-"])
+      ).some((c) => !c.ok)
+    ).toBe(true);
+  });
+});
+
+describe("negocios de laboratorio inertes", () => {
+  const id = NEGOCIOS_DE_LABORATORIO[0]!.id;
+
+  it("deja pasar el sembrado y los negocios que no son del catálogo", () => {
+    expect(() =>
+      exigirNegocioDeLaboratorioInerte({
+        id,
+        name: "Lab · Peluquería",
+        telnyxPhoneNumber: null,
+      })
+    ).not.toThrow();
+    expect(() =>
+      exigirNegocioDeLaboratorioInerte({
+        id: "biz_real",
+        name: "Peluquería real",
+        telnyxPhoneNumber: "+34930000000",
+      })
+    ).not.toThrow();
+    expect(() =>
+      exigirNegocioDeLaboratorioInerte({
+        id: NEGOCIOS_DE_LABORATORIO.find(
+          (n) => n.clave === "transferencia-siempre"
+        )!.id,
+        name: "Lab · Transferencia siempre",
+        telnyxPhoneNumber: "+34900000002",
+      })
+    ).not.toThrow();
+  });
+
+  it("se niega si alguien le puso número de Telnyx o le cambió el nombre", () => {
+    expect(() =>
+      exigirNegocioDeLaboratorioInerte({
+        id,
+        name: "Lab · Peluquería",
+        telnyxPhoneNumber: "+34930454394",
+      })
+    ).toThrow(/número de Telnyx \(\+34•+4394\)/);
+    expect(() =>
+      exigirNegocioDeLaboratorioInerte({
+        id,
+        name: "Peluquería de Ana",
+        telnyxPhoneNumber: null,
+      })
+    ).toThrow(/se llama «Peluquería de Ana»/);
+  });
+});
+
+describe("variablesComunes", () => {
+  const con = (nombre: string) => ({
+    saludo: "s",
+    variables: {
+      nombre_cliente: nombre,
+      ultimo_servicio: nombre ? "Corte" : "",
+    },
+  });
+
+  it("las mismas en todas, ninguna con valor o distintas", () => {
+    expect(variablesComunes([con("Marta"), con("Marta")])).toEqual({
+      nombre_cliente: "Marta",
+      ultimo_servicio: "Corte",
+    });
+    expect(variablesComunes([con(""), con("")])).toBeUndefined();
+    expect(variablesComunes([])).toBeUndefined();
+    expect(variablesComunes([con("Marta"), con("")])).toBe("distintas");
+  });
+});
+
+describe("crearCerrojosPorNegocio", () => {
+  it("una exclusiva va sola en su negocio; las compartidas, juntas; otro negocio no espera", async () => {
+    const cerrojos = crearCerrojosPorNegocio();
+    const eventos: string[] = [];
+    let soltar!: () => void;
+    const bloqueo = new Promise<void>((r) => (soltar = r));
+    const lectura1 = cerrojos.con("a", false, async () => {
+      eventos.push("l1 empieza");
+      await bloqueo;
+      eventos.push("l1 acaba");
+    });
+    const lectura2 = cerrojos.con("a", false, async () => {
+      eventos.push("l2 empieza");
+    });
+    const escritura = cerrojos.con("a", true, async () => {
+      eventos.push("e empieza");
+    });
+    const lecturaTardia = cerrojos.con("a", false, async () => {
+      eventos.push("l3 empieza");
+    });
+    const otroNegocio = cerrojos.con("b", true, async () => {
+      eventos.push("b empieza");
+    });
+    await otroNegocio;
+    await lectura2;
+    expect(eventos).toEqual(["l1 empieza", "l2 empieza", "b empieza"]);
+    soltar();
+    await Promise.all([lectura1, escritura, lecturaTardia]);
+    // La escritura espera a las lecturas que tenía delante, y la lectura que
+    // llegó después espera a la escritura.
+    expect(eventos.slice(3)).toEqual(["l1 acaba", "e empieza", "l3 empieza"]);
+  });
+
+  it("suelta el cerrojo aunque el trabajo falle", async () => {
+    const cerrojos = crearCerrojosPorNegocio();
+    await expect(
+      cerrojos.con("a", true, async () => {
+        throw new Error("fallo");
+      })
+    ).rejects.toThrow("fallo");
+    await expect(cerrojos.con("a", true, async () => "sigue")).resolves.toBe(
+      "sigue"
+    );
+  });
+});
+
+describe("restablecer los negocios de laboratorio entre repeticiones", () => {
+  it("solo las que reservan, y solo en negocios del catálogo", () => {
+    const deLab = planificar(
+      sinForzar(["--escenarios", "E1,E10", "--n", "1", "--con-citas"]),
+      CATALOGO_DE_PRUEBA
+    );
+    expect(
+      deLab.tareas.map((t) => [
+        t.guion.clave,
+        restableceElNegocio(t, CATALOGO_DE_PRUEBA),
+      ])
+    ).toEqual([
+      ["E1", false],
+      ["E10", true],
+    ]);
+    const elegido = planificar(
+      opciones(["--escenarios", "E10", "--n", "1", "--con-citas"]),
+      CATALOGO_DE_PRUEBA
+    );
+    expect(restableceElNegocio(elegido.tareas[0]!, CATALOGO_DE_PRUEBA)).toBe(
+      false
+    );
+  });
+
+  it("restablece antes y después de cada repetición que reserva, de una en una", async () => {
+    const orden: string[] = [];
+    let enCurso = 0;
+    let maximoEnCurso = 0;
+    const adaptador = adaptadorFalso({
+      chatWithAssistant: vi.fn(async () => {
+        enCurso++;
+        maximoEnCurso = Math.max(maximoEnCurso, enCurso);
+        orden.push("chat");
+        await new Promise((r) => setTimeout(r, 1));
+        enCurso--;
+        return "Hecho.";
+      }),
+    });
+    const restablecerNegocio = vi.fn(async (negocioId: string) => {
+      orden.push(`restablecer ${negocioId}`);
+    });
+    const { deps } = dependenciasDeLaboratorio(adaptador, {
+      restablecerNegocio,
+    });
+    const resultado = await ejecutarLaboratorio(
+      sinForzar([
+        "--escenarios",
+        "E10",
+        "--n",
+        "2",
+        "--con-citas",
+        "--si",
+        "--paralelo",
+        "3",
+        "--variantes",
+        "control",
+      ]),
+      deps
+    );
+    expect(resultado.informe).not.toBeNull();
+    // Dos repeticiones, cada una entre dos restablecimientos y sin solaparse.
+    expect(restablecerNegocio).toHaveBeenCalledTimes(4);
+    expect(maximoEnCurso).toBe(1);
+    const sinChats = orden.filter(
+      (paso, i) => paso !== "chat" || orden[i - 1] !== "chat"
+    );
+    expect(sinChats).toEqual([
+      `restablecer ${BASE}`,
+      "chat",
+      `restablecer ${BASE}`,
+      `restablecer ${BASE}`,
+      "chat",
+      `restablecer ${BASE}`,
+    ]);
+  });
+
+  it("si no se puede restablecer antes, la repetición es un error de ejecución", async () => {
+    const adaptador = adaptadorFalso();
+    const { deps } = dependenciasDeLaboratorio(adaptador, {
+      restablecerNegocio: vi.fn(async () => {
+        throw new Error("BD caída");
+      }),
+    });
+    const resultado = await ejecutarLaboratorio(
+      sinForzar([
+        "--escenarios",
+        "E10",
+        "--n",
+        "1",
+        "--con-citas",
+        "--si",
+        "--variantes",
+        "control",
+      ]),
+      deps
+    );
+    const repeticion = resultado.informe!.repeticiones[0]!.resultados[0]!;
+    expect(repeticion.error).toMatch(/BD caída/);
+    expect(adaptador.chatWithAssistant).not.toHaveBeenCalled();
+    expect(resultado.informe!.meta.avisos.join("\n")).toMatch(
+      /No se pudo restablecer/
+    );
+  });
+
+  it("sin restablecer, avisa de que las citas se acumulan", async () => {
+    const adaptador = adaptadorFalso();
+    const { deps } = dependenciasDeLaboratorio(adaptador);
+    const resultado = await ejecutarLaboratorio(
+      sinForzar([
+        "--escenarios",
+        "E10",
+        "--n",
+        "1",
+        "--con-citas",
+        "--si",
+        "--variantes",
+        "control",
+      ]),
+      deps
+    );
+    expect(resultado.informe!.meta.avisos.join("\n")).toMatch(
+      /no restablece.*se acumulan/
+    );
+  });
+});
+
+describe("saludo y variables de cada llamada", () => {
+  it("una llamada usa el saludo con que contestaría el backend y pasa sus variables", async () => {
+    const adaptador = adaptadorFalso();
+    const { deps } = dependenciasDeLaboratorio(adaptador, {
+      cargarContexto: vi.fn(async (input) => ({
+        ...contextoDeLaboratorio(input.negocioId, input.fecha, input.variantes),
+        porLlamada: Object.fromEntries(
+          ["call-1", "call-2", "call-3"].map((callId) => [
+            callId,
+            {
+              saludo: "¡Hola, Marta! ¿Quieres repetir Corte?",
+              variables: { nombre_cliente: "Marta", ultimo_servicio: "Corte" },
+            },
+          ])
+        ),
+      })),
+    });
+    await ejecutarLaboratorio(
+      sinForzar(["--escenarios", "E1", "--n", "1", "--variantes", "control"]),
+      deps
+    );
+    expect(adaptador.addConversationMessage).toHaveBeenCalledWith(
+      expect.any(String),
+      { role: "assistant", content: "¡Hola, Marta! ¿Quieres repetir Corte?" }
+    );
+    const metadata = (
+      llamadasA(adaptador.createConversation)[0]![0] as {
+        metadata: Record<string, string>;
+      }
+    ).metadata;
+    expect(metadata).toMatchObject({
+      nombre_cliente: "Marta",
+      ultimo_servicio: "Corte",
+    });
+  });
+});
+
+describe("la despedida del cliente reactivo", () => {
+  function llmQueDice(...respuestas: string[]) {
+    return vi.fn(async () => {
+      const siguiente = respuestas.shift();
+      if (siguiente === undefined) throw new Error("el LLM no esperaba más");
+      return siguiente;
+    });
+  }
+  const entradaDe = (
+    clave: string,
+    turno: number,
+    completar: EntradaDelCliente["completar"],
+    historial: EntradaDelCliente["historial"] = []
+  ): EntradaDelCliente => ({
+    guion: guionDe(clave),
+    modo: "reactivo",
+    turno,
+    historial,
+    saludo: "Hola",
+    modelo: MODELO_DEL_CLIENTE,
+    completar,
+  });
+
+  it("solo la exigen los guiones que miran el último turno", () => {
+    expect(exigeDespedida(guionDe("E16b"))).toBe(true);
+    expect(exigeDespedida(guionDe("E17"))).toBe(true);
+    expect(exigeDespedida(guionDe("E1"))).toBe(false);
+    expect(pareceDespedida("Perfecto, nada más. Muchas gracias, adiós")).toBe(
+      true
+    );
+    expect(pareceDespedida("Sí, confirmo")).toBe(false);
+  });
+
+  it("si termina callado sin despedirse, dice la despedida del guion", async () => {
+    const decision = await siguienteMensajeDelCliente(
+      entradaDe("E16b", 4, llmQueDice('{"mensaje":"","fin":true}'), [
+        { cliente: "Sí, confírmalo", respuesta: "Reservado. ¿Algo más?" },
+      ])
+    );
+    expect(decision.mensaje).toBe(guionDe("E16b").turnos.at(-1));
+    expect(decision.fin).toBe(true);
+    expect(decision.avisos.join("\n")).toMatch(/sin despedirse/);
+  });
+
+  it("si ya se despidió, termina sin repetirla", async () => {
+    const decision = await siguienteMensajeDelCliente(
+      entradaDe("E16b", 5, llmQueDice('{"mensaje":"","fin":true}'), [
+        { cliente: "Nada más, adiós", respuesta: "¡Adiós!" },
+      ])
+    );
+    expect(decision.mensaje).toBeNull();
+  });
+
+  it("si cumple el objetivo sin despedirse, sigue un turno más", async () => {
+    const decision = await siguienteMensajeDelCliente(
+      entradaDe(
+        "E16b",
+        3,
+        llmQueDice('{"mensaje":"Sí, confírmalo","fin":true}')
+      )
+    );
+    expect(decision).toMatchObject({ mensaje: "Sí, confírmalo", fin: false });
+  });
+
+  it("en el tope, el último mensaje es la despedida del guion", async () => {
+    const tope = topeDeTurnos(guionDe("E16b"));
+    const decision = await siguienteMensajeDelCliente(
+      entradaDe(
+        "E16b",
+        tope,
+        llmQueDice('{"mensaje":"¿Y a las 18?","fin":false}')
+      )
+    );
+    expect(decision.mensaje).toBe(guionDe("E16b").turnos.at(-1));
+    expect(decision.fin).toBe(true);
+  });
+
+  it("un guion sin `ultimo` termina callado como siempre", async () => {
+    const decision = await siguienteMensajeDelCliente(
+      entradaDe("E10", 3, llmQueDice('{"mensaje":"","fin":true}'))
+    );
+    expect(decision.mensaje).toBeNull();
+  });
+});
+
+describe("E17 por chat", () => {
+  it("los informes del turno de la despedida no cuentan para «como mucho uno»", () => {
+    const c = conversacion(
+      ["¿A qué número te llama Ana?", "Apuntado, se lo paso.", "¡Hasta luego!"],
+      [
+        { nombre: "informar_al_negocio", turno: 3 },
+        { nombre: "informar_al_negocio", turno: 3 },
+      ]
+    );
+    expect(evaluarGuion(guionDe("E17"), c).filter((r) => !r.ok)).toEqual([]);
+    expect(turnosDelAmbito(c, { salvoUltimo: true })).toEqual([1, 2]);
+    const dosAntes = conversacion(
+      ["¿A qué número?", "Apuntado.", "¡Hasta luego!"],
+      [
+        { nombre: "informar_al_negocio", turno: 2 },
+        { nombre: "informar_al_negocio", turno: 2 },
+      ]
+    );
+    expect(
+      evaluarGuion(guionDe("E17"), dosAntes).some(
+        (r) => !r.ok && /antes de la despedida/.test(r.descripcion)
+      )
+    ).toBe(true);
   });
 });
