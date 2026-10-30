@@ -41,6 +41,8 @@ Notes.
 - **Aislamiento multi-tenant:** toda consulta con ámbito de negocio se filtra por
   `request.user.businessId` del token JWT. Nunca aceptes un `businessId` del body para
   lecturas ni escrituras.
+  Única excepción: `/growth/*` (Alhabla Growth) no es de ningún negocio y tiene su propia
+  autenticación; ver `AGENTS.md` § Alhabla Growth.
 - **Los adaptadores son la única vía a las APIs de voz.** Telnyx pasa por
   `backend/src/adapters/telnyx/TelnyxAdapter.ts` (números) y `TelnyxAiAdapter.ts` (assistants), y
   WhatsApp por `adapters/whatsapp/WhatsAppAdapter.ts`. Jamás llames a esas APIs desde un route
