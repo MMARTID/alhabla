@@ -98,6 +98,9 @@
   th { color: var(--apagado); font-weight: 500; font-size: 12.5px; border-top: 0; }
   .vacio { color: var(--apagado); }
   .cargando { color: var(--apagado); font-style: italic; }
+  .barras { display: flex; align-items: flex-end; gap: 3px; height: 54px; }
+  .barras i { flex: 1; background: var(--morado); opacity: .75; border-radius: 3px 3px 0 0; min-height: 2px; }
+  .barras-pie { display: flex; justify-content: space-between; color: var(--tenue); font-size: 11.5px; margin-top: 4px; }
   #toast {
     position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(20px); opacity: 0;
     background: var(--tinta); color: var(--superficie); padding: 10px 16px; border-radius: 12px; transition: .2s; max-width: 90vw;
@@ -109,6 +112,7 @@
 <header>
   <div class="marca"><i></i>Alhabla <span>· desarrollo</span></div>
   <nav>
+    <a href="/inventario">Inventario</a>
     <a href="http://localhost:3001" target="_blank">App dev</a>
     <a href="http://localhost:3002" target="_blank">Web dev</a>
     <a href="https://app.alhabla.ai" target="_blank">App producción</a>
@@ -122,6 +126,9 @@
   <section class="panel mitad">
     <h2>Servicios <span class="detalle" id="servicios-hora"></span></h2>
     <ul class="lista" id="servicios"><li class="cargando">Comprobando…</li></ul>
+    <div id="sim-detalle" class="detalle" style="margin-top:10px"></div>
+    <div class="fila" style="margin-top:12px"><button class="boton" onclick="cargarDiagnostico(this)">Diagnóstico del MCP</button></div>
+    <ul class="lista" id="diagnostico" style="margin-top:10px"></ul>
   </section>
 
   <section class="panel mitad">
@@ -132,6 +139,16 @@
   <section class="panel">
     <h2>Producción <button class="boton" onclick="cargarProduccion()">Actualizar</button></h2>
     <div id="produccion"><p class="cargando">Preguntando a Google Cloud…</p></div>
+  </section>
+
+  <section class="panel">
+    <h2>Plataforma (producción, 14 días) <button class="boton" onclick="cargarPlataforma()">Actualizar</button></h2>
+    <div id="plataforma"><p class="cargando">Contando…</p></div>
+  </section>
+
+  <section class="panel">
+    <h2>Visitas a la web (7 días) <button class="boton" id="boton-visitas" onclick="cargarVisitas()">Cargar</button></h2>
+    <div id="visitas"><p class="vacio">Tarda unos segundos (Vercel y los logs del API): pulsa Cargar.</p></div>
   </section>
 
   <section class="panel mitad">
@@ -277,9 +294,11 @@ function pintarProduccion(p) {
   const s = p.servicio || {};
   const salud = p.salud && p.salud.cuerpo && p.salud.cuerpo.dependencies;
   const colas = Array.isArray(p.colas) ? p.colas.filter((c) => c.tareas > 0) : [];
+  const detalle = p.colasDetalle && Array.isArray(p.colasDetalle.colas) ? p.colasDetalle : null;
+  const reintentando = detalle ? detalle.tareas.filter((t) => t.estado === "reintentando" || t.estado === "atascada") : [];
   const conFallo = p.jobs && p.jobs.conFallo ? p.jobs.conFallo : [];
   const ultimo = Array.isArray(p.despliegues) ? p.despliegues[0] : null;
-  const errores = p.errores && p.errores.lineas ? p.errores.lineas.slice().reverse() : [];
+  const grupos = p.errores && Array.isArray(p.errores.grupos) ? p.errores.grupos : [];
   let html = `<div class="datos">
     <div class="dato"><small>Revisión que sirve</small><strong>${esc(s.revisionLista || s.error || "¿?")}</strong></div>
     <div class="dato"><small>Commit</small><strong class="mono">${esc((s.commit || "").slice(0, 7))}</strong>
@@ -287,14 +306,19 @@ function pintarProduccion(p) {
     <div class="dato"><small>/health</small><strong>${salud ? Object.entries(salud).map(([k, v]) => `<span class="insignia ${v === "ok" ? "ok" : "fallo"}">${esc(k)}</span>`).join(" ") : esc(p.salud && p.salud.error || "¿?")}</strong></div>
     <div class="dato"><small>Máximo de instancias</small><strong>${esc(s.maxInstanciasDelServicio ?? "¿?")}</strong> ${s.maxInstanciasDelServicio === "11" ? '<span class="insignia ok">bien</span>' : '<span class="insignia fallo">revisar</span>'}</div>
     <div class="dato"><small>Último deploy</small><strong>${ultimo ? `${esc(ultimo.resultado || ultimo.estado)} · ${esc(hace(ultimo.creado))}` : "¿?"}</strong></div>
-    <div class="dato"><small>Tareas en cola</small><strong>${colas.length ? colas.map((c) => `${esc(c.cola)}: ${c.tareas}`).join(", ") : "ninguna"}</strong></div>
+    <div class="dato"><small>Tareas en cola</small><strong>${detalle
+      ? (detalle.colas.some((c) => c.tareas > 0) ? detalle.colas.filter((c) => c.tareas > 0).map((c) => `${esc(c.cola)}: ${c.tareas}${Object.entries(c.porEstado || {}).map(([k, n]) => ` <span class="insignia ${k === "reintentando" || k === "atascada" ? "fallo" : ""}">${n} ${esc(k.replace("_", " "))}</span>`).join("")}`).join("<br>") : "ninguna")
+      : colas.length ? colas.map((c) => `${esc(c.cola)}: ${c.tareas}`).join(", ") : "ninguna"}</strong></div>
   </div>`;
   if (conFallo.length) {
     html += `<div class="aviso urgente"><p>Jobs con el último intento fallido: ${conFallo.map((j) => `<b>${esc(j.job)}</b> (${esc(j.fallo.mensaje || j.fallo.codigo)})`).join(", ")}</p></div>`;
   }
-  html += `<h2 style="margin-top:16px">Errores y avisos de las últimas 24 h</h2>`;
-  html += errores.length
-    ? `<table><tr><th style="width:120px">Cuándo</th><th>Mensaje</th></tr>${errores.map((l) => `<tr><td class="detalle">${esc(hora(l.hora))}</td><td class="mono">${esc(l.mensaje)}${l.error ? `<div class="detalle">${esc(l.error)}</div>` : ""}</td></tr>`).join("")}</table>`
+  if (reintentando.length) {
+    html += `<div class="aviso urgente"><p>Tareas que no acaban: ${reintentando.slice(0, 8).map((t) => `<b>${esc(t.ruta)}</b> (${esc(t.estado)}, ${t.intentos} intento${t.intentos === 1 ? "" : "s"}${t.ultimoIntento && t.ultimoIntento.http ? `, HTTP ${t.ultimoIntento.http}` : ""})`).join(", ")}</p></div>`;
+  }
+  html += `<h2 style="margin-top:16px">Errores y avisos de las últimas 24 h, agrupados${p.errores && p.errores.entradasLeidas ? ` <span class="detalle">${p.errores.entradasLeidas} entradas${p.errores.truncado ? ", truncado" : ""}</span>` : ""}</h2>`;
+  html += grupos.length
+    ? `<table><tr><th style="width:56px">Veces</th><th style="width:120px">Última</th><th>Mensaje</th></tr>${grupos.slice(0, 20).map((g) => `<tr><td><span class="insignia ${g.nivel === "warn" || g.nivel === "WARNING" ? "aviso" : "fallo"}">${g.veces}</span></td><td class="detalle">${esc(hora(g.ultima))}${g.veces > 1 ? `<div>desde ${esc(hora(g.primera))}</div>` : ""}</td><td class="mono">${esc(g.mensaje)}<div class="detalle">${esc(Object.keys(g.revisiones || {}).join(", "))}</div></td></tr>`).join("")}</table>`
     : `<p class="vacio">${p.errores && p.errores.error ? esc(p.errores.error) : "Ninguno. 🎉"}</p>`;
   $("produccion").innerHTML = html;
 }
@@ -303,6 +327,85 @@ async function cargarProduccion() {
   $("produccion").innerHTML = `<p class="cargando">Preguntando a Google Cloud…</p>`;
   try { pintarProduccion(await pedir("/api/produccion")); }
   catch (e) { $("produccion").innerHTML = `<p class="vacio">No pude leer producción: ${esc(e.message)}</p>`; }
+}
+
+function barras(valores, etiquetas) {
+  const max = Math.max(1, ...valores);
+  return `<div class="barras">${valores.map((v, i) => `<i style="height:${Math.round((v / max) * 100)}%" title="${esc(etiquetas[i])}: ${v}"></i>`).join("")}</div>
+    <div class="barras-pie"><span>${esc(etiquetas[0] || "")}</span><span>${esc(etiquetas[etiquetas.length - 1] || "")}</span></div>`;
+}
+
+async function cargarPlataforma() {
+  $("plataforma").innerHTML = `<p class="cargando">Contando…</p>`;
+  try {
+    const p = await pedir("/api/plataforma");
+    const dias = p.porDia.slice().reverse();
+    const t = p.ventana.totales;
+    const suma = (o) => Object.values(o || {}).reduce((a, n) => a + n, 0);
+    $("plataforma").innerHTML = `<div class="datos">
+      <div class="dato"><small>Cuentas</small><strong>${p.negocios}</strong></div>
+      <div class="dato"><small>Llamadas del mes</small><strong>${p.mesEnCurso.llamadasDeVoz}</strong> <span class="detalle">${p.mesEnCurso.minutosDeVoz} min</span></div>
+      <div class="dato"><small>Altas (14 d)</small><strong>${t.altas}</strong></div>
+      <div class="dato"><small>Citas creadas (14 d)</small><strong>${suma(t.citas)}</strong></div>
+      <div class="dato"><small>Chats de WhatsApp nuevos (14 d)</small><strong>${t.chatsNuevos}</strong></div>
+      <div class="dato"><small>Suscripciones</small><strong style="font-size:13.5px;word-break:normal">${p.suscripciones.map((s) => `${esc(s.plan)} ${esc(s.estado.replace("_", " "))}: ${s.negocios}`).join("<br>") || "ninguna"}</strong></div>
+    </div>
+    <div class="datos" style="grid-template-columns:repeat(auto-fit,minmax(240px,1fr))">
+      <div class="dato"><small>Llamadas por día</small>${barras(dias.map((d) => d.llamadas), dias.map((d) => d.dia))}</div>
+      <div class="dato"><small>Citas por día</small>${barras(dias.map((d) => suma(d.citas)), dias.map((d) => d.dia))}</div>
+      <div class="dato"><small>Mensajes de WhatsApp por día</small>${barras(dias.map((d) => suma(d.mensajesWhatsapp)), dias.map((d) => d.dia))}</div>
+    </div>
+    <p class="detalle">Embudo: ${p.embudoDeAlta.map((e) => `${esc(e.etapa)} <b>${e.negocios}</b>`).join(" → ")}</p>`;
+  } catch (e) {
+    $("plataforma").innerHTML = `<p class="vacio">No pude leer la plataforma: ${esc(e.message)}</p>`;
+  }
+}
+
+async function cargarVisitas() {
+  $("visitas").innerHTML = `<p class="cargando">Preguntando a Vercel y a los logs del API…</p>`;
+  $("boton-visitas").textContent = "Actualizar";
+  try {
+    const v = await pedir("/api/visitas");
+    const partes = [];
+    if (v.vercel) {
+      partes.push(v.vercel.error
+        ? `<div class="dato"><small>Vercel</small><strong>${esc(v.vercel.error)}</strong>${v.vercel.arreglo ? `<div class="detalle">${esc(v.vercel.arreglo)}</div>` : ""}</div>`
+        : `<div class="dato"><small>Vercel (${esc(v.vercel.proyecto)}): visitantes · páginas</small><strong>${v.vercel.visitantesUnicos ?? "¿?"} · ${v.vercel.paginasVistas ?? "¿?"}</strong>
+            ${Array.isArray(v.vercel.porDia) ? barras(v.vercel.porDia.slice().reverse().map((d) => d.visitantes), v.vercel.porDia.slice().reverse().map((d) => d.dia)) : ""}</div>`);
+    }
+    if (v.api) {
+      partes.push(v.api.error
+        ? `<div class="dato"><small>Logs del API</small><strong>${esc(v.api.error)}</strong></div>`
+        : `<div class="dato"><small>Logs del API: cargas · IPs · bots</small><strong>${v.api.cargas} · ${v.api.ipsDistintas} · ${v.api.bots.total}</strong>
+            ${barras(v.api.porDia.slice().reverse().map((d) => d.cargas), v.api.porDia.slice().reverse().map((d) => d.dia))}</div>`);
+    }
+    $("visitas").innerHTML = `<div class="datos" style="grid-template-columns:repeat(auto-fit,minmax(260px,1fr))">${partes.join("")}</div>`;
+  } catch (e) {
+    $("visitas").innerHTML = `<p class="vacio">No pude leer las visitas: ${esc(e.message)}</p>`;
+  }
+}
+
+async function cargarDiagnostico(boton) {
+  boton.disabled = true;
+  $("diagnostico").innerHTML = `<li class="cargando">Comprobando el MCP…</li>`;
+  try {
+    const d = await pedir("/api/diagnostico");
+    const lista = d.comprobaciones || [];
+    $("diagnostico").innerHTML = lista.map((c) => `<li><div class="nombre"><span class="punto ${c.ok ? "ok" : "caido"}"></span><div><b>${esc(c.pieza)}</b>${c.detalle ? `<div class="detalle">${esc(c.detalle)}</div>` : ""}${c.arreglo && !c.ok ? `<div class="detalle">Arreglo: ${esc(c.arreglo)}</div>` : ""}</div></div></li>`).join("") || `<li class="vacio">Sin comprobaciones.</li>`;
+  } catch (e) {
+    $("diagnostico").innerHTML = `<li class="vacio">${esc(e.message)}</li>`;
+  } finally { boton.disabled = false; }
+}
+
+async function cargarSim() {
+  try {
+    const s = await pedir("/api/sim");
+    if (!s.carpeta) { $("sim-detalle").textContent = ""; return; }
+    const sitio = { herramientas: "main (herramientas)", rama: `la rama ${s.rama ?? "¿?"}`, otra: `otra carpeta: ${s.carpeta}` }[s.tipoDeCarpeta] || s.carpeta;
+    $("sim-detalle").innerHTML = `Backend de simulación desde ${esc(sitio)} · <code>${esc(s.commit ?? "")}</code>`
+      + (s.commitsDeBackendDetrasDeMain > 0 ? ` · <span class="insignia aviso">${s.commitsDeBackendDetrasDeMain} commits de backend por detrás de main</span>` : "")
+      + (s.cambiosSinCommitearEnBackend > 0 ? ` · <span class="insignia aviso">${s.cambiosSinCommitearEnBackend} cambios sin commitear</span>` : "");
+  } catch { $("sim-detalle").textContent = ""; }
 }
 
 async function cargarEnvios() {
@@ -319,7 +422,10 @@ async function cargarEnvios() {
 
 cargarEstado().then(cargarPrs);
 cargarProduccion();
+cargarPlataforma();
 cargarEnvios();
+cargarSim();
+setInterval(cargarSim, 60000);
 setInterval(cargarEstado, 5000);
 setInterval(cargarPrs, 60000);
 </script>

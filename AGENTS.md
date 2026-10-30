@@ -494,8 +494,34 @@ Para probar cambios de estos scripts antes de fusionarlos: un worktree de la ram
   `localhost:3005`/`127.0.0.1:3005` (DNS rebinding) y las acciones (`POST /api/ver`,
   `/api/reiniciar`) exigen el `Origin` del panel y cuerpo JSON; la rama se valida antes de pasarla
   al script.
+  Desde el 30-10 usa además las herramientas nuevas del MCP: en Producción, los errores agrupados
+  (`errores_prod`) y las colas con lo que se reintenta o se atasca (`ver_cola_prod`); una sección
+  Plataforma (`panorama_plataforma`: cuentas, suscripciones, llamadas y citas de 14 días); Visitas
+  (`visitas_web`, al pulsar: tarda); en Servicios, de dónde sale backend-sim (`backend_sim`) y el
+  botón Diagnóstico (`diagnostico_mcp`).
+- **Inventario `http://localhost:3005/inventario`** (`backend/mcp/inventario.ts`, `panel/inventario.html`):
+  cuentas de dev o de producción en hilos cuenta → número de voz → assistant (con el `systemPrompt`
+  en un desplegable) y los dos WhatsApp de plataforma (`whatsapp_senders`: `client` = reservas,
+  `owner` = Gestor; el WhatsApp propio de cada negocio aún no tiene campo). Solo lee id, nombre, plan,
+  suscripción y números de Telnyx: nada de Stripe, tokens, teléfonos del local o del dueño ni clientes.
+  - **Ediciones** (nombre, `active`, `systemPrompt`; el plan lo cambia Stripe) por la API de la app
+    como el usuario más antiguo de la cuenta: `PATCH /business/me` y `PATCH /agents/:id` (que marca
+    `promptManuallyEdited` y llama a `syncAgentToTelnyx`). En dev, por `llamarApiDeDev`; en
+    producción, a `api.alhabla.ai` con un JWT de 2 min firmado con el `JWT_SECRET` de Secret Manager,
+    y solo escribiendo el id del objetivo. Una cuenta sin usuario no se puede editar (409).
+  - **Fantasmas**: la cuenta de Telnyx es UNA para dev y producción (comprobado el 30-10), así que se
+    cruza la lista de la cuenta (`listAssistants`/`listNumbers`, nuevos en los adaptadores) con las
+    DOS BD, los `*_ASSISTANT_ID` y números del `.env` y de Cloud Run, el WABA y las etiquetas
+    `whatsapp*` de Telnyx (los WhatsApp de sector en reserva no tienen fila en ninguna BD). Un
+    assistant cuyo único agente está borrado sigue siendo fantasma. Si falla cualquier fuente no se
+    marca nada. Borrar: dry-run, id escrito y la casilla «cuenta de producción»; se vuelve a comprobar
+    y se usa la secuencia de la baja de cuenta (`releaseNumber`, o `deleteAssistant` y su app TeXML).
+    Un fantasma puede ser de un PR abierto (p. ej. #325 y `demo-brain-to-train`): mira antes los PR.
+  - Cada escritura, también las rechazadas, va a `~/Library/Logs/alhabla-dev/inventario.log` (el
+    prompt, solo su tamaño).
 - **Vistas previas de las sesiones** (`.claude/launch.json`): `:3101` (app) y `:3102` (web), contra
   el backend fijo; el login con Google no funciona ahí (sus URIs de redirección son las de `:3001`).
+  `panel-dev` levanta el panel de la rama en `:3105` (el fijo de `:3005` no se toca).
 - **MCP:** `estado_dev` y `ver_en_dev` hacen lo mismo que el panel desde una sesión, sin `git` fuera
   de su worktree.
 
