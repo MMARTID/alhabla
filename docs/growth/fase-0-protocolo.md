@@ -1,103 +1,75 @@
-# Fase 0 — Protocolo de validación
+# Fase 0 — Cierre
 
-Sin código. Dura 1–2 semanas y cuesta unos 15–20 minutos al día. Su único producto es
-**la decisión de dónde poner el esfuerzo**: Reddit, backlinks o SEO/GEO. Todo lo de
-Reddit lo haces tú a mano, con tus ojos, en tu navegador; nada de esto lo hace una
-herramienta.
+La Fase 0 era una validación sin código para decidir dónde poner el esfuerzo. El 2026-10-30
+el fundador decidió omitir Reddit, así que se cierra con lo que se hizo y lo que queda.
 
-## A. Tu cuenta de Reddit (a diario)
+## Qué se hizo y qué no
 
-- Usa tu cuenta personal. No crees otras, ni de marca ni de apoyo.
-- **Durante la Fase 0 no menciones Alhabla ni pongas ningún enlace.** Participa por interés
-  real: responde a quien puedas ayudar, sobre todo en tu terreno (negocios con cita,
-  autónomos, atención al cliente).
-- Antes de comentar en una comunidad, lee sus normas. Apunta si prohíben enlaces, herramientas
-  o contenido hecho con IA.
-- Sin mensajes privados a nadie.
-
-Sirve para dos cosas: que la cuenta tenga historial cuando toque mencionar Alhabla, y que
-sepas por experiencia propia cómo reacciona cada comunidad.
-
-## B. Muestreo de hilos (7 días seguidos)
-
-**Cómo buscar** (a mano): el buscador de Reddit y la sección de comunidades relacionadas.
-Reddit Pro no sirve (solo inglés). Prueba con estas palabras: peluquería, barbería, centro
-de estética, uñas, fisioterapia, pestañas, cita previa, agenda, no-shows, "no puedo coger el
-teléfono", llamadas perdidas, recepcionista, software de reservas, autónomo con cita.
-
-**Dónde mirar** (tipos de comunidad; los nombres exactos no están verificados, búscalos
-tú): generalistas de España, de autónomos y emprendimiento, de cada oficio (peluquería,
-barbería, estética, fisioterapia) y de herramientas o IA para pequeños negocios.
-
-**Qué anotar** por cada hilo candidato (hoja de cálculo, una fila):
-
-| Columna | Valores |
+| Tarea | Estado |
 |---|---|
-| Fecha, URL, comunidad, título | texto |
-| Antigüedad del hilo | horas o días |
-| ¿Quien pregunta es dueño o profesional del sector? | sí / no / no se sabe |
-| Dolor | llamadas perdidas · agenda · no-shows · otro |
-| ¿Sigue abierto a respuestas? | sí / no |
-| ¿La comunidad permite mencionar herramientas? | sí / no / solo en hilo semanal / no se sabe |
-| Objetivo que encajaría | A tráfico y marca · B cliente potencial · C backlink |
-| ¿Habrías respondido? Una línea de qué dirías | texto |
-| Calidad | 0 (ruido) · 1 (flojo) · 2 (bueno) · 3 (muy bueno) |
+| Muestreo manual de hilos de Reddit | **Cancelada** (Reddit fuera del sistema) |
+| Cuenta y enlace de perfil en Reddit | **Cancelados** |
+| Medir el `rel` de los enlaces de Reddit | **Hecho** (abajo) |
+| Cuenta de servicio de Search Console | **Hecho**, sin clave (abajo) |
+| Muestreo inicial de backlinks | **Hecho** (`fase-0-muestreo-backlinks.md`) |
+| Línea base de uso de Claude Max | **Pendiente** (abajo) |
+| Revisar a mano las seis comparativas de «recepcionista de IA» | **Pendiente, opcional** |
 
-**Hilo de calidad** = publicado en los últimos 7 días, el dolor encaja con lo que hace
-Alhabla, se puede aportar una respuesta útil **sin** promoción y la comunidad no veta
-herramientas. Puntúa 2 o 3.
+## El atributo `rel`
 
-**Puerta de decisión** (media de las semanas medidas):
+Cada enlace de una página es una etiqueta `<a href="...">`. Su atributo `rel` le dice al
+buscador cómo tratarlo:
 
-| Hilos de calidad por semana | Decisión |
+| Valor | Significado | SEO |
+|---|---|---|
+| (sin `rel`) | Enlace normal | Pasa autoridad |
+| `nofollow` | «No te fíes de este enlace» | Normalmente no pasa autoridad; Google lo trata como pista |
+| `ugc` | Contenido creado por usuarios | Igual que `nofollow`, más específico |
+| `sponsored` | Enlace de pago o publicitario | Igual |
+| `noopener`, `noreferrer` | Seguridad del navegador | No importa para SEO |
+
+Medido por el fundador en Reddit el 2026-10-30:
+
+| Enlace | `rel` |
 |---|---|
-| 3 o más | Reddit merece un módulo propio; seguimos el diseño tal cual |
-| 1 o 2 | Reddit queda como canal menor: solo entrada manual, sin esfuerzo de agentes dedicado |
-| 0 | Reddit se descarta como fuente; el peso pasa a backlinks (C) y SEO/GEO |
+| Publicación | `noopener nofollow sponsored` |
+| Comentario | `noopener nofollow ugc` |
+| Enlace social del perfil | sin `rel` |
 
-## C. Comprobar el `rel` de los enlaces de Reddit
+Cómo se comprueba en cualquier web: clic derecho sobre el enlace → **Inspeccionar** y leer el
+`rel` de la etiqueta `<a>` resaltada. Un `<img>` o un `<span>` dentro del enlace no cuentan; solo
+el `<a>`.
 
-Mide si un enlace de Reddit pasa autoridad. En el navegador de escritorio, abre un
-comentario o una publicación que contenga un enlace externo, clic derecho sobre el enlace →
-**Inspeccionar** y lee el atributo `rel` (`nofollow`, `ugc`, `sponsored`, `noopener`…).
-Hazlo con tres enlaces distintos: en un comentario, en una publicación de enlace y en el
-perfil de un usuario. Anota qué sale. Es leer el HTML de una página que tú has abierto.
+## Search Console
 
-## D. Cuenta de servicio de Search Console (lectura)
+- API `searchconsole.googleapis.com` habilitada en el proyecto `project-84381467-a606-4b71-a6e`.
+- Cuenta de servicio `growth-lectura-gsc@project-84381467-a606-4b71-a6e.iam.gserviceaccount.com`, sin roles de proyecto.
+- Acceso **Restringido** (solo lectura) a la propiedad de **dominio** `sc-domain:alhabla.ai`.
+- **No hay clave JSON**: la política de organización `iam.disableServiceAccountKeyCreation` impide crearla y no se salta.
+- `admin@alhabla.ai` tiene `roles/iam.serviceAccountTokenCreator` solo sobre esa cuenta, para suplantarla.
 
-La necesita el módulo SEO & GEO en la Fase 4. Puedes dejarla preparada ya:
+Cuando llegue la Fase 4, el inicio de sesión es interactivo y lo haces tú en tu terminal:
 
-1. En Google Cloud Console, habilita la **Search Console API** en el proyecto que prefieras.
-2. Crea una cuenta de servicio `growth-lectura-gsc` **sin roles** de proyecto.
-3. Crea su clave JSON y guárdala **fuera del repo** (por ejemplo `~/.alhabla-growth/` con
-   permisos `600`, o el llavero de macOS). Nunca en `.env` del repo.
-4. En Search Console → *Configuración* → *Usuarios y permisos*, añade el correo de la
-   cuenta de servicio con permiso **Restringido** (solo lectura) en la propiedad de
-   `alhabla.ai`.
-5. Apunta si la propiedad es de **dominio** (`sc-domain:alhabla.ai`) o de prefijo de URL;
-   cambia cómo se pide a la API.
+```bash
+gcloud auth application-default login --impersonate-service-account=growth-lectura-gsc@project-84381467-a606-4b71-a6e.iam.gserviceaccount.com
+```
 
-Si prefieres que lo haga contigo paso a paso, dímelo; no toco tu cuenta de Google ni tu
-proyecto de GCP sin tu confirmación.
+Después se hace una llamada de prueba de solo lectura antes de construir nada encima. Los
+cambios de permisos de Google pueden tardar unos minutos en aplicarse.
 
-## E. Medir el consumo de Claude Max
+## Línea base de uso de Claude Max (pendiente)
 
-Los runs saldrán de tus límites de 5 horas y semanales, compartidos con tu uso normal.
-Para saber el margen:
+Los runs saldrán de tus límites de 5 horas y semanales, compartidos con tu uso normal. Para
+saber el margen: al cerrar una semana sin ningún run de Growth, apunta en
+`claude.ai/settings/usage` el **% semanal consumido**. Presupuesto provisional del sistema:
+**no más del 10 % del límite semanal**, a ajustar con runs reales. No actives los créditos de
+uso para esto, o ponles un tope.
 
-- Al cerrar cada semana de la Fase 0, anota en `claude.ai/settings/usage` el **% semanal
-  consumido** sin ningún run de Growth. Es tu línea base.
-- Presupuesto provisional del sistema: **no más del 10–15 % del límite semanal**. Es una
-  propuesta mía sin medir; se ajusta en la Fase 2 con runs reales.
-- No actives los créditos de uso (consumo adicional) para esto, o ponles un tope.
+## Si algún día se retoma Reddit
 
-## F. Qué hago yo mientras
-
-Muestreo inicial para el objetivo C con búsqueda web pública, sin tocar Reddit:
-`docs/growth/fase-0-muestreo-backlinks.md`.
-
-## Entregable de la Fase 0
-
-Un mensaje tuyo con: la hoja del muestreo (o su resumen), el `rel` observado, si la cuenta
-de servicio está lista y tu % semanal base. Con eso decido contigo si se pasa a la Fase 1 y
-con qué peso para Reddit.
+La referencia está en `PLAN-GROWTH.md` § 1: la API exige aprobación escrita para uso comercial
+y el acceso automatizado está prohibido. Para decidir con datos, una sola sesión de unos 45
+minutos bastaría: en el buscador de Reddit, pestaña de publicaciones, **Ordenar: Nuevo** y
+**Fecha: Último mes**, con las palabras clave del sector, contando los hilos de calidad y
+dividiendo entre 4. La puerta era 3 o más hilos de calidad a la semana. Todo a mano, sin
+extensiones ni herramientas.
