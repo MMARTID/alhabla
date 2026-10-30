@@ -1,0 +1,311 @@
+{
+  "id": "cmvutefal004qrar0bnrlg9xy",
+  "claveExterna": "e6499f31ef27e8290dca62d5792026bedfefebc1d8621beb3b52a921c5220da7",
+  "fuenteId": "fuente_web",
+  "nichoId": "cmvutbd230007rar0x2pjp5qf",
+  "url": "https://guia-peluquerias-madrid.es/directorio",
+  "dominio": "guia-peluquerias-madrid.es",
+  "titulo": "Guía de peluquerías de Madrid",
+  "extracto": "Listado de peluquerías con reseñas y enlaces a sus herramientas de reserva.",
+  "idioma": "es",
+  "detectadaEn": "2026-10-30T10:13:49.677Z",
+  "objetivoPrincipal": "BACKLINKS",
+  "puntTrafico": 55,
+  "puntLeads": 40,
+  "puntBacklinks": 82,
+  "estado": "pendiente_aprobacion",
+  "motivoDescarte": null,
+  "datos": {
+    "nota": "Tiene sección herramientas",
+    "dificultad": "baja",
+    "tipoDestino": "directorio",
+    "enlaceEsperado": "dofollow"
+  },
+  "expiraEn": "2026-12-09T10:13:49.669Z",
+  "retencionHasta": "2027-04-28T10:13:49.677Z",
+  "ejecucionId": "cmvutefa7004orar0u5khjz9f",
+  "fuente": {
+    "id": "fuente_web",
+    "tipo": "web",
+    "nombre": "Búsqueda en la web"
+  },
+  "nicho": {
+    "id": "cmvutbd230007rar0x2pjp5qf",
+    "slug": "peluqueria",
+    "nombre": "Peluquerías"
+  },
+  "ejecucion": {
+    "id": "cmvutefa7004orar0u5khjz9f",
+    "disparador": "programada",
+    "estado": "en_curso",
+    "inicio": "2026-10-30T10:13:49.662Z"
+  },
+  "investigacion": {
+    "oportunidadId": "cmvutefal004qrar0bnrlg9xy",
+    "resumen": "Directorio con sección de herramientas para peluquerías. Edita un equipo editorial pequeño.",
+    "quienEdita": "Equipo editorial",
+    "viaDeContacto": "formulario",
+    "competidoresEnlazados": [
+      "heydiga.ai"
+    ],
+    "contexto": {
+      "seccion": "herramientas",
+      "urlContacto": "https://www.guia-peluquerias-madrid.es/contacto"
+    },
+    "creadaEn": "2026-10-30T10:14:11.557Z"
+  },
+  "borradores": [
+    {
+      "id": "cmvutfbuq0060rar0pdkf5ppo",
+      "oportunidadId": "cmvutefal004qrar0bnrlg9xy",
+      "version": 1,
+      "tipo": "email",
+      "objetivo": "BACKLINKS",
+      "asunto": "Una herramienta para vuestras peluquerías",
+      "texto": "Hola, soy el fundador de Alhabla. Hemos hecho una recepcionista de IA para peluquerías que atiende las llamadas y reserva en el calendario del negocio. Si os encaja, nos gustaría aparecer en vuestra sección de herramientas. Un saludo.",
+      "enlaceUrl": "https://alhabla.ai/peluqueria?utm_source=growth&utm_medium=email",
+      "utm": {
+        "utm_medium": "email",
+        "utm_source": "growth"
+      },
+      "afirmaciones": [
+        "funcion.calendarios"
+      ],
+      "estado": "pendiente_aprobacion",
+      "textoFinal": null,
+      "editadoPorHumano": false,
+      "creadoEn": "2026-10-30T10:14:31.874Z",
+      "revisiones": [
+        {
+          "id": "cmvutfbva006crar0vf7da853",
+          "borradorId": "cmvutfbuq0060rar0pdkf5ppo",
+          "resultado": "aviso",
+          "comprobaciones": [
+            {
+              "ok": true,
+              "dura": false,
+              "regla": "tono",
+              "detalle": "Tono correcto y claro."
+            },
+            {
+              "ok": false,
+              "dura": false,
+              "regla": "aporte",
+              "detalle": "El aporte al destinatario podría concretarse."
+            }
+          ],
+          "revisor": "llm",
+          "creadaEn": "2026-10-30T10:14:31.894Z"
+        },
+        {
+          "id": "cmvutfbuq0062rar07oaxn4rn",
+          "borradorId": "cmvutfbuq0060rar0pdkf5ppo",
+          "resultado": "pasa",
+          "comprobaciones": [
+            {
+              "ok": true,
+              "dura": true,
+              "regla": "afirmaciones_vigentes",
+              "detalle": "Todas las afirmaciones citadas están vigentes."
+            },
+            {
+              "ok": true,
+              "dura": true,
+              "regla": "precio_trazable",
+              "detalle": "No menciona precios ni minutos."
+            },
+            {
+              "ok": true,
+              "dura": true,
+              "regla": "sin_terminos_prohibidos",
+              "detalle": "No usa ningún término prohibido."
+            },
+            {
+              "ok": true,
+              "dura": true,
+              "regla": "comparativa_con_fuente",
+              "detalle": "No nombra a ningún competidor."
+            },
+            {
+              "ok": true,
+              "dura": true,
+              "regla": "identificacion",
+              "detalle": "Se identifica como parte de Alhabla."
+            },
+            {
+              "ok": true,
+              "dura": true,
+              "regla": "sin_esquemas_de_enlaces",
+              "detalle": "No propone intercambios ni enlaces de pago."
+            },
+            {
+              "ok": true,
+              "dura": true,
+              "regla": "enlace_a_alhabla",
+              "detalle": "El enlace, si lo hay, apunta a alhabla.ai."
+            },
+            {
+              "ok": true,
+              "dura": true,
+              "regla": "un_contacto_por_dominio",
+              "detalle": "No hay contactos con este dominio en los últimos 90 días."
+            },
+            {
+              "ok": true,
+              "dura": true,
+              "regla": "tope_semanal",
+              "detalle": "Van 0 de 5 contactos esta semana."
+            },
+            {
+              "ok": true,
+              "dura": true,
+              "regla": "sin_plantilla_repetida",
+              "detalle": "Parecido máximo con lo anterior: 16 %."
+            },
+            {
+              "ok": true,
+              "dura": true,
+              "regla": "sin_datos_personales",
+              "detalle": "No incluye correos ni teléfonos de terceros."
+            },
+            {
+              "ok": true,
+              "dura": true,
+              "regla": "tipo_acorde_con_objetivo",
+              "detalle": "Un borrador de tipo email encaja con el objetivo BACKLINKS."
+            },
+            {
+              "ok": true,
+              "dura": false,
+              "regla": "similitud_alta",
+              "detalle": "Poco parecido con lo anterior."
+            },
+            {
+              "ok": true,
+              "dura": false,
+              "regla": "similitud_con_version_anterior",
+              "detalle": "No hay una versión anterior con la que comparar."
+            },
+            {
+              "ok": true,
+              "dura": false,
+              "regla": "pocos_enlaces",
+              "detalle": "No abusa de los enlaces."
+            },
+            {
+              "ok": true,
+              "dura": false,
+              "regla": "enlace_con_utm",
+              "detalle": "El enlace lleva UTM."
+            },
+            {
+              "ok": true,
+              "dura": false,
+              "regla": "longitud_razonable",
+              "detalle": "Longitud de 234 caracteres."
+            }
+          ],
+          "revisor": "reglas",
+          "creadaEn": "2026-10-30T10:14:31.875Z"
+        }
+      ],
+      "gestion": null,
+      "afirmacionesDetalle": [
+        {
+          "clave": "funcion.calendarios",
+          "existe": true,
+          "tipo": "funcion",
+          "texto": "Reservas en tu calendario de Google, Outlook o iCloud, o en la agenda de Alhabla si no usas ninguno",
+          "valor": {
+            "planes": [
+              "inicio",
+              "pro",
+              "scale"
+            ]
+          },
+          "fuente": "web/src/lib/plans.ts#plans.inicio.features",
+          "commitSha": "5743b5ee9ac70b6843dbbea68874bd22a5654713",
+          "vigente": true,
+          "vigenteDesde": "2026-10-30T10:11:26.793Z",
+          "vigenteHasta": null
+        }
+      ],
+      "similitudConVersionAnterior": null
+    }
+  ],
+  "decisiones": [
+    {
+      "id": "cmvutfbur0064rar0622sofjv",
+      "borradorId": "cmvutfbuq0060rar0pdkf5ppo",
+      "accion": "redactar",
+      "motivo": "Versión 1 (email)",
+      "por": "agente:agente-e2e",
+      "en": "2026-10-30T10:14:31.876Z"
+    },
+    {
+      "id": "cmvutew6i005grar08yvy7z3d",
+      "borradorId": null,
+      "accion": "investigar",
+      "motivo": null,
+      "por": "agente:agente-e2e",
+      "en": "2026-10-30T10:14:11.563Z"
+    },
+    {
+      "id": "cmvutew4o0054rar08xa7l51k",
+      "borradorId": null,
+      "accion": "calificar",
+      "motivo": null,
+      "por": "agente:agente-e2e",
+      "en": "2026-10-30T10:14:11.496Z"
+    }
+  ],
+  "codigoDescarte": null,
+  "puntuacion": 82,
+  "puntuaciones": {
+    "TRAFICO_MARCA": 55,
+    "LEADS": 40,
+    "BACKLINKS": 82
+  },
+  "extractoPurgado": false,
+  "diasParaCaducar": 40,
+  "borradorEditableId": "cmvutfbuq0060rar0pdkf5ppo",
+  "acciones": [
+    {
+      "accion": "aprobar",
+      "habilitada": true
+    },
+    {
+      "accion": "devolver",
+      "habilitada": true
+    },
+    {
+      "accion": "descartar",
+      "habilitada": true
+    },
+    {
+      "accion": "marcar_gestionado",
+      "habilitada": false,
+      "motivo": "Una oportunidad pendiente_aprobacion no admite esta acción."
+    },
+    {
+      "accion": "conseguido",
+      "habilitada": false,
+      "motivo": "Una oportunidad pendiente_aprobacion no admite esta acción."
+    },
+    {
+      "accion": "sin_respuesta",
+      "habilitada": false,
+      "motivo": "Una oportunidad pendiente_aprobacion no admite esta acción."
+    },
+    {
+      "accion": "rechazado",
+      "habilitada": false,
+      "motivo": "Una oportunidad pendiente_aprobacion no admite esta acción."
+    }
+  ],
+  "contacto": {
+    "dominioEnEnfriamientoHasta": null,
+    "contactosEstaSemana": 0,
+    "topeSemanal": 5
+  }
+}

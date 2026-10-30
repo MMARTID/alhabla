@@ -14,6 +14,12 @@
       "port": 3102
     },
     {
+      "name": "growth-dev",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": ["-c", "cd growth && NEXT_PUBLIC_GROWTH_DEMO=1 exec npx next dev -p 3103"],
+      "port": 3103
+    },
+    {
       "name": "panel-dev",
       "runtimeExecutable": "sh",
       "runtimeArgs": ["-c", "cd backend && ALHABLA_PANEL_PUERTO=3105 exec node_modules/.bin/tsx mcp/panel/servidorPanel.ts"],
