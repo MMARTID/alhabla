@@ -1,5 +1,6 @@
 import { prisma } from "../../lib/prisma.js";
 import { telnyxAdapter } from "../../adapters/telnyx/TelnyxAdapter.js";
+import { telnyxAiAdapter } from "../../adapters/telnyx/TelnyxAiAdapter.js";
 import { invalidarCacheDeVoz } from "../../lib/voiceConfigCache.js";
 import { acquireLock, releaseLock } from "../../lib/bookingLock.js";
 import { alertarNumeroNoActivo } from "../whatsapp/alertas.js";
@@ -420,4 +421,154 @@ export async function getPhoneNumberStatus(businessId: string) {
     purchasedAt: business.telnyxPhoneNumberPurchasedAt,
     status: business.phoneNumberStatus,
   };
+}
+
+export class ErrorDeAsignacion extends Error {
+  constructor(
+    mensaje: string,
+    readonly codigo: number
+  ) {
+    super(mensaje);
+  }
+}
+
+/**
+ * Da a un negocio un número que YA está en la cuenta de Telnyx (uno sin uso,
+ * en vez de comprar otro). Lo llama solo el panel de desarrollo
+ * (POST /internal/panel/asignar-numero), que antes comprueba que el número no
+ * lo use nadie en NINGUNA de las dos BD: la cuenta de Telnyx es la misma para
+ * dev y producción, y desde aquí solo se ve la de este entorno.
+ *
+ * Hace lo mismo que el final de provisionPhoneNumber: conectar el número al
+ * Call Control App de este entorno, guardarlo, invalidar la caché de voz y
+ * resincronizar el assistant (la tool de transferencia sale desde él). Con el
+ * mismo cerrojo, para no cruzarse con una compra en curso. Si el negocio ya
+ * tenía número, solo con `sustituir`: el anterior se queda en la cuenta de
+ * Telnyx, sin usar.
+ */
+export async function asignarNumeroExistente(
+  businessId: string,
+  telnyxPhoneNumberId: string,
+  { sustituir = false }: { sustituir?: boolean } = {}
+): Promise<{ phoneNumber: string; anterior: string | null }> {
+  const connectionId = process.env.TELNYX_CALL_CONTROL_APP_ID;
+  if (!connectionId) {
+    throw new ErrorDeAsignacion(
+      "Falta configurar TELNYX_CALL_CONTROL_APP_ID (el Call Control App de Telnyx que contesta las llamadas)",
+      503
+    );
+  }
+
+  const lockKey = `phone_provision_lock:${businessId}`;
+  const lockToken = await acquireLock(
+    lockKey,
+    PROVISION_LOCK_TTL_SECONDS * 1000,
+    0
+  );
+  if (!lockToken) {
+    throw new ErrorDeAsignacion(
+      "Hay una compra o asignación de número en curso para este negocio",
+      409
+    );
+  }
+
+  try {
+    const business = await prisma.business.findUnique({
+      where: { id: businessId },
+      select: {
+        telnyxPhoneNumber: true,
+        telnyxNumberOrderId: true,
+        telnyxPendingPhoneNumber: true,
+      },
+    });
+    if (!business) {
+      throw new ErrorDeAsignacion("Negocio no encontrado", 404);
+    }
+    if (business.telnyxNumberOrderId || business.telnyxPendingPhoneNumber) {
+      throw new ErrorDeAsignacion(
+        "El negocio tiene una compra de número a medias: resuélvela antes",
+        409
+      );
+    }
+    if (business.telnyxPhoneNumber && !sustituir) {
+      throw new ErrorDeAsignacion(
+        `El negocio ya tiene el número ${business.telnyxPhoneNumber}; marca «sustituir» para cambiarlo`,
+        409
+      );
+    }
+
+    const numero = await telnyxAdapter.getNumber(telnyxPhoneNumberId);
+    if (!numero) {
+      throw new ErrorDeAsignacion(
+        "Ese número no está en la cuenta de Telnyx",
+        404
+      );
+    }
+    if (numero.status !== "active") {
+      throw new ErrorDeAsignacion(
+        `El número ${numero.phoneNumber} está «${numero.status}» en Telnyx, no activo`,
+        409
+      );
+    }
+
+    const [deOtroNegocio, deWhatsapp] = await Promise.all([
+      prisma.business.findFirst({
+        where: {
+          id: { not: businessId },
+          OR: [
+            { telnyxPhoneNumber: numero.phoneNumber },
+            { telnyxPhoneNumberId: numero.id },
+            { telnyxPendingPhoneNumber: numero.phoneNumber },
+          ],
+        },
+        select: { id: true },
+      }),
+      prisma.whatsappSender.findFirst({
+        where: {
+          OR: [
+            { phoneNumber: numero.phoneNumber },
+            { telnyxPhoneNumberId: numero.id },
+          ],
+        },
+        select: { audience: true },
+      }),
+    ]);
+    if (deOtroNegocio) {
+      throw new ErrorDeAsignacion(
+        `El número ${numero.phoneNumber} ya es del negocio ${deOtroNegocio.id}`,
+        409
+      );
+    }
+    if (deWhatsapp) {
+      throw new ErrorDeAsignacion(
+        `El número ${numero.phoneNumber} es el WhatsApp de plataforma (${deWhatsapp.audience})`,
+        409
+      );
+    }
+
+    await telnyxAiAdapter.setPhoneNumberConnectionId(numero.id, connectionId);
+    await prisma.business.update({
+      where: { id: businessId },
+      data: {
+        telnyxPhoneNumber: numero.phoneNumber,
+        telnyxPhoneNumberId: numero.id,
+        // Para el negocio el número es nuevo: el recordatorio de comprobar el
+        // desvío (recordarDesvioSinComprobar) cuenta desde aquí.
+        telnyxPhoneNumberPurchasedAt: new Date(),
+        phoneNumberStatus: "active",
+      },
+    });
+    await invalidarCacheDeVoz(businessId, "[Phone]");
+    await syncAgentToTelnyx(businessId);
+
+    console.log(
+      `[Phone] Número ${numero.phoneNumber} (${numero.id}) asignado al negocio ${businessId}${business.telnyxPhoneNumber ? `, en lugar de ${business.telnyxPhoneNumber}` : ""}`
+    );
+    return {
+      phoneNumber: numero.phoneNumber,
+      anterior: business.telnyxPhoneNumber,
+    };
+  } finally {
+    await releaseLock(lockKey, lockToken);
+  }
 }

@@ -1,8 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
+  ErrorDeAsignacion,
+  asignarNumeroExistente,
   provisionPhoneNumber,
   getPhoneNumberStatus,
 } from "../../../src/modules/phone/service.js";
+import { telnyxAiAdapter } from "../../../src/adapters/telnyx/TelnyxAiAdapter.js";
 import { prisma } from "../../../src/lib/prisma.js";
 import { telnyxAdapter } from "../../../src/adapters/telnyx/TelnyxAdapter.js";
 import { syncAgentToTelnyx } from "../../../src/lib/telnyxAgentSync.js";
@@ -13,8 +16,18 @@ vi.mock("../../../src/lib/prisma.js", () => ({
   prisma: {
     business: {
       findUnique: vi.fn(),
+      findFirst: vi.fn(),
       update: vi.fn(),
     },
+    whatsappSender: {
+      findFirst: vi.fn(),
+    },
+  },
+}));
+
+vi.mock("../../../src/adapters/telnyx/TelnyxAiAdapter.js", () => ({
+  telnyxAiAdapter: {
+    setPhoneNumberConnectionId: vi.fn(),
   },
 }));
 
@@ -24,6 +37,7 @@ vi.mock("../../../src/adapters/telnyx/TelnyxAdapter.js", () => ({
     purchaseNumber: vi.fn(),
     getNumberOrder: vi.fn(),
     getNumberByPhoneNumber: vi.fn(),
+    getNumber: vi.fn(),
   },
 }));
 
@@ -55,10 +69,14 @@ vi.mock("../../../src/lib/voiceConfigCache.js", () => ({
 
 const mockedBusinessFindUnique = vi.mocked(prisma.business.findUnique);
 const mockedBusinessUpdate = vi.mocked(prisma.business.update);
-const mockedSearchAvailableNumbers = vi.mocked(telnyxAdapter.searchAvailableNumbers);
+const mockedSearchAvailableNumbers = vi.mocked(
+  telnyxAdapter.searchAvailableNumbers
+);
 const mockedPurchaseNumber = vi.mocked(telnyxAdapter.purchaseNumber);
 const mockedGetNumberOrder = vi.mocked(telnyxAdapter.getNumberOrder);
-const mockedGetNumberByPhoneNumber = vi.mocked(telnyxAdapter.getNumberByPhoneNumber);
+const mockedGetNumberByPhoneNumber = vi.mocked(
+  telnyxAdapter.getNumberByPhoneNumber
+);
 const mockedSyncAgentToTelnyx = vi.mocked(syncAgentToTelnyx);
 const mockedAcquireLock = vi.mocked(acquireLock);
 const mockedReleaseLock = vi.mocked(releaseLock);
@@ -257,7 +275,9 @@ describe("provisionPhoneNumber", () => {
     expect(mockedGetNumberByPhoneNumber).toHaveBeenCalledWith("+34886020712");
     expect(mockedBusinessUpdate).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({ telnyxPhoneNumberId: "3042776700011153161" }),
+        data: expect.objectContaining({
+          telnyxPhoneNumberId: "3042776700011153161",
+        }),
       })
     );
   });
@@ -417,9 +437,8 @@ describe("provisionPhoneNumber", () => {
     expect(result.success).toBe(false);
     expect(result.status).toBe("failed");
     // Alerta #5 al dueño por WhatsApp.
-    const { alertarNumeroNoActivo } = await import(
-      "../../../src/modules/whatsapp/alertas.js"
-    );
+    const { alertarNumeroNoActivo } =
+      await import("../../../src/modules/whatsapp/alertas.js");
     expect(alertarNumeroNoActivo).toHaveBeenCalledWith({ businessId });
   });
 
@@ -626,5 +645,127 @@ describe("getPhoneNumberStatus", () => {
     const result = await getPhoneNumberStatus(businessId);
 
     expect(result).toBeNull();
+  });
+});
+
+describe("asignarNumeroExistente", () => {
+  const numero = {
+    id: "3047548328515471109",
+    phoneNumber: "+34930000009",
+    status: "active",
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    process.env.TELNYX_CALL_CONTROL_APP_ID = "cca_test";
+    mockedAcquireLock.mockResolvedValue("token-del-cerrojo");
+    mockedReleaseLock.mockResolvedValue(undefined);
+    mockedBusinessFindUnique.mockResolvedValue({
+      telnyxPhoneNumber: null,
+      telnyxNumberOrderId: null,
+      telnyxPendingPhoneNumber: null,
+    } as never);
+    vi.mocked(telnyxAdapter.getNumber).mockResolvedValue(numero);
+    vi.mocked(prisma.business.findFirst).mockResolvedValue(null);
+    vi.mocked(prisma.whatsappSender.findFirst).mockResolvedValue(null);
+  });
+
+  afterEach(() => {
+    delete process.env.TELNYX_CALL_CONTROL_APP_ID;
+  });
+
+  it("conecta el número, lo guarda, invalida la caché y resincroniza", async () => {
+    const r = await asignarNumeroExistente(businessId, numero.id);
+
+    expect(r).toEqual({ phoneNumber: numero.phoneNumber, anterior: null });
+    expect(telnyxAiAdapter.setPhoneNumberConnectionId).toHaveBeenCalledWith(
+      numero.id,
+      "cca_test"
+    );
+    expect(mockedBusinessUpdate).toHaveBeenCalledWith({
+      where: { id: businessId },
+      data: expect.objectContaining({
+        telnyxPhoneNumber: numero.phoneNumber,
+        telnyxPhoneNumberId: numero.id,
+        phoneNumberStatus: "active",
+        telnyxPhoneNumberPurchasedAt: expect.any(Date),
+      }),
+    });
+    expect(invalidarCacheDeVoz).toHaveBeenCalledWith(businessId, "[Phone]");
+    expect(mockedSyncAgentToTelnyx).toHaveBeenCalledWith(businessId);
+    expect(mockedReleaseLock).toHaveBeenCalledWith(
+      `phone_provision_lock:${businessId}`,
+      "token-del-cerrojo"
+    );
+  });
+
+  it("no pisa un número que ya tiene sin «sustituir»", async () => {
+    mockedBusinessFindUnique.mockResolvedValue({
+      telnyxPhoneNumber: "+34930000001",
+      telnyxNumberOrderId: null,
+      telnyxPendingPhoneNumber: null,
+    } as never);
+
+    await expect(asignarNumeroExistente(businessId, numero.id)).rejects.toThrow(
+      "ya tiene el número +34930000001"
+    );
+    expect(telnyxAiAdapter.setPhoneNumberConnectionId).not.toHaveBeenCalled();
+
+    const r = await asignarNumeroExistente(businessId, numero.id, {
+      sustituir: true,
+    });
+    expect(r.anterior).toBe("+34930000001");
+  });
+
+  it("rechaza un número de otro negocio o del WhatsApp de plataforma", async () => {
+    vi.mocked(prisma.business.findFirst).mockResolvedValueOnce({
+      id: "otro",
+    } as never);
+    await expect(asignarNumeroExistente(businessId, numero.id)).rejects.toThrow(
+      "ya es del negocio otro"
+    );
+
+    vi.mocked(prisma.whatsappSender.findFirst).mockResolvedValueOnce({
+      audience: "client",
+    } as never);
+    await expect(asignarNumeroExistente(businessId, numero.id)).rejects.toThrow(
+      "WhatsApp de plataforma (client)"
+    );
+    expect(telnyxAiAdapter.setPhoneNumberConnectionId).not.toHaveBeenCalled();
+    expect(mockedReleaseLock).toHaveBeenCalledTimes(2);
+  });
+
+  it("rechaza un número que no está o no está activo, y una compra a medias", async () => {
+    vi.mocked(telnyxAdapter.getNumber).mockResolvedValueOnce(null);
+    const noEsta = await asignarNumeroExistente(businessId, numero.id).catch(
+      (e: ErrorDeAsignacion) => e
+    );
+    expect((noEsta as ErrorDeAsignacion).codigo).toBe(404);
+
+    vi.mocked(telnyxAdapter.getNumber).mockResolvedValueOnce({
+      ...numero,
+      status: "port-pending",
+    });
+    await expect(asignarNumeroExistente(businessId, numero.id)).rejects.toThrow(
+      "«port-pending»"
+    );
+
+    mockedBusinessFindUnique.mockResolvedValueOnce({
+      telnyxPhoneNumber: null,
+      telnyxNumberOrderId: "order_1",
+      telnyxPendingPhoneNumber: null,
+    } as never);
+    await expect(asignarNumeroExistente(businessId, numero.id)).rejects.toThrow(
+      "compra de número a medias"
+    );
+  });
+
+  it("con otra compra en curso no hace nada", async () => {
+    mockedAcquireLock.mockResolvedValueOnce(null);
+    const error = await asignarNumeroExistente(businessId, numero.id).catch(
+      (e: ErrorDeAsignacion) => e
+    );
+    expect((error as ErrorDeAsignacion).codigo).toBe(409);
+    expect(mockedBusinessFindUnique).not.toHaveBeenCalled();
   });
 });

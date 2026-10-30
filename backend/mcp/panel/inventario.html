@@ -134,6 +134,7 @@
 const $ = (id) => document.getElementById(id);
 let entorno = new URLSearchParams(location.search).get("entorno") === "prod" ? "prod" : "dev";
 let inventario = null;
+let fantasmas = null;
 
 function esc(texto) {
   return String(texto ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -158,6 +159,8 @@ async function cargarFantasmas() {
   $("fantasmas").innerHTML = `<p class="cargando">Leyendo la cuenta de Telnyx y las dos bases de datos…</p>`;
   try {
     const f = await pedir("/api/fantasmas");
+    fantasmas = f;
+    if (inventario) pintarHilos();
     const nA = f.assistants.length, nN = f.numeros.length;
     let html = `<div class="contador">
       <div><strong class="${nA ? "hay" : "cero"}">${nA}</strong> assistant${nA === 1 ? "" : "s"} sin dueño <span class="detalle">de ${f.enLaCuenta.assistants}</span></div>
@@ -174,6 +177,7 @@ async function cargarFantasmas() {
     }
     $("fantasmas").innerHTML = html;
   } catch (e) {
+    fantasmas = null;
     $("fantasmas").innerHTML = `<div class="alerta urgente"><p><b>No se marca nada como fantasma.</b> ${esc(e.message)}</p></div>`;
   }
 }
@@ -191,12 +195,19 @@ async function simular(id, boton) {
       <p class="detalle">Se libera:</p>
       <ul>${plan.seLibera.map((s) => `<li>${esc(s)}</li>`).join("")}</ul>
       <div class="alerta urgente"><p>${esc(plan.aviso)}</p></div>
-      <p style="margin-top:14px">Para borrarlo de verdad, escribe el id <code>${esc(plan.id)}</code>:</p>
-      <input type="text" id="confirmacion" style="width:100%" autocomplete="off" oninput="habilitarBorrado('${esc(plan.id)}')">
-      <label class="fila" style="margin-top:10px"><input type="checkbox" id="compartida" onchange="habilitarBorrado('${esc(plan.id)}')"> Sé que esta cuenta de Telnyx es la de producción</label>
-      <div class="fila" style="margin-top:14px; justify-content:flex-end">
-        <button class="boton" onclick="cerrarDialogo()">Cancelar</button>
-        <button class="boton peligro" id="boton-borrar" disabled onclick="borrar('${esc(plan.id)}', this)">Borrar en Telnyx</button>
+      <p class="detalle">Esto es solo la simulación: no se ha borrado nada.</p>
+      <div class="fila" id="paso-simulacion" style="margin-top:14px; justify-content:flex-end">
+        <button class="boton primario" onclick="cerrarDialogo()">Cerrar</button>
+        <button class="boton" onclick="$('paso-simulacion').hidden = true; $('paso-borrado').hidden = false; $('confirmacion').focus()">Quiero borrarlo de verdad…</button>
+      </div>
+      <div id="paso-borrado" hidden>
+        <p style="margin-top:14px">Para borrarlo, escribe el id <code>${esc(plan.id)}</code>:</p>
+        <input type="text" id="confirmacion" style="width:100%" autocomplete="off" oninput="habilitarBorrado('${esc(plan.id)}')">
+        <label class="fila" style="margin-top:10px"><input type="checkbox" id="compartida" onchange="habilitarBorrado('${esc(plan.id)}')"> Sé que esta cuenta de Telnyx es la de producción</label>
+        <div class="fila" style="margin-top:14px; justify-content:flex-end">
+          <button class="boton" onclick="cerrarDialogo()">Cancelar</button>
+          <button class="boton peligro" id="boton-borrar" disabled onclick="borrar('${esc(plan.id)}', this)">Borrar en Telnyx</button>
+        </div>
       </div>`);
   } catch (e) { aviso(e.message); }
   finally { boton.disabled = false; }
@@ -234,15 +245,23 @@ function nodoCuenta(c) {
   </div>`;
 }
 
+function accionesDeNumero(c) {
+  return `<div class="acciones fila">
+    <button class="boton" onclick="dialogoAsignar('${esc(c.id)}')">${c.numero ? "Cambiar número" : "Asignar número"}</button>
+    <button class="boton" onclick="dialogoPedir('${esc(c.id)}')">Pedir número nuevo</button>
+  </div>`;
+}
+
 function nodoNumero(c) {
   if (!c.numero) {
-    return `<div class="nodo vacio-nodo" data-nodo="n-${esc(c.id)}"><div class="tipo">Sin número</div><div class="detalle">La cuenta aún no tiene número de Telnyx.</div></div>`;
+    return `<div class="nodo vacio-nodo" data-nodo="n-${esc(c.id)}"><div class="tipo">Sin número</div><div class="detalle">La cuenta aún no tiene número de Telnyx.</div>${accionesDeNumero(c)}</div>`;
   }
   return `<div class="nodo" data-nodo="n-${esc(c.id)}">
     <div class="tipo">Asistente de voz</div>
     <div class="titulo mono">${esc(c.numero.numero ?? c.numero.pendiente ?? "¿?")}</div>
     ${c.numero.pendiente && !c.numero.numero ? `<span class="insignia aviso">a medio comprar</span>` : ""}
     <div class="ids detalle mono">${esc(c.numero.telnyxId ?? "sin id de Telnyx")}</div>
+    ${accionesDeNumero(c)}
   </div>`;
 }
 
@@ -359,6 +378,64 @@ async function guardarActivo(businessId, agenteId, casilla) {
 function guardarPrompt(businessId, agenteId, boton) {
   editar({ tipo: "agente", businessId, agenteId, systemPrompt: $(`prompt-${agenteId}`).value }, agenteId, "guardar el systemPrompt (y sincronizarlo con Telnyx)", boton);
 }
+const cuenta = (id) => inventario.cuentas.find((c) => c.id === id);
+const nombreDelEntorno = () => (entorno === "prod" ? "producción" : "dev");
+
+function dialogoAsignar(businessId) {
+  const c = cuenta(businessId);
+  const libres = fantasmas ? fantasmas.numeros : null;
+  if (!libres) { aviso("Espera a que cargue la lista de fantasmas (o mira por qué falló arriba)"); return; }
+  if (!libres.length) { aviso("No hay números sin uso en la cuenta de Telnyx: pide uno nuevo"); return; }
+  abrirDialogo(`<h2>${c.numero ? "Cambiar el número" : "Asignar un número"} · ${nombreDelEntorno()}</h2>
+    <p><b>${esc(c.nombre)}</b> <span class="detalle mono">${esc(c.id)}</span></p>
+    <p class="detalle">Solo números sin uso en ninguna de las dos BD ni en WhatsApp. Se conecta al Call Control App de ${nombreDelEntorno()}, se guarda en la cuenta y se resincroniza su assistant (POST /internal/panel/asignar-numero).</p>
+    <select id="numero-libre" style="width:100%; font:inherit; padding:7px; border-radius:10px; border:1px solid var(--linea); background:var(--superficie); color:var(--tinta)">
+      ${libres.map((n) => `<option value="${esc(n.id)}">${esc(n.phoneNumber)} · ${esc((n.tags || []).join(", ") || "sin etiquetas")}</option>`).join("")}
+    </select>
+    ${c.numero ? `<label class="fila" style="margin-top:10px"><input type="checkbox" id="sustituir"> Sustituir ${esc(c.numero.numero ?? "el actual")}: el actual se queda en Telnyx, sin uso</label>` : ""}
+    ${entorno === "prod" ? `<p style="margin-top:12px">Producción: escribe el id del número elegido para confirmar.</p><input type="text" id="confirmacion-numero" style="width:100%" autocomplete="off">` : ""}
+    <div class="fila" style="margin-top:14px; justify-content:flex-end">
+      <button class="boton" onclick="cerrarDialogo()">Cancelar</button>
+      <button class="boton primario" onclick="asignar('${esc(c.id)}', this)">Asignar</button>
+    </div>`);
+}
+async function asignar(businessId, boton) {
+  boton.disabled = true;
+  try {
+    const r = await pedir("/api/inventario/asignar-numero", {
+      entorno, businessId,
+      telnyxPhoneNumberId: $("numero-libre").value,
+      sustituir: $("sustituir") ? $("sustituir").checked : false,
+      ...($("confirmacion-numero") ? { confirmacion: $("confirmacion-numero").value } : {}),
+    });
+    cerrarDialogo(); aviso(r.mensaje); cargarInventario(); cargarFantasmas();
+  } catch (e) { aviso(e.message); boton.disabled = false; }
+}
+
+function dialogoPedir(businessId) {
+  const c = cuenta(businessId);
+  abrirDialogo(`<h2>Pedir un número nuevo · ${nombreDelEntorno()}</h2>
+    <p><b>${esc(c.nombre)}</b> <span class="detalle mono">${esc(c.id)}</span></p>
+    <ul>
+      <li>Se compra en Telnyx un número geográfico de España: <b>1 $ + 1 $/mes</b>.</li>
+      <li>Por la ruta de la app (POST /business/me/phone/provision, como el dueño): exige suscripción activa o en prueba.</li>
+      ${c.numero ? `<li>La cuenta ya tiene ${esc(c.numero.numero ?? "un número")}: si está activo, la app no compra otro.</li>` : ""}
+    </ul>
+    <p style="margin-top:12px">Escribe el id de la cuenta para confirmar la compra:</p>
+    <input type="text" id="confirmacion-compra" style="width:100%" autocomplete="off">
+    <div class="fila" style="margin-top:14px; justify-content:flex-end">
+      <button class="boton" onclick="cerrarDialogo()">Cancelar</button>
+      <button class="boton peligro" onclick="comprar('${esc(c.id)}', this)">Comprar número</button>
+    </div>`);
+}
+async function comprar(businessId, boton) {
+  boton.disabled = true;
+  try {
+    const r = await pedir("/api/inventario/pedir-numero", { entorno, businessId, confirmacion: $("confirmacion-compra").value });
+    cerrarDialogo(); aviso(r.mensaje); cargarInventario(); cargarFantasmas();
+  } catch (e) { aviso(e.message); boton.disabled = false; }
+}
+
 async function entrar(businessId, boton) {
   boton.disabled = true;
   try { const { url } = await pedir("/api/entrar", { businessId }); window.open(url, "_blank"); }

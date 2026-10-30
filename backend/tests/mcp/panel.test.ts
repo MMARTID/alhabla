@@ -158,6 +158,8 @@ describe("servidor del panel", () => {
     }),
     editar: vi.fn(async () => ({ mensaje: "Guardado en dev" })),
     entrar: vi.fn(async () => ({ url: "http://localhost:3001/auth/entrar" })),
+    asignarNumero: vi.fn(async () => ({ mensaje: "asignado" })),
+    pedirNumero: vi.fn(async () => ({ mensaje: "comprado" })),
   };
   let servidor: Server;
 
@@ -280,6 +282,8 @@ describe("servidor del panel", () => {
       "/api/fantasmas/borrar",
       "/api/fantasmas/simular",
       "/api/inventario/editar",
+      "/api/inventario/asignar-numero",
+      "/api/inventario/pedir-numero",
       "/api/entrar",
     ]) {
       const respuesta = await pedir("POST", ruta, {
@@ -290,6 +294,8 @@ describe("servidor del panel", () => {
     }
     expect(deps.borrarFantasma).not.toHaveBeenCalled();
     expect(deps.editar).not.toHaveBeenCalled();
+    expect(deps.asignarNumero).not.toHaveBeenCalled();
+    expect(deps.pedirNumero).not.toHaveBeenCalled();
   });
 
   it("el dry-run y el borrado pasan id, confirmación y la marca", async () => {

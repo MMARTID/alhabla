@@ -17,6 +17,17 @@ import { purgarCaducados } from "../../../src/lib/almacenTemporal.js";
 import { purgeOldRecordingsJob } from "../../../src/jobs/purgeOldRecordings.js";
 import { purgarTextoDeLlamadasJob } from "../../../src/jobs/purgarTextoDeLlamadas.js";
 
+vi.mock("../../../src/modules/phone/service.js", () => ({
+  asignarNumeroExistente: vi.fn(),
+  ErrorDeAsignacion: class extends Error {
+    constructor(
+      mensaje: string,
+      readonly codigo: number
+    ) {
+      super(mensaje);
+    }
+  },
+}));
 vi.mock("../../../src/jobs/processRecording.js", () => ({
   processRecordingJob: vi.fn(),
 }));
@@ -92,6 +103,7 @@ describe("internalJobsRoutes", () => {
     // tests/plugins/internalAuth.test.ts — aquí se deja pasar siempre para
     // aislar la validación y el despacho a cada job.
     fastify.decorate("verifyCloudTasks", async () => {});
+    fastify.decorate("verifyPanel", async () => {});
     await fastify.register(internalJobsRoutes);
   });
 
@@ -723,6 +735,7 @@ describe("internalJobsRoutes — fuera del rate limit global", () => {
     const app = Fastify();
     await app.register(rateLimit, { max: 1, timeWindow: "1 minute" });
     app.decorate("verifyCloudTasks", async () => {});
+    app.decorate("verifyPanel", async () => {});
     // Ruta de control: con el mismo limitador, la segunda petición ya es 429.
     app.get("/publica", async () => ({ ok: true }));
     await app.register(internalJobsRoutes);
@@ -746,5 +759,50 @@ describe("internalJobsRoutes — fuera del rate limit global", () => {
 
     expect(publicas).toEqual([200, 429]);
     expect(internas).toEqual([200, 200, 200, 200, 200]);
+  });
+});
+
+describe("POST /panel/asignar-numero", () => {
+  it("valida el cuerpo, llama al servicio y devuelve sus errores con su código", async () => {
+    const { asignarNumeroExistente, ErrorDeAsignacion } = await import(
+      "../../../src/modules/phone/service.js"
+    );
+    const app = Fastify();
+    app.decorate("verifyCloudTasks", async () => {});
+    app.decorate("verifyPanel", async () => {});
+    await app.register(internalJobsRoutes);
+    const pedir = (payload: unknown) =>
+      app.inject({ method: "POST", url: "/panel/asignar-numero", payload });
+
+    expect(
+      (await pedir({ businessId: "b1", telnyxPhoneNumberId: "x;y" })).statusCode
+    ).toBe(400);
+    expect(asignarNumeroExistente).not.toHaveBeenCalled();
+
+    vi.mocked(asignarNumeroExistente).mockResolvedValueOnce({
+      phoneNumber: "+34930000009",
+      anterior: null,
+    });
+    const ok = await pedir({
+      businessId: "b1",
+      telnyxPhoneNumberId: "3047548328515471109",
+      sustituir: true,
+    });
+    expect(ok.statusCode).toBe(200);
+    expect(asignarNumeroExistente).toHaveBeenCalledWith(
+      "b1",
+      "3047548328515471109",
+      { sustituir: true }
+    );
+
+    vi.mocked(asignarNumeroExistente).mockRejectedValueOnce(
+      new ErrorDeAsignacion("ya es del negocio otro", 409)
+    );
+    const ocupado = await pedir({
+      businessId: "b1",
+      telnyxPhoneNumberId: "3047548328515471109",
+    });
+    expect(ocupado.statusCode).toBe(409);
+    expect(ocupado.json()).toEqual({ error: "ya es del negocio otro" });
   });
 });
