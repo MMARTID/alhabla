@@ -2,6 +2,10 @@
   "mcpServers": {
     "alhabla-dev": {
       "command": "backend/mcp/arrancar.sh"
+    },
+    "alhabla-growth": {
+      "command": "backend/mcp/arrancar.sh",
+      "args": ["growth/servidorGrowth"]
     }
   }
 }
