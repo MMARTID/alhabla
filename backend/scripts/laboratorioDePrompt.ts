@@ -336,7 +336,7 @@ export function parsearArgumentos(argv: string[]): Opciones {
     dryRun: sueltas.has("dry-run"),
     si: sueltas.has("si"),
     juez,
-    paralelo: numero("paralelo", 3, 1, 8),
+    paralelo: numero("paralelo", 3, 1, 10),
     conCitas: sueltas.has("con-citas"),
     listaDeEspera: listaDeEspera as Opciones["listaDeEspera"],
     cliente: cliente as ModoDeCliente,
