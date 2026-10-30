@@ -6,6 +6,7 @@ import type {
   GrowthObjetivo as Objetivo,
 } from "@prisma/client";
 import { prisma } from "../../lib/prisma.js";
+import { COMPETIDOR_CONFIRMADO } from "./competidores.js";
 import type { Comprobacion } from "./cumplimiento.js";
 import {
   DIAS_ENTRE_CONTACTOS_AL_MISMO_DOMINIO,
@@ -433,7 +434,10 @@ export async function contextoParaElAgente(
           where: { vigenteHasta: null },
           orderBy: { clave: "asc" },
         }),
+    // Solo los confirmados: un `propuesto` no aplica reglas y el agente lo
+    // lee aparte (`GET /growth/agente/competidores`).
     prisma.growthCompetidor.findMany({
+      where: COMPETIDOR_CONFIRMADO,
       orderBy: { nombre: "asc" },
       select: { id: true, nombre: true, dominio: true },
     }),
@@ -552,6 +556,63 @@ async function nichoPorSlug(slug: string, cliente: ClienteDeBd = prisma) {
   return nicho.id;
 }
 
+/**
+ * Los competidores que una página menciona (`datos.competidoresMencionados`):
+ * cada dominio se normaliza, se deduplica y debe ser el de un competidor
+ * CONFIRMADO (no `propuesto`) o un subdominio suyo, que se guarda como el
+ * dominio canónico del competidor. Si alguno no lo es: 400
+ * `competidor_desconocido` con la lista en `dominios`. Así lo que cuenta
+ * `menciones` y filtra la Bandeja no depende de que el agente acierte con la
+ * ortografía ni de que una página hostil le haga inventar competidores.
+ */
+export async function normalizarCompetidoresMencionados(
+  dominios: readonly string[],
+  cliente: ClienteDeBd = prisma
+): Promise<string[]> {
+  const pedidos = [...new Set(dominios.map((d) => normalizarDominio(d)))];
+  if (pedidos.length === 0) return [];
+  const confirmados = await cliente.growthCompetidor.findMany({
+    where: COMPETIDOR_CONFIRMADO,
+    select: { dominio: true },
+  });
+  // Del más largo al más corto: `app.heydiga.ai` (si existiera) gana a `heydiga.ai`.
+  const conocidos = confirmados
+    .map((c) => normalizarDominio(c.dominio))
+    .sort((a, b) => b.length - a.length);
+
+  const canonicos: string[] = [];
+  const desconocidos: string[] = [];
+  for (const pedido of pedidos) {
+    const canonico = conocidos.find(
+      (conocido) => pedido === conocido || pedido.endsWith(`.${conocido}`)
+    );
+    if (!canonico) desconocidos.push(pedido);
+    else if (!canonicos.includes(canonico)) canonicos.push(canonico);
+  }
+  if (desconocidos.length > 0) {
+    throw new ErrorDeGrowth(
+      400,
+      `No es un competidor confirmado: ${desconocidos.join(", ")}. Propónlo con proponer_competidor y espera a que el administrador lo acepte.`,
+      "competidor_desconocido",
+      { dominios: desconocidos }
+    );
+  }
+  return canonicos;
+}
+
+/** `datos` con `competidoresMencionados` verificado y canónico (si lo trae). */
+async function datosConMencionesVerificadas<
+  T extends { competidoresMencionados?: string[] },
+>(datos: T | undefined): Promise<T | undefined> {
+  if (!datos?.competidoresMencionados) return datos;
+  return {
+    ...datos,
+    competidoresMencionados: await normalizarCompetidoresMencionados(
+      datos.competidoresMencionados
+    ),
+  };
+}
+
 /** Crear una oportunidad como agente (`POST /growth/agente/oportunidades`). */
 export async function crearOportunidad(entradaCruda: OportunidadBody) {
   const entrada = limpiarJsonParaBd(entradaCruda);
@@ -610,6 +671,8 @@ export async function crearOportunidad(entradaCruda: OportunidadBody) {
     }
   }
 
+  const datos = await datosConMencionesVerificadas(entrada.datos);
+
   return insertarOportunidad({
     fuenteId: fuente.id,
     nichoId,
@@ -621,7 +684,7 @@ export async function crearOportunidad(entradaCruda: OportunidadBody) {
     puntTrafico: entrada.puntTrafico,
     puntLeads: entrada.puntLeads,
     puntBacklinks: entrada.puntBacklinks,
-    datos: entrada.datos as Prisma.InputJsonObject | undefined,
+    datos: datos as Prisma.InputJsonObject | undefined,
     expiraEn: entrada.expiraEn,
     ejecucionId: entrada.ejecucionId,
   });
@@ -723,7 +786,7 @@ export async function transicionarComoAgente(
   cuerpoCrudo: EstadoBody,
   agente: { nombre: string }
 ) {
-  const cuerpo = limpiarJsonParaBd(cuerpoCrudo);
+  let cuerpo = limpiarJsonParaBd(cuerpoCrudo);
   const a: Estado = cuerpo.a;
   const oportunidad = await prisma.growthOportunidad.findUnique({
     where: { id },
@@ -740,6 +803,15 @@ export async function transicionarComoAgente(
     },
   });
   if (!oportunidad) throw new ErrorDeGrowth(404, "La oportunidad no existe.");
+  // Calificar o investigar también puede llevar `datos.competidoresMencionados`:
+  // se verifica igual que al crear (y se canoniza ANTES de comparar con lo
+  // guardado, para que un reintento idéntico siga siendo un 200).
+  if (cuerpo.datos?.competidoresMencionados) {
+    cuerpo = {
+      ...cuerpo,
+      datos: await datosConMencionesVerificadas(cuerpo.datos),
+    };
+  }
   if (oportunidad.estado === a) {
     // Reintento de red: mismo estado y mismos datos, 200 sin efectos. Pero si
     // lo que llega es DISTINTO, el modelo cree que ha corregido la
@@ -810,7 +882,9 @@ export async function transicionarComoAgente(
     });
     const [ajustes, competidores] = await Promise.all([
       leerAjustesEfectivos(),
+      // La puerta dura solo la aplican los competidores confirmados.
       prisma.growthCompetidor.findMany({
+        where: COMPETIDOR_CONFIRMADO,
         select: { nombre: true, dominio: true },
       }),
     ]);
@@ -1232,6 +1306,7 @@ function dondeDeOportunidades(
     | "fuente"
     | "ejecucionId"
     | "dominio"
+    | "menciona"
     | "q"
   >
 ): Prisma.GrowthOportunidadWhereInput {
@@ -1245,6 +1320,20 @@ function dondeDeOportunidades(
     ...(filtros.fuente ? { fuente: { tipo: filtros.fuente } } : {}),
     ...(filtros.ejecucionId ? { ejecucionId: filtros.ejecucionId } : {}),
     ...(filtros.dominio ? { dominio: normalizarDominio(filtros.dominio) } : {}),
+    // En `AND` para no pisar el `datos` del filtro de `tipoDestino`. En
+    // Postgres `array_contains` exige un array, no una cadena.
+    ...(filtros.menciona
+      ? {
+          AND: [
+            {
+              datos: {
+                path: ["competidoresMencionados"],
+                array_contains: [normalizarDominio(filtros.menciona)],
+              },
+            },
+          ],
+        }
+      : {}),
     ...(filtros.q
       ? {
           OR: [

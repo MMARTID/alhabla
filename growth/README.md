@@ -64,6 +64,15 @@ semanal, un contacto por dominio): fallan con un `409` que no cambia nada. Dejan
 recorrer Bandeja → Revisión → Aprobar → Historial. `?vacio=1` enseña la Bandeja vacía con los descartes de la
 semana. Una pastilla fija dice «DEMOSTRACIÓN · datos de prueba». Recargar la página reinicia los datos.
 
+La **Competencia** (`/competencia`, `/competencia/[id]`) tiene cuatro competidores de ejemplo, uno por estado
+(un propuesto por el agente, uno por analizar, uno analizado con precios y dos versiones, uno revisado con el
+análisis caducado) y las mismas transiciones y errores que el backend (`src/lib/demo/competencia-demo.ts`:
+`409 competidor_existente`, `competidor_del_repositorio`, `estado_incorrecto`, `analisis_antiguo`,
+`ya_revisado` y los `400 dominio_propio` / `url_de_otro_dominio`). `tests/lib/paridad-de-competencia.test.ts` lee
+`backend/src/modules/growth/` y falla si se separan las constantes, los campos de las respuestas, las rutas, los
+códigos o las transiciones. El agente no existe en la demostración: nadie escribe un análisis nuevo, así que un
+competidor recién añadido se queda «por analizar».
+
 Si cambias el contrato con el backend (`types.ts`), cambia también la demostración y las fixtures de
 `tests/fixtures/` (respuestas reales del servidor): `tests/components/acciones-contrato.test.tsx` ejecuta el
 mismo caso del contrato de `acciones` contra la demostración y contra una respuesta con la forma real.
@@ -85,6 +94,9 @@ Tres seguros para que nunca llegue a producción:
   falso (`tests/helpers/cliente-falso.ts`, `render.tsx`) o el de demostración (`clienteDemo({ retardoMs: 0 })`).
 - Todo texto de terceros (título, extracto, resumen, borradores, `datos`) es DATO: se pinta como texto, nunca
   con `dangerouslySetInnerHTML`, y un `href` solo sale de `esUrlWeb` / `EnlaceExterno` (solo http y https).
+  En la Competencia (nombre, notas de un propuesto, resumen y datos de un análisis) el dominio es siempre
+  texto y solo se enlazan las URL **https** (`urlHttpsSegura`: la URL de partida y la fuente de cada dato), con
+  `rel="nofollow noopener noreferrer"` y `target="_blank"`.
 - Un `409` de la API trae `codigo` y, en el de cumplimiento, `comprobaciones`: `analizarError()`
   (`src/lib/api-errors.ts`) los devuelve. El texto de un `5xx` nunca se enseña.
 - Colores solo con tokens (`bg-lavado`, `text-morado-tinta`, `border-linea`…), nunca hex en las clases. Los

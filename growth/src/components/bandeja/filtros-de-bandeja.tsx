@@ -24,6 +24,9 @@ import {
 
 export type OpcionDeNicho = { slug: string; nombre: string };
 
+/** Un competidor al que se puede filtrar por «Menciona a». */
+export type OpcionDeCompetidor = { dominio: string; nombre: string };
+
 const ETIQUETA_DE_ORDEN: Record<OrdenDeOportunidades, string> = {
   puntuacion: "Mejor puntuación",
   recientes: "Más recientes",
@@ -70,12 +73,15 @@ function Selector({
 export function BarraDeFiltros({
   filtros,
   nichos,
+  competidores = [],
   conteos,
   alCambiar,
   alQuitar,
 }: {
   filtros: FiltrosDeBandeja;
   nichos: readonly OpcionDeNicho[];
+  /** Los competidores que se pueden mencionar; vacío = no hay filtro «Menciona a». */
+  competidores?: readonly OpcionDeCompetidor[];
   /** Con los mismos filtros salvo el estado; `undefined` mientras carga. */
   conteos?: Record<EstadoDeOportunidad, number>;
   alCambiar: (cambios: Partial<FiltrosDeBandeja>) => void;
@@ -87,6 +93,16 @@ export function BarraDeFiltros({
     : null;
   const conRecuento = (texto: string, n: number | null | undefined) =>
     n === null || n === undefined ? texto : `${texto} (${n})`;
+  // Si el filtro viene de un enlace y el competidor ya no está (o aún no ha
+  // cargado), se sigue pudiendo ver y quitar.
+  const opcionesDeCompetidor =
+    filtros.menciona !== "" &&
+    !competidores.some((c) => c.dominio === filtros.menciona)
+      ? [
+          ...competidores,
+          { dominio: filtros.menciona, nombre: filtros.menciona },
+        ]
+      : competidores;
 
   const opcionesDeObjetivo: Array<{ valor: Objetivo | ""; etiqueta: string }> =
     [
@@ -128,7 +144,9 @@ export function BarraDeFiltros({
         </div>
       </fieldset>
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div
+        className={`grid grid-cols-2 gap-3 ${opcionesDeCompetidor.length > 0 ? "lg:grid-cols-5" : "lg:grid-cols-4"}`}
+      >
         <Selector
           etiqueta="Estado"
           valor={filtros.estado}
@@ -170,6 +188,20 @@ export function BarraDeFiltros({
             </option>
           ))}
         </Selector>
+        {opcionesDeCompetidor.length > 0 ? (
+          <Selector
+            etiqueta="Menciona a"
+            valor={filtros.menciona}
+            alCambiar={(valor) => alCambiar({ menciona: valor })}
+          >
+            <option value="">Cualquiera</option>
+            {opcionesDeCompetidor.map((competidor) => (
+              <option key={competidor.dominio} value={competidor.dominio}>
+                {competidor.nombre}
+              </option>
+            ))}
+          </Selector>
+        ) : null}
         <Selector
           etiqueta="Ordenar por"
           valor={filtros.orden}

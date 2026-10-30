@@ -24,6 +24,14 @@ const NOMBRES: (keyof ClienteGrowth)[] = [
   "ajustes",
   "guardarAjustes",
   "competidores",
+  "detalleDeCompetidor",
+  "analisisDeCompetidor",
+  "anadirCompetidor",
+  "editarCompetidor",
+  "quitarCompetidor",
+  "aceptarCompetidor",
+  "reanalizarCompetidor",
+  "revisarAnalisis",
 ];
 
 /**

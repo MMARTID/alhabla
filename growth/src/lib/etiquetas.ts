@@ -3,14 +3,17 @@ import type {
   Canal,
   CodigoDescarte,
   EstadoDeBorrador,
+  EstadoDeCompetidor,
   EstadoDeEjecucion,
   EstadoDeOportunidad,
   GrupoDeBorradores,
   Objetivo,
+  OrigenDeCompetidor,
   Resultado,
   ResultadoDeGestion,
   TipoDeAfirmacion,
   TipoDeBorrador,
+  TipoDeDatoDeCompetidor,
   TipoDeDestino,
 } from "./types";
 
@@ -300,3 +303,57 @@ export const TONO_DE_ESTADO_DE_EJECUCION: Record<EstadoDeEjecucion, Tono> = {
   parcial: "aviso",
   error: "error",
 };
+
+// --- Competencia ----------------------------------------------------------
+
+export const ETIQUETA_DE_ESTADO_DE_COMPETIDOR: Record<
+  EstadoDeCompetidor,
+  string
+> = {
+  propuesto: "Propuesto por el agente",
+  por_analizar: "Por analizar",
+  analizado: "Pendiente de revisión",
+  revisado: "Revisado",
+};
+
+export const TONO_DE_ESTADO_DE_COMPETIDOR: Record<EstadoDeCompetidor, Tono> = {
+  propuesto: "aviso",
+  por_analizar: "neutro",
+  analizado: "morado",
+  revisado: "exito",
+};
+
+export const ETIQUETA_DE_ORIGEN_DE_COMPETIDOR: Record<
+  OrigenDeCompetidor,
+  string
+> = {
+  repo: "Del repositorio",
+  manual: "Añadido por ti",
+  agente: "Propuesto por el agente",
+};
+
+/**
+ * Cómo se agrupan los datos de un análisis al enseñarlos: precios y planes
+ * juntos, el resto por tipo. El orden es el de lectura: primero qué es y qué
+ * hace, luego cuánto cuesta y con qué se conecta.
+ */
+export const GRUPOS_DE_DATOS_DE_COMPETIDOR: ReadonlyArray<{
+  clave: string;
+  titulo: string;
+  tipos: readonly TipoDeDatoDeCompetidor[];
+}> = [
+  { clave: "producto", titulo: "Producto", tipos: ["producto"] },
+  { clave: "servicio", titulo: "Servicio", tipos: ["servicio"] },
+  { clave: "precios", titulo: "Precios y planes", tipos: ["precio", "plan"] },
+  { clave: "integraciones", titulo: "Integraciones", tipos: ["integracion"] },
+  { clave: "sectores", titulo: "Sectores", tipos: ["sector"] },
+  { clave: "idiomas", titulo: "Idiomas", tipos: ["idioma"] },
+  { clave: "canales", titulo: "Canales", tipos: ["canal"] },
+  { clave: "limites", titulo: "Límites", tipos: ["limite"] },
+  {
+    clave: "diferencias",
+    titulo: "Diferencias con Alhabla",
+    tipos: ["diferencia"],
+  },
+  { clave: "otros", titulo: "Otros datos", tipos: ["otro"] },
+];

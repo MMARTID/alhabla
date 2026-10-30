@@ -74,5 +74,34 @@ export const clienteHttp: ClienteGrowth = {
   ajustes: async () => (await api.get(`${RUTA}/ajustes`)).data,
   guardarAjustes: async (cambios) =>
     (await api.put(`${RUTA}/ajustes`, cambios)).data,
+
   competidores: async () => (await api.get(`${RUTA}/competidores`)).data,
+  detalleDeCompetidor: async (id) =>
+    (await api.get(`${RUTA}/competidores/${segmento(id)}`)).data,
+  analisisDeCompetidor: async (id, analisisId) =>
+    (
+      await api.get(
+        `${RUTA}/competidores/${segmento(id)}/analisis/${segmento(analisisId)}`
+      )
+    ).data,
+  anadirCompetidor: async (alta) =>
+    (await api.post(`${RUTA}/competidores`, alta)).data,
+  editarCompetidor: async (id, cambios) =>
+    (await api.patch(`${RUTA}/competidores/${segmento(id)}`, cambios)).data,
+  quitarCompetidor: async (id) => {
+    // 204 sin cuerpo.
+    await api.delete(`${RUTA}/competidores/${segmento(id)}`);
+  },
+  aceptarCompetidor: async (id) =>
+    (await api.post(`${RUTA}/competidores/${segmento(id)}/aceptar`, {})).data,
+  reanalizarCompetidor: async (id) =>
+    (await api.post(`${RUTA}/competidores/${segmento(id)}/reanalizar`, {}))
+      .data,
+  revisarAnalisis: async (id, analisisId, revision) =>
+    (
+      await api.post(
+        `${RUTA}/competidores/${segmento(id)}/analisis/${segmento(analisisId)}/revisar`,
+        revision
+      )
+    ).data,
 };

@@ -396,13 +396,17 @@ describe("lecturas", () => {
     });
   });
 
-  it("los competidores cuentan sus oportunidades", async () => {
+  it("los competidores cuentan sus oportunidades y sus menciones, por orden de nombre", async () => {
     const { data } = await cliente.competidores();
     expect(data.map((c) => c.nombre)).toEqual([
+      "Atiende24 (ejemplo)",
       "Competidor ficticio",
       "Otra recepcionista (ejemplo)",
+      "Recepción Express (ejemplo)",
     ]);
-    expect(data[0].oportunidades).toBe(1);
+    const ficticio = data.find((c) => c.id === "demo-co-1")!;
+    expect(ficticio.oportunidades).toBe(1);
+    expect(ficticio.menciones).toBe(3);
   });
 
   it("el resumen cuenta lo que hay y avisa de lo que caduca", async () => {

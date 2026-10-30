@@ -4,15 +4,15 @@ import { EncabezadoDePagina } from "@/components/encabezado-de-pagina";
 import { EstadoDeConsulta } from "@/components/estado-de-consulta";
 import { useAjustes } from "@/lib/consultas";
 import { FormularioDeAjustes } from "./formulario-de-ajustes";
-import { ListaDeCompetidores } from "./lista-de-competidores";
+import { ResumenDeCompetencia } from "./resumen-de-competencia";
 import { SoloLectura } from "./solo-lectura";
 import { TarjetaDePausa } from "./tarjeta-de-pausa";
 
 /**
  * Ajustes: el control del sistema. La pausa general (con confirmación), los
  * umbrales de puntuación por objetivo, el tope de contactos y el umbral de
- * similitud; lo fijo en solo lectura y la lista de competidores. Cada cambio
- * queda en el Historial.
+ * similitud; lo fijo en solo lectura y un resumen de la competencia con el
+ * enlace a su vista. Cada cambio queda en el Historial.
  */
 export function VistaDeAjustes() {
   const consulta = useAjustes();
@@ -35,7 +35,7 @@ export function VistaDeAjustes() {
           </div>
         )}
       </EstadoDeConsulta>
-      <ListaDeCompetidores />
+      <ResumenDeCompetencia />
     </>
   );
 }

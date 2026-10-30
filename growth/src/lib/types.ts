@@ -105,6 +105,12 @@ export type DatosDeOportunidad = {
   dificultad?: Dificultad;
   /** Hasta 500 caracteres. */
   nota?: string;
+  /**
+   * Dominios de los competidores que la página menciona o lista (por ejemplo,
+   * un «mejores recepcionistas de IA» que cita a uno). Los normaliza el
+   * backend y solo admite competidores que no sean `propuesto`.
+   */
+  competidoresMencionados?: string[];
 };
 
 export type FuenteTipo = "web" | "directorio" | "manual";
@@ -256,6 +262,8 @@ export type FiltrosDeOportunidades = {
   fuente?: FuenteTipo;
   ejecucionId?: string;
   dominio?: string;
+  /** Dominio de un competidor: solo las oportunidades que lo mencionan. */
+  menciona?: string;
   /** De 1 a 100 caracteres: título, dominio y URL. */
   q?: string;
   orden?: OrdenDeOportunidades;
@@ -838,14 +846,156 @@ export type Ajustes = {
 /** Cuerpo de PUT /growth/admin/ajustes (al menos una clave). */
 export type CambiosDeAjustes = Partial<ValoresDeAjustes>;
 
-export type Competidor = {
+// ---------------------------------------------------------------------------
+// Competencia
+// ---------------------------------------------------------------------------
+
+/**
+ * `propuesto`: lo sugirió el agente y NO aplica ninguna regla hasta que lo
+ * aceptas. `por_analizar`: confirmado, el agente aún no lo ha leído (o pediste
+ * repetirlo). `analizado`: hay un análisis esperando tu revisión. `revisado`:
+ * lo diste por bueno.
+ */
+export const ESTADOS_DE_COMPETIDOR = [
+  "propuesto",
+  "por_analizar",
+  "analizado",
+  "revisado",
+] as const;
+export type EstadoDeCompetidor = (typeof ESTADOS_DE_COMPETIDOR)[number];
+
+/** Quién lo dio de alta. Solo se quitan los que no son `repo`. */
+export const ORIGENES_DE_COMPETIDOR = ["repo", "manual", "agente"] as const;
+export type OrigenDeCompetidor = (typeof ORIGENES_DE_COMPETIDOR)[number];
+
+export const TIPOS_DE_DATO_DE_COMPETIDOR = [
+  "producto",
+  "servicio",
+  "precio",
+  "plan",
+  "integracion",
+  "sector",
+  "idioma",
+  "canal",
+  "limite",
+  "diferencia",
+  "otro",
+] as const;
+export type TipoDeDatoDeCompetidor =
+  (typeof TIPOS_DE_DATO_DE_COMPETIDOR)[number];
+
+export const MONEDAS_DE_PRECIO = ["EUR", "USD", "GBP"] as const;
+export type MonedaDePrecio = (typeof MONEDAS_DE_PRECIO)[number];
+
+export const PERIODOS_DE_PRECIO = ["mes", "anio", "uso", "unico"] as const;
+export type PeriodoDePrecio = (typeof PERIODOS_DE_PRECIO)[number];
+
+/** Pasado este tiempo un análisis cuenta como caducado y el agente lo repite. */
+export const DIAS_PARA_CADUCAR_UN_ANALISIS = 90;
+
+/** Los topes del backend (`CambioDeCompetidorBody`, `AltaDeCompetidorBody`). */
+export const LARGO_MAXIMO_DE_NOMBRE_DE_COMPETIDOR = 120;
+export const LARGO_MAXIMO_DE_NOTAS_DE_COMPETIDOR = 500;
+export const LARGO_MAXIMO_DE_URL_DE_COMPETIDOR = 2000;
+
+/** Un precio estructurado; solo lo llevan los datos de tipo `precio` y `plan`. */
+export type ValorDePrecio = {
+  importe: number;
+  moneda: MonedaDePrecio;
+  periodo: PeriodoDePrecio;
+  ivaIncluido?: boolean;
+  /** «minuto», «usuario»…: lo que se cobra por unidad. */
+  unidad?: string;
+};
+
+/**
+ * Un hecho público sobre un competidor, con la página de la que sale y el día
+ * que el agente la leyó. Texto de un tercero (lo escribió un modelo que leyó
+ * páginas ajenas): se pinta siempre como texto.
+ */
+export type DatoDeCompetidor = {
+  tipo: TipoDeDatoDeCompetidor;
+  etiqueta: string;
+  texto: string;
+  valor?: ValorDePrecio;
+  urlFuente: string;
+  consultadoEn: string;
+};
+
+/** Un competidor en la lista: el último análisis, resumido. */
+export type CompetidorResumen = {
   id: string;
   nombre: string;
+  /** Sin `www.`, en minúsculas. Nunca se pinta como enlace. */
   dominio: string;
+  /** La página de partida del análisis. */
+  url: string | null;
   notas: string | null;
-  /** Oportunidades con ese dominio. */
+  origen: OrigenDeCompetidor;
+  estado: EstadoDeCompetidor;
+  creadoEn: string;
+  /** Cuándo pediste (o se pidió) que el agente lo leyera; `null` si no. */
+  analisisSolicitadoEn: string | null;
+  /** Oportunidades en su dominio o en sus subdominios. */
   oportunidades: number;
+  /** Oportunidades cuyos `competidoresMencionados` incluyen su dominio. */
+  menciones: number;
+  /** El último análisis. */
+  analisis: {
+    id: string;
+    version: number;
+    creadoEn: string;
+    revisadoEn: string | null;
+    numDatos: number;
+    /** Tiene más de 90 días: el agente lo repetirá solo. */
+    caducado: boolean;
+  } | null;
 };
 
 /** GET /growth/admin/competidores */
-export type RespuestaDeCompetidores = { data: Competidor[] };
+export type RespuestaDeCompetidores = { data: CompetidorResumen[] };
+
+export type AnalisisDeCompetidor = {
+  id: string;
+  version: number;
+  resumen: string;
+  datos: DatoDeCompetidor[];
+  creadoEn: string;
+  /** El nombre del token del agente que lo guardó. */
+  creadoPor: string;
+  revisadoEn: string | null;
+  notaDeRevision: string | null;
+};
+
+export type VersionDeAnalisis = {
+  id: string;
+  version: number;
+  creadoEn: string;
+  revisadoEn: string | null;
+  numDatos: number;
+};
+
+/** GET /growth/admin/competidores/:id */
+export type CompetidorDetalle = CompetidorResumen & {
+  ultimoAnalisis: AnalisisDeCompetidor | null;
+  /** De la más nueva a la más vieja. */
+  versiones: VersionDeAnalisis[];
+};
+
+/** Cuerpo de POST /growth/admin/competidores (Añadir competidor). */
+export type AltaDeCompetidor = {
+  url: string;
+  nombre?: string;
+  notas?: string;
+};
+
+/** Cuerpo de PATCH /growth/admin/competidores/:id (al menos un campo). */
+export type CambioDeCompetidor = {
+  nombre?: string;
+  notas?: string | null;
+  /** Del mismo dominio que el competidor: el dominio no cambia. */
+  url?: string | null;
+};
+
+/** Cuerpo de POST …/analisis/:analisisId/revisar. */
+export type RevisionDeAnalisis = { nota?: string };

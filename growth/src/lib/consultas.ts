@@ -9,6 +9,8 @@ import {
 } from "@tanstack/react-query";
 import { useCliente } from "./cliente";
 import type {
+  AltaDeCompetidor,
+  CambioDeCompetidor,
   CambiosDeAjustes,
   Decision,
   EdicionDeBorrador,
@@ -18,6 +20,7 @@ import type {
   FiltrosDeGestiones,
   FiltrosDeOportunidades,
   NuevaUrl,
+  RevisionDeAnalisis,
   TipoDeAfirmacion,
 } from "./types";
 
@@ -59,16 +62,25 @@ export const claves = {
   ejecucion: (id: string) => [RAIZ, "ejecucion", id] as const,
   ajustes: () => [RAIZ, "ajustes"] as const,
   competidores: () => [RAIZ, "competidores"] as const,
+  competidor: (id: string) => [RAIZ, "competidor", id] as const,
+  analisisDeCompetidor: (id: string, analisisId: string) =>
+    [RAIZ, "competidor", id, "analisis", analisisId] as const,
 };
 
 /**
  * Tras cualquier cambio se refresca todo lo del panel (hay contadores en
  * varias vistas) salvo `yo`, que no cambia con una decisión.
  */
-export function invalidarTodoGrowth(queryClient: QueryClient) {
+export function invalidarTodoGrowth(
+  queryClient: QueryClient,
+  /** Consultas que NO se refrescan (la ficha de algo que acaba de borrarse). */
+  excluir?: (clave: readonly unknown[]) => boolean
+) {
   return queryClient.invalidateQueries({
     predicate: (consulta) =>
-      consulta.queryKey[0] === RAIZ && consulta.queryKey[1] !== "yo",
+      consulta.queryKey[0] === RAIZ &&
+      consulta.queryKey[1] !== "yo" &&
+      !excluir?.(consulta.queryKey),
   });
 }
 
@@ -211,6 +223,27 @@ export function useCompetidores() {
   });
 }
 
+/** La ficha de un competidor con su último análisis y la lista de versiones. */
+export function useDetalleDeCompetidor(id: string) {
+  const cliente = useCliente();
+  return useQuery({
+    queryKey: claves.competidor(id),
+    queryFn: () => cliente.detalleDeCompetidor(id),
+    staleTime: TIEMPO_DE_FRESCURA_MS,
+  });
+}
+
+/** Una versión concreta del análisis; con `analisisId` en `null` no pide nada. */
+export function useAnalisisDeCompetidor(id: string, analisisId: string | null) {
+  const cliente = useCliente();
+  return useQuery({
+    queryKey: claves.analisisDeCompetidor(id, analisisId ?? ""),
+    queryFn: () => cliente.analisisDeCompetidor(id, analisisId as string),
+    enabled: analisisId !== null,
+    staleTime: TIEMPO_DE_FRESCURA_MS,
+  });
+}
+
 // --- Escrituras -------------------------------------------------------------
 //
 // Ninguna reintenta sola: si falla, la persona decide (una decisión repetida
@@ -250,6 +283,73 @@ export function useGuardarAjustes() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (cambios: CambiosDeAjustes) => cliente.guardarAjustes(cambios),
+    onSettled: () => invalidarTodoGrowth(queryClient),
+  });
+}
+
+// --- Competencia ------------------------------------------------------------
+
+export function useAnadirCompetidor() {
+  const cliente = useCliente();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (alta: AltaDeCompetidor) => cliente.anadirCompetidor(alta),
+    onSettled: () => invalidarTodoGrowth(queryClient),
+  });
+}
+
+export function useEditarCompetidor(id: string) {
+  const cliente = useCliente();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (cambios: CambioDeCompetidor) =>
+      cliente.editarCompetidor(id, cambios),
+    onSettled: () => invalidarTodoGrowth(queryClient),
+  });
+}
+
+/**
+ * Quitar un competidor o rechazar un propuesto. No refresca su propia ficha:
+ * acaba de borrarse y pedirla de nuevo daría un 404 justo antes de salir de
+ * la pantalla.
+ */
+export function useQuitarCompetidor(id: string) {
+  const cliente = useCliente();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => cliente.quitarCompetidor(id),
+    onSettled: () =>
+      invalidarTodoGrowth(
+        queryClient,
+        (clave) => clave[1] === "competidor" && clave[2] === id
+      ),
+  });
+}
+
+export function useAceptarCompetidor(id: string) {
+  const cliente = useCliente();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => cliente.aceptarCompetidor(id),
+    onSettled: () => invalidarTodoGrowth(queryClient),
+  });
+}
+
+export function useReanalizarCompetidor(id: string) {
+  const cliente = useCliente();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => cliente.reanalizarCompetidor(id),
+    onSettled: () => invalidarTodoGrowth(queryClient),
+  });
+}
+
+export function useRevisarAnalisis(id: string, analisisId: string) {
+  const cliente = useCliente();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (revision: RevisionDeAnalisis) =>
+      cliente.revisarAnalisis(id, analisisId, revision),
     onSettled: () => invalidarTodoGrowth(queryClient),
   });
 }

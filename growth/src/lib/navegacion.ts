@@ -5,6 +5,7 @@ import {
   History,
   Inbox,
   Settings,
+  Swords,
   type LucideIcon,
 } from "lucide-react";
 
@@ -16,7 +17,10 @@ export type Destino = {
   tambien?: readonly string[];
 };
 
-/** Las seis vistas de la Fase 1b. Las otras del plan (Analítica, Backlinks…) llegan después. */
+/**
+ * Las siete vistas del panel (las seis de la Fase 1b y la Competencia de la
+ * 2a). Las otras del plan (Analítica, Backlinks…) llegan después.
+ */
 export const DESTINOS: readonly Destino[] = [
   {
     href: "/bandeja",
@@ -27,11 +31,15 @@ export const DESTINOS: readonly Destino[] = [
   { href: "/borradores", etiqueta: "Borradores", icono: FileText },
   { href: "/historial", etiqueta: "Historial", icono: History },
   { href: "/conocimiento", etiqueta: "Conocimiento", icono: BookOpen },
+  { href: "/competencia", etiqueta: "Competencia", icono: Swords },
   { href: "/ejecuciones", etiqueta: "Ejecuciones", icono: Activity },
   { href: "/ajustes", etiqueta: "Ajustes", icono: Settings },
 ];
 
-/** En la barra inferior del móvil caben cuatro; el resto va en «Más». */
+/**
+ * En la barra inferior del móvil caben cuatro; el resto (Competencia,
+ * Ejecuciones y Ajustes) va en «Más».
+ */
 export const DESTINOS_DE_LA_BARRA = DESTINOS.slice(0, 4);
 export const DESTINOS_DE_MAS = DESTINOS.slice(4);
 

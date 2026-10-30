@@ -1479,8 +1479,51 @@ model GrowthCompetidor {
   nombre  String
   dominio String  @unique
   notas   String?
+  /// URL de partida del análisis (la que pegó el administrador o la que
+  /// propuso el agente). Null en los que siembra el sincronizador.
+  url     String?
+  /// repo | manual | agente: quién lo dio de alta. Solo se pueden quitar los
+  /// que no son `repo` (esos los vuelve a sembrar el sincronizador).
+  origen  String  @default("repo")
+  /// propuesto | por_analizar | analizado | revisado. Un `propuesto` (lo
+  /// sugiere el agente) NO aplica ninguna regla dura hasta que el
+  /// administrador lo acepta.
+  estado  String  @default("por_analizar")
+  creadoEn DateTime @default(now())
+  /// Cuándo se pidió el último análisis (al darlo de alta o con «Volver a
+  /// analizar»). Null en los sembrados.
+  analisisSolicitadoEn DateTime?
+  analisis GrowthCompetidorAnalisis[]
 
   @@map("growth_competidores")
+}
+
+/// Lo que el agente lee de la web pública de un competidor (producto, precios,
+/// planes…), con la URL y la fecha de cada dato. Es INTELIGENCIA INTERNA: ningún
+/// borrador puede citarla (decisión del 30-10-2026); una comparativa publicable
+/// sigue saliendo solo de `comparativas.ts`. Una fila por versión.
+model GrowthCompetidorAnalisis {
+  id             String           @id @default(cuid())
+  competidorId   String
+  competidor     GrowthCompetidor @relation(fields: [competidorId], references: [id], onDelete: Cascade)
+  /// 1, 2, 3… por competidor.
+  version        Int
+  /// Texto del agente sobre contenido de terceros: se pinta como texto.
+  resumen        String           @db.Text
+  /// `DatoDeCompetidor[]` validado con Zod (esquemas.ts).
+  datos          Json
+  /// Ejecución en la que se hizo (informativo, sin clave foránea).
+  ejecucionId    String?
+  creadoEn       DateTime         @default(now())
+  /// Nombre del token de agente que lo escribió.
+  creadoPor      String
+  /// Cuándo lo dio por bueno el administrador.
+  revisadoEn     DateTime?
+  notaDeRevision String?
+
+  @@unique([competidorId, version])
+  @@index([competidorId, creadoEn])
+  @@map("growth_competidor_analisis")
 }
 
 model GrowthEnlaceEntrante {

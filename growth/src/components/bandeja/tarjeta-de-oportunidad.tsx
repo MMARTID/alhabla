@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
+import { textoDeMenciones } from "@/components/competencia/utilidades";
 import { ChipDeCaducidad } from "@/components/comunes/d1-caducidad";
 import {
   Insignia,
@@ -32,14 +33,18 @@ function motivoDeBloqueo(oportunidad: OportunidadResumen): string | null {
 export function TarjetaDeOportunidad({
   oportunidad,
   ahora,
+  nombresDeCompetidores,
 }: {
   oportunidad: OportunidadResumen;
   ahora: number;
+  /** dominio → nombre, para «Menciona a X»; sin él sale el dominio. */
+  nombresDeCompetidores?: ReadonlyMap<string, string>;
 }) {
   const bloqueo = motivoDeBloqueo(oportunidad);
   const borrador = oportunidad.borradorActual;
   const { puntuaciones } = oportunidad;
   const tipoDestino = oportunidad.datos?.tipoDestino;
+  const menciones = oportunidad.datos?.competidoresMencionados ?? [];
   return (
     <li>
       <Link
@@ -76,6 +81,15 @@ export function TarjetaDeOportunidad({
             ) : null}
             {borrador?.resultado ? (
               <InsigniaDeResultado resultado={borrador.resultado} />
+            ) : null}
+            {menciones.length > 0 ? (
+              <Insignia tono="morado" envolver>
+                Menciona a{" "}
+                {textoDeMenciones(
+                  menciones,
+                  nombresDeCompetidores ?? new Map()
+                )}
+              </Insignia>
             ) : null}
           </span>
           {bloqueo ? (

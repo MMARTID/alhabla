@@ -24,6 +24,8 @@ export type FiltrosDeBandeja = {
   nicho: string;
   /** Vacío = todos los tipos. */
   tipoDestino: TipoDeDestino | "";
+  /** Dominio de un competidor al que la página menciona; vacío = cualquiera. */
+  menciona: string;
   orden: OrdenDeOportunidades;
   /** Empieza en 1. */
   pagina: number;
@@ -34,9 +36,26 @@ export const FILTROS_POR_DEFECTO: FiltrosDeBandeja = {
   objetivo: "",
   nicho: "",
   tipoDestino: "",
+  menciona: "",
   orden: "puntuacion",
   pagina: 1,
 };
+
+/**
+ * Un dominio de `?menciona=` o de la memoria de la pestaña, o `""` si no lo
+ * parece: minúsculas, sin `www.`, solo letras, cifras, puntos y guiones.
+ */
+export function normalizarMenciona(valor: unknown): string {
+  if (typeof valor !== "string") return "";
+  const dominio = valor
+    .trim()
+    .toLowerCase()
+    .replace(/^www\./, "");
+  return dominio.length <= 253 &&
+    /^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$/.test(dominio)
+    ? dominio
+    : "";
+}
 
 /** Tarjetas por página: pocas, para que el móvil no sea una lista eterna. */
 export const LIMITE_DE_PAGINA = 20;
@@ -47,7 +66,8 @@ export function hayFiltrosActivos(filtros: FiltrosDeBandeja): boolean {
     filtros.estado !== FILTROS_POR_DEFECTO.estado ||
     filtros.objetivo !== "" ||
     filtros.nicho !== "" ||
-    filtros.tipoDestino !== ""
+    filtros.tipoDestino !== "" ||
+    filtros.menciona !== ""
   );
 }
 
@@ -66,6 +86,7 @@ export function aFiltrosDeApi(
     ...(filtros.objetivo ? { objetivo: filtros.objetivo } : {}),
     ...(filtros.nicho ? { nicho: filtros.nicho } : {}),
     ...(filtros.tipoDestino ? { tipoDestino: filtros.tipoDestino } : {}),
+    ...(filtros.menciona ? { menciona: filtros.menciona } : {}),
     orden: filtros.orden,
     pagina: filtros.pagina,
     limite: LIMITE_DE_PAGINA,
@@ -120,6 +141,7 @@ export function leerFiltrosGuardados(): FiltrosDeBandeja {
         (TIPOS_DE_DESTINO as readonly string[]).includes(tipo)
           ? (tipo as TipoDeDestino)
           : "",
+      menciona: normalizarMenciona(d.menciona),
       orden:
         typeof orden === "string" &&
         (ORDENES as readonly string[]).includes(orden)
@@ -131,6 +153,27 @@ export function leerFiltrosGuardados(): FiltrosDeBandeja {
   } catch {
     return FILTROS_POR_DEFECTO;
   }
+}
+
+/**
+ * Los filtros con los que abre la Bandeja: los recordados de la pestaña y, si
+ * viene `?menciona=<dominio>` (el enlace de «N menciones» en Competencia), ese
+ * competidor con todos los estados, para que la lista cuente las mismas
+ * oportunidades que el número del que vienes. Se recuerda como cualquier otro
+ * filtro.
+ */
+export function filtrosIniciales(mencionaDeLaUrl?: string): FiltrosDeBandeja {
+  const guardados = leerFiltrosGuardados();
+  const menciona = normalizarMenciona(mencionaDeLaUrl);
+  if (!menciona) return guardados;
+  const filtros: FiltrosDeBandeja = {
+    ...guardados,
+    menciona,
+    estado: "todas",
+    pagina: 1,
+  };
+  guardarFiltros(filtros);
+  return filtros;
 }
 
 export function guardarFiltros(filtros: FiltrosDeBandeja) {

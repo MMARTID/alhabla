@@ -5,10 +5,15 @@ import { growthRoutes } from "../../../src/modules/growth/routes.js";
 import {
   AbrirEjecucionBody,
   AjustesPutBody,
+  AltaDeCompetidorBody,
+  AnalisisDeCompetidorBody,
+  CambioDeCompetidorBody,
   CerrarEjecucionBody,
   EvaluarBorradorBody,
   OportunidadManualBody,
   PatchBorradorBody,
+  PropuestaDeCompetidorBody,
+  RevisionDeAnalisisBody,
   RevisionLlmBody,
 } from "../../../src/modules/growth/esquemas.js";
 import { CalificacionRutaBody } from "../../../src/modules/growth/servicioAgente.js";
@@ -146,6 +151,72 @@ const EJEMPLOS_DE_CUERPOS: {
     },
   },
   {
+    nombre: "dar de alta un competidor por URL",
+    metodo: "POST",
+    url: "/growth/admin/competidores",
+    quien: "admin",
+    esquema: AltaDeCompetidorBody,
+    cuerpo: {
+      url: "https://www.retellai.com/pricing?utm_source=x",
+      nombre: "Retell AI",
+      notas: "Lo vimos en una lista",
+    },
+  },
+  {
+    nombre: "editar un competidor",
+    metodo: "PATCH",
+    url: "/growth/admin/competidores/c1",
+    quien: "admin",
+    esquema: CambioDeCompetidorBody,
+    cuerpo: { nombre: "Retell", notas: null, url: "https://retellai.com" },
+  },
+  {
+    nombre: "revisar un análisis de competidor",
+    metodo: "POST",
+    url: "/growth/admin/competidores/c1/analisis/a1/revisar",
+    quien: "admin",
+    esquema: RevisionDeAnalisisBody,
+    cuerpo: { nota: "Los precios cuadran con su web" },
+  },
+  {
+    nombre: "proponer un competidor",
+    metodo: "POST",
+    url: "/growth/agente/competidores",
+    quien: "agente",
+    esquema: PropuestaDeCompetidorBody,
+    cuerpo: {
+      url: "https://nuevo-competidor.ejemplo.com",
+      nombre: "Nuevo Competidor",
+      motivo: "Aparece en una lista de alternativas a HeyDiga",
+      fuenteUrl: "https://blog.ejemplo.es/alternativas-a-heydiga",
+    },
+  },
+  {
+    nombre: "guardar el análisis de un competidor",
+    metodo: "POST",
+    url: "/growth/agente/competidores/c1/analisis",
+    quien: "agente",
+    esquema: AnalisisDeCompetidorBody,
+    cuerpo: {
+      resumen: "Recepcionista de IA para pymes con planes por minutos.",
+      datos: [
+        {
+          tipo: "precio",
+          etiqueta: "Plan Pro",
+          texto: "99 € al mes con 500 minutos",
+          valor: {
+            importe: 99,
+            moneda: "EUR",
+            periodo: "mes",
+            ivaIncluido: false,
+          },
+          urlFuente: "https://competidor.ejemplo.com/precios",
+          consultadoEn: new Date().toISOString(),
+        },
+      ],
+    },
+  },
+  {
     nombre: "cerrar una ejecución",
     metodo: "POST",
     url: "/growth/agente/ejecuciones/e1/cierre",
@@ -232,6 +303,7 @@ describe("contratos de las rutas de Alhabla Growth", () => {
       estado: "detectada",
       motivoDescarte: null,
     });
+    mock.growthCompetidor.create.mockResolvedValue({ id: "c1" });
 
     fastify = Fastify();
     await fastify.register(growthRoutes);
@@ -378,7 +450,7 @@ describe("contratos de las rutas de Alhabla Growth", () => {
   });
 
   describe("las rutas que existen y las que no", () => {
-    it("la API de la 1b no expone nichos, fuentes, tokens ni altas/bajas de competidores", async () => {
+    it("la API no expone nichos, fuentes ni tokens (la competencia sí tiene altas y bajas desde la 2a)", async () => {
       const fuera: [string, string][] = [
         ["GET", "/growth/admin/nichos"],
         ["POST", "/growth/admin/nichos/n1/decision"],
@@ -386,8 +458,6 @@ describe("contratos de las rutas de Alhabla Growth", () => {
         ["PATCH", "/growth/admin/fuentes/f1"],
         ["GET", "/growth/admin/tokens"],
         ["POST", "/growth/admin/tokens/t1/revocar"],
-        ["POST", "/growth/admin/competidores"],
-        ["DELETE", "/growth/admin/competidores/c1"],
       ];
       for (const [metodo, url] of fuera) {
         const response = await fastify.inject({

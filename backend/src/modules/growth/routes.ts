@@ -5,6 +5,7 @@ import { growthRoutesAdmin } from "./routesAdmin.js";
 import { growthRoutesAdminExtra } from "./routesAdminExtra.js";
 import { growthRoutesAgente } from "./routesAgente.js";
 import { growthRoutesAgenteExtra } from "./routesAgenteExtra.js";
+import { growthRoutesCompetencia } from "./routesCompetencia.js";
 import { growthRoutesConocimiento } from "./routesConocimiento.js";
 import { ErrorDeGrowth } from "./service.js";
 
@@ -112,4 +113,5 @@ export const growthRoutes: FastifyPluginAsync = async (fastify) => {
   await fastify.register(growthRoutesConocimiento);
   await fastify.register(growthRoutesAdmin);
   await fastify.register(growthRoutesAdminExtra);
+  await fastify.register(growthRoutesCompetencia);
 };

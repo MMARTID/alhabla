@@ -33,14 +33,20 @@ export function Insignia({
   tono = "neutro",
   children,
   className = "",
+  envolver = false,
 }: {
   tono?: Tono;
   children: ReactNode;
   className?: string;
+  /**
+   * Deja que un texto largo (los nombres de varios competidores) pase a otra
+   * línea en vez de salirse de la tarjeta en el móvil. Lo normal es una sola.
+   */
+  envolver?: boolean;
 }) {
   return (
     <span
-      className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-2.5 py-0.5 text-xs font-semibold ${CLASES_POR_TONO[tono]} ${className}`}
+      className={`inline-flex max-w-full items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-semibold ${envolver ? "text-left [overflow-wrap:anywhere]" : "whitespace-nowrap"} ${CLASES_POR_TONO[tono]} ${className}`}
     >
       {children}
     </span>

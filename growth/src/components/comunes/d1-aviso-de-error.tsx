@@ -19,7 +19,26 @@ const AYUDA_POR_CODIGO: Record<string, string> = {
   conflicto: "Alguien lo cambió mientras tanto: recarga y vuelve a revisarlo.",
   ya_calificada:
     "Esa oportunidad ya estaba calificada: recarga para ver cómo está ahora.",
+  // La competencia (Fase 2a).
+  competidor_existente:
+    "Ábrelo desde la lista de competidores en vez de añadirlo otra vez.",
+  dominio_propio:
+    "Un competidor tiene que ser otra empresa: pega la web del competidor, no la de Alhabla.",
+  url_de_otro_dominio:
+    "El dominio de un competidor no se cambia: usa una página del mismo sitio o deja la dirección vacía.",
+  competidor_del_repositorio:
+    "Viene del repositorio y el sincronizador lo volvería a crear. Si ya no compite contigo, se quita allí.",
+  estado_incorrecto:
+    "Ha cambiado mientras mirabas: recarga la pantalla y vuelve a intentarlo.",
+  analisis_antiguo:
+    "El agente ha guardado un análisis más reciente: recarga y revisa ese.",
+  ya_revisado: "Ya estaba revisado: recarga para ver cómo está ahora.",
 };
+
+/** Qué hacer ante un `codigo` conocido, o `null` si no hay consejo. */
+export function ayudaDeCodigo(codigo: string | null): string | null {
+  return codigo ? (AYUDA_POR_CODIGO[codigo] ?? null) : null;
+}
 
 /**
  * Los `409` de AGENDA: dependen de cuándo se hace algo (la semana llena, un

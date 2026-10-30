@@ -30,5 +30,15 @@ export function urlSegura(valor: unknown): string | null {
   }
 }
 
+/**
+ * Como `urlSegura`, pero solo https: lo que enlazan las fichas de la
+ * competencia (la URL de partida y las fuentes de cada dato). Una `http://`
+ * se enseña como texto, nunca como enlace.
+ */
+export function urlHttpsSegura(valor: unknown): string | null {
+  const segura = urlSegura(valor);
+  return segura !== null && segura.startsWith("https://") ? segura : null;
+}
+
 /** Los `rel` de todo enlace externo del panel. */
 export const REL_EXTERNO = "noopener noreferrer nofollow";

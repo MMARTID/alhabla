@@ -3,11 +3,17 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { useState } from "react";
+import { useNombresDeCompetidores } from "@/components/competencia/use-nombres-de-competidores";
+import { textoDeMenciones } from "@/components/competencia/utilidades";
 import { useAhora } from "@/components/comunes/d1-ahora";
 import { ChipDeCaducidad } from "@/components/comunes/d1-caducidad";
 import { ConsultaConDatos } from "@/components/comunes/d1-consulta-con-datos";
 import { EncabezadoDePagina } from "@/components/encabezado-de-pagina";
-import { InsigniaDeEstado, InsigniaDeObjetivo } from "@/components/insignia";
+import {
+  Insignia,
+  InsigniaDeEstado,
+  InsigniaDeObjetivo,
+} from "@/components/insignia";
 import { useDetalleDeOportunidad } from "@/lib/consultas";
 import type { BorradorDetallado, DetalleDeOportunidad } from "@/lib/types";
 import { ColumnaDeBorrador } from "./columna-de-borrador";
@@ -64,6 +70,8 @@ function Revision({
   borradorInicial: string | null;
 }) {
   const ahora = useAhora();
+  const { nombres } = useNombresDeCompetidores();
+  const menciones = oportunidad.datos?.competidoresMencionados ?? [];
   const [eleccion, setEleccion] = useState<string | null>(borradorInicial);
   const [ediciones, setEdiciones] = useState<Record<string, EdicionParcial>>(
     {}
@@ -141,6 +149,11 @@ function Revision({
               estado={oportunidad.estado}
               ahora={ahora}
             />
+            {menciones.length > 0 ? (
+              <Insignia tono="morado" envolver>
+                Menciona a {textoDeMenciones(menciones, nombres)}
+              </Insignia>
+            ) : null}
           </>
         }
       />

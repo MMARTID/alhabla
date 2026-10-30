@@ -1,4 +1,7 @@
+import Link from "next/link";
 import { EnlaceExterno } from "@/components/enlace-externo";
+import { useNombresDeCompetidores } from "@/components/competencia/use-nombres-de-competidores";
+import { rutaDeMenciones } from "@/components/competencia/utilidades";
 import { ChipDeCaducidad } from "@/components/comunes/d1-caducidad";
 import { Insignia } from "@/components/insignia";
 import {
@@ -159,6 +162,8 @@ export function ColumnaDeDestino({
       ? oportunidad.decisiones.find((d) => d.accion === "devolver")
       : undefined;
   const datos = oportunidad.datos;
+  const menciones = datos?.competidoresMencionados ?? [];
+  const { nombres } = useNombresDeCompetidores();
   return (
     <section aria-labelledby="revision-destino" className="panel space-y-5 p-5">
       <h2 id="revision-destino" className="text-sm font-semibold text-tinta">
@@ -212,6 +217,27 @@ export function ColumnaDeDestino({
           </Dato>
         ) : null}
         {datos?.nota ? <Dato etiqueta="Nota">{datos.nota}</Dato> : null}
+        {menciones.length > 0 ? (
+          <Dato etiqueta="Menciona a">
+            <ul className="space-y-0.5">
+              {menciones.map((dominio) => (
+                <li key={dominio}>
+                  <Link
+                    href={rutaDeMenciones(dominio)}
+                    className="inline-flex min-h-11 items-center font-semibold text-morado-tinta underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-morado"
+                  >
+                    {nombres.get(dominio) ?? dominio}
+                  </Link>
+                  {nombres.has(dominio) ? (
+                    <span className="ml-2 font-mono text-xs text-muted">
+                      {dominio}
+                    </span>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          </Dato>
+        ) : null}
         <Dato etiqueta="Detectada">
           {formatearFechaYHora(oportunidad.detectadaEn)}
         </Dato>

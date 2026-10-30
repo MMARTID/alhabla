@@ -123,3 +123,83 @@ describe("clienteHttp", () => {
     expect(ultima?.url).toBe("/growth/admin/yo");
   });
 });
+
+describe("clienteHttp · competencia", () => {
+  it("lista los competidores y pide uno por su id codificado", async () => {
+    await clienteHttp.competidores();
+    expect(ultima?.method).toBe("get");
+    expect(ultima?.url).toBe("/growth/admin/competidores");
+    await clienteHttp.detalleDeCompetidor("a/b c");
+    expect(ultima?.method).toBe("get");
+    expect(ultima?.url).toBe("/growth/admin/competidores/a%2Fb%20c");
+  });
+
+  it("pide una versión del análisis con los dos ids codificados", async () => {
+    await clienteHttp.analisisDeCompetidor("co 1", "an/2");
+    expect(ultima?.method).toBe("get");
+    expect(ultima?.url).toBe(
+      "/growth/admin/competidores/co%201/analisis/an%2F2"
+    );
+  });
+
+  it("añade un competidor con un POST y el cuerpo tal cual", async () => {
+    await clienteHttp.anadirCompetidor({
+      url: "https://rival.example",
+      nombre: "Rival",
+    });
+    expect(ultima?.method).toBe("post");
+    expect(ultima?.url).toBe("/growth/admin/competidores");
+    expect(JSON.parse(ultima?.data)).toEqual({
+      url: "https://rival.example",
+      nombre: "Rival",
+    });
+  });
+
+  it("edita con PATCH (y manda null para borrar la URL o las notas)", async () => {
+    await clienteHttp.editarCompetidor("co-1", { notas: null, url: null });
+    expect(ultima?.method).toBe("patch");
+    expect(ultima?.url).toBe("/growth/admin/competidores/co-1");
+    expect(JSON.parse(ultima?.data)).toEqual({ notas: null, url: null });
+  });
+
+  it("quita con DELETE, sin cuerpo, y no devuelve nada (204)", async () => {
+    await expect(clienteHttp.quitarCompetidor("co-1")).resolves.toBeUndefined();
+    expect(ultima?.method).toBe("delete");
+    expect(ultima?.url).toBe("/growth/admin/competidores/co-1");
+    expect(ultima?.data).toBeUndefined();
+  });
+
+  it("aceptar y volver a analizar son POST con cuerpo vacío (Fastify no admite un POST JSON sin cuerpo)", async () => {
+    await clienteHttp.aceptarCompetidor("co-1");
+    expect(ultima?.method).toBe("post");
+    expect(ultima?.url).toBe("/growth/admin/competidores/co-1/aceptar");
+    expect(JSON.parse(ultima?.data)).toEqual({});
+    await clienteHttp.reanalizarCompetidor("co-1");
+    expect(ultima?.method).toBe("post");
+    expect(ultima?.url).toBe("/growth/admin/competidores/co-1/reanalizar");
+    expect(JSON.parse(ultima?.data)).toEqual({});
+  });
+
+  it("revisa un análisis con un POST a su ruta, con la nota o con el cuerpo vacío", async () => {
+    await clienteHttp.revisarAnalisis("co-1", "an-2", { nota: "Bien" });
+    expect(ultima?.method).toBe("post");
+    expect(ultima?.url).toBe(
+      "/growth/admin/competidores/co-1/analisis/an-2/revisar"
+    );
+    expect(JSON.parse(ultima?.data)).toEqual({ nota: "Bien" });
+    await clienteHttp.revisarAnalisis("co-1", "an-2", {});
+    expect(JSON.parse(ultima?.data)).toEqual({});
+  });
+
+  it("filtra las oportunidades por el competidor que mencionan", async () => {
+    await clienteHttp.listarOportunidades({
+      menciona: "rival.example",
+      pagina: 1,
+    });
+    expect(ultima?.url).toBe("/growth/admin/oportunidades");
+    expect(ultima?.params).toEqual({
+      menciona: "rival.example",
+      pagina: "1",
+    });
+  });
+});

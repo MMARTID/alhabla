@@ -20,7 +20,6 @@ import {
   editarBorrador,
   historialDeAfirmacion,
   listarBorradores,
-  listarCompetidores,
   listarDecisiones,
   listarGestiones,
   resumenDelAdministrador,
@@ -29,7 +28,7 @@ import {
 /**
  * Rutas de administración que completan a `routesAdmin.ts` (Bandeja y
  * Revisión): sesión, resumen, alta manual de URL, borradores, historial,
- * conocimiento, ejecuciones, ajustes y competidores.
+ * conocimiento, ejecuciones y ajustes.
  *
  * Cuelga de `growthRoutes` (routes.ts): ya tiene `Cache-Control: no-store` y
  * el manejador de errores. Todas pasan por `autenticarAdminGrowth`: el
@@ -117,7 +116,7 @@ export const growthRoutesAdminExtra: FastifyPluginAsync = async (fastify) => {
     return detalleDeEjecucion(id);
   });
 
-  // ── Ajustes y competidores ─────────────────────────────────────────────
+  // ── Ajustes ────────────────────────────────────────────────────────────
 
   fastify.get("/growth/admin/ajustes", admin, async () =>
     leerAjustesParaElAdministrador()
@@ -128,9 +127,6 @@ export const growthRoutesAdminExtra: FastifyPluginAsync = async (fastify) => {
     return guardarAjustes(body, request.growthAdmin!.email);
   });
 
-  // Solo lectura en la 1b: dar de alta o de baja un competidor queda fuera
-  // (la siembra la hace el sincronizador, y quitar uno debilita la regla 3).
-  fastify.get("/growth/admin/competidores", admin, async () =>
-    listarCompetidores()
-  );
+  // Los competidores (listar, alta por URL, edición, baja y el ciclo de
+  // análisis) viven en routesCompetencia.ts.
 };

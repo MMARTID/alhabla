@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Plus, SearchX, X } from "lucide-react";
 import { useState } from "react";
+import { useNombresDeCompetidores } from "@/components/competencia/use-nombres-de-competidores";
 import { useAhora } from "@/components/comunes/d1-ahora";
 import { ConsultaConDatos } from "@/components/comunes/d1-consulta-con-datos";
 import { EncabezadoDePagina } from "@/components/encabezado-de-pagina";
@@ -21,9 +22,9 @@ import { DialogoAnadirUrl } from "./dialogo-anadir-url";
 import {
   FILTROS_POR_DEFECTO,
   aFiltrosDeApi,
+  filtrosIniciales,
   guardarFiltros,
   hayFiltrosActivos,
-  leerFiltrosGuardados,
   type FiltrosDeBandeja,
 } from "./estado-de-filtros";
 import { BarraDeFiltros, type OpcionDeNicho } from "./filtros-de-bandeja";
@@ -114,12 +115,19 @@ function AvisoDeUrlAnadida({
 /**
  * La Bandeja: lo que merece tu tiempo esta semana. Tarjetas ordenadas por
  * puntuación (el servidor ordena y pagina), filtros por objetivo, estado,
- * nicho y tipo, contadores de la semana y «Añadir URL». Con la lista vacía
+ * nicho, tipo y competidor mencionado, contadores de la semana y «Añadir
+ * URL». Con la lista vacía
  * cuenta la verdad: cuántas candidatas se descartaron y por qué.
  */
-export function VistaDeBandeja() {
-  const [filtros, setFiltros] =
-    useState<FiltrosDeBandeja>(leerFiltrosGuardados);
+export function VistaDeBandeja({
+  mencionaInicial,
+}: {
+  /** `?menciona=<dominio>` de la URL: abre ya filtrada por ese competidor. */
+  mencionaInicial?: string;
+} = {}) {
+  const [filtros, setFiltros] = useState<FiltrosDeBandeja>(() =>
+    filtrosIniciales(mencionaInicial)
+  );
   const [anadiendo, setAnadiendo] = useState(false);
   const [anadida, setAnadida] = useState<RespuestaDeNuevaUrl | null>(null);
   const ahora = useAhora();
@@ -127,6 +135,7 @@ export function VistaDeBandeja() {
   const consulta = useOportunidades(aFiltrosDeApi(filtros));
   const resumen = useResumen();
   const nichos = useNichosVistos(consulta.data, filtros.nicho);
+  const { nombres, mencionables } = useNombresDeCompetidores();
 
   function cambiar(cambios: Partial<FiltrosDeBandeja>) {
     // Cualquier cambio de filtro vuelve a la primera página.
@@ -196,6 +205,10 @@ export function VistaDeBandeja() {
       <BarraDeFiltros
         filtros={filtros}
         nichos={nichos}
+        competidores={mencionables.map((c) => ({
+          dominio: c.dominio,
+          nombre: c.nombre,
+        }))}
         conteos={consulta.data?.conteos.porEstado}
         alCambiar={cambiar}
         alQuitar={quitarFiltros}
@@ -257,6 +270,7 @@ export function VistaDeBandeja() {
                     key={oportunidad.id}
                     oportunidad={oportunidad}
                     ahora={ahora}
+                    nombresDeCompetidores={nombres}
                   />
                 ))}
               </ul>

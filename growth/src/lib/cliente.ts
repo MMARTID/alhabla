@@ -7,8 +7,12 @@ import {
   type ReactNode,
 } from "react";
 import type {
+  AltaDeCompetidor,
+  AnalisisDeCompetidor,
   Ajustes,
+  CambioDeCompetidor,
   CambiosDeAjustes,
+  CompetidorDetalle,
   Decision,
   DetalleDeBorrador,
   DetalleDeEjecucion,
@@ -32,6 +36,7 @@ import type {
   RespuestaDeEdicion,
   RespuestaDeNuevaUrl,
   Resumen,
+  RevisionDeAnalisis,
   TipoDeAfirmacion,
   Yo,
 } from "./types";
@@ -93,8 +98,35 @@ export interface ClienteGrowth {
   ajustes(): Promise<Ajustes>;
   /** PUT /ajustes: devuelve los ajustes ya actualizados. */
   guardarAjustes(cambios: CambiosDeAjustes): Promise<Ajustes>;
-  /** GET /competidores (solo lectura en la 1b). */
+
+  /** GET /competidores: todos, con su último análisis resumido. */
   competidores(): Promise<RespuestaDeCompetidores>;
+  /** GET /competidores/:id: la ficha, el último análisis y la lista de versiones. */
+  detalleDeCompetidor(id: string): Promise<CompetidorDetalle>;
+  /** GET /competidores/:id/analisis/:analisisId: una versión concreta. */
+  analisisDeCompetidor(
+    id: string,
+    analisisId: string
+  ): Promise<AnalisisDeCompetidor>;
+  /** POST /competidores: «Añadir competidor» por URL (201). 409 `competidor_existente`. */
+  anadirCompetidor(alta: AltaDeCompetidor): Promise<CompetidorDetalle>;
+  /** PATCH /competidores/:id: nombre, notas y URL (el dominio no cambia). */
+  editarCompetidor(
+    id: string,
+    cambios: CambioDeCompetidor
+  ): Promise<CompetidorDetalle>;
+  /** DELETE /competidores/:id (204): quitar, o rechazar un propuesto. 409 si es del repositorio. */
+  quitarCompetidor(id: string): Promise<void>;
+  /** POST /competidores/:id/aceptar: `propuesto` → `por_analizar`. */
+  aceptarCompetidor(id: string): Promise<CompetidorDetalle>;
+  /** POST /competidores/:id/reanalizar: pide al agente que vuelva a leerlo. */
+  reanalizarCompetidor(id: string): Promise<CompetidorDetalle>;
+  /** POST /competidores/:id/analisis/:analisisId/revisar: «Marcar como revisado». */
+  revisarAnalisis(
+    id: string,
+    analisisId: string,
+    revision: RevisionDeAnalisis
+  ): Promise<CompetidorDetalle>;
 }
 
 const ContextoDeCliente = createContext<ClienteGrowth | null>(null);

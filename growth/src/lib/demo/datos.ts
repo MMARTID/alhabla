@@ -2,6 +2,7 @@ import { CORREO_DE_DEMOSTRACION } from "../modo-demo";
 import { mencionaPrecio, similitudDeTextos } from "./reglas-demo";
 import type {
   Afirmacion,
+  AnalisisDeCompetidor,
   Comprobacion,
   DatosDeOportunidad,
   EjecucionBase,
@@ -17,6 +18,8 @@ import type {
   BorradorDetallado,
   CodigoDescarte,
   FuenteTipo,
+  OrigenDeCompetidor,
+  EstadoDeCompetidor,
   TipoDeAfirmacion,
 } from "../types";
 
@@ -68,6 +71,21 @@ export type RegistroDeDecisionDemo = RegistroDeDecision & {
 };
 export type RegistroDeAfirmacion = Afirmacion & { vigenteHasta: string | null };
 
+/** Un competidor con todas las versiones de su análisis (de la 1 en adelante). */
+export type RegistroDeCompetidor = {
+  id: string;
+  nombre: string;
+  dominio: string;
+  url: string | null;
+  notas: string | null;
+  origen: OrigenDeCompetidor;
+  estado: EstadoDeCompetidor;
+  creadoEn: string;
+  analisisSolicitadoEn: string | null;
+  /** Orden ascendente de versión. */
+  analisis: AnalisisDeCompetidor[];
+};
+
 export type AlmacenDeDemostracion = {
   /** La sentinela: no se pinta, pero viaja con los datos. */
   origen: string;
@@ -81,12 +99,7 @@ export type AlmacenDeDemostracion = {
   ejecuciones: EjecucionBase[];
   fuentes: Array<{ id: string; tipo: FuenteTipo; nombre: string }>;
   nichos: Array<{ id: string; slug: string; nombre: string }>;
-  competidores: Array<{
-    id: string;
-    nombre: string;
-    dominio: string;
-    notas: string | null;
-  }>;
+  competidores: RegistroDeCompetidor[];
   ajustes: {
     valores: ValoresDeAjustes;
     actualizadoEn: Record<string, string | null>;
@@ -288,6 +301,10 @@ export function crearAlmacenDeDemostracion(
         tipoDestino: "comparativa",
         enlaceEsperado: "dofollow",
         dificultad: "media",
+        competidoresMencionados: [
+          "competidor-ficticio.example",
+          "recepcion-express.example",
+        ],
       },
     }),
     // 3. Investigada, sin borrador aún.
@@ -310,6 +327,7 @@ export function crearAlmacenDeDemostracion(
         tipoDestino: "directorio",
         enlaceEsperado: "nofollow",
         dificultad: "baja",
+        competidoresMencionados: ["competidor-ficticio.example"],
       },
     }),
     // 4. Con borrador: el paso entre redactar y evaluar las reglas.
@@ -350,6 +368,11 @@ export function crearAlmacenDeDemostracion(
         enlaceEsperado: "dofollow",
         dificultad: "media",
         nota: "Actualizan el listado cada trimestre.",
+        competidoresMencionados: [
+          "competidor-ficticio.example",
+          "otra-recepcionista.example",
+          "recepcion-express.example",
+        ],
       },
     }),
     // 6. Por revisar, limpia y a punto de caducar.
@@ -391,6 +414,7 @@ export function crearAlmacenDeDemostracion(
         tipoDestino: "comparativa",
         enlaceEsperado: "dofollow",
         dificultad: "media",
+        competidoresMencionados: ["otra-recepcionista.example"],
       },
     }),
     // 8. Devuelta con una nota.
@@ -1352,20 +1376,7 @@ export function crearAlmacenDeDemostracion(
     ejecuciones,
     fuentes,
     nichos,
-    competidores: [
-      {
-        id: "demo-co-1",
-        nombre: "Competidor ficticio",
-        dominio: "competidor-ficticio.example",
-        notas: "Solo para la demostración.",
-      },
-      {
-        id: "demo-co-2",
-        nombre: "Otra recepcionista (ejemplo)",
-        dominio: "otra-recepcionista.example",
-        notas: null,
-      },
-    ],
+    competidores: competidoresDeEjemplo(hace),
     ajustes: {
       valores: copiar(AJUSTES_POR_DEFECTO),
       actualizadoEn: {
@@ -1379,6 +1390,226 @@ export function crearAlmacenDeDemostracion(
   };
 
   return opciones.vacio ? vaciarLaBandeja(almacen) : almacen;
+}
+
+/**
+ * Cuatro competidores que cubren los cuatro estados: uno del repositorio
+ * revisado (con el análisis ya caducado), otro del repositorio por analizar,
+ * uno añadido a mano con dos versiones (la última, con precios, por revisar)
+ * y uno propuesto por el agente. Todo inventado, con dominios `.example`.
+ */
+function competidoresDeEjemplo(
+  hace: (dias: number, horas?: number) => string
+): RegistroDeCompetidor[] {
+  return [
+    {
+      id: "demo-co-1",
+      nombre: "Competidor ficticio",
+      dominio: "competidor-ficticio.example",
+      url: "https://competidor-ficticio.example/precios",
+      notas: "Solo para la demostración.",
+      origen: "repo",
+      estado: "revisado",
+      creadoEn: hace(120),
+      analisisSolicitadoEn: null,
+      analisis: [
+        {
+          id: "demo-an-1-1",
+          version: 1,
+          resumen:
+            "Recepcionista de IA genérica para pymes: atiende llamadas y toma recados. Planes por minutos, sin agenda propia.",
+          datos: [
+            {
+              tipo: "producto",
+              etiqueta: "Recepcionista telefónica",
+              texto:
+                "Atiende las llamadas del negocio 24 horas y envía un resumen por correo.",
+              urlFuente: "https://competidor-ficticio.example/producto",
+              consultadoEn: hace(95),
+            },
+            {
+              tipo: "plan",
+              etiqueta: "Plan Básico",
+              texto: "Hasta 100 minutos al mes incluidos.",
+              valor: {
+                importe: 49,
+                moneda: "EUR",
+                periodo: "mes",
+                ivaIncluido: false,
+              },
+              urlFuente: "https://competidor-ficticio.example/precios",
+              consultadoEn: hace(95),
+            },
+            {
+              tipo: "integracion",
+              etiqueta: "Google Calendar",
+              texto: "Reserva citas en Google Calendar.",
+              urlFuente: "https://competidor-ficticio.example/integraciones",
+              consultadoEn: hace(95),
+            },
+          ],
+          creadoEn: hace(95),
+          creadoPor: "agente-de-ejemplo",
+          revisadoEn: hace(94),
+          notaDeRevision: "Datos correctos. Repetir en tres meses.",
+        },
+      ],
+    },
+    {
+      id: "demo-co-2",
+      nombre: "Otra recepcionista (ejemplo)",
+      dominio: "otra-recepcionista.example",
+      url: null,
+      notas: null,
+      origen: "repo",
+      estado: "por_analizar",
+      creadoEn: hace(120),
+      analisisSolicitadoEn: hace(0, 5),
+      analisis: [],
+    },
+    {
+      id: "demo-co-3",
+      nombre: "Recepción Express (ejemplo)",
+      dominio: "recepcion-express.example",
+      url: "https://recepcion-express.example/",
+      notas: "Lo vi en un directorio de software para estética.",
+      origen: "manual",
+      estado: "analizado",
+      creadoEn: hace(20),
+      analisisSolicitadoEn: null,
+      analisis: [
+        {
+          id: "demo-an-3-1",
+          version: 1,
+          resumen:
+            "Asistente telefónico para clínicas y centros de estética. Primera lectura de la web.",
+          datos: [
+            {
+              tipo: "servicio",
+              etiqueta: "Atención de llamadas",
+              texto: "Contesta llamadas y reserva citas en su propia agenda.",
+              urlFuente: "https://recepcion-express.example/servicio",
+              consultadoEn: hace(15),
+            },
+          ],
+          creadoEn: hace(15),
+          creadoPor: "agente-de-ejemplo",
+          revisadoEn: hace(14),
+          notaDeRevision: null,
+        },
+        {
+          id: "demo-an-3-2",
+          version: 2,
+          resumen:
+            "Recepcionista de IA para clínicas y centros de estética con agenda propia. Cobra por plan mensual más un extra por minuto; ofrece pago anual con descuento. Atiende en castellano y catalán y avisa por WhatsApp.",
+          datos: [
+            {
+              tipo: "producto",
+              etiqueta: "Recepcionista con agenda propia",
+              texto:
+                "Contesta llamadas y gestiona una agenda propia que sustituye al calendario del negocio.",
+              urlFuente: "https://recepcion-express.example/producto",
+              consultadoEn: hace(2),
+            },
+            {
+              tipo: "servicio",
+              etiqueta: "Atención las 24 horas",
+              texto: "Contesta de lunes a domingo, también fuera de horario.",
+              urlFuente: "https://recepcion-express.example/servicio",
+              consultadoEn: hace(2),
+            },
+            {
+              tipo: "plan",
+              etiqueta: "Plan Pro",
+              texto: "300 minutos al mes y hasta 5 profesionales.",
+              valor: {
+                importe: 79,
+                moneda: "EUR",
+                periodo: "mes",
+                ivaIncluido: false,
+              },
+              urlFuente: "https://recepcion-express.example/precios",
+              consultadoEn: hace(2),
+            },
+            {
+              tipo: "plan",
+              etiqueta: "Plan Pro anual",
+              texto: "El mismo plan Pro pagado por adelantado un año.",
+              valor: {
+                importe: 790,
+                moneda: "EUR",
+                periodo: "anio",
+                ivaIncluido: true,
+              },
+              urlFuente: "https://recepcion-express.example/precios",
+              consultadoEn: hace(2),
+            },
+            {
+              tipo: "precio",
+              etiqueta: "Minutos extra",
+              texto: "Cada minuto por encima del plan.",
+              valor: {
+                importe: 0.12,
+                moneda: "EUR",
+                periodo: "uso",
+                unidad: "minuto",
+                ivaIncluido: false,
+              },
+              urlFuente: "https://recepcion-express.example/precios",
+              consultadoEn: hace(2),
+            },
+            {
+              tipo: "integracion",
+              etiqueta: "WhatsApp",
+              texto: "Avisa al dueño por WhatsApp cuando entra una cita.",
+              urlFuente: "https://recepcion-express.example/integraciones",
+              consultadoEn: hace(2),
+            },
+            {
+              tipo: "idioma",
+              etiqueta: "Castellano y catalán",
+              texto: "Atiende en dos idiomas.",
+              urlFuente: "https://recepcion-express.example/producto",
+              consultadoEn: hace(2),
+            },
+            {
+              tipo: "limite",
+              etiqueta: "Sin calendarios externos",
+              texto:
+                "No se conecta a Google Calendar ni a Outlook: solo su agenda.",
+              urlFuente: "https://recepcion-express.example/preguntas",
+              consultadoEn: hace(2),
+            },
+            {
+              tipo: "diferencia",
+              etiqueta: "Agenda propia obligatoria",
+              texto:
+                "Hay que usar su agenda; Alhabla trabaja con el calendario que el negocio ya usa.",
+              urlFuente: "https://recepcion-express.example/producto",
+              consultadoEn: hace(2),
+            },
+          ],
+          creadoEn: hace(2),
+          creadoPor: "agente-de-ejemplo",
+          revisadoEn: null,
+          notaDeRevision: null,
+        },
+      ],
+    },
+    {
+      id: "demo-co-4",
+      nombre: "Atiende24 (ejemplo)",
+      dominio: "atiende24.example",
+      url: "https://atiende24.example/",
+      notas:
+        "Propuesto por el agente: sale en tres listas de «alternativas a» recepcionistas de IA. Visto en https://guia-de-pymes.example/herramientas-para-peluquerias.",
+      origen: "agente",
+      estado: "propuesto",
+      creadoEn: hace(1),
+      analisisSolicitadoEn: null,
+      analisis: [],
+    },
+  ];
 }
 
 /**

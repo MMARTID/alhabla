@@ -92,9 +92,24 @@ describe("rutas del agente de Alhabla Growth", () => {
           vigenteDesde: new Date(),
         },
       ]);
-      mock.growthCompetidor.findMany.mockResolvedValue([
-        { id: "c1", nombre: "HeyDiga", dominio: "heydiga.ai" },
-      ]);
+      // Dos consultas distintas: la lista de competidores del contexto (solo
+      // confirmados) y la de los que hay que analizar (con su último análisis).
+      mock.growthCompetidor.findMany.mockImplementation(
+        async (args: { select?: { analisis?: unknown } }) =>
+          args.select?.analisis
+            ? [
+                {
+                  id: "c1",
+                  nombre: "HeyDiga",
+                  dominio: "heydiga.ai",
+                  url: null,
+                  estado: "revisado",
+                  origen: "repo",
+                  analisis: [{ creadoEn: new Date() }],
+                },
+              ]
+            : [{ id: "c1", nombre: "HeyDiga", dominio: "heydiga.ai" }]
+      );
       mock.growthNicho.findMany.mockResolvedValue([
         {
           id: "n1",

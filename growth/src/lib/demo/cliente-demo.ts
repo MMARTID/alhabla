@@ -14,6 +14,7 @@ import {
   puedeTransicionar,
   transicionesPosibles,
 } from "./estados-demo";
+import { crearCompetenciaDeDemostracion } from "./competencia-demo";
 import { gruposDeBorrador } from "./grupos-de-borradores";
 import {
   DIAS_ENTRE_CONTACTOS_AL_MISMO_DOMINIO,
@@ -23,6 +24,7 @@ import {
   terminosProhibidosDe,
   type ContextoDeReglas,
 } from "./reglas-demo";
+import { claveDeUrl, dominioDe, esDominioPropioOInterno } from "./urls-demo";
 import {
   ESTADOS_DE_OPORTUNIDAD,
   GRUPOS_DE_BORRADORES,
@@ -166,40 +168,6 @@ function porEstadoCompleto(
 export { similitudDeTextos };
 
 const URL_HTTP = "La URL debe empezar por http:// o https://.";
-
-function dominioDe(url: string): string {
-  return new URL(url).hostname.toLowerCase().replace(/^www\./, "");
-}
-
-/** Los parámetros de seguimiento que el backend quita para saber si una URL ya existe. */
-const PARAMETROS_DE_SEGUIMIENTO = /^(utm_|gclid$|fbclid$|mc_|ref$)/i;
-
-/**
- * La clave de una URL, como `normalizarUrl` del backend: la misma página con
- * distinto seguimiento (`utm_*`, `gclid`, `fbclid`, `mc_*`, `ref`), `www`,
- * barra final, puerto o ancla es la misma.
- */
-function claveDeUrl(url: string): string {
-  const u = new URL(url);
-  const parametros = [...u.searchParams.entries()]
-    .filter(([clave]) => !PARAMETROS_DE_SEGUIMIENTO.test(clave))
-    .sort(([a], [b]) => a.localeCompare(b));
-  const consulta = new URLSearchParams(parametros).toString();
-  const ruta =
-    u.pathname.length > 1 ? u.pathname.replace(/\/+$/, "") : u.pathname;
-  return `${u.protocol}//${dominioDe(url)}${ruta}${consulta ? `?${consulta}` : ""}`;
-}
-
-function esDominioPropioOInterno(dominio: string): boolean {
-  return (
-    dominio === "alhabla.ai" ||
-    dominio.endsWith(".alhabla.ai") ||
-    dominio === "localhost" ||
-    dominio.endsWith(".local") ||
-    dominio.endsWith(".internal") ||
-    /^\d{1,3}(\.\d{1,3}){3}$/.test(dominio)
-  );
-}
 
 // --- El cliente ------------------------------------------------------------------
 
@@ -424,6 +392,15 @@ export function clienteDemo(
     });
   }
 
+  // La competencia vive en su propio módulo; aquí solo se le da el reloj y los
+  // ids. Como en el backend, no deja rastro en el Historial.
+  const competencia = crearCompetenciaDeDemostracion({
+    almacen,
+    ahoraMs,
+    ahoraIso,
+    nuevoId,
+  });
+
   // --- Topes y contactos ---------------------------------------------------------
 
   const gestionesDeLaSemana = () =>
@@ -503,7 +480,10 @@ export function clienteDemo(
       terminosProhibidos: vigentes
         .filter((a) => a.tipo === "prohibida")
         .flatMap(terminosProhibidosDe),
-      competidores: almacen.competidores,
+      // Un competidor `propuesto` no aplica ninguna regla hasta que lo aceptas.
+      competidores: almacen.competidores.filter(
+        (c) => c.estado !== "propuesto"
+      ),
       // Como el backend: los 30 borradores más recientes de OTRAS oportunidades.
       textosAnteriores: textosDe(
         almacen.borradores
@@ -792,6 +772,17 @@ export function clienteDemo(
       if (filtros.ejecucionId && o.ejecucionId !== filtros.ejecucionId)
         return false;
       if (filtros.dominio && o.dominio !== filtros.dominio) return false;
+      if (
+        filtros.menciona &&
+        !o.datos?.competidoresMencionados?.includes(
+          filtros.menciona
+            .trim()
+            .toLowerCase()
+            .replace(/^www\./, "")
+        )
+      ) {
+        return false;
+      }
       if (
         q &&
         ![o.titulo, o.dominio, o.url].some((t) => t.toLowerCase().includes(q))
@@ -1796,16 +1787,21 @@ export function clienteDemo(
 
     guardarAjustes: (cambios) => responder(() => guardarAjustesAhora(cambios)),
 
-    competidores: () =>
-      responder(() => ({
-        data: [...almacen.competidores]
-          .sort((a, b) => a.nombre.localeCompare(b.nombre))
-          .map((c) => ({
-            ...c,
-            oportunidades: almacen.oportunidades.filter(
-              (o) => o.dominio === c.dominio
-            ).length,
-          })),
-      })),
+    competidores: () => responder(() => ({ data: competencia.listar() })),
+    detalleDeCompetidor: (id) => responder(() => competencia.detalle(id)),
+    analisisDeCompetidor: (id, analisisId) =>
+      responder(() => competencia.analisis(id, analisisId)),
+    anadirCompetidor: (alta) => responder(() => competencia.anadir(alta)),
+    editarCompetidor: (id, cambios) =>
+      responder(() => competencia.editar(id, cambios)),
+    // 204 sin cuerpo: no hay nada que copiar.
+    quitarCompetidor: async (id) => {
+      await esperar();
+      competencia.quitar(id);
+    },
+    aceptarCompetidor: (id) => responder(() => competencia.aceptar(id)),
+    reanalizarCompetidor: (id) => responder(() => competencia.reanalizar(id)),
+    revisarAnalisis: (id, analisisId, revision) =>
+      responder(() => competencia.revisar(id, analisisId, revision)),
   };
 }
