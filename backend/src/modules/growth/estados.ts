@@ -41,12 +41,18 @@ const TRANSICIONES: Transiciones = {
   },
   bloqueada: {
     con_borrador: ["agente"],
+    // Editar a mano un borrador bloqueado y que las reglas lo den por bueno.
+    pendiente_aprobacion: ["sistema"],
     descartada: ["admin"],
   },
   pendiente_aprobacion: {
     aprobada: ["admin"],
     devuelta: ["admin"],
     descartada: ["admin"],
+    // Al aprobar se reevalúan las reglas, al editar también y el
+    // sincronizador de conocimiento bloquea lo que cita una afirmación
+    // cerrada o cambiada: todo eso lo decide el backend, no una persona.
+    bloqueada: ["sistema"],
   },
   devuelta: {
     con_borrador: ["agente"],
@@ -56,6 +62,9 @@ const TRANSICIONES: Transiciones = {
     gestionada: ["admin"],
     caducada: ["sistema"],
     descartada: ["admin"],
+    // Una afirmación que cita cambió desde que se aprobó y aún no se ha
+    // gestionado: hay que volver a revisarlo antes de enviarlo.
+    bloqueada: ["sistema"],
   },
   gestionada: {
     conseguida: ["admin"],

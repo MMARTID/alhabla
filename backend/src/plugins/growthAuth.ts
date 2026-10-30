@@ -6,9 +6,10 @@ import {
   PREFIJO_DE_TOKEN,
   administradoresDeGrowth,
   hashDeToken,
+  type AlcanceDeAgente,
 } from "../modules/growth/tokens.js";
 
-export type AlcanceDeAgente = "leer" | "escribir";
+export type { AlcanceDeAgente };
 
 declare module "fastify" {
   interface FastifyRequest {
@@ -30,6 +31,27 @@ const oauthClient = new OAuth2Client();
 /** Cada cuánto se anota el último uso de un token: una escritura por petición sobraría. */
 const MS_ENTRE_ANOTACIONES_DE_USO = 5 * 60 * 1000;
 
+/**
+ * Qué se registra de un ID token que no se pudo verificar. NUNCA el error
+ * entero: `google-auth-library` mete el token en el mensaje («Wrong number of
+ * segments in token: <jwt>»), y un token de agente (`gta_…`) enviado por
+ * error a /growth/admin/* acabaría en el log, con tokens que no caducan. Se
+ * deja el nombre del error y el mensaje cortado antes del primer «:» (donde
+ * la librería pega lo que recibió), sin saltos de línea ni nada con aspecto de
+ * token.
+ */
+export function motivoSinToken(error: unknown, idToken?: string): string {
+  const nombre = error instanceof Error ? error.name : typeof error;
+  const mensaje = error instanceof Error ? error.message : "";
+  let motivo = (mensaje.split(/[:\n]/)[0] ?? "").trim();
+  if (idToken) motivo = motivo.split(idToken).join("[token]");
+  motivo = motivo
+    .replace(/\bgta_[\w-]+/g, "[token]")
+    .replace(/\beyJ[\w-]*(?:\.[\w-]*)*/g, "[token]")
+    .slice(0, 120);
+  return motivo ? `${nombre}: ${motivo}` : nombre;
+}
+
 function bearer(request: FastifyRequest): string | null {
   const cabecera = request.headers.authorization;
   if (!cabecera || !cabecera.startsWith("Bearer ")) return null;
@@ -44,7 +66,10 @@ function bearer(request: FastifyRequest): string | null {
  * - Administrador: un ID token de Google cuyo correo está en la lista blanca
  *   GROWTH_ADMIN_EMAILS. Es el único que aprueba, descarta o da algo por hecho.
  * - Agente: un token de servicio (`gta_…`) cuyo SHA-256 está en
- *   `growth_tokens_agente`, con alcances `leer` y/o `escribir`.
+ *   `growth_tokens_agente`, con alcances `leer`, `escribir` y/o
+ *   `conocimiento` (este último, solo para sincronizar la base de
+ *   conocimiento). Deja `request.growthAgente` con su id y su nombre, que es
+ *   lo que firma la auditoría (`agente:<nombre>`).
  */
 const growthAuthPlugin: FastifyPluginAsync = async (fastify) => {
   fastify.decorate(
@@ -80,8 +105,9 @@ const growthAuthPlugin: FastifyPluginAsync = async (fastify) => {
         correo = payload?.email?.toLowerCase();
         verificado = payload?.email_verified;
       } catch (error) {
+        // Sin `err: error`: ver `motivoSinToken`.
         request.log.warn(
-          { err: error },
+          { motivo: motivoSinToken(error, idToken) },
           "[Growth] ID token de administrador no verificado"
         );
         return reply

@@ -82,6 +82,28 @@ describe("estados de una oportunidad de Growth", () => {
     expect(puedeTransicionar("aprobada", "caducada", "agente")).toBe(false);
   });
 
+  it("solo el sistema bloquea lo que está en cola y solo el sistema lo reabre", () => {
+    for (const desde of ["pendiente_aprobacion", "aprobada"] as const) {
+      expect(puedeTransicionar(desde, "bloqueada", "sistema")).toBe(true);
+      expect(puedeTransicionar(desde, "bloqueada", "agente")).toBe(false);
+      expect(puedeTransicionar(desde, "bloqueada", "admin")).toBe(false);
+    }
+    expect(
+      puedeTransicionar("bloqueada", "pendiente_aprobacion", "sistema")
+    ).toBe(true);
+    expect(
+      puedeTransicionar("bloqueada", "pendiente_aprobacion", "agente")
+    ).toBe(false);
+    // Nadie reabre un bloqueo aprobando: hay que pasar otra vez por las reglas.
+    expect(puedeTransicionar("bloqueada", "aprobada", "admin")).toBe(false);
+    expect(puedeTransicionar("bloqueada", "aprobada", "sistema")).toBe(false);
+  });
+
+  it("lo gestionado, ya enviado, no se bloquea", () => {
+    expect(puedeTransicionar("gestionada", "bloqueada", "sistema")).toBe(false);
+    expect(puedeTransicionar("conseguida", "bloqueada", "sistema")).toBe(false);
+  });
+
   it("los estados finales no tienen salida", () => {
     const finales: Estado[] = [
       "conseguida",
