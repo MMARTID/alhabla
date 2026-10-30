@@ -888,11 +888,17 @@ export class TelnyxAiAdapter {
     temperatura?: number;
   }): Promise<string> {
     const client = getTelnyxClient();
-    const response = (await client.ai.openai.chat.createCompletion({
-      model: input.modelo,
-      messages: input.mensajes,
-      temperature: input.temperatura ?? 0,
-    })) as { choices?: Array<{ message?: { content?: unknown } }> };
+    // Kimi con el historial entero de una conversación pasa a veces de los
+    // 10 s del cliente (el 30-10 tiró 113 de 170 conversaciones del
+    // laboratorio): 60 s, que esto solo lo usan los scripts.
+    const response = (await client.ai.openai.chat.createCompletion(
+      {
+        model: input.modelo,
+        messages: input.mensajes,
+        temperature: input.temperatura ?? 0,
+      },
+      { timeout: 60_000 }
+    )) as { choices?: Array<{ message?: { content?: unknown } }> };
     const contenido = response?.choices?.[0]?.message?.content;
     return typeof contenido === "string" ? contenido : "";
   }

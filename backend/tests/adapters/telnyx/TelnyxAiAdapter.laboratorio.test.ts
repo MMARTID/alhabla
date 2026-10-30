@@ -81,11 +81,14 @@ describe("TelnyxAiAdapter (laboratorio de prompt)", () => {
     });
 
     expect(texto).toBe('{"respuestas":[]}');
-    expect(mockCreateCompletion).toHaveBeenCalledWith({
-      model: "moonshotai/Kimi-K2.6",
-      messages: [{ role: "user", content: "hola" }],
-      temperature: 0,
-    });
+    expect(mockCreateCompletion).toHaveBeenCalledWith(
+      {
+        model: "moonshotai/Kimi-K2.6",
+        messages: [{ role: "user", content: "hola" }],
+        temperature: 0,
+      },
+      { timeout: 60_000 }
+    );
   });
 
   it("completarChat devuelve vacío si Telnyx no trae texto", async () => {

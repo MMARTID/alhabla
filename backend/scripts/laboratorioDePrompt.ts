@@ -2498,17 +2498,38 @@ function esLimiteDeTelnyx(error: unknown): boolean {
   return estado === 429 || /\b429\b/.test(String((error as Error)?.message));
 }
 
+export function esPlazoAgotado(error: unknown): boolean {
+  return /timed? ?out/i.test(mensajeDeError(error));
+}
+
+/**
+ * Reintenta los 429 de Telnyx. Con `tambienPlazo`, también un plazo agotado:
+ * solo para lo que se puede repetir sin efectos (el cliente simulado y el
+ * juez); repetir un turno del assistant duplicaría el mensaje del cliente.
+ */
 async function conReintentos<T>(
   deps: Pick<DependenciasDelLaboratorio, "dormir">,
-  accion: () => Promise<T>
+  accion: () => Promise<T>,
+  { tambienPlazo = false }: { tambienPlazo?: boolean } = {}
 ): Promise<T> {
   for (let intento = 1; ; intento++) {
     try {
       return await accion();
     } catch (error) {
-      if (!esLimiteDeTelnyx(error) || intento >= 4) throw error;
+      const reintentable =
+        esLimiteDeTelnyx(error) || (tambienPlazo && esPlazoAgotado(error));
+      if (!reintentable || intento >= 4) throw error;
       await deps.dormir(2_000 * intento);
     }
+  }
+}
+
+/** Dice en qué paso falló: el cliente simulado o el assistant. */
+async function enElPaso<T>(paso: string, accion: () => Promise<T>): Promise<T> {
+  try {
+    return await accion();
+  } catch (error) {
+    throw new Error(`${paso}: ${mensajeDeError(error)}`, { cause: error });
   }
 }
 
@@ -2631,12 +2652,17 @@ async function ejecutarRepeticion(
         saludo,
         modelo: opciones.modeloDelCliente,
         completar: (peticion) =>
-          conReintentos(deps, () =>
-            adaptador.completarChat({
-              modelo: peticion.modelo,
-              temperatura: peticion.temperatura,
-              mensajes: peticion.mensajes,
-            })
+          enElPaso(`Cliente simulado (${peticion.modelo})`, () =>
+            conReintentos(
+              deps,
+              () =>
+                adaptador.completarChat({
+                  modelo: peticion.modelo,
+                  temperatura: peticion.temperatura,
+                  mensajes: peticion.mensajes,
+                }),
+              { tambienPlazo: true }
+            )
           ),
       });
       avisosDelCliente.push(...decision.avisos);
@@ -2653,11 +2679,13 @@ async function ejecutarRepeticion(
             })} ${mensaje}`
           : mensaje;
       const desde = Date.now();
-      const respuesta = await conReintentos(deps, () =>
-        adaptador.chatWithAssistant(entorno.assistantId, {
-          content: contenido,
-          conversationId: creada.id,
-        })
+      const respuesta = await enElPaso(`Assistant (turno ${turno})`, () =>
+        conReintentos(deps, () =>
+          adaptador.chatWithAssistant(entorno.assistantId, {
+            content: contenido,
+            conversationId: creada.id,
+          })
+        )
       );
       entrada.push({
         cliente: mensaje,
@@ -2741,27 +2769,30 @@ async function juzgar(
   conversacion: Conversacion,
   deps: DependenciasDelLaboratorio
 ): Promise<ResultadoDeComprobacion[]> {
-  const respuesta = await conReintentos(deps, () =>
-    deps.adaptador.completarChat({
-      modelo,
-      temperatura: 0,
-      mensajes: [
-        {
-          role: "system",
-          content:
-            "Eres un evaluador estricto de conversaciones de una recepcionista de IA de un negocio. " +
-            "Responde cada pregunta con sí o no según la transcripción, sin suponer nada que no esté en ella. " +
-            'Devuelve SOLO un JSON: {"respuestas":[{"cumple":true|false,"motivo":"una frase"}]}, ' +
-            "con exactamente una respuesta por pregunta y en el mismo orden.",
-        },
-        {
-          role: "user",
-          content: `Transcripción:\n${transcripcionParaElJuez(conversacion)}\n\nPreguntas:\n${rubrica
-            .map((pregunta, i) => `${i + 1}. ${pregunta}`)
-            .join("\n")}`,
-        },
-      ],
-    })
+  const respuesta = await conReintentos(
+    deps,
+    () =>
+      deps.adaptador.completarChat({
+        modelo,
+        temperatura: 0,
+        mensajes: [
+          {
+            role: "system",
+            content:
+              "Eres un evaluador estricto de conversaciones de una recepcionista de IA de un negocio. " +
+              "Responde cada pregunta con sí o no según la transcripción, sin suponer nada que no esté en ella. " +
+              'Devuelve SOLO un JSON: {"respuestas":[{"cumple":true|false,"motivo":"una frase"}]}, ' +
+              "con exactamente una respuesta por pregunta y en el mismo orden.",
+          },
+          {
+            role: "user",
+            content: `Transcripción:\n${transcripcionParaElJuez(conversacion)}\n\nPreguntas:\n${rubrica
+              .map((pregunta, i) => `${i + 1}. ${pregunta}`)
+              .join("\n")}`,
+          },
+        ],
+      }),
+    { tambienPlazo: true }
   );
   return leerVeredictoDelJuez(respuesta, rubrica);
 }

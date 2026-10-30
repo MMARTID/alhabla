@@ -3043,11 +3043,68 @@ describe("ejecutarLaboratorio con el cliente reactivo", () => {
       ok: 0,
       fallos: 0,
       errores: 2,
-      mensajesDeError: ["modelo caído"],
+      mensajesDeError: [
+        "Cliente simulado (moonshotai/Kimi-K2.6): modelo caído",
+      ],
     });
     expect(informeMarkdown(resultado.informe!)).toContain(
       "## Errores de ejecución (no cuentan como fallos del prompt)"
     );
+  });
+
+  it("si el cliente simulado agota el plazo, lo reintenta y la conversación sigue", async () => {
+    let llamadas = 0;
+    const adaptador = adaptadorConChat(() => "No la tenemos.", {
+      completarChat: vi.fn(async () => {
+        if (++llamadas === 1) throw new Error("Request timed out.");
+        return '{"mensaje":"Vale, gracias","fin":true}';
+      }),
+    });
+    const { deps } = dependencias(adaptador);
+    vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const resultado = await ejecutarLaboratorio(
+      parsearArgumentos([
+        "--negocio",
+        "biz_1",
+        "--escenarios",
+        "E1",
+        "--n",
+        "1",
+      ]),
+      deps
+    );
+
+    expect(llamadas).toBeGreaterThan(1);
+    expect(resultado.informe!.resumen[0]).toMatchObject({ errores: 0 });
+  });
+
+  it("si el assistant agota el plazo, no repite el turno y dice el paso", async () => {
+    const adaptador = adaptadorConChat(() => {
+      throw new Error("Request timed out.");
+    });
+    const { deps } = dependencias(adaptador);
+    vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const resultado = await ejecutarLaboratorio(
+      parsearArgumentos([
+        "--negocio",
+        "biz_1",
+        "--escenarios",
+        "E1",
+        "--n",
+        "1",
+        "--cliente",
+        "guion",
+      ]),
+      deps
+    );
+
+    expect(adaptador.chatWithAssistant).toHaveBeenCalledTimes(1);
+    expect(resultado.informe!.resumen[0]).toMatchObject({
+      errores: 1,
+      mensajesDeError: ["Assistant (turno 1): Request timed out."],
+    });
   });
 
   it("el chat de WhatsApp lleva el marcador solo en el primer mensaje", async () => {
