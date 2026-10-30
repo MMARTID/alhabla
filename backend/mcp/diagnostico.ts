@@ -3,6 +3,8 @@ import { promisify } from "node:util";
 import { estadoDeBackendSim } from "./backendSim.js";
 import { cargarEnv, rutaDelEnv, urlDeBdDeDev } from "./entorno.js";
 import { COMO_VOLVER_A_ENTRAR, explicarFalloDeGcloud } from "./gcloud.js";
+import { comprobarGrowth } from "./growth/comprobacion.js";
+import type { LeerLlavero } from "./growth/credenciales.js";
 import { DIR_HERRAMIENTAS, HERRAMIENTAS } from "./panel/entornoDev.js";
 import { ejecutarSoloLectura } from "./sqlDeSoloLectura.js";
 
@@ -100,6 +102,42 @@ async function herramientas(): Promise<Comprobacion> {
     },
     "Se pone al día sola (al arrancar el MCP y cada 15 min desde el panel). Para forzarlo: `bash ~/.alhabla-mcp/scripts/dev/entorno.sh herramientas`; el código nuevo del MCP vale en la próxima sesión."
   );
+}
+
+/**
+ * Alhabla Growth: el token de agente y la API (`GET /growth/agente/contexto`).
+ * Mientras no haya token es opcional (ok, «sin configurar»): hasta la Fase 2
+ * nadie lo necesita y no debe ensuciar el panel. Con token configurado pero
+ * inválido, sin alcance, con una URL no permitida o con la API caída, falla con
+ * su arreglo. Nunca devuelve el token.
+ */
+export async function comprobacionDeGrowth({
+  fetchFn = fetch,
+  env = process.env,
+  leerLlavero,
+}: {
+  fetchFn?: typeof fetch;
+  env?: Record<string, string | undefined>;
+  leerLlavero?: LeerLlavero;
+} = {}): Promise<Comprobacion> {
+  const pieza = "Alhabla Growth (token de agente y API)";
+  try {
+    const r = await comprobarGrowth({ fetchFn, env, leerLlavero });
+    return {
+      pieza,
+      ok: r.ok,
+      detalle: r.detalle,
+      ...(r.ok && r.estado !== "sin_configurar" ? {} : { arreglo: r.arreglo }),
+    };
+  } catch (error) {
+    return {
+      pieza,
+      ok: false,
+      detalle: motivo(error),
+      arreglo:
+        "Prueba estado_growth (alhabla-growth) o `GET /growth/agente/contexto` con el token.",
+    };
+  }
 }
 
 export async function diagnosticarMcp({
@@ -208,6 +246,7 @@ export async function diagnosticarMcp({
       async () => salida("vercel", ["whoami"], { cwd: "/private/tmp", timeoutMs: 20_000 }),
       "npm i -g vercel y `vercel login` (desde /private/tmp, fuera del repo)."
     ),
+    comprobacionDeGrowth({ fetchFn }),
   ]);
 
   const mal = comprobaciones.filter((c) => !c.ok);

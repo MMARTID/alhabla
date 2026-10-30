@@ -28,6 +28,7 @@ import { onboardingRoutes } from "./modules/onboarding/routes.js";
 import { whatsappRoutes } from "./modules/whatsapp/routes.js";
 import { demoRoutes } from "./modules/demo/routes.js";
 import { contactoRoutes } from "./modules/contacto/routes.js";
+import { growthRoutes } from "./modules/growth/routes.js";
 import { webhooksTelnyxRoutes } from "./modules/webhooksTelnyx/routes.js";
 import { telnyxAdapter } from "./adapters/telnyx/TelnyxAdapter.js";
 import { comprobarSalud, conMemoria } from "./lib/salud.js";
@@ -240,6 +241,7 @@ async function start() {
     fastify.register(whatsappRoutes);
     fastify.register(demoRoutes, { prefix: '/demo' });
     fastify.register(contactoRoutes);
+    fastify.register(growthRoutes);
     fastify.register(internalAuthPlugin);
     fastify.register(internalJobsRoutes, { prefix: '/internal' });
 

@@ -10,13 +10,15 @@ y tu asistente, «el Gestor» en código) y con sus clientes. Visión de product
 
 Backend Fastify 5 + Prisma/PostgreSQL (el estado temporal también: cerrojos, límite de peticiones,
 cachés y claves de un solo uso; sin Redis desde el 2026-10-19, ver AGENTS.md § Corte de Redis a
-Postgres). Dos webs Next.js 16 App Router (React 19) con Tailwind 3
+Postgres). Tres webs Next.js 16 App Router (React 19) con Tailwind 3
 (desde el 2026-09-21, `docs/historico/PLAN-APP-DOMINIO.md`): **la app** en `frontend/` (puerto 3001,
 `app.alhabla.ai`, TanStack Query, sesión JWT en `localStorage`) y **la web pública** en `web/`
 (puerto 3002, `alhabla.ai`: landing, sectores, planes, legal, registro de cuenta y blog en MDX,
 sin sesión). El registro crea la cuenta en la web y entra en la app con un pase de un solo uso
-(`POST /auth/pase/canjear`). Voz vía **Telnyx AI Assistants**; telefonía y WhatsApp por Telnyx,
-pagos Stripe.
+(`POST /auth/pase/canjear`). La tercera web es el **dashboard interno de Alhabla Growth** en `growth/`
+(puerto 3003, `growth.alhabla.ai`, login con un ID token de Google, sin sesión propia; ver
+`PLAN-GROWTH.md` y `AGENTS.md` § Alhabla Growth). Voz vía **Telnyx AI Assistants**; telefonía y
+WhatsApp por Telnyx, pagos Stripe.
 
 **Producción** (desde 2026-09-01): backend en Google Cloud Run, **un solo servicio**,
 `alhabla-api` (`https://api.alhabla.ai`, tráfico público). Los jobs en segundo plano (antes
@@ -41,6 +43,8 @@ Notes.
 - **Aislamiento multi-tenant:** toda consulta con ámbito de negocio se filtra por
   `request.user.businessId` del token JWT. Nunca aceptes un `businessId` del body para
   lecturas ni escrituras.
+  Única excepción: `/growth/*` (Alhabla Growth) no es de ningún negocio y tiene su propia
+  autenticación; ver `AGENTS.md` § Alhabla Growth.
 - **Los adaptadores son la única vía a las APIs de voz.** Telnyx pasa por
   `backend/src/adapters/telnyx/TelnyxAdapter.ts` (números) y `TelnyxAiAdapter.ts` (assistants), y
   WhatsApp por `adapters/whatsapp/WhatsAppAdapter.ts`. Jamás llames a esas APIs desde un route
@@ -119,6 +123,8 @@ npm run prisma:studio  # :5555
 
 cd frontend && npm run dev   # la app, Next.js :3001
 cd web && npm run dev        # la web pública, Next.js :3002
+cd growth && npm run dev     # el dashboard de Growth, Next.js :3003
+cd growth && npm run dev:demo  # con datos de prueba, sin backend ni Google (solo desarrollo)
 
 docker compose --profile dev up   # backend + postgres + cloudflared (desde la raíz)
 scripts/backend-sim.sh            # backend-sim :3010, destino de los webhooks de Telnyx simulados (también desde un worktree)
@@ -140,6 +146,8 @@ commit» que solo existe ahí. Reglas para las sesiones:
   ocupes `:3001`/`:3002`: tus vistas previas (`.claude/launch.json`) van a `:3101`/`:3102` contra el
   backend fijo. Si el panel o `estado_dev` dicen `backendFueraDeSitio`, alguien lo hizo: devuélvelo
   con `ver_en_dev`.
+- El dashboard de Growth (`growth/`) no se sirve en el entorno fijo: su vista previa es
+  `growth-dev` (`:3103`, en modo demostración, sin backend ni Google).
 - Para que el usuario vea tu cambio **antes de fusionar**: push de la rama y MCP `ver_en_dev` (o el
   botón «Ver en dev» del panel); dale `http://localhost:3001`. Al acabar, `ver_en_dev main`.
 - Las migraciones de esa rama se aplican a la BD de dev (`botbook`), que es compartida.
@@ -173,6 +181,7 @@ backend/
 └── Dockerfile
 frontend/src/{app,components,lib,hooks}/   # la app (app.alhabla.ai)
 web/src/{app,components,lib,hooks}/        # la web pública (alhabla.ai); artículos en web/content/blog/*.mdx
+growth/src/{app,components,lib}/           # el dashboard de Growth (growth.alhabla.ai); growth/agentes/ = reglas del agente
 infra/cloudflare/failover-laliga/          # Worker de Cloudflare de los bloqueos de LaLiga (node --test; se sube a mano)
 ```
 
@@ -193,6 +202,9 @@ y `WEB_URL` (`backend/src/lib/urls.ts`). Nada de rutas de la otra web escritas a
   salud y traza de las llamadas, resumen de un negocio, assistants y conversaciones de Telnyx (solo GET)
   y los jobs del Scheduler que se pueden repetir. Si algo falla, `diagnostico_mcp` primero. Úsalo antes
   que `gcloud`/`curl`/`psql` a mano. Ver `AGENTS.md` § MCP de desarrollo.
+- MCP `alhabla-growth` (`.mcp.json`, `backend/mcp/growth/`): solo para la sesión programada de Growth. 15
+  herramientas que hablan únicamente con `/growth/agente/`: proponen y redactan, no aprueban ni
+  gestionan nada. Ver `AGENTS.md` § Alhabla Growth.
 - `.claude-context.md` — resumen de producto, audiencia, tono de marca y problemas
   UI/UX conocidos.
 - `PRODUCT.md` (producto y marca), `DESIGN.md` (sistema de diseño), `CONTRIBUTING.md`

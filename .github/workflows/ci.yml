@@ -1,12 +1,13 @@
 name: CI
 
 # Gate de calidad: corre en cada PR y en cada push a main, para backend,
-# frontend (la app), web (la web pública) y el Worker de Cloudflare de los
+# frontend (la app), web (la web pública), growth (el dashboard interno de
+# Alhabla Growth) y el Worker de Cloudflare de los
 # bloqueos de LaLiga (infra/cloudflare/failover-laliga) por separado. No
 # despliega nada —
-# eso lo hace deploy-backend.yml (solo backend; la app y la web se despliegan
-# solas vía la integración Git de Vercel). Ver AGENTS.md § Deployment Notes
-# para el resto del pipeline.
+# eso lo hace deploy-backend.yml (solo backend; la app, la web y growth se
+# despliegan solas vía la integración Git de Vercel). Ver AGENTS.md §
+# Deployment Notes para el resto del pipeline.
 
 on:
   pull_request:
@@ -41,6 +42,11 @@ jobs:
       - run: npm run typecheck
       - run: npm run lint
       - run: npm run test
+      # Alhabla Growth: el extractor de conocimiento lee PRODUCT.md, plans.ts y
+      # paginas.ts. Si alguno cambia de forma que el mapa no cubra algo, falla
+      # aquí y no cuando alguien sincroniza. Sin red, sin base de datos y sin
+      # git profundo (el checkout trae el monorepo entero).
+      - run: npm run growth:conocimiento -- --comprobar
 
   integration:
     name: Backend — tests de integración
@@ -157,17 +163,17 @@ jobs:
           exit 1
 
       # No bloquea: el riesgo real es bajo y ocasional, pero conviene recordar
-      # el orden. Vercel publica la app (frontend/) y la web (web/) en cuanto
+      # el orden. Vercel publica la app (frontend/), la web (web/) y growth (growth/) en cuanto
       # se fusiona, mientras que el backend pasa por build, migraciones y
       # despliegue de revisión.
       - name: Aviso si el PR toca frontend/web y backend a la vez
         run: |
           BASE="origin/${{ github.base_ref }}"
           CAMBIOS=$(git diff --name-only "$BASE"...HEAD)
-          TOCA_FRONT=$(echo "$CAMBIOS" | grep -cE '^(frontend|web)/' || true)
+          TOCA_FRONT=$(echo "$CAMBIOS" | grep -cE '^(frontend|web|growth)/' || true)
           TOCA_BACK=$(echo "$CAMBIOS" | grep -c '^backend/' || true)
           if [ "$TOCA_FRONT" -gt 0 ] && [ "$TOCA_BACK" -gt 0 ]; then
-            echo "::warning::Este PR toca frontend/web ($TOCA_FRONT ficheros) y backend ($TOCA_BACK). Vercel publica la app y la web en cuanto se fusiona y el backend tarda varios minutos: si el frontend depende de algo nuevo del backend, habrá una ventana en la que falle. Si es el caso, fusiona antes el backend."
+            echo "::warning::Este PR toca frontend/web/growth ($TOCA_FRONT ficheros) y backend ($TOCA_BACK). Vercel publica la app, la web y growth en cuanto se fusiona y el backend tarda varios minutos: si el frontend depende de algo nuevo del backend, habrá una ventana en la que falle. Si es el caso, fusiona antes el backend."
           else
             echo "El PR no mezcla frontend y backend."
           fi
@@ -275,3 +281,47 @@ jobs:
       # principal: Google agrupa las casi iguales y solo indexa una (las 30
       # páginas sector × ciudad, 2026-10-20). Lee el HTML del build anterior.
       - run: npm run seo:similitud
+
+  growth:
+    name: Growth — lint, test, build
+    if: github.event.action != 'labeled' && github.event.action != 'unlabeled'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: growth
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # La versión de Node vive en .nvmrc, la misma que la imagen de
+          # producción (backend/Dockerfile) y que `engines` en cada package.json.
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: growth/package-lock.json
+
+      - run: npm ci
+      - run: npm run lint
+      # Incluye la prueba de paridad con backend/src/modules/growth/estados.ts
+      # (el checkout trae el repo entero, así que el fichero está).
+      - run: npm run test
+      # El dashboard interno de Alhabla Growth (PLAN-GROWTH.md § 8). Sin
+      # NEXT_PUBLIC_GROWTH_DEMO: con ella el build de producción FALLA a
+      # propósito (src/lib/config.ts). El ID de cliente de Google de abajo es
+      # un relleno, no un secreto: solo hace falta para que el build no se
+      # niegue; el de verdad lo tiene el proyecto de Vercel.
+      - run: npm run build
+        env:
+          NEXT_PUBLIC_API_BASE_URL: https://api.alhabla.ai
+          NEXT_PUBLIC_GROWTH_GOOGLE_CLIENT_ID: ci-sin-valor-real.apps.googleusercontent.com
+      # El modo demostración pone una sesión falsa y datos inventados en un
+      # panel que aprueba contactos externos. Sus datos de prueba llevan una
+      # sentinela (growth/src/lib/demo/datos.ts): si aparece en el build, la
+      # demostración se ha colado y el job falla.
+      - name: La demostración no está en el build
+        run: |
+          if grep -rl DEMO_ALHABLA_GROWTH_SENTINELA .next/static .next/server; then
+            echo "::error::La sentinela del modo demostración está en el build de producción (ficheros arriba). La condición de src/lib/crear-cliente.ts o de src/components/puerta-de-sesion.tsx ya no la elimina."
+            exit 1
+          fi
+          echo "La sentinela de la demostración no aparece en .next/static ni en .next/server."

@@ -1,0 +1,100 @@
+{
+  "pausa": false,
+  "ajustes": {
+    "topeSemanal": 20,
+    "umbralDeSimilitud": 0.6,
+    "umbralesPorObjetivo": {
+      "TRAFICO_MARCA": 55,
+      "LEADS": 60,
+      "BACKLINKS": 65
+    },
+    "pausa": false
+  },
+  "porEstado": {
+    "detectada": 3,
+    "calificada": 3,
+    "investigada": 0,
+    "con_borrador": 0,
+    "pendiente_aprobacion": 3,
+    "aprobada": 2,
+    "gestionada": 1,
+    "conseguida": 1,
+    "sin_respuesta": 1,
+    "devuelta": 0,
+    "bloqueada": 5,
+    "descartada": 9,
+    "caducada": 0
+  },
+  "paraRevisar": 3,
+  "aprobadasSinGestionar": 2,
+  "bloqueadas": 5,
+  "devueltas": 0,
+  "porCaducar": [
+    {
+      "id": "cmvuu1lio00f7rar093lo38u4",
+      "titulo": "Caduca pronto",
+      "dominio": "caduca-pronto.example.org",
+      "estado": "pendiente_aprobacion",
+      "expiraEn": "2026-11-02T10:31:50.803Z",
+      "diasParaCaducar": 3
+    }
+  ],
+  "contactos": {
+    "estaSemana": 5,
+    "hechas": 3,
+    "aprobadasSinGestionar": 2,
+    "tope": 20
+  },
+  "descartesUltimos7Dias": {
+    "total": 9,
+    "porMotivo": [
+      {
+        "codigo": "bajo_umbral",
+        "n": 2
+      },
+      {
+        "codigo": "competidor",
+        "n": 2
+      },
+      {
+        "codigo": "irrelevante",
+        "n": 2
+      },
+      {
+        "codigo": "otro",
+        "n": 2
+      },
+      {
+        "codigo": "baja_calidad",
+        "n": 1
+      }
+    ]
+  },
+  "ultimaEjecucion": {
+    "id": "cmvuu1bl600evrar0qkp58k1v",
+    "disparador": "manual",
+    "estado": "en_curso",
+    "inicio": "2026-10-30T10:31:37.961Z",
+    "fin": null
+  },
+  "conocimiento": {
+    "commitSha": "5743b5ee9ac70b6843dbbea68874bd22a5654713",
+    "sincronizadoEn": "2026-10-30T10:24:19.052Z",
+    "antiguedadHoras": 0.1,
+    "obsoleto": false,
+    "vigentes": 152,
+    "porTipo": {
+      "limite": 22,
+      "pagina": 74,
+      "precio": 6,
+      "sector": 8,
+      "funcion": 16,
+      "prohibida": 5,
+      "comparativa": 21
+    }
+  },
+  "tokens": {
+    "activos": 4,
+    "ultimoUso": "2026-10-30T10:31:38.266Z"
+  }
+}

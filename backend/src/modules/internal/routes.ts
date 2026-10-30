@@ -18,6 +18,8 @@ import { purgarCaducados } from "../../lib/almacenTemporal.js";
 import { recordarDesvioSinComprobarJob } from "../../jobs/recordarDesvioSinComprobar.js";
 import { purgeOldRecordingsJob } from "../../jobs/purgeOldRecordings.js";
 import { purgarTextoDeLlamadasJob } from "../../jobs/purgarTextoDeLlamadas.js";
+import { caducarAprobadasDeGrowthJob } from "../../jobs/caducarAprobadasDeGrowth.js";
+import { purgarRetencionDeGrowthJob } from "../../jobs/purgarRetencionDeGrowth.js";
 import { telnyxReconcilerJob } from "../../jobs/telnyxReconciler.js";
 import { retryStuckRecordingsJob } from "../../jobs/retryStuckRecordings.js";
 import { suspendOverdueCallsJob } from "../../jobs/suspendOverdueCalls.js";
@@ -543,6 +545,48 @@ export const internalJobsRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.status(500).send({ error: "Job processing failed" });
       }
       return reply.send({ received: true, ...audio, texto });
+    }
+  );
+
+  fastify.post(
+    "/jobs/growth-mantenimiento",
+    opcionesDeJob,
+    async (_request, reply) => {
+      // Un solo job de Cloud Scheduler para el mantenimiento de Alhabla
+      // Growth (diario, 05:20 Europe/Madrid): caducar las oportunidades
+      // aprobadas que nadie gestionó y purgar los datos de terceros pasada su
+      // retención (180 días). Mismo criterio que purge-old-recordings: el
+      // plazo de retención no puede depender de que alguien se acuerde de
+      // crear un segundo job. Cada tarea en su try, para que el fallo de una
+      // no impida la otra; si falla alguna, 500 al final y Scheduler repite
+      // (las dos son idempotentes). Sin cuerpo ni PermanentJobError: solo
+      // toca la base de datos.
+      let caducidad: Awaited<
+        ReturnType<typeof caducarAprobadasDeGrowthJob>
+      > | null = null;
+      let retencion: Awaited<
+        ReturnType<typeof purgarRetencionDeGrowthJob>
+      > | null = null;
+      try {
+        caducidad = await caducarAprobadasDeGrowthJob();
+      } catch (error) {
+        fastify.log.error(
+          { err: error },
+          "growth-mantenimiento: la caducidad de aprobadas falló"
+        );
+      }
+      try {
+        retencion = await purgarRetencionDeGrowthJob();
+      } catch (error) {
+        fastify.log.error(
+          { err: error },
+          "growth-mantenimiento: la purga de retención falló"
+        );
+      }
+      if (!caducidad || !retencion) {
+        return reply.status(500).send({ error: "Job processing failed" });
+      }
+      return reply.send({ received: true, caducidad, retencion });
     }
   );
 

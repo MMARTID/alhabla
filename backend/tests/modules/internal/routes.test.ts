@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import Fastify from "fastify";
+import type { FastifyReply } from "fastify";
 import { internalJobsRoutes } from "../../../src/modules/internal/routes.js";
 import { PermanentJobError } from "../../../src/lib/jobErrors.js";
 import { processRecordingJob } from "../../../src/jobs/processRecording.js";
@@ -16,6 +17,8 @@ import { retryUsageReportsJob } from "../../../src/jobs/retryUsageReports.js";
 import { purgarCaducados } from "../../../src/lib/almacenTemporal.js";
 import { purgeOldRecordingsJob } from "../../../src/jobs/purgeOldRecordings.js";
 import { purgarTextoDeLlamadasJob } from "../../../src/jobs/purgarTextoDeLlamadas.js";
+import { caducarAprobadasDeGrowthJob } from "../../../src/jobs/caducarAprobadasDeGrowth.js";
+import { purgarRetencionDeGrowthJob } from "../../../src/jobs/purgarRetencionDeGrowth.js";
 
 vi.mock("../../../src/modules/phone/service.js", () => ({
   asignarNumeroExistente: vi.fn(),
@@ -65,6 +68,12 @@ vi.mock("../../../src/jobs/purgeOldRecordings.js", () => ({
 vi.mock("../../../src/jobs/purgarTextoDeLlamadas.js", () => ({
   purgarTextoDeLlamadasJob: vi.fn(),
 }));
+vi.mock("../../../src/jobs/caducarAprobadasDeGrowth.js", () => ({
+  caducarAprobadasDeGrowthJob: vi.fn(),
+}));
+vi.mock("../../../src/jobs/purgarRetencionDeGrowth.js", () => ({
+  purgarRetencionDeGrowthJob: vi.fn(),
+}));
 // La purga del estado temporal (cerrojos, contadores) corre dentro de
 // cleanup-zombie-calls; aquí no hay base de datos.
 vi.mock("../../../src/lib/almacenTemporal.js", () => ({
@@ -87,6 +96,8 @@ const mockedRetryUsageReportsJob = vi.mocked(retryUsageReportsJob);
 const mockedPurgarCaducados = vi.mocked(purgarCaducados);
 const mockedPurgeOldRecordingsJob = vi.mocked(purgeOldRecordingsJob);
 const mockedPurgarTextoJob = vi.mocked(purgarTextoDeLlamadasJob);
+const mockedCaducarGrowthJob = vi.mocked(caducarAprobadasDeGrowthJob);
+const mockedPurgarGrowthJob = vi.mocked(purgarRetencionDeGrowthJob);
 
 describe("internalJobsRoutes", () => {
   let fastify: ReturnType<typeof Fastify>;
@@ -524,6 +535,94 @@ describe("internalJobsRoutes", () => {
         url: "/jobs/purge-old-recordings",
       });
       expect(otra.statusCode).toBe(500);
+    });
+  });
+
+  describe("POST /jobs/growth-mantenimiento", () => {
+    const CADUCIDAD = { caducadas: 2, borradoresDescartados: 3, fallidas: 0 };
+    const RETENCION = {
+      filasBorradas: 4,
+      extractosVaciados: 5,
+      investigacionesSinNombre: 1,
+    };
+
+    it("hace la caducidad y la purga de retención y devuelve los dos recuentos", async () => {
+      mockedCaducarGrowthJob.mockResolvedValue(CADUCIDAD);
+      mockedPurgarGrowthJob.mockResolvedValue(RETENCION);
+
+      const response = await fastify.inject({
+        method: "POST",
+        url: "/jobs/growth-mantenimiento",
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toEqual({
+        received: true,
+        caducidad: CADUCIDAD,
+        retencion: RETENCION,
+      });
+      expect(mockedCaducarGrowthJob).toHaveBeenCalledTimes(1);
+      expect(mockedPurgarGrowthJob).toHaveBeenCalledTimes(1);
+    });
+
+    it("la purga de retención (RGPD) corre aunque la caducidad lance, y responde 500 para que Scheduler repita", async () => {
+      mockedCaducarGrowthJob.mockRejectedValue(new Error("BD caída"));
+      mockedPurgarGrowthJob.mockResolvedValue(RETENCION);
+
+      const response = await fastify.inject({
+        method: "POST",
+        url: "/jobs/growth-mantenimiento",
+      });
+
+      expect(mockedPurgarGrowthJob).toHaveBeenCalledTimes(1);
+      expect(response.statusCode).toBe(500);
+      expect(response.json()).toEqual({ error: "Job processing failed" });
+    });
+
+    it("la caducidad corre aunque la purga lance, y responde 500", async () => {
+      mockedCaducarGrowthJob.mockResolvedValue(CADUCIDAD);
+      mockedPurgarGrowthJob.mockRejectedValue(new Error("BD caída"));
+
+      const response = await fastify.inject({
+        method: "POST",
+        url: "/jobs/growth-mantenimiento",
+      });
+
+      expect(mockedCaducarGrowthJob).toHaveBeenCalledTimes(1);
+      expect(response.statusCode).toBe(500);
+    });
+
+    it("solo la abre quien pasa verifyCloudTasks: sin ese OIDC no corre ninguna de las dos tareas", async () => {
+      const cerrada = Fastify();
+      cerrada.decorate("verifyCloudTasks", async (_req: unknown, reply: FastifyReply) =>
+        reply.status(401).send({ error: "Unauthorized" })
+      );
+      cerrada.decorate("verifyPanel", async () => {});
+      await cerrada.register(internalJobsRoutes);
+
+      const response = await cerrada.inject({
+        method: "POST",
+        url: "/jobs/growth-mantenimiento",
+      });
+
+      expect(response.statusCode).toBe(401);
+      expect(mockedCaducarGrowthJob).not.toHaveBeenCalled();
+      expect(mockedPurgarGrowthJob).not.toHaveBeenCalled();
+      await cerrada.close();
+    });
+
+    it("no filtra el mensaje del error al que llama", async () => {
+      mockedCaducarGrowthJob.mockRejectedValue(
+        new Error("password authentication failed for user postgres")
+      );
+      mockedPurgarGrowthJob.mockResolvedValue(RETENCION);
+
+      const response = await fastify.inject({
+        method: "POST",
+        url: "/jobs/growth-mantenimiento",
+      });
+
+      expect(response.body).not.toMatch(/password/);
     });
   });
 
