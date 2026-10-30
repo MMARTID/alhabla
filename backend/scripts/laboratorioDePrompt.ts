@@ -134,8 +134,11 @@ export type ModoDeCliente = (typeof MODOS_DE_CLIENTE)[number];
 const VOZ_DEL_LABORATORIO = "Telnyx.Ultra.538a8872-3799-4df5-b373-b78493b766c6";
 
 /** Destino de la tool `transfer` en el laboratorio: ninguna prueba por chat
- * puede hacer sonar el móvil del dueño. */
-const DESTINO_INERTE_DE_TRANSFERENCIA = "+34000000000";
+ * puede hacer sonar el móvil del dueño. Telnyx exige un teléfono o una URI
+ * SIP válidos (+34000000000 lo rechaza con 10015); `.invalid` es un dominio
+ * reservado que nunca resuelve (RFC 6761). */
+export const DESTINO_INERTE_DE_TRANSFERENCIA =
+  "sip:laboratorio@alhabla.invalid";
 
 const CLAVE_LISTA_DE_ESPERA = "hueco_libre";
 
@@ -1577,6 +1580,34 @@ export async function siguienteMensajeDelCliente(
 // ---------------------------------------------------------------------------
 // Resultados y veredicto
 // ---------------------------------------------------------------------------
+
+/** La repetición de un negocio cuyo assistant no se pudo crear: error de
+ * ejecución, no del prompt. */
+export function resultadoSinAssistant(
+  tarea: Pick<Tarea, "repeticion">,
+  llamadaUsada: string,
+  motivo: string
+): ResultadoDeRepeticion {
+  return {
+    repeticion: tarea.repeticion,
+    llamadaUsada,
+    error: motivo,
+    ok: false,
+    comprobaciones: [],
+    turnos: [],
+    herramientas: [],
+    avisos: [],
+    metricas: {
+      llamadasAHerramientas: 0,
+      getCatalog: 0,
+      caracteresDeRespuestas: 0,
+      duracionMs: 0,
+      turnos: 0,
+      caracteresDeTools: 0,
+      latenciaMediaPorTurnoMs: 0,
+    },
+  };
+}
 
 export interface ResultadoDeRepeticion {
   repeticion: number;
@@ -3138,6 +3169,7 @@ export async function ejecutarLaboratorio(
 
   try {
     // Un assistant por (negocio, variante), solo de los que se van a usar.
+    const sinAssistant = new Map<string, string>();
     const usados = new Set(
       ejecutables.map((t) => `${t.negocioId}:${t.variante}`)
     );
@@ -3150,10 +3182,21 @@ export async function ejecutarLaboratorio(
             `[Laboratorio] Nombre de assistant no permitido: ${payload.name}`
           );
         }
-        const creado = await registro.crear(
-          () => deps.adaptador.createAssistant(payload),
-          (assistant) => registro.anotarAssistant(assistant.id, payload.name)
-        );
+        let creado: { id: string };
+        try {
+          creado = await registro.crear(
+            () => deps.adaptador.createAssistant(payload),
+            (assistant) => registro.anotarAssistant(assistant.id, payload.name)
+          );
+        } catch (error) {
+          // Un negocio cuyo assistant Telnyx no acepta no para la tanda: sus
+          // repeticiones salen como error de ejecución, no del prompt.
+          const motivo = `No se pudo crear el assistant ${payload.name}: ${mensajeDeError(error)}`;
+          sinAssistant.set(`${contexto.negocioId}:${variante}`, motivo);
+          avisos.push(motivo);
+          console.error(`[Laboratorio] ${motivo}`);
+          continue;
+        }
         entornos.set(`${contexto.negocioId}:${variante}`, {
           assistantId: creado.id,
           contexto,
@@ -3177,7 +3220,20 @@ export async function ejecutarLaboratorio(
       ejecutables,
       opciones.paralelo,
       async (tarea) => {
-        const entorno = entornos.get(`${tarea.negocioId}:${tarea.variante}`)!;
+        const clave = `${tarea.negocioId}:${tarea.variante}`;
+        const entorno = entornos.get(clave);
+        if (!entorno) {
+          resultados.push({
+            tarea,
+            resultado: resultadoSinAssistant(
+              tarea,
+              asignacion.porTarea.get(tarea)?.callId ?? "",
+              sinAssistant.get(clave) ?? "Sin assistant"
+            ),
+          });
+          hechas++;
+          return;
+        }
         const restablece =
           restablecer !== undefined && restableceElNegocio(tarea, catalogo);
         const resultado = await cerrojos.con(

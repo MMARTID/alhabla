@@ -28,6 +28,8 @@ import {
   leerInformeAnterior,
   leerVeredictoDelJuez,
   neutralizarTransferencia,
+  DESTINO_INERTE_DE_TRANSFERENCIA,
+  resultadoSinAssistant,
   nombreDelAssistant,
   parsearArgumentos,
   pareceDespedida,
@@ -468,8 +470,13 @@ describe("guardas", () => {
       webhook: { name: "get_catalog" },
     });
     expect(resultado.tools[1]!.transfer.targets).toEqual([
-      { name: "Responsable", to: "+34000000000" },
+      { name: "Responsable", to: DESTINO_INERTE_DE_TRANSFERENCIA },
     ]);
+    // Telnyx rechaza +34000000000 (10015): tiene que ser una URI SIP válida
+    // en un dominio que nunca resuelve.
+    expect(DESTINO_INERTE_DE_TRANSFERENCIA).toMatch(
+      /^sip:[^@]+@[^@]+\.invalid$/
+    );
     expect(resultado.tools[1]!.transfer.from).toBe("+34930000000");
   });
 
@@ -1590,7 +1597,7 @@ describe("ejecutarLaboratorio", () => {
     expect(adaptador.deleteAssistant).toHaveBeenCalledTimes(1);
   });
 
-  it("limpia aunque falle a mitad: crea el segundo assistant y revienta", async () => {
+  it("si Telnyx rechaza un assistant, sigue con los demás y limpia", async () => {
     let creados = 0;
     const adaptador = adaptadorFalso();
     adaptador.createAssistant.mockImplementation(
@@ -1605,26 +1612,19 @@ describe("ejecutarLaboratorio", () => {
       }
     );
     const { deps } = dependencias(adaptador);
+    vi.spyOn(console, "error").mockImplementation(() => {});
 
-    await expect(
-      ejecutarLaboratorio(
-        opciones([
-          "--escenarios",
-          "E1",
-          "--n",
-          "1",
-          "--variantes",
-          "control,v2",
-        ]),
-        deps
-      )
-    ).rejects.toThrow(/Telnyx caído/);
+    const resultado = await ejecutarLaboratorio(
+      opciones(["--escenarios", "E1", "--n", "1", "--variantes", "control,v2"]),
+      deps
+    );
 
+    expect(resultado.informe).not.toBeNull();
+    expect(JSON.stringify(resultado.informe)).toMatch(/Telnyx caído/);
     expect(adaptador.deleteAssistant).toHaveBeenCalledWith("assistant-1");
     expect(adaptador.deleteTexmlAppOfAssistant).toHaveBeenCalledWith(
       "assistant-1"
     );
-    expect(adaptador.chatWithAssistant).not.toHaveBeenCalled();
   });
 
   it("un error de Telnyx en una repetición no cuenta como fallo del prompt", async () => {
@@ -3754,5 +3754,21 @@ describe("E17 por chat", () => {
         (r) => !r.ok && /antes de la despedida/.test(r.descripcion)
       )
     ).toBe(true);
+  });
+});
+
+describe("resultadoSinAssistant", () => {
+  it("cuenta como error de ejecución, no como fallo del prompt", () => {
+    const r = resultadoSinAssistant(
+      { repeticion: 3 } as Parameters<typeof resultadoSinAssistant>[0],
+      "lab-x-0001",
+      "400 10015"
+    );
+    expect(r).toMatchObject({
+      repeticion: 3,
+      llamadaUsada: "lab-x-0001",
+      ok: false,
+      error: "400 10015",
+    });
   });
 });
