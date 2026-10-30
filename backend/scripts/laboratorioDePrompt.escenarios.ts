@@ -86,11 +86,15 @@ export type Comprobacion = Base &
         herramientas: string[];
       }
     | {
-        /** El argumento de la última llamada a la tool vale esto. */
+        /** El argumento de la última llamada a la tool vale esto. Con
+         * `oAntesEn`, también vale si lo llevó alguna llamada anterior a
+         * esas otras tools (p. ej. la insistencia ya viajó en la consulta y
+         * el token que se reserva sale sin recomendación). */
         tipo: "argumento";
         herramienta: string;
         campo: string;
         esperado: string | number | boolean;
+        oAntesEn?: string[];
       }
     | {
         /** Todas las llamadas a la tool traen el argumento y (no) casa con
@@ -1498,12 +1502,17 @@ export const ESCENARIOS: Escenario[] = [
             descripcion: "check_availability lleva el professionalId de Laura",
           },
           {
+            // La insistencia vale en la reserva o en la consulta de antes:
+            // check_availability con professionalConfirmed = true ya no
+            // propone a nadie y su token reserva con Laura (laboratorio del
+            // 30-10: 3 de 10 lo hicieron así y la cita quedó con Laura).
             tipo: "argumento",
             herramienta: "book_appointment",
             campo: "professionalConfirmed",
             esperado: true,
+            oAntesEn: ["check_availability"],
             descripcion:
-              "Reserva con professionalConfirmed = true tras la insistencia",
+              "Reserva con professionalConfirmed = true tras la insistencia (en la reserva o en la consulta de antes)",
           },
           {
             tipo: "texto",

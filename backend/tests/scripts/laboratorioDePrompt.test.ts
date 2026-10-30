@@ -934,6 +934,50 @@ describe("evaluarComprobacion", () => {
     expect(argumento(true, "otra")).toBe(false);
   });
 
+  it("argumento con oAntesEn: vale si lo llevó una llamada anterior a esa otra tool", () => {
+    const insistencia: Comprobacion = {
+      tipo: "argumento",
+      herramienta: "book_appointment",
+      campo: "professionalConfirmed",
+      esperado: true,
+      oAntesEn: ["check_availability"],
+      descripcion: "x",
+    };
+    const enLaConsulta = conversacion(
+      ["a", "b"],
+      [
+        { nombre: "check_availability", turno: 1, argumentos: {} },
+        {
+          nombre: "check_availability",
+          turno: 2,
+          argumentos: { professionalConfirmed: true },
+        },
+        { nombre: "book_appointment", turno: 2, argumentos: {} },
+      ]
+    );
+    const despuesDeReservar = conversacion(
+      ["a", "b"],
+      [
+        { nombre: "book_appointment", turno: 1, argumentos: {} },
+        {
+          nombre: "check_availability",
+          turno: 2,
+          argumentos: { professionalConfirmed: true },
+        },
+      ]
+    );
+    const sinInsistir = conversacion(
+      ["a"],
+      [
+        { nombre: "check_availability", turno: 1, argumentos: {} },
+        { nombre: "book_appointment", turno: 1, argumentos: {} },
+      ]
+    );
+    expect(evaluar(insistencia, enLaConsulta)).toBe(true);
+    expect(evaluar(insistencia, despuesDeReservar)).toBe(false);
+    expect(evaluar(insistencia, sinInsistir)).toBe(false);
+  });
+
   it("argumentoPatron: todas las llamadas, y sin llamadas se cumple", () => {
     const utc = conversacion(
       ["a"],

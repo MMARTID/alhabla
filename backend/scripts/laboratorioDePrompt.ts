@@ -1024,8 +1024,18 @@ export function evaluarComprobacion(
         return resultado(false, `no se llamó a ${comprobacion.herramienta}`);
       }
       const real = ultima.argumentos[comprobacion.campo];
+      const esperado = String(comprobacion.esperado);
+      const antes = conversacion.llamadas.slice(
+        0,
+        conversacion.llamadas.indexOf(ultima)
+      );
+      const enUnaAnterior = antes.some(
+        (llamada) =>
+          comprobacion.oAntesEn?.includes(llamada.nombre) &&
+          valorComoTexto(llamada.argumentos[comprobacion.campo]) === esperado
+      );
       return resultado(
-        valorComoTexto(real) === String(comprobacion.esperado),
+        valorComoTexto(real) === esperado || enUnaAnterior,
         `${comprobacion.campo} = ${valorComoTexto(real) || "(ausente)"}`
       );
     }
