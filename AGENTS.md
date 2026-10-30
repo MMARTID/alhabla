@@ -108,8 +108,8 @@ Most modules are a folder containing a `routes.ts` file (and optionally `service
 Since 2026-09-21 (`docs/historico/PLAN-APP-DOMINIO.md`) there are **two** Next.js projects:
 `frontend/` is the authenticated app (`app.alhabla.ai`) and `web/` is the public site
 (`alhabla.ai`: landing, niche pages, plans, legal, registration and blog). Marketing components
-(`MainLanding`, `SiteLanding`, `LandingHero`, `PlansWithRoi`, `DemoVoiceCall`, `PaginaGuia`,
-`LegalPage`…) and `roi-context.ts` live only in `web/src/`; the few files used by both are copied
+(`MainLanding`, `SiteLanding`, `LandingHero`, `TarjetasDePlanes`, `DemoVoiceCall`, `PaginaGuia`,
+`LegalPage`…) live only in `web/src/`; the few files used by both are copied
 into each (list under Key Components). The component and lib notes below say which project holds
 each file.
 
@@ -193,8 +193,17 @@ each page's image explicitly from its `openGraph`/`twitter` metadata.
   timed simulation, not scroll-driven, that cycles through three real assistant actions —
   `marcar_ausencia` + `mover_cita` + `avisar_cliente`, `cerrar_dia`, `editar_servicio`. The
   laptop helpers shared by both scenes live in `web/src/lib/portatil-3d.ts`; on phones only the
-  iPhone is shown), `PuntosFuertesSection`, `WhatsAppClientesSection`, `EnMarchaSection`, the
-  sector accordion, plans and FAQ (`home-faqs.ts`).
+  iPhone is shown), `PuntosFuertesSection`, `WhatsAppClientesSection`, `EnMarchaSection`,
+  `EscenasDeOficio` (`#sectores`, «Elige tu oficio y mira la llamada que entra.»: since
+  2026-10-30 the eight sectors are drawn scenes, not the stock-photo accordion. One card per sector
+  in menu order, data in `web/src/lib/escenas-de-oficio.ts`: the ringing tile, «Suena y estás…»,
+  the caller's bubble and the booked appointment in the sector accent, with the same caller,
+  service and professional as `GUIONES_SECTOR` and a different Thursday time each; a drawer with
+  one thing Alhabla does in that trade and the link to the landing opens on hover, on keyboard
+  focus or, on touch, by itself after 3 s on the centred card and with a tap. 4×2 grid from `lg`,
+  2 columns from `md`, a native scroll-snap carousel on phones; the motion lives in
+  `escenas-de-oficio.module.css`), `CalculadoraCompacta` (`#cuenta`, see `SiteLanding`; on the home
+  page with an oficio selector and the brand purple), plans and FAQ (`home-faqs.ts`).
 - `SiteLanding` — The eight sector landings (`/peluqueria`, `/barberia`, `/centro-de-estetica`,
   `/salon-de-unas`, `/fisioterapia`, `/pestanas-y-cejas`, `/spa-y-masajes`,
   `/peluqueria-canina`). Since the evening of 2026-10-29, «text and 3D balanced» (the founder
@@ -209,7 +218,16 @@ each page's image explicitly from its `openGraph`/`twitter` metadata.
   `asistente.situaciones`, closing «Con tus clientes manda Alhabla. Con tu agenda mandas tú.»);
   `OficioDelSector` (the app's services table, `ServiciosDelOficio`: duration and the
   Especialista / Lo hace / No sugerir pill per professional, the split by speciality and, in
-  fisioterapia, the health note); `PreciosDelSector`; five folded questions; the black close
+  fisioterapia, the health note); `CalculadoraCompacta`
+  (`components/herramientas/calculadora-compacta.tsx`, since 2026-10-30: «¿Cuánto me cuestan las
+  llamadas que no cojo?», the full calculator's `calcular` with the sector's starting price — the
+  slug→id map is `ID_DE_LA_CALCULADORA` — calls per week and price sliders, «¿Cuántos sois?»
+  (`TAMANOS_DE_EQUIPO`: 2 / 6 / 11 professionals, so the proposed plan really fits), the live
+  figure, «se paga con N de esas citas», the assumptions folded and a link to the full calculator
+  with the numbers in the URL; «Probar 7 días gratis» goes to `/planes?plan=<id>&niche=<slug>`,
+  `data-ubicacion` `sector_calculadora`, `portada_calculadora` on the home page);
+  `PreciosDelSector` (no calculator link any more: the compact one sits right above); five
+  folded questions; the black close
   with «Empezar ahora». All eight sectors have both scripts (pestañas y cejas, spa y masajes and
   peluquería canina got theirs that day); `tests/lib/sectores.test.ts` checks that the scripts'
   `negocio`, the absence names and the WhatsApp booking match the sector data. Everything else
@@ -227,9 +245,10 @@ each page's image explicitly from its `openGraph`/`twitter` metadata.
   lines on desktop and three on a phone. Then the street phrase, «Probar 7 días gratis» (to
   `/planes?niche=`), «Escuchar una llamada» (`DemoVoiceCall` with the sector demo, or the general
   one for the three sectors without it) and «Tu número de siempre · Sin permanencia».
-- `PlansWithRoi` / `PlansHeadline` — Pricing cards, ROI-aware copy. Reads `?plan=` from the URL to
-  flag the card the visitor already chose, and renders the value contrast from
-  `calculatePlanValueContrast` only when the visitor's own estimate covers the plan. Each card's
+- `TarjetasDePlanes` — The three pricing cards of `/planes`. Reads `?plan=` from the URL to
+  flag the card the visitor already chose. (The ROI-aware headline and value contrast fed by
+  the old landing calculator through `roi-context.ts` were removed on 2026-10-30: nothing wrote
+  that estimate any more; the lost-calls calculator lives in `components/herramientas/`.) Each card's
   button (`PlanSelectionLink`) jumps to the app's `/elegir-plan?plan=&niche=`: the web cannot see
   the session, so the app decides between checkout and registration. Since the landing
   calculator went away (2026-10-29) nothing calls `activateRoiContext`: the ROI copy only shows an
@@ -371,8 +390,6 @@ the content: each project keeps what it needs.
   «ventaja competitiva» or «llenar la agenda». The trial action is «Probar 7 días gratis» and the
   close «Empezar ahora». The voice provider is never named on the site, except in the processors
   list that the law requires in `/legal/privacidad`.
-- `roi-context.ts` — ROI calculation, plan value contrast and the calculator → `/planes` hand-off
-  (`activateRoiContext` / `getActiveRoiContext`).
 - `seo.ts` — Site metadata, structured data (JSON-LD), absolute URL builder, OG image list.
 - `blog.ts` — MDX articles in `web/content/blog`, read at build time. Next to it: `keystatic/`
   (editor blocks), `preview/` (draft preview redirects) and `og/plantilla.tsx` (the Open Graph
@@ -3503,12 +3520,14 @@ The landing lives in `web/`; the backend (demo) and the app (redirect) need a sm
    (`GUIONES_SECTOR` in `relato-guiones.ts`, `GUIONES_GESTOR` in `gestor-guiones.ts`).
 2. **Pages:** copy an existing sector folder — `web/src/app/<sector>/page.tsx` (`SiteLanding` +
    `datosEstructuradosDeSector`, metadata from `metadatosDeSector`) and `opengraph-image.tsx`
-   (`imagenOg`) — and add the sector photo `web/public/heroes/<sector>.jpg` if the OG image or the
-   home accordion use it.
+   (`imagenOg`) — and add the sector photo `web/public/heroes/<sector>.jpg` if its OG image uses
+   it (the home page no longer shows photos).
 3. **Lists nothing type-checks:** its entry in `PAGINAS` (`web/src/lib/paginas.ts`, section
    `sectores`: the single registry the sitemap, `/llms.txt`, the menus (`nicheLinks`) and the
    tests read; `tests/lib/paginas.test.ts` fails if a `page.tsx` is missing from it);
-   `SECTORES` in `components/main-landing.tsx` (home accordion) and `components/site-footer.tsx`;
+   its scene in `ESCENAS_DE_OFICIO` (`web/src/lib/escenas-de-oficio.ts`, home page; its test
+   checks one per sector) and `components/site-footer.tsx`; `ID_DE_LA_CALCULADORA` and
+   `SECTORES_DE_LA_CALCULADORA` (`components/herramientas/calculo-de-llamadas-perdidas.ts`);
    the blog CTA targets (`DESTINOS` in `components/blog/bloques.tsx` and
    `lib/keystatic/bloques.tsx`) and article sectors (`SECTORES` in `web/keystatic.config.tsx`).
    Optionally a plural alias in `web/next.config.mjs` (`/peluquerias` → `/peluqueria`).

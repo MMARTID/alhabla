@@ -1,13 +1,40 @@
 import { plans, type Plan } from "@/lib/plans";
+import type { SectorSlug } from "@/lib/sectores/tipos";
 
 /**
  * La cuenta de /herramientas/calculadora-de-llamadas-perdidas, sin React:
  * la usan el componente de cliente, la página (tabla de valores de partida,
- * de servidor) y los tests. Va aparte del componente porque lo que exporta
- * un fichero "use client" no se puede leer desde un componente de servidor.
+ * de servidor), la calculadora compacta de la portada y las landings
+ * (calculadora-compacta.tsx) y los tests. Va aparte del componente porque lo
+ * que exporta un fichero "use client" no se puede leer desde un componente
+ * de servidor.
  */
 
 export type IdSector = "peluqueria" | "barberia" | "unas" | "estetica" | "fisioterapia" | "pestanas" | "spa" | "canina";
+
+/** El sector de la calculadora de cada landing: aquí los ids son más cortos
+ * que los slugs de las páginas (y van en la URL de la versión completa). */
+export const ID_DE_LA_CALCULADORA: Record<SectorSlug, IdSector> = {
+  peluqueria: "peluqueria",
+  barberia: "barberia",
+  "centro-de-estetica": "estetica",
+  "salon-de-unas": "unas",
+  fisioterapia: "fisioterapia",
+  "pestanas-y-cejas": "pestanas",
+  "spa-y-masajes": "spa",
+  "peluqueria-canina": "canina",
+};
+
+/**
+ * «¿Cuántos sois?» de la calculadora compacta: cada tramo pone un número de
+ * profesionales que cae dentro del límite de un plan (3 en Inicio y 10 en
+ * Pro, leídos de lib/plans.ts), para que el plan que propone quepa de verdad.
+ */
+export const TAMANOS_DE_EQUIPO = [
+  { etiqueta: "1–3", nombre: "De 1 a 3", profesionales: "2" },
+  { etiqueta: "4–10", nombre: "De 4 a 10", profesionales: "6" },
+  { etiqueta: "Más de 10", nombre: "Más de 10", profesionales: "11" },
+] as const;
 
 /** Valores de partida: orientativos, no estadísticas. */
 export const SECTORES_DE_LA_CALCULADORA: readonly { id: IdSector; nombre: string; ticket: number; visitas: number }[] = [
