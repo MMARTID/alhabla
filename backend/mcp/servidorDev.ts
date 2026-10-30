@@ -90,6 +90,9 @@ import {
  * Lo de producción y Telnyx enmascara los teléfonos salvo que se pida lo
  * contrario (privacidad.ts).
  *
+ * Alhabla Growth (el agente semanal de backlinks y SEO) tiene su propio
+ * servidor, aparte de este: growth/servidorGrowth.ts (`alhabla-growth`).
+ *
  * stdout es el canal del protocolo: todo log va a stderr.
  */
 

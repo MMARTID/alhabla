@@ -1,5 +1,10 @@
 #!/bin/sh
-# Arranque del MCP de desarrollo (lo lanza Claude Code desde .mcp.json).
+# Arranque de los MCP del repo (lo lanza Claude Code desde .mcp.json).
+#
+# Sin argumentos arranca alhabla-dev (mcp/servidorDev.ts). Con un argumento,
+# el servidor de esa ruta bajo mcp/ sin extensión: `arrancar.sh
+# growth/servidorGrowth` lanza alhabla-growth. Solo se admiten letras, números
+# y barras (nada de `..` ni de rutas fuera de mcp/).
 #
 # Cada sesión nueva del escritorio es un worktree sin node_modules: sin
 # esto el MCP no arranca. La primera vez se instalan las dependencias del
@@ -13,4 +18,15 @@ if [ ! -d node_modules/@modelcontextprotocol/sdk ]; then
   echo "[MCP] Instalando las dependencias del backend en este checkout..." >&2
   npm install --no-audit --no-fund --no-save >&2 || exit 1
 fi
-exec node_modules/.bin/tsx mcp/servidorDev.ts
+servidor="${1:-servidorDev}"
+case "$servidor" in
+  "" | /* | */ | *//* | *[!A-Za-z0-9/]*)
+    echo "[MCP] Servidor no válido: $servidor" >&2
+    exit 1
+    ;;
+esac
+if [ ! -f "mcp/$servidor.ts" ]; then
+  echo "[MCP] No existe mcp/$servidor.ts" >&2
+  exit 1
+fi
+exec node_modules/.bin/tsx "mcp/$servidor.ts"
