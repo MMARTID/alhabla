@@ -701,9 +701,10 @@ oficios. Cambian los textos, el acento y los dos guiones de las escenas (`lib/se
    la cambia.
 4. Tu asistente en 3D: el WhatsApp del dueño y el panel en el portátil, con tres situaciones.
 5. Los servicios del oficio, con el reparto en una línea.
-6. Los tres planes.
-7. Cinco preguntas plegadas.
-8. El cierre en `oscuro`, con «Empezar ahora».
+6. La calculadora compacta, con el precio de partida del oficio (ver abajo).
+7. Los tres planes.
+8. Cinco preguntas plegadas.
+9. El cierre en `oscuro`, con «Empezar ahora».
 
 Entre dos escenas nunca hay más que dos líneas y una pieza plana.
 
@@ -722,6 +723,59 @@ Entre dos escenas nunca hay más que dos líneas y una pieza plana.
   más de 40 palabras.
 - La regla de confianza cierra la escena de tu asistente: «Con tus clientas manda Alhabla. Con tu
   agenda mandas tú.»
+
+### Escenas del oficio (portada)
+
+`web/src/components/escenas-de-oficio.tsx`, sección `#sectores` (30-10-2026; sustituye al
+acordeón de fotos de banco, que no le gustaba al fundador). «Elige tu oficio y mira la llamada que
+entra.»: ocho tarjetas, una por oficio y en el orden del menú, cada una el segundo en que suena el
+teléfono y la cita que sale. Producto dibujado con el vocabulario del relato, nunca icono, título
+y texto.
+
+- **Anatomía:** oficio y azulejo del timbre arriba; «**Suena** y estás…» en `apagado`; la burbuja
+  gris (`relleno-fuerte`) de quien llama; un hilo de 2 px en `strong` que se estira para que, en
+  cada fila, las citas queden alineadas abajo como en una agenda; y la ficha: hora del jueves en
+  números tabulares, «Cita reservada», servicio y profesional en `soft`/`deep`, check en `strong`.
+  Los nombres son los del guion de cada landing; debajo de la rejilla, «Un jueves de ejemplo, con
+  nombres inventados.».
+- **Ocho acentos a la vez**, a propósito: cada tarjeta es la puerta a su landing y lleva su color,
+  solo en el azulejo, el hilo y la ficha. Juntas se leen como un jueves de agenda con citas de
+  colores. El resto, neutro.
+- **Un solo movimiento**, «el timbre que se vuelve cita», una vez por tarjeta al entrar en
+  pantalla: el azulejo suena dos veces (onda y sacudida), la burbuja entra, el hilo baja y la ficha
+  pasa de hueco discontinuo a cita con un `clip-path` de izquierda a derecha; salida exponencial
+  (`cubic-bezier(0.16, 1, 0.3, 1)`). El HTML sale resuelto; solo pasan a «espera» las que no se
+  ven al cargar. Con movimiento reducido, quieto y resuelto.
+- **El cajón** (una cosa que Alhabla hace en ese oficio y «Ver …») está siempre en el DOM y sube
+  como un chat que avanza: la cita y el cajón suben lo que mide el cajón, el hilo se acorta primero
+  y la frase solo sube lo que el hilo no absorbe, fundiéndose por la máscara de arriba. Se abre al
+  pasar el ratón (toda la tarjeta es el enlace), con el teclado al llegar al enlace (anillo en el
+  acento sobre la tarjeta) y, en táctil, sola a los 3 s en la tarjeta del centro de la pantalla;
+  un toque abre o cierra y el enlace es el del cajón, de 44 px.
+- **Rejilla:** 4 × 2 desde `lg` (a 1024 la tarjeta se estrecha y la hora pasa encima de la cita,
+  por consulta de contenedor), 2 columnas desde `md` y, en el móvil, un carrusel de scroll nativo
+  con anclaje que asoma la siguiente, con puntos de posición que solo son dibujo.
+
+### Calculadora compacta (web)
+
+`web/src/components/herramientas/calculadora-compacta.tsx` (30-10-2026): la calculadora de llamadas
+perdidas en pequeño, con la misma cuenta que la completa (`calcular`). En la portada va entre los
+sectores y el precio, con «Tu oficio» y el morado; en cada sector, antes del precio, con el oficio
+fijo y su acento.
+
+- **Un panel partido**, no tarjeta dentro de tarjeta: borde `linea` y `rounded-3xl` por fuera; a la
+  izquierda los números («¿Cuántos sois?» en pastillas segmentadas, dos deslizadores
+  `RangeSlider` en modo `compact`, alineados en la misma línea) y los supuestos plegados; a la
+  derecha, a sangre, la cuenta en `oscuro`: «Con estos números, unos» y la cifra en blanco, en
+  `font-black` y números tabulares, que cambia al arrastrar; debajo, la línea del plan y «Probar 7
+  días gratis» en el `soft`/`deep` del acento, como la ficha de las escenas. En el móvil, la
+  cuenta justo debajo de los números.
+- **Honesta:** nunca «pierdes X». Son sus números y los supuestos se ven («De dónde sale la
+  cuenta»); si el plan pide más citas de las que se van, no dice «de esas», dice «lo que cobras por
+  N citas». «Ajusta los supuestos en la calculadora completa» abre la completa con los mismos
+  números.
+- **Bloque, no sección de texto:** título y una línea encima y el panel; nada más, para que no
+  rompa el equilibrio de texto y 3D de la landing.
 
 ### Logotipo
 

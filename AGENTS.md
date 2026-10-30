@@ -193,8 +193,17 @@ each page's image explicitly from its `openGraph`/`twitter` metadata.
   timed simulation, not scroll-driven, that cycles through three real assistant actions —
   `marcar_ausencia` + `mover_cita` + `avisar_cliente`, `cerrar_dia`, `editar_servicio`. The
   laptop helpers shared by both scenes live in `web/src/lib/portatil-3d.ts`; on phones only the
-  iPhone is shown), `PuntosFuertesSection`, `WhatsAppClientesSection`, `EnMarchaSection`, the
-  sector accordion, plans and FAQ (`home-faqs.ts`).
+  iPhone is shown), `PuntosFuertesSection`, `WhatsAppClientesSection`, `EnMarchaSection`,
+  `EscenasDeOficio` (`#sectores`, «Elige tu oficio y mira la llamada que entra.»: since
+  2026-10-30 the eight sectors are drawn scenes, not the stock-photo accordion. One card per sector
+  in menu order, data in `web/src/lib/escenas-de-oficio.ts`: the ringing tile, «Suena y estás…»,
+  the caller's bubble and the booked appointment in the sector accent, with the same caller,
+  service and professional as `GUIONES_SECTOR` and a different Thursday time each; a drawer with
+  one thing Alhabla does in that trade and the link to the landing opens on hover, on keyboard
+  focus or, on touch, by itself after 3 s on the centred card and with a tap. 4×2 grid from `lg`,
+  2 columns from `md`, a native scroll-snap carousel on phones; the motion lives in
+  `escenas-de-oficio.module.css`), `CalculadoraCompacta` (`#cuenta`, see `SiteLanding`; on the home
+  page with an oficio selector and the brand purple), plans and FAQ (`home-faqs.ts`).
 - `SiteLanding` — The eight sector landings (`/peluqueria`, `/barberia`, `/centro-de-estetica`,
   `/salon-de-unas`, `/fisioterapia`, `/pestanas-y-cejas`, `/spa-y-masajes`,
   `/peluqueria-canina`). Since the evening of 2026-10-29, «text and 3D balanced» (the founder
@@ -209,7 +218,16 @@ each page's image explicitly from its `openGraph`/`twitter` metadata.
   `asistente.situaciones`, closing «Con tus clientes manda Alhabla. Con tu agenda mandas tú.»);
   `OficioDelSector` (the app's services table, `ServiciosDelOficio`: duration and the
   Especialista / Lo hace / No sugerir pill per professional, the split by speciality and, in
-  fisioterapia, the health note); `PreciosDelSector`; five folded questions; the black close
+  fisioterapia, the health note); `CalculadoraCompacta`
+  (`components/herramientas/calculadora-compacta.tsx`, since 2026-10-30: «¿Cuánto me cuestan las
+  llamadas que no cojo?», the full calculator's `calcular` with the sector's starting price — the
+  slug→id map is `ID_DE_LA_CALCULADORA` — calls per week and price sliders, «¿Cuántos sois?»
+  (`TAMANOS_DE_EQUIPO`: 2 / 6 / 11 professionals, so the proposed plan really fits), the live
+  figure, «se paga con N de esas citas», the assumptions folded and a link to the full calculator
+  with the numbers in the URL; «Probar 7 días gratis» goes to `/planes?plan=<id>&niche=<slug>`,
+  `data-ubicacion` `sector_calculadora`, `portada_calculadora` on the home page);
+  `PreciosDelSector` (no calculator link any more: the compact one sits right above); five
+  folded questions; the black close
   with «Empezar ahora». All eight sectors have both scripts (pestañas y cejas, spa y masajes and
   peluquería canina got theirs that day); `tests/lib/sectores.test.ts` checks that the scripts'
   `negocio`, the absence names and the WhatsApp booking match the sector data. Everything else
@@ -3502,12 +3520,14 @@ The landing lives in `web/`; the backend (demo) and the app (redirect) need a sm
    (`GUIONES_SECTOR` in `relato-guiones.ts`, `GUIONES_GESTOR` in `gestor-guiones.ts`).
 2. **Pages:** copy an existing sector folder — `web/src/app/<sector>/page.tsx` (`SiteLanding` +
    `datosEstructuradosDeSector`, metadata from `metadatosDeSector`) and `opengraph-image.tsx`
-   (`imagenOg`) — and add the sector photo `web/public/heroes/<sector>.jpg` if the OG image or the
-   home accordion use it.
+   (`imagenOg`) — and add the sector photo `web/public/heroes/<sector>.jpg` if its OG image uses
+   it (the home page no longer shows photos).
 3. **Lists nothing type-checks:** its entry in `PAGINAS` (`web/src/lib/paginas.ts`, section
    `sectores`: the single registry the sitemap, `/llms.txt`, the menus (`nicheLinks`) and the
    tests read; `tests/lib/paginas.test.ts` fails if a `page.tsx` is missing from it);
-   `SECTORES` in `components/main-landing.tsx` (home accordion) and `components/site-footer.tsx`;
+   its scene in `ESCENAS_DE_OFICIO` (`web/src/lib/escenas-de-oficio.ts`, home page; its test
+   checks one per sector) and `components/site-footer.tsx`; `ID_DE_LA_CALCULADORA` and
+   `SECTORES_DE_LA_CALCULADORA` (`components/herramientas/calculo-de-llamadas-perdidas.ts`);
    the blog CTA targets (`DESTINOS` in `components/blog/bloques.tsx` and
    `lib/keystatic/bloques.tsx`) and article sectors (`SECTORES` in `web/keystatic.config.tsx`).
    Optionally a plural alias in `web/next.config.mjs` (`/peluquerias` → `/peluqueria`).

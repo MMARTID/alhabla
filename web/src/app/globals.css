@@ -354,18 +354,6 @@ body {
   .scrollbar-dark::-webkit-scrollbar-thumb:hover {
     background-color: rgba(255, 255, 255, 0.5);
   }
-
-  /* Carrusel de sectores en móvil: el gesto es el del dedo y los puntos de
-     abajo ya dicen por dónde va, así que la barra sobra — y en escritorio
-     con ratón partiría el borde inferior de las tarjetas. */
-  .scrollbar-none {
-    scrollbar-width: none;
-    -ms-overflow-style: none;
-  }
-
-  .scrollbar-none::-webkit-scrollbar {
-    display: none;
-  }
 }
 
 /* ---------------------------------------------------------------------------
@@ -488,11 +476,6 @@ body {
     background-size: 100% 100%;
   }
 }
-
-/* La sección de sectores de la portada usa una pila de cartas (ver
-   SectorStackCard en main-landing.tsx, motion.div con animate de
-   framer-motion) — sin clases CSS propias, todo el posicionamiento se
-   calcula en JS por carta. */
 
 /* Cuerpo de los artículos del blog (MDX sin plugin de tipografía). */
 .articulo {
