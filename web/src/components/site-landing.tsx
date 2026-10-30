@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowRight, Plus } from "lucide-react";
 import { EnTuNegocioScroll } from "@/components/en-tu-negocio";
 import { GestorSimulacionSection } from "@/components/gestor-simulacion";
+import { CalculadoraCompacta } from "@/components/herramientas/calculadora-compacta";
 import { LandingHero } from "@/components/landing-hero";
 import { LlamadaScroll } from "@/components/llamada-scroll";
 import { Reveal } from "@/components/scroll-reveal";
@@ -25,8 +26,8 @@ import type { SectorLanding } from "@/lib/sectores/tipos";
  * (LlamadaScroll + EnTuNegocioScroll, GUIONES_SECTOR) y tu asistente
  * resolviendo una ausencia por WhatsApp con el panel al lado
  * (GestorSimulacionSection, GUIONES_GESTOR). Entre escena y escena, dos
- * líneas y una pieza plana: el WhatsApp de la clienta, sus servicios, el
- * precio y cinco preguntas. Lo que cambia de un oficio a otro está en
+ * líneas y una pieza plana: el WhatsApp de la clienta, sus servicios, la
+ * calculadora compacta con su oficio, el precio y cinco preguntas. Lo que cambia de un oficio a otro está en
  * lib/sectores/<sector>.ts y en esos dos guiones. La portada es otra
  * (main-landing.tsx).
  */
@@ -105,6 +106,10 @@ export function SiteLanding({ sector }: { sector: SectorLanding }) {
       </div>
 
       <OficioDelSector oficio={sector.oficio} acento={acento} />
+
+      {/* Su cuenta antes del precio: con sus llamadas y su precio de cita,
+          qué plan se paga con cuántas citas. */}
+      <CalculadoraCompacta sector={sector} />
 
       <PreciosDelSector slug={sector.slug} acento={acento} />
 

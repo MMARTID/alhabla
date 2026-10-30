@@ -1,0 +1,630 @@
+/*
+ * Las escenas del oficio de la portada (escenas-de-oficio.tsx).
+ *
+ * Cada tarjeta lleva el acento de su sector en tres variables que pone el
+ * componente desde NICHE_ACCENTS: `--acento` (strong: el timbre, el hilo y el
+ * check), `--acento-suave` (soft: el fondo de la cita) y `--acento-tinta`
+ * (deep: el texto sobre ese fondo, AA en los ocho). Los mismos nombres que
+ * usa la cita nueva del relato (llamada-scroll.module.css).
+ *
+ * Lo que se mueve es un solo momento, «el timbre que se vuelve cita»: el
+ * azulejo suena dos veces, la frase de quien llama entra, el hilo baja y la
+ * ficha de la agenda se rellena de izquierda a derecha. Solo con
+ * `data-fase="suena"`, una vez por tarjeta; sin JavaScript, con movimiento
+ * reducido o si la tarjeta ya se veía al cargar, la escena sale resuelta.
+ *
+ * El cajón (detalle y enlace) vive debajo del visor, fuera de la vista. Al
+ * abrir, sube como un chat que avanza, lo justo para que quepa: la cita y el
+ * cajón suben lo que mide el cajón; el hilo se acorta primero y la frase de
+ * arriba solo sube lo que el hilo no alcanza a absorber, fundiéndose al
+ * cruzar el borde de arriba (la máscara del visor). Las tres medidas las
+ * pone el componente; sin él, todo sube junto.
+ */
+
+.escena {
+  /* Lo que suben al abrir la cita con el cajón y, la frase, la burbuja y el
+     hilo, y lo que se queda el hilo (lo mide el componente). */
+  --subida: 8rem;
+  --subida-arriba: 8rem;
+  --hilo-escala: 1;
+  --expo: cubic-bezier(0.16, 1, 0.3, 1);
+  container-type: inline-size;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid rgb(var(--linea));
+  border-radius: 1.5rem;
+  background: rgb(var(--superficie));
+  transition:
+    border-color 200ms ease,
+    box-shadow 400ms var(--expo),
+    transform 400ms var(--expo);
+}
+
+/* Abierta: borde del acento y una sombra de algo que se levanta. */
+.escena[data-abierta="true"],
+.escena:has(.enlace:focus) {
+  border-color: color-mix(in srgb, var(--acento) 45%, rgb(var(--linea)));
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.07);
+}
+
+.escena[data-abierta="true"] :is(.momento, .burbuja),
+.escena:has(.enlace:focus) :is(.momento, .burbuja) {
+  transform: translateY(calc(var(--subida-arriba) * -1));
+}
+
+.escena[data-abierta="true"] .hilo,
+.escena:has(.enlace:focus) .hilo {
+  transform: translateY(calc(var(--subida-arriba) * -1))
+    scaleY(var(--hilo-escala));
+}
+
+.escena[data-abierta="true"] :is(.cita, .cajon),
+.escena:has(.enlace:focus) :is(.cita, .cajon) {
+  transform: translateY(calc(var(--subida) * -1));
+}
+
+/* Con ratón, se abre al pasar; con un respiro de 60 ms para que cruzar la
+   rejilla de un lado a otro no abra y cierre cuatro tarjetas seguidas. */
+@media (hover: hover) and (pointer: fine) {
+  .escena:hover {
+    border-color: color-mix(in srgb, var(--acento) 45%, rgb(var(--linea)));
+    box-shadow: 0 14px 36px rgba(0, 0, 0, 0.07);
+    transform: translateY(-2px);
+  }
+
+  .escena:hover :is(.momento, .burbuja, .hilo, .cita, .cajon) {
+    transition-delay: 60ms;
+  }
+
+  .escena:hover :is(.momento, .burbuja) {
+    transform: translateY(calc(var(--subida-arriba) * -1));
+  }
+
+  .escena:hover .hilo {
+    transform: translateY(calc(var(--subida-arriba) * -1))
+      scaleY(var(--hilo-escala));
+  }
+
+  .escena:hover :is(.cita, .cajon) {
+    transform: translateY(calc(var(--subida) * -1));
+  }
+
+  .escena:hover .flecha {
+    transform: translateX(3px);
+  }
+}
+
+/* El teclado llega al enlace del cajón: el anillo va en la tarjeta. */
+.escena:has(.enlace:focus-visible) {
+  outline: 2px solid var(--acento);
+  outline-offset: 3px;
+}
+
+/* ---- Capas: el destino del clic va debajo y el dibujo encima, sin
+   recibir el puntero, para que la tarjeta entera responda. ---- */
+
+.cubierta,
+.toque {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: inherit;
+}
+
+/* Con ratón, la tarjeta entera es el enlace; en táctil, un toque abre o
+   cierra y el enlace es el del cajón. */
+@media (hover: hover) and (pointer: fine) {
+  .toque {
+    display: none;
+  }
+}
+
+@media not all and (hover: hover) and (pointer: fine) {
+  .cubierta {
+    display: none;
+  }
+}
+
+.toque {
+  cursor: pointer;
+  background: transparent;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.toque:focus-visible {
+  outline: 2px solid var(--acento);
+  outline-offset: 3px;
+}
+
+.cabecera,
+.visor {
+  position: relative;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.cabecera {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 1.25rem 1.25rem 0;
+}
+
+/* ---- El timbre ---- */
+
+.timbre {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 0.75rem;
+  background: var(--acento-suave);
+  color: var(--acento);
+}
+
+.timbre svg {
+  width: 1.125rem;
+  height: 1.125rem;
+}
+
+/* ---- El visor y su carril ---- */
+
+/* La máscara funde lo que sube por el borde de arriba a lo largo de una
+   línea entera de texto (1,5rem), para que la frase que cruza se lea como un
+   fundido y no como un corte. En reposo no toca nada: el visor se mete
+   0,75rem bajo la cabecera (lo de ahí arriba es transparente) y el cuerpo
+   empieza justo donde la máscara ya es opaca. */
+.visor {
+  display: grid;
+  flex: 1 1 auto;
+  overflow: hidden;
+  margin-top: -0.75rem;
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 1.5rem);
+  mask-image: linear-gradient(to bottom, transparent, #000 1.5rem);
+}
+
+.carril {
+  position: relative;
+  display: grid;
+}
+
+.cuerpo {
+  display: flex;
+  flex-direction: column;
+  padding: 1.5rem 1.25rem 1.25rem;
+}
+
+.momento,
+.burbuja,
+.hilo,
+.cita,
+.cajon {
+  transition: transform 520ms var(--expo);
+}
+
+/* La línea de arriba se va del todo al abrir: la máscara del visor solo
+   funde 1,5 rem y, con dos líneas, dejaba un rastro bajo el título. */
+.momento {
+  transition:
+    transform 520ms var(--expo),
+    opacity 240ms ease-out;
+}
+
+.escena[data-abierta="true"] .momento,
+.escena:has(.enlace:focus) .momento {
+  opacity: 0;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .escena:hover .momento {
+    opacity: 0;
+  }
+}
+
+.momento {
+  font-size: 0.875rem;
+  line-height: 1.375rem;
+  color: rgb(var(--apagado));
+}
+
+.momento strong {
+  font-weight: 600;
+  color: rgb(var(--tinta));
+}
+
+/* La frase de quien llama: la burbuja que entra, como en el teléfono. */
+.burbuja {
+  align-self: flex-start;
+  max-width: 94%;
+  margin-top: 0.75rem;
+  padding: 0.5rem 0.75rem 0.625rem;
+  border-radius: 1rem 1rem 1rem 0.375rem;
+  background: rgb(var(--relleno-fuerte));
+}
+
+.quien {
+  display: block;
+  font-size: 0.75rem;
+  line-height: 1rem;
+  font-weight: 600;
+  color: rgb(var(--apagado));
+}
+
+.dice {
+  margin-top: 0.125rem;
+  font-size: 0.9375rem;
+  line-height: 1.375rem;
+  color: rgb(var(--tinta));
+}
+
+/* El hilo baja de la frase a la cita y se estira lo que haga falta: en una
+   fila, las citas quedan alineadas abajo, como en una agenda. */
+.hilo {
+  flex: 1 0 1rem;
+  width: 2px;
+  margin: 0.25rem 0 0.25rem 1.5rem;
+  border-radius: 1px;
+  background: var(--acento);
+  transform-origin: top;
+}
+
+/* ---- La cita: el hueco discontinuo y, encima, la ficha rellena ---- */
+
+.cita {
+  display: grid;
+}
+
+.hueco,
+.ficha {
+  grid-area: 1 / 1;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  column-gap: 0.75rem;
+  border-radius: 0.75rem;
+  padding: 0.5rem 0.75rem;
+}
+
+.hueco {
+  border: 1px dashed rgb(var(--linea-fuerte));
+  color: rgb(var(--apagado));
+  font-size: 0.8125rem;
+  visibility: hidden;
+}
+
+.escena[data-fase="espera"] .hueco,
+.escena[data-fase="suena"] .hueco {
+  visibility: visible;
+}
+
+.ficha {
+  border: 1px solid color-mix(in srgb, var(--acento) 28%, var(--acento-suave));
+  background: var(--acento-suave);
+  color: var(--acento-tinta);
+}
+
+.hora {
+  display: flex;
+  flex-direction: column;
+  min-width: 2.75rem;
+  padding-right: 0.75rem;
+  border-right: 1px solid color-mix(in srgb, currentColor 22%, transparent);
+  font-size: 0.6875rem;
+  line-height: 1rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.hora b {
+  font-size: 0.9375rem;
+  line-height: 1.25rem;
+  font-weight: 700;
+}
+
+.estado {
+  display: block;
+  font-size: 0.75rem;
+  line-height: 1rem;
+  font-weight: 600;
+}
+
+.servicio {
+  display: block;
+  margin-top: 0.125rem;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  font-weight: 700;
+  color: var(--acento-tinta);
+}
+
+.con {
+  display: block;
+  font-size: 0.8125rem;
+  line-height: 1.125rem;
+}
+
+.check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.375rem;
+  height: 1.375rem;
+  border-radius: 9999px;
+  background: var(--acento);
+  color: #fff;
+}
+
+.check svg {
+  width: 0.8125rem;
+  height: 0.8125rem;
+}
+
+/* ---- El cajón: fuera del visor hasta que el carril sube ---- */
+
+.cajon {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  padding: 0 1.25rem 1.25rem;
+}
+
+.detalle {
+  font-size: 0.875rem;
+  line-height: 1.375rem;
+  color: rgb(var(--tinta-2));
+}
+
+.enlace {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  min-height: 2.75rem;
+  margin-top: 0.125rem;
+  margin-bottom: -0.5rem;
+  border-radius: 0.375rem;
+  font-size: 0.875rem;
+  line-height: 1.5rem;
+  font-weight: 600;
+  color: rgb(var(--tinta));
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--acento) 55%, transparent);
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 4px;
+  pointer-events: auto;
+}
+
+.enlace:focus-visible {
+  outline: none;
+}
+
+.flecha {
+  width: 1rem;
+  height: 1rem;
+  transition: transform 250ms var(--expo);
+}
+
+/* ---- «El timbre que se vuelve cita» ---- */
+
+.escena[data-fase="espera"] .burbuja {
+  opacity: 0;
+  transform: translateY(8px);
+}
+
+.escena[data-fase="espera"] .hilo {
+  transform: scaleY(0);
+}
+
+.escena[data-fase="espera"] .ficha {
+  clip-path: inset(0 100% 0 0 round 0.75rem);
+}
+
+.escena[data-fase="espera"] .check {
+  opacity: 0;
+  transform: scale(0.3);
+}
+
+/* `backwards`: el primer fotograma cubre la espera y, al acabar, manda el
+   estilo de siempre (así el cajón puede apagar la burbuja después). */
+.escena[data-fase="suena"] .timbre {
+  animation: onda 450ms var(--expo) calc(var(--retraso, 0ms)) 2 backwards;
+}
+
+.escena[data-fase="suena"] .timbre svg {
+  animation: sacudir 900ms linear calc(var(--retraso, 0ms)) backwards;
+}
+
+.escena[data-fase="suena"] .burbuja {
+  animation: entrar 560ms var(--expo) calc(var(--retraso, 0ms) + 260ms)
+    backwards;
+}
+
+.escena[data-fase="suena"] .hilo {
+  animation: bajar 480ms var(--expo) calc(var(--retraso, 0ms) + 640ms) backwards;
+}
+
+.escena[data-fase="suena"] .ficha {
+  animation: rellenar 680ms var(--expo) calc(var(--retraso, 0ms) + 980ms)
+    backwards;
+}
+
+.escena[data-fase="suena"] .check {
+  animation: marcar 420ms var(--expo) calc(var(--retraso, 0ms) + 1400ms)
+    backwards;
+}
+
+@keyframes onda {
+  from {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--acento) 40%, transparent);
+  }
+  to {
+    box-shadow: 0 0 0 12px color-mix(in srgb, var(--acento) 0%, transparent);
+  }
+}
+
+/* Dos sacudidas cortas y quieto, como un timbre de verdad. */
+@keyframes sacudir {
+  0%,
+  44%,
+  100% {
+    transform: rotate(0deg);
+  }
+  6%,
+  50% {
+    transform: rotate(-16deg);
+  }
+  14%,
+  58% {
+    transform: rotate(14deg);
+  }
+  22%,
+  66% {
+    transform: rotate(-10deg);
+  }
+  30%,
+  74% {
+    transform: rotate(6deg);
+  }
+  38%,
+  82% {
+    transform: rotate(0deg);
+  }
+}
+
+@keyframes entrar {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+    filter: blur(3px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    filter: blur(0);
+  }
+}
+
+@keyframes bajar {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+
+@keyframes rellenar {
+  from {
+    clip-path: inset(0 100% 0 0 round 0.75rem);
+  }
+  to {
+    clip-path: inset(0 0 0 0 round 0.75rem);
+  }
+}
+
+@keyframes marcar {
+  from {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Movimiento reducido: quieto y resuelto; el cajón se abre sin deslizarse. */
+@media (prefers-reduced-motion: reduce) {
+  .escena,
+  .momento,
+  .burbuja,
+  .hilo,
+  .cita,
+  .cajon,
+  .flecha {
+    transition: none;
+  }
+
+  .escena:hover {
+    transform: none;
+  }
+
+  .escena[data-fase] .timbre,
+  .escena[data-fase] .timbre svg,
+  .escena[data-fase] .burbuja,
+  .escena[data-fase] .hilo,
+  .escena[data-fase] .ficha,
+  .escena[data-fase] .check {
+    animation: none;
+    opacity: 1;
+    transform: none;
+    filter: none;
+    clip-path: none;
+  }
+
+  .escena[data-fase] .hueco {
+    visibility: hidden;
+  }
+}
+
+/* ---- Tarjeta estrecha: cuatro columnas en un portátil de 1024 ----
+   Menos margen dentro y la hora encima de la cita, para que
+   «Manicura semipermanente» quepa sin partirse a media palabra. */
+
+@container (max-width: 16rem) {
+  .cabecera {
+    padding: 1rem 1rem 0;
+  }
+
+  .cuerpo,
+  .cajon {
+    padding-right: 1rem;
+    padding-left: 1rem;
+  }
+
+  .cuerpo {
+    padding-bottom: 1rem;
+  }
+
+  .cajon {
+    padding-bottom: 1rem;
+  }
+
+  .ficha,
+  .hueco {
+    grid-template-columns: 1fr auto;
+    row-gap: 0.125rem;
+  }
+
+  .hora {
+    grid-column: 1 / -1;
+    flex-direction: row;
+    align-items: baseline;
+    gap: 0.25rem;
+    min-width: 0;
+    padding-right: 0;
+    border-right: 0;
+  }
+
+  .hora b {
+    font-size: 0.8125rem;
+  }
+
+  .hilo {
+    margin-left: 1.25rem;
+  }
+}
+
+/* ---- Carrusel del móvil ---- */
+
+.pista {
+  scrollbar-width: none;
+}
+
+.pista::-webkit-scrollbar {
+  display: none;
+}

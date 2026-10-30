@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, Calculator } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { AvisoDeFundador, PrecioDePlan } from "@/components/precio-de-plan";
 import type { NicheAccent } from "@/lib/niche-landings";
 import { formatIncludedMinutes, plans, TRIAL_REASSURANCE } from "@/lib/plans";
@@ -15,7 +15,8 @@ function loQueIncluye(resumen: string): string {
 /**
  * «¿Cuánto cuesta?»: los tres planes en una sola pieza (precio, minutos y
  * una línea), la prueba y el fundador una vez, y la comparación entera en
- * /planes. La calculadora de llamadas perdidas, en un enlace discreto.
+ * /planes. La calculadora de llamadas perdidas va justo encima, en pequeño
+ * (CalculadoraCompacta), así que aquí ya no lleva enlace.
  */
 export function PreciosDelSector({
   slug,
@@ -93,17 +94,10 @@ export function PreciosDelSector({
           </ul>
         </div>
 
-        <div className="mt-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="mt-8">
           <Link href={planesHref} className="btn-secondary w-full sm:w-auto">
             Comparar los planes
             <ArrowRight className="h-4 w-4" aria-hidden="true" />
-          </Link>
-          <Link
-            href="/herramientas/calculadora-de-llamadas-perdidas"
-            className="inline-flex min-h-11 items-center gap-2 text-sm font-medium text-apagado underline decoration-linea-fuerte underline-offset-4 transition hover:text-tinta hover:decoration-tinta"
-          >
-            <Calculator className="h-4 w-4 shrink-0" aria-hidden="true" />
-            ¿Cuánto te cuestan las llamadas que no coges? Haz la cuenta
           </Link>
         </div>
       </div>

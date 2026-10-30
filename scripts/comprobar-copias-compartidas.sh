@@ -19,7 +19,6 @@ set -euo pipefail
 
 # Rutas relativas a frontend/src/ y a web/src/.
 COPIAS_COMPARTIDAS=(
-  components/back-link.tsx
   components/beta-pill.tsx
   components/brand-icons.tsx
   components/brand-mark.tsx

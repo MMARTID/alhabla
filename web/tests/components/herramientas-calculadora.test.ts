@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { calcular, estadoInicial, SEMANAS_POR_MES } from "@/components/herramientas/calculo-de-llamadas-perdidas";
+import {
+  calcular,
+  estadoInicial,
+  ID_DE_LA_CALCULADORA,
+  SECTORES_DE_LA_CALCULADORA,
+  SEMANAS_POR_MES,
+  TAMANOS_DE_EQUIPO,
+} from "@/components/herramientas/calculo-de-llamadas-perdidas";
 import { plans } from "@/lib/plans";
+import { SECTORES } from "@/lib/sectores";
 
 /**
  * La cuenta que explica /herramientas/calculadora-de-llamadas-perdidas en
@@ -37,5 +45,21 @@ describe("calculadora de llamadas perdidas", () => {
   it("no divide por cero con un ticket vacío", () => {
     const r = calcular({ ...estadoInicial("peluqueria"), ticket: "" });
     expect(Number.isFinite(r.citasParaCubrirlo ?? 0)).toBe(true);
+  });
+
+  it("cada landing de sector tiene su sector en la calculadora, y ninguno se repite", () => {
+    expect(Object.keys(ID_DE_LA_CALCULADORA).sort()).toEqual(Object.keys(SECTORES).sort());
+    const ids = Object.values(ID_DE_LA_CALCULADORA);
+    expect(new Set(ids).size).toBe(ids.length);
+    for (const id of ids) {
+      expect(SECTORES_DE_LA_CALCULADORA.some((s) => s.id === id), id).toBe(true);
+    }
+  });
+
+  it("cada tramo de «¿Cuántos sois?» propone un plan donde caben", () => {
+    const planes = TAMANOS_DE_EQUIPO.map(
+      ({ profesionales }) => calcular({ ...estadoInicial("peluqueria"), profesionales }).recomendado?.plan.id
+    );
+    expect(planes).toEqual(["inicio", "pro", "scale"]);
   });
 });
