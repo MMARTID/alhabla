@@ -172,6 +172,38 @@ describe("TelnyxAdapter", () => {
     });
   });
 
+  describe("listNumbers", () => {
+    it("recorre todas las páginas y se salta los que vienen sin id", async () => {
+      mockPhoneNumbersList.mockReturnValue(
+        (async function* () {
+          yield {
+            id: "pn_1",
+            phone_number: "+34930000001",
+            status: "active",
+            connection_id: "cc_1",
+            messaging_profile_id: null,
+            tags: ["alhabla"],
+            created_at: "2026-09-01T00:00:00Z",
+          };
+          yield { id: null, phone_number: "+34930000002" };
+        })()
+      );
+
+      expect(await adapter.listNumbers()).toEqual([
+        {
+          id: "pn_1",
+          phoneNumber: "+34930000001",
+          status: "active",
+          connectionId: "cc_1",
+          messagingProfileId: null,
+          tags: ["alhabla"],
+          createdAt: "2026-09-01T00:00:00Z",
+        },
+      ]);
+      expect(mockPhoneNumbersList).toHaveBeenCalledWith({ "page[size]": 250 });
+    });
+  });
+
   describe("releaseNumber", () => {
     it("elimina el número", async () => {
       mockPhoneNumbersDelete.mockResolvedValue(undefined);

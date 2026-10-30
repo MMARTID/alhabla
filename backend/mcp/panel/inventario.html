@@ -1,0 +1,373 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Alhabla · Inventario</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%238b5cf6'/%3E%3Ctext x='16' y='22' font-size='16' font-family='system-ui' font-weight='700' fill='white' text-anchor='middle'%3EI%3C/text%3E%3C/svg%3E">
+<style>
+  :root {
+    --lienzo: #fafafa; --superficie: #ffffff; --tinta: #0a0a0a; --apagado: #52525b;
+    --tenue: #a1a1aa; --linea: #e5e5e5; --linea-suave: #f0f0f0; --morado: #8b5cf6;
+    --morado-tinta: #6d28d9; --lavado: #f3eeff; --exito: #2c7334; --exito-fondo: #edf7ee;
+    --error: #c53030; --error-fondo: #fdecec; --aviso: #806012; --aviso-fondo: #fdf6e1;
+    --sombra: 0 1px 2px rgba(10,10,10,.04);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --lienzo: #0b0b0e; --superficie: #141418; --tinta: #f4f4f5; --apagado: #a1a1aa;
+      --tenue: #71717a; --linea: #27272a; --linea-suave: #1c1c21; --morado: #a78bfa;
+      --morado-tinta: #c4b5fd; --lavado: #1f1830; --exito: #6fcf7d; --exito-fondo: #12261a;
+      --error: #f87171; --error-fondo: #2a1414; --aviso: #e8c15a; --aviso-fondo: #2a2312;
+      --sombra: none;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--lienzo); color: var(--tinta); font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; }
+  a { color: inherit; }
+  code, .mono { font-family: ui-monospace, monospace; font-size: 12.5px; }
+  header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 24px; border-bottom: 1px solid var(--linea); background: var(--superficie); position: sticky; top: 0; z-index: 3; flex-wrap: wrap; }
+  .marca { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 15px; text-decoration: none; }
+  .marca i { width: 26px; height: 26px; border-radius: 8px; background: var(--morado); display: inline-block; }
+  .marca span { color: var(--apagado); font-weight: 500; }
+  nav { display: flex; gap: 6px; flex-wrap: wrap; }
+  nav a, .pastilla { text-decoration: none; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--linea); color: var(--apagado); font-size: 13px; background: var(--superficie); cursor: pointer; font-family: inherit; }
+  nav a:hover, .pastilla:hover { color: var(--tinta); border-color: var(--tenue); }
+  .pastilla.activa { background: var(--tinta); color: var(--superficie); border-color: var(--tinta); }
+  main { max-width: 1240px; margin: 0 auto; padding: 24px; display: grid; gap: 16px; }
+  @media (max-width: 900px) { main { padding: 16px; } header { padding: 14px 16px; } }
+  .panel { background: var(--superficie); border: 1px solid var(--linea); border-radius: 24px; padding: 20px 22px; box-shadow: var(--sombra); min-width: 0; }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--apagado); margin: 0 0 14px; font-weight: 600; display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .fila { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .boton { border: 1px solid var(--linea); background: var(--superficie); color: var(--tinta); border-radius: 10px; padding: 6px 11px; font: inherit; font-size: 12.5px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+  .boton:hover { border-color: var(--tenue); }
+  .boton.primario { background: var(--tinta); color: var(--superficie); border-color: var(--tinta); }
+  .boton.morado { background: var(--lavado); color: var(--morado-tinta); border-color: transparent; font-weight: 600; }
+  .boton.peligro { background: #c53030; color: #fff; border-color: #c53030; font-weight: 600; }
+  .boton:disabled { opacity: .45; cursor: default; }
+  .insignia { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 11.5px; font-weight: 600; background: var(--linea-suave); color: var(--apagado); }
+  .insignia.ok { background: var(--exito-fondo); color: var(--exito); }
+  .insignia.fallo { background: var(--error-fondo); color: var(--error); }
+  .insignia.aviso { background: var(--aviso-fondo); color: var(--aviso); }
+  .insignia.morado { background: var(--lavado); color: var(--morado-tinta); }
+  .detalle { color: var(--apagado); font-size: 12.5px; }
+  .vacio { color: var(--apagado); }
+  .cargando { color: var(--apagado); font-style: italic; }
+  .contador { display: flex; gap: 28px; flex-wrap: wrap; align-items: baseline; }
+  .contador strong { font-size: 30px; letter-spacing: -.02em; }
+  .contador .cero { color: var(--exito); }
+  .contador .hay { color: var(--error); }
+  table { width: 100%; border-collapse: collapse; }
+  td, th { text-align: left; padding: 8px 10px 8px 0; border-top: 1px solid var(--linea-suave); vertical-align: top; }
+  th { color: var(--apagado); font-weight: 500; font-size: 12.5px; border-top: 0; }
+  .alerta { border-radius: 14px; padding: 12px 14px; margin-top: 12px; }
+  .alerta.urgente { background: var(--error-fondo); color: var(--error); }
+  .alerta p { margin: 0 0 6px; }
+  input[type=text], textarea { font: inherit; color: var(--tinta); background: var(--superficie); border: 1px solid var(--linea); border-radius: 10px; padding: 6px 9px; }
+  input[type=text]:focus, textarea:focus { outline: 2px solid var(--morado); outline-offset: 0; border-color: transparent; }
+  textarea { width: 100%; min-height: 260px; font-family: ui-monospace, monospace; font-size: 12px; line-height: 1.45; resize: vertical; }
+
+  /* Hilos: cuenta → número → assistant, unidos con SVG */
+  .hilos { position: relative; }
+  .hilos svg.lineas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
+  .hilo { display: grid; grid-template-columns: minmax(220px, 1fr) minmax(180px, .8fr) minmax(260px, 1.3fr); column-gap: 44px; row-gap: 10px; padding: 16px 0; border-top: 1px solid var(--linea-suave); align-items: start; }
+  .hilo:first-child { border-top: 0; padding-top: 0; }
+  .columna { display: grid; gap: 10px; min-width: 0; }
+  .nodo { position: relative; background: var(--lienzo); border: 1px solid var(--linea); border-radius: 16px; padding: 12px 14px; min-width: 0; z-index: 1; }
+  .nodo.vacio-nodo { border-style: dashed; background: transparent; }
+  .nodo.cuenta { border-color: var(--tinta); }
+  .nodo .tipo { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--morado-tinta); font-weight: 600; }
+  .nodo .titulo { font-weight: 650; font-size: 14.5px; word-break: break-word; }
+  .nodo .ids { margin-top: 2px; word-break: break-all; }
+  .nodo .acciones { margin-top: 8px; }
+  details { margin-top: 8px; }
+  details summary { cursor: pointer; color: var(--morado-tinta); font-weight: 600; font-size: 12.5px; }
+  details[open] summary { margin-bottom: 8px; }
+  .cabecera-hilos { display: grid; grid-template-columns: minmax(220px, 1fr) minmax(180px, .8fr) minmax(260px, 1.3fr); column-gap: 44px; color: var(--apagado); font-size: 12px; margin-bottom: 8px; }
+  @media (max-width: 900px) {
+    .hilo, .cabecera-hilos { grid-template-columns: 1fr; column-gap: 0; }
+    .cabecera-hilos { display: none; }
+    .hilos svg.lineas { display: none; }
+    .columna + .columna { padding-left: 18px; border-left: 2px solid var(--linea); }
+  }
+  .plataforma { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; }
+  #dialogo { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: none; align-items: center; justify-content: center; z-index: 10; padding: 16px; }
+  #dialogo.visible { display: flex; }
+  #dialogo .panel { max-width: 560px; width: 100%; }
+  #toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(20px); opacity: 0; background: var(--tinta); color: var(--superficie); padding: 10px 16px; border-radius: 12px; transition: .2s; max-width: 90vw; z-index: 20; }
+  #toast.visible { opacity: 1; transform: translateX(-50%); }
+</style>
+</head>
+<body>
+<header>
+  <a class="marca" href="/"><i></i>Alhabla <span>· inventario</span></a>
+  <nav>
+    <a href="/">Panel</a>
+    <button class="pastilla activa" data-entorno="dev" onclick="cambiarEntorno('dev')">Dev</button>
+    <button class="pastilla" data-entorno="prod" onclick="cambiarEntorno('prod')">Producción</button>
+  </nav>
+</header>
+
+<main>
+  <section class="panel">
+    <h2>Fantasmas en la cuenta de Telnyx <button class="boton" onclick="cargarFantasmas()">Actualizar</button></h2>
+    <div id="fantasmas"><p class="cargando">Leyendo la cuenta de Telnyx y las dos bases de datos…</p></div>
+  </section>
+
+  <section class="panel">
+    <h2><span id="titulo-hilos">Cuentas de dev</span> <span class="detalle" id="resumen-hilos"></span></h2>
+    <div class="cabecera-hilos"><span>Cuenta</span><span>Número de Telnyx</span><span>Assistant de Telnyx</span></div>
+    <div class="hilos" id="hilos"><p class="cargando">Leyendo…</p></div>
+  </section>
+
+  <section class="panel">
+    <h2>Números de la plataforma</h2>
+    <p class="detalle" style="margin-top:-6px">No son de ninguna cuenta: el mismo WhatsApp para todos los negocios.</p>
+    <div class="plataforma" id="plataforma"></div>
+  </section>
+</main>
+
+<div id="dialogo" onclick="if (event.target === this) cerrarDialogo()"><div class="panel" id="dialogo-cuerpo"></div></div>
+<div id="toast"></div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let entorno = new URLSearchParams(location.search).get("entorno") === "prod" ? "prod" : "dev";
+let inventario = null;
+
+function esc(texto) {
+  return String(texto ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+function fecha(iso) { return iso ? new Date(iso).toLocaleDateString("es-ES", { day: "2-digit", month: "2-digit", year: "2-digit" }) : ""; }
+function aviso(texto) {
+  const t = $("toast"); t.textContent = texto; t.classList.add("visible");
+  clearTimeout(aviso.t); aviso.t = setTimeout(() => t.classList.remove("visible"), 5000);
+}
+async function pedir(ruta, cuerpo) {
+  const opciones = cuerpo ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(cuerpo) } : {};
+  const respuesta = await fetch(ruta, opciones);
+  const datos = await respuesta.json();
+  if (!respuesta.ok) throw new Error(datos.error || `HTTP ${respuesta.status}`);
+  return datos;
+}
+function cerrarDialogo() { $("dialogo").classList.remove("visible"); }
+function abrirDialogo(html) { $("dialogo-cuerpo").innerHTML = html; $("dialogo").classList.add("visible"); }
+
+// ── Fantasmas ───────────────────────────────────────────────────────────
+async function cargarFantasmas() {
+  $("fantasmas").innerHTML = `<p class="cargando">Leyendo la cuenta de Telnyx y las dos bases de datos…</p>`;
+  try {
+    const f = await pedir("/api/fantasmas");
+    const nA = f.assistants.length, nN = f.numeros.length;
+    let html = `<div class="contador">
+      <div><strong class="${nA ? "hay" : "cero"}">${nA}</strong> assistant${nA === 1 ? "" : "s"} sin dueño <span class="detalle">de ${f.enLaCuenta.assistants}</span></div>
+      <div><strong class="${nN ? "hay" : "cero"}">${nN}</strong> número${nN === 1 ? "" : "s"} sin uso <span class="detalle">de ${f.enLaCuenta.numeros}</span></div>
+    </div>
+    <p class="detalle">Cruzado con: ${f.cruzadoCon.map(esc).join(" · ")}. La cuenta de Telnyx es la misma para dev y producción.</p>`;
+    if (nA || nN) {
+      html += `<table><tr><th>Tipo</th><th>Qué es</th><th>Id</th><th></th></tr>
+        ${f.assistants.map((a) => `<tr><td><span class="insignia morado">assistant</span></td><td><b>${esc(a.name)}</b><div class="detalle">${a.createdAt ? `creado el ${fecha(a.createdAt)}` : ""}${a.nota ? ` · solo lo apuntan agentes borrados` : ""}</div></td><td class="mono">${esc(a.id)}</td><td><button class="boton" onclick="simular('${esc(a.id)}', this)">Simular borrado</button></td></tr>`).join("")}
+        ${f.numeros.map((n) => `<tr><td><span class="insignia aviso">número</span></td><td><b class="mono">${esc(n.phoneNumber)}</b><div class="detalle">${esc(n.status)}${n.createdAt ? ` · comprado el ${fecha(n.createdAt)}` : ""}</div>${n.tags && n.tags.length ? `<div class="fila" style="margin-top:4px">${n.tags.map((t) => `<span class="insignia">${esc(t)}</span>`).join("")}</div>` : ""}</td><td class="mono">${esc(n.id)}</td><td><button class="boton" onclick="simular('${esc(n.id)}', this)">Simular borrado</button></td></tr>`).join("")}
+      </table>`;
+    } else {
+      html += `<p class="vacio">Nada que limpiar.</p>`;
+    }
+    $("fantasmas").innerHTML = html;
+  } catch (e) {
+    $("fantasmas").innerHTML = `<div class="alerta urgente"><p><b>No se marca nada como fantasma.</b> ${esc(e.message)}</p></div>`;
+  }
+}
+
+async function simular(id, boton) {
+  boton.disabled = true;
+  try {
+    const plan = await pedir("/api/fantasmas/simular", { id });
+    if (!plan.esFantasma) {
+      abrirDialogo(`<h2>Ya no es un fantasma</h2><p class="mono">${esc(id)}</p><ul>${plan.motivo.map((m) => `<li>${esc(m)}</li>`).join("")}</ul><div class="fila"><button class="boton" onclick="cerrarDialogo(); cargarFantasmas()">Cerrar</button></div>`);
+      return;
+    }
+    abrirDialogo(`<h2>Dry-run: borrar ${plan.tipo === "numero" ? "un número" : "un assistant"}</h2>
+      <p><b>${esc(plan.descripcion)}</b></p>
+      <p class="detalle">Se libera:</p>
+      <ul>${plan.seLibera.map((s) => `<li>${esc(s)}</li>`).join("")}</ul>
+      <div class="alerta urgente"><p>${esc(plan.aviso)}</p></div>
+      <p style="margin-top:14px">Para borrarlo de verdad, escribe el id <code>${esc(plan.id)}</code>:</p>
+      <input type="text" id="confirmacion" style="width:100%" autocomplete="off" oninput="habilitarBorrado('${esc(plan.id)}')">
+      <label class="fila" style="margin-top:10px"><input type="checkbox" id="compartida" onchange="habilitarBorrado('${esc(plan.id)}')"> Sé que esta cuenta de Telnyx es la de producción</label>
+      <div class="fila" style="margin-top:14px; justify-content:flex-end">
+        <button class="boton" onclick="cerrarDialogo()">Cancelar</button>
+        <button class="boton peligro" id="boton-borrar" disabled onclick="borrar('${esc(plan.id)}', this)">Borrar en Telnyx</button>
+      </div>`);
+  } catch (e) { aviso(e.message); }
+  finally { boton.disabled = false; }
+}
+function habilitarBorrado(id) {
+  $("boton-borrar").disabled = !($("confirmacion").value.trim() === id && $("compartida").checked);
+}
+async function borrar(id, boton) {
+  boton.disabled = true;
+  try {
+    const r = await pedir("/api/fantasmas/borrar", { id, confirmacion: $("confirmacion").value, cuentaCompartida: $("compartida").checked });
+    cerrarDialogo(); aviso(r.hecho.join(" · ")); cargarFantasmas();
+  } catch (e) { aviso(e.message); boton.disabled = false; }
+}
+
+// ── Hilos ───────────────────────────────────────────────────────────────
+const SUSCRIPCION = { active: "ok", trialing: "ok", past_due: "aviso", unpaid: "fallo", canceled: "fallo", incomplete: "aviso" };
+
+function nodoCuenta(c) {
+  return `<div class="nodo cuenta" data-nodo="c-${esc(c.id)}">
+    <div class="tipo">Cuenta</div>
+    <div class="titulo">${esc(c.nombre)}</div>
+    <div class="ids detalle mono">${esc(c.id)}</div>
+    <div class="fila" style="margin-top:6px">
+      <span class="insignia morado">plan ${esc(c.plan)}</span>
+      <span class="insignia ${SUSCRIPCION[(c.estadoDeSuscripcion || "").toLowerCase()] || ""}">${esc(c.estadoDeSuscripcion ?? "sin suscripción")}</span>
+      <span class="insignia ${c.estadoDelNumero === "active" ? "ok" : "aviso"}">número ${esc(c.estadoDelNumero ?? "¿?")}</span>
+    </div>
+    <details><summary>Editar nombre</summary>
+      <div class="fila"><input type="text" id="nombre-${esc(c.id)}" value="${esc(c.nombre)}" style="flex:1 1 160px">
+      <button class="boton primario" onclick="guardarNombre('${esc(c.id)}', this)">Guardar</button></div>
+      <p class="detalle">Por PATCH /business/me, como el dueño. El plan lo cambia Stripe: aquí solo se lee.</p>
+    </details>
+    ${entorno === "dev" ? `<div class="acciones"><button class="boton morado" onclick="entrar('${esc(c.id)}', this)">Entrar como esta cuenta</button></div>` : ""}
+  </div>`;
+}
+
+function nodoNumero(c) {
+  if (!c.numero) {
+    return `<div class="nodo vacio-nodo" data-nodo="n-${esc(c.id)}"><div class="tipo">Sin número</div><div class="detalle">La cuenta aún no tiene número de Telnyx.</div></div>`;
+  }
+  return `<div class="nodo" data-nodo="n-${esc(c.id)}">
+    <div class="tipo">Asistente de voz</div>
+    <div class="titulo mono">${esc(c.numero.numero ?? c.numero.pendiente ?? "¿?")}</div>
+    ${c.numero.pendiente && !c.numero.numero ? `<span class="insignia aviso">a medio comprar</span>` : ""}
+    <div class="ids detalle mono">${esc(c.numero.telnyxId ?? "sin id de Telnyx")}</div>
+  </div>`;
+}
+
+function nodoAssistant(c, a) {
+  const estado = a.borrado ? `<span class="insignia fallo">agente borrado</span>` : a.activo ? `<span class="insignia ok">activo</span>` : `<span class="insignia aviso">inactivo</span>`;
+  return `<div class="nodo" data-nodo="a-${esc(a.id)}" data-de="n-${esc(c.id)}">
+    <div class="tipo">Assistant de Telnyx</div>
+    <div class="titulo">${esc(a.nombre)}</div>
+    <div class="ids detalle mono">${esc(a.assistantId ?? "sin assistant")}</div>
+    <div class="fila" style="margin-top:6px">${estado}
+      ${a.promptEditadoAMano ? `<span class="insignia morado">prompt editado a mano</span>` : ""}
+      ${a.errorDeSync ? `<span class="insignia fallo" title="${esc(a.errorDeSync)}">error de sync</span>` : a.sincronizado ? `<span class="insignia">sync ${fecha(a.sincronizado)}</span>` : ""}
+    </div>
+    ${a.borrado ? "" : `<label class="fila detalle" style="margin-top:8px"><input type="checkbox" ${a.activo ? "checked" : ""} onchange="guardarActivo('${esc(c.id)}', '${esc(a.id)}', this)"> Activo (atiende llamadas)</label>`}
+    <details ontoggle="dibujarLineas()"><summary>systemPrompt (${a.systemPrompt.length.toLocaleString("es-ES")} caracteres)</summary>
+      <textarea id="prompt-${esc(a.id)}" ${a.borrado ? "readonly" : ""}>${esc(a.systemPrompt)}</textarea>
+      ${a.borrado ? "" : `<div class="fila" style="margin-top:8px; justify-content:space-between">
+        <span class="detalle">Por PATCH /agents/:id: queda como editado a mano y se sincroniza con Telnyx.</span>
+        <button class="boton primario" onclick="guardarPrompt('${esc(c.id)}', '${esc(a.id)}', this)">Guardar prompt</button></div>`}
+    </details>
+  </div>`;
+}
+
+function pintarHilos() {
+  const cuentas = inventario.cuentas;
+  $("titulo-hilos").textContent = entorno === "prod" ? "Cuentas de producción" : "Cuentas de dev";
+  const agentes = cuentas.reduce((n, c) => n + c.agentes.length, 0);
+  $("resumen-hilos").textContent = `${cuentas.length} cuenta${cuentas.length === 1 ? "" : "s"} · ${agentes} agente${agentes === 1 ? "" : "s"}`;
+  $("hilos").innerHTML = `<svg class="lineas" id="lineas" aria-hidden="true"></svg>` + (cuentas.length
+    ? cuentas.map((c) => `<div class="hilo">
+        <div class="columna">${nodoCuenta(c)}</div>
+        <div class="columna">${nodoNumero(c)}</div>
+        <div class="columna">${c.agentes.length ? c.agentes.map((a) => nodoAssistant(c, a)).join("") : `<div class="nodo vacio-nodo" data-nodo="sin-${esc(c.id)}" data-de="n-${esc(c.id)}"><div class="tipo">Sin agente</div><div class="detalle">Ningún assistant para esta cuenta.</div></div>`}</div>
+      </div>`).join("")
+    : `<p class="vacio">No hay cuentas.</p>`);
+  const PLATAFORMA = {
+    whatsapp_reservas: ["WhatsApp de reservas", "Los clientes de los negocios escriben aquí (audience client)."],
+    whatsapp_gestor: ["WhatsApp del Gestor", "Los dueños: avisos y tu asistente (audience owner)."],
+  };
+  $("plataforma").innerHTML = inventario.numerosDePlataforma.map((s) => {
+    const [titulo, texto] = PLATAFORMA[s.tipo] || [s.audiencia, ""];
+    return `<div class="nodo"><div class="tipo">${esc(titulo)}</div><div class="titulo mono">${esc(s.numero)}</div>
+      <div class="detalle">${esc(texto)}</div>
+      <div class="fila" style="margin-top:6px"><span class="insignia ${s.estado === "CONNECTED" ? "ok" : "aviso"}">${esc(s.estado)}</span>${s.nombreVisible ? `<span class="insignia">${esc(s.nombreVisible)}</span>` : ""}</div>
+      <div class="ids detalle mono">${esc(s.telnyxId ?? "sin id de Telnyx en la BD")}</div></div>`;
+  }).join("") + `<div class="nodo vacio-nodo"><div class="tipo">WhatsApp propio del negocio</div><div class="detalle">Para el futuro (coexistencia): todavía no hay ningún campo en la BD que lo guarde.</div></div>`
+    + (inventario.numerosDePlataforma.length ? "" : `<p class="vacio">No hay WhatsApp de plataforma en esta BD.</p>`);
+  requestAnimationFrame(dibujarLineas);
+}
+
+/** Une cada cuenta con su número y el número con cada assistant. */
+function dibujarLineas() {
+  const svg = $("lineas"); if (!svg) return;
+  const base = $("hilos").getBoundingClientRect();
+  const caja = (el) => { const r = el.getBoundingClientRect(); return { x: r.left - base.left, y: r.top - base.top, w: r.width, h: r.height }; };
+  const curva = (a, b, discontinua) => {
+    const x1 = a.x + a.w, y1 = a.y + Math.min(30, a.h / 2), x2 = b.x, y2 = b.y + Math.min(30, b.h / 2), m = (x1 + x2) / 2;
+    return `<path d="M${x1},${y1} C${m},${y1} ${m},${y2} ${x2},${y2}" fill="none" stroke="var(--morado)" stroke-width="1.6" ${discontinua ? 'stroke-dasharray="4 4" opacity=".55"' : 'opacity=".8"'}/>
+      <circle cx="${x1}" cy="${y1}" r="3" fill="var(--morado)"/><circle cx="${x2}" cy="${y2}" r="3" fill="var(--morado)"/>`;
+  };
+  let trazos = "";
+  for (const cuenta of document.querySelectorAll('[data-nodo^="c-"]')) {
+    const id = cuenta.dataset.nodo.slice(2);
+    const numero = document.querySelector(`[data-nodo="n-${CSS.escape(id)}"]`);
+    if (!numero) continue;
+    const sinNumero = numero.classList.contains("vacio-nodo");
+    trazos += curva(caja(cuenta), caja(numero), sinNumero);
+    for (const destino of document.querySelectorAll(`[data-de="n-${CSS.escape(id)}"]`)) {
+      trazos += curva(caja(numero), caja(destino), sinNumero || destino.classList.contains("vacio-nodo"));
+    }
+  }
+  svg.innerHTML = trazos;
+}
+window.addEventListener("resize", () => requestAnimationFrame(dibujarLineas));
+
+async function cargarInventario() {
+  $("hilos").innerHTML = `<p class="cargando">Leyendo la BD de ${entorno === "prod" ? "producción" : "dev"}…</p>`;
+  try { inventario = await pedir(`/api/inventario?entorno=${entorno}`); pintarHilos(); }
+  catch (e) { $("hilos").innerHTML = `<div class="alerta urgente"><p>${esc(e.message)}</p></div>`; }
+}
+function cambiarEntorno(nuevo) {
+  entorno = nuevo;
+  document.querySelectorAll("[data-entorno]").forEach((b) => b.classList.toggle("activa", b.dataset.entorno === entorno));
+  history.replaceState(null, "", entorno === "prod" ? "?entorno=prod" : "/inventario");
+  cargarInventario();
+}
+
+// ── Ediciones ───────────────────────────────────────────────────────────
+/** En producción, el id escrito a mano es el OK de esa operación. */
+function confirmarEnProduccion(objetivo, queHace) {
+  if (entorno !== "prod") return "";
+  const escrito = prompt(`PRODUCCIÓN: ${queHace}.\nEscribe el id ${objetivo} para confirmar:`);
+  if (escrito === null) return null;
+  return escrito.trim();
+}
+async function editar(cuerpo, objetivo, queHace, boton) {
+  const confirmacion = confirmarEnProduccion(objetivo, queHace);
+  if (confirmacion === null) return false;
+  if (boton) boton.disabled = true;
+  try {
+    const r = await pedir("/api/inventario/editar", { ...cuerpo, entorno, ...(confirmacion ? { confirmacion } : {}) });
+    aviso(r.mensaje); await cargarInventario(); return true;
+  } catch (e) { aviso(e.message); return false; }
+  finally { if (boton) boton.disabled = false; }
+}
+function guardarNombre(businessId, boton) {
+  const nombre = $(`nombre-${businessId}`).value;
+  editar({ tipo: "cuenta", businessId, nombre }, businessId, `cambiar el nombre de la cuenta a «${nombre}»`, boton);
+}
+async function guardarActivo(businessId, agenteId, casilla) {
+  const ok = await editar({ tipo: "agente", businessId, agenteId, activo: casilla.checked }, agenteId, `${casilla.checked ? "activar" : "desactivar"} el agente`, null);
+  if (!ok) casilla.checked = !casilla.checked;
+}
+function guardarPrompt(businessId, agenteId, boton) {
+  editar({ tipo: "agente", businessId, agenteId, systemPrompt: $(`prompt-${agenteId}`).value }, agenteId, "guardar el systemPrompt (y sincronizarlo con Telnyx)", boton);
+}
+async function entrar(businessId, boton) {
+  boton.disabled = true;
+  try { const { url } = await pedir("/api/entrar", { businessId }); window.open(url, "_blank"); }
+  catch (e) { aviso(e.message); }
+  finally { boton.disabled = false; }
+}
+
+cambiarEntorno(entorno);
+cargarFantasmas();
+</script>
+</body>
+</html>

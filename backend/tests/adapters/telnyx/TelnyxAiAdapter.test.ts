@@ -9,6 +9,7 @@ const mockAssistantsCreate = vi.fn();
 const mockAssistantsUpdate = vi.fn();
 const mockAssistantsRetrieve = vi.fn();
 const mockAssistantsDelete = vi.fn();
+const mockAssistantsList = vi.fn();
 const mockPhoneNumbersUpdate = vi.fn();
 const mockStartAIAssistant = vi.fn();
 const mockStopAIAssistant = vi.fn();
@@ -57,6 +58,7 @@ const mockTelnyxClient = {
       update: mockAssistantsUpdate,
       retrieve: mockAssistantsRetrieve,
       delete: mockAssistantsDelete,
+      list: mockAssistantsList,
       chat: mockAssistantsChat,
       tests: {
         create: mockAssistantTestsCreate,
@@ -364,6 +366,31 @@ describe("TelnyxAiAdapter", () => {
       await adapter.deleteAssistant("assistant_123");
 
       expect(mockAssistantsDelete).toHaveBeenCalledWith("assistant_123");
+    });
+  });
+
+  describe("listAssistants", () => {
+    it("devuelve id, nombre y fecha, sin instrucciones", async () => {
+      mockAssistantsList.mockResolvedValue({
+        data: [
+          {
+            id: "assistant-1",
+            name: "alhabla-x",
+            created_at: "2026-10-01T00:00:00Z",
+            instructions: "largo",
+          },
+          { id: "assistant-2", name: "sin fecha" },
+        ],
+      });
+
+      expect(await adapter.listAssistants()).toEqual([
+        {
+          id: "assistant-1",
+          name: "alhabla-x",
+          createdAt: "2026-10-01T00:00:00Z",
+        },
+        { id: "assistant-2", name: "sin fecha", createdAt: null },
+      ]);
     });
   });
 
