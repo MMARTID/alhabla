@@ -1,79 +1,105 @@
-# PLAN-GROWTH — Alhabla Growth
+# PLAN-GROWTH — Alhabla Growth (v2, sin Reddit)
 
-> **Estado: DISEÑO APROBADO (2026-10-30), en Fase 0. No hay código ni Scheduled Task creada.**
-> Decisiones en `docs/growth/registro-de-decisiones.md`; protocolo de la Fase 0 en
-> `docs/growth/fase-0-protocolo.md`. Cada fase siguiente necesita tu visto bueno.
-> Sustituye a la propuesta del chat de la misma fecha (cola en Notion, cinco borradores
-> diarios, un Explorador que buscaba hilos de Reddit). Qué cambia y por qué, en § 0.
+> **Estado: v2 (2026-10-30), alcance reducido. Fase 0 cerrada; no hay código ni Scheduled Task.**
+> La v1 (fusionada en #381) incluía Reddit como fuente de conversaciones. El 2026-10-30 el
+> fundador decidió omitirlo; esta versión lo retira y reorienta el sistema hacia **backlinks,
+> SEO y visibilidad en IA**. Decisiones en `docs/growth/registro-de-decisiones.md`; cierre de la
+> Fase 0 en `docs/growth/fase-0-protocolo.md`. Cada fase siguiente necesita tu visto bueno.
 
-Alhabla Growth es un sistema interno que **encuentra oportunidades, prepara borradores y
-los deja en una bandeja para que los revises, los apruebes y los publiques tú a mano**.
-Los agentes razonan en Claude Code (suscripción Max) con una Scheduled Task; la
-persistencia y el dashboard son infraestructura propia de Alhabla.
-
----
-
-## 0. Qué cambia respecto a la propuesta anterior
-
-| Antes | Ahora | Motivo |
-|---|---|---|
-| Cola de revisión en Notion | Dashboard propio `growth.alhabla.ai` | Pedido tuyo; además permite reglas duras en el backend |
-| 5 borradores diarios | Umbral de calidad; **hay días con cero** | Pedido tuyo; Reddit castiga el volumen repetitivo |
-| Explorador que buscaba hilos de Reddit con búsqueda web y navegador | **Reddit solo por entrada manual** (tú pegas el hilo) | § 1: el User Agreement de Reddit prohíbe el acceso automatizado sin permiso escrito. Mi propuesta anterior lo incumplía; queda corregida |
-| 6 agentes | 8 módulos, 3 objetivos separados | Pedido tuyo |
-| Conocimiento "leído del repo" | Base de afirmaciones con fuente y commit; el backend rechaza lo no trazable | Para que no invente funciones |
+Alhabla Growth es un sistema interno que **encuentra oportunidades de enlace y de visibilidad,
+prepara los borradores y los deja en una bandeja para que los revises, los apruebes y los
+ejecutes tú a mano**. Los agentes razonan en Claude Code (suscripción Max) con una Scheduled
+Task; la persistencia y el dashboard son infraestructura propia de Alhabla.
 
 ---
 
-## 1. Reddit: restricciones comerciales verificadas (2026-10-30)
+## 0. Qué cambia respecto a la v1
 
-| Hecho | Fuente | Consecuencia de diseño |
+| v1 | v2 | Motivo |
 |---|---|---|
-| Hay que **pedir y obtener aprobación explícita antes de acceder a cualquier dato** por la API. Política actualizada el 5-10-2026 (la versión de 5-6-2026 ya lo decía) | Responsible Builder Policy | Integración con Reddit **desactivada** y modelada como adaptador futuro |
-| El uso comercial exige **aprobación escrita**. Fuentes secundarias cifran la tarifa comercial en ~0,24 $/1.000 llamadas, desde ~12.000 $/mes, sin plan intermedio. **Dato no oficial: no lo he visto en las páginas de Reddit** | Responsible Builder Policy; prowlo.com | Alhabla promocionando su producto es uso comercial. Fuera de alcance; solo se pediría con evidencia de valor |
-| **Prohibido acceder, buscar o recoger datos por medios automatizados** (scraping incluido) sin consentimiento escrito; solo se tolera el rastreo conforme a `robots.txt` | User Agreement §7 | Sin scraping, sin navegador automatizado sobre reddit.com, sin APIs no autorizadas |
-| Spam = acciones repetidas o no solicitadas, automáticas o manuales. Ejemplos prohibidos: **un bot que promociona productos**, herramientas (bots, IA generativa) que faciliten spam, **varias cuentas**, mensajes privados masivos. La promoción no es spam por sí sola; cada subreddit decide (muchos aplican ~10 %) | Política de spam | Publica una persona, cuenta única, sin mensajes privados, tope de autopromoción y de frecuencia |
-| No se pueden usar datos de Reddit para entrenar modelos ni comercializarlos; hay que **borrar lo que no se necesite** | Responsible Builder Policy; Data API Terms | Extracto máximo 500 caracteres, retención 90 días, nada de Reddit en corpus de ejemplos |
-| **Reddit Pro** (gratis, beta): solo países angloparlantes, Trends solo con conversaciones públicas **en inglés**, y prohíbe descargar publicaciones o comentarios de terceros (a mano o con herramientas) | Ayuda de Reddit Pro | No sirve para España y no puede alimentar al sistema |
+| Reddit como fuente (entrada manual de hilos) | **Fuera del sistema** | Decisión del fundador. Sin API autorizada ni acceso automatizado, el coste de esfuerzo manual no compensaba (§ 1) |
+| Tareas diarias | **Run semanal** | Sin hilos que caducan en horas no hace falta ritmo diario |
+| Objetivos A y B con conversaciones | A y B **reducidos** (§ 2); el peso lo lleva C | Sin foros, no hay un canal claro de conversaciones |
+| Vistas Entrada y Comunidades | Eliminadas; un botón «Añadir URL» en la Bandeja | Ya no hay normas de comunidad que guardar |
+| Borradores: comentario, respuesta, publicación | Email de contacto, ficha de directorio, texto invitado, solicitud por formulario | El trabajo es de enlaces y menciones editoriales |
+| Reglas de ratio de autopromoción y topes por comunidad | Reglas contra esquemas de enlaces y topes de contacto por dominio | Cambia el riesgo principal |
 
-**Hipótesis mías, sin verificar** (se comprueban en la Fase 0): que los enlaces de usuario en
-Reddit salen `nofollow`/`ugc` (si es así, su valor SEO directo es nulo y rinden por tráfico y
-por citas en IA); y que en español hay pocos hilos de dueños de peluquerías en Reddit. Si la
-segunda se cumple, el peso real del sistema está en backlinks, SEO y GEO, no en Reddit.
+Se mantiene todo lo demás: 8 módulos, 3 objetivos separados, conocimiento con fuente,
+reglas duras en el backend, aprobación y ejecución manual, backend sin LLM y suscripción
+separada de la API.
+
+---
+
+## 1. Qué sabemos tras la Fase 0
+
+### Por qué se omite Reddit (referencia por si se retoma)
+
+| Hecho (revisado el 2026-10-30) | Fuente |
+|---|---|
+| Hay que **pedir y obtener aprobación explícita antes de acceder a cualquier dato** por la API (política actualizada el 5-10-2026) | Responsible Builder Policy |
+| El uso comercial exige aprobación escrita; fuentes secundarias hablan de ~12.000 $/mes (**dato no oficial**) | Responsible Builder Policy; prowlo.com |
+| Prohibido acceder, buscar o recoger datos por medios automatizados sin consentimiento escrito | User Agreement §7 |
+| Bots que promocionan productos, varias cuentas y mensajes privados masivos cuentan como spam | Política de spam |
+| Reddit Pro (gratis) es solo para países angloparlantes, Trends solo en inglés, y prohíbe descargar contenido de terceros | Ayuda de Reddit Pro |
+
+Medido por el fundador en su navegador (2026-10-30):
+
+| Enlace | `rel` | Efecto |
+|---|---|---|
+| Publicación | `noopener nofollow sponsored` | No pasa autoridad |
+| Comentario | `noopener nofollow ugc` | No pasa autoridad |
+| Enlace social del perfil | sin `rel` | Podría pasarla; un solo enlace |
+
+**Cómo se retomaría:** solo con aprobación escrita de Reddit o con otra fuente de
+conversaciones que lo permita. La interfaz `FuenteDeOportunidades` (§ 4) deja el hueco; no hay
+código específico de Reddit hasta entonces. Publicar seguiría siendo manual.
+
+### Lo que sí está hecho
+
+- **Muestreo de backlinks** (`docs/growth/fase-0-muestreo-backlinks.md`): al menos seis comparativas de «recepcionista de IA en España» publicadas entre agosto y octubre de 2026 donde no aparece Alhabla en los extractos; un directorio sectorial gratuito (Beautymarket) y varias asociaciones. Son extractos de búsqueda, sin métricas de autoridad.
+- **Search Console**: API habilitada; cuenta de servicio `growth-lectura-gsc` sin roles de proyecto y con acceso **Restringido** a la propiedad de dominio `sc-domain:alhabla.ai`. Crear claves está bloqueado por la política de organización `iam.disableServiceAccountKeyCreation`; se usa **suplantación sin clave** (`admin@alhabla.ai` tiene Token Creator solo sobre esa cuenta). La suplantación aún no se ha probado de extremo a extremo.
+
+### Pendiente de la Fase 0
+
+- Línea base de uso de Claude Max (§ 10).
+- Revisar a mano las seis comparativas para ver cuáles son editoriales y cuáles de pago o de competidores.
 
 ---
 
 ## 2. Tres objetivos, separados
 
-Una oportunidad tiene un `objetivoPrincipal` y tres puntuaciones. Comparten el pipeline
-pero **cada objetivo tiene su umbral, su plantilla de borrador, su política de enlace y sus KPI**.
+Una oportunidad tiene un `objetivoPrincipal` y tres puntuaciones. Comparten el pipeline pero
+**cada objetivo tiene su umbral, su plantilla de borrador, su política de enlace y sus KPI**.
 
-| | A. Tráfico y marca | B. Clientes potenciales | C. Backlinks y autoridad |
+| | A. Tráfico y marca | B. Clientes potenciales (reducido) | C. Backlinks y autoridad (centro) |
 |---|---|---|---|
-| Qué buscamos | Conversaciones donde aportar valor y ser mencionados | Dueños de negocios con cita que describen el dolor (llamadas perdidas, agenda, no-shows) | Enlaces editoriales: listicles, directorios, prensa y asociaciones del sector, menciones sin enlace |
-| Dónde | Reddit (manual), foros y Q&A públicos | Igual, más los nichos nuevos | Sobre todo **fuera de Reddit** (enlace `nofollow`) |
-| Borrador | Respuesta útil, normalmente sin enlace | Respuesta que ayuda; si menciona Alhabla, con divulgación | Email de contacto, ficha de directorio o texto para artículo invitado |
-| Enlace | Solo si aporta; con UTM y divulgación | Solo si lo piden o encaja; UTM | Es el objetivo |
-| KPI | Visitas por UTM, menciones, citas en IA | Conversaciones útiles, visitas a registro, altas atribuidas | Dominios nuevos que enlazan, calidad, posiciones |
-| Nunca | Mensaje privado, plantillas repetidas | Perfilar personas, sacar contactos, DM | Comprar enlaces, esquemas de intercambio, spam en comentarios |
+| Qué buscamos | Menciones y fichas donde nos encuentren: comparativas, directorios, prensa y asociaciones del sector | **Prescriptores** que llegan a dueños de negocios con cita: asociaciones, distribuidores, academias, gestorías, integradores de agenda. Hipótesis por validar | Enlaces editoriales: listados, comparativas, artículos invitados, menciones sin enlace |
+| Dónde | Web pública | Web pública | Web pública |
+| Borrador | Ficha de directorio, solicitud de inclusión | Email o formulario de contacto proponiendo colaboración | Email, texto invitado, petición de enlace en una mención existente |
+| Enlace | Con UTM | Con UTM | Es el objetivo |
+| KPI | Visitas por UTM, menciones, citas en IA | Contactos que responden, altas atribuidas | Dominios nuevos que enlazan, calidad, posiciones |
+| Nunca | Fichas falsas o duplicadas | Contactar a particulares; correo masivo | Comprar enlaces sin `sponsored`, intercambios masivos, spam en comentarios |
+
+B es el más débil sin conversaciones: se persigue poco y se **mide** más (altas atribuidas por
+UTM, visitas a registro). Lo cubren sobre todo el SEO y las citas en IA (módulo 8).
 
 ---
 
 ## 3. Los ocho módulos
 
 Regla de diseño: **lo que se puede decidir con reglas vive en el backend (determinista,
-testeable); el LLM solo hace lo que exige criterio.** Un agente mal instruido o con
-prompt injection no puede saltarse las reglas duras.
+testeable); el LLM solo hace lo que exige criterio.** Un agente mal instruido o con prompt
+injection no puede saltarse las reglas duras.
 
 | # | Módulo | Tipo | Hace | Salida | No puede |
 |---|---|---|---|---|---|
-| 1 | **Discovery Agent** | LLM + fuentes | Convierte en candidatos: la cola de entrada manual (hilos que pegas) y la web pública no-Reddit (foros, Q&A, blogs, directorios, listicles). Propone nichos nuevos | `GrowthOportunidad` en `detectada` | Tocar reddit.com por ninguna vía automática |
-| 2 | **Qualification Agent** | Reglas + LLM | Puertas duras (abierto, reciente, comunidad apta, sin datos sensibles) y puntuación 0–100 por objetivo. Registra el motivo de cada descarte | `calificada` o `descartada` | Aprobar nada |
-| 3 | **Research Agent** | LLM | Intención, competidores mencionados, reglas de la comunidad que ya guardaste, qué se respondió ya | `GrowthInvestigacion` | Leer Reddit por su cuenta |
-| 4 | **Knowledge Agent** | Sincronización determinista + LLM | Mantiene la base de afirmaciones desde el repo (§ 3.1) y responde "¿qué puede decir Alhabla de X y con qué fuente?" | `GrowthAfirmacion`, snapshot con commit | Inventar: solo registra lo que tiene fuente |
+| 1 | **Discovery Agent** | LLM + web pública | Encuentra páginas candidatas (comparativas, directorios, asociaciones, prensa, menciones de Alhabla o de competidores) y procesa las URL que añades a mano. Propone nichos nuevos | `GrowthOportunidad` en `detectada` | Acceder a sitios que lo prohíban; contactar |
+| 2 | **Qualification Agent** | Reglas + LLM | Puertas duras (página viva, idioma, relevancia, no es un competidor, no es contenido ilegal o de baja calidad) y puntuación 0–100 por objetivo. Registra el motivo de cada descarte | `calificada` o `descartada` | Aprobar nada |
+| 3 | **Research Agent** | LLM | Quién edita la página, cómo se aceptan inclusiones, qué enlaza hoy, si hay formulario de alta o contacto editorial | `GrowthInvestigacion` | Enviar nada |
+| 4 | **Knowledge Agent** | Sincronización determinista + LLM | Mantiene la base de afirmaciones desde el repo (§ 3.1) y responde «¿qué puede decir Alhabla de X y con qué fuente?» | `GrowthAfirmacion`, snapshot con commit | Inventar: solo registra lo que tiene fuente |
 | 5 | **Response Agent** | LLM | Redacta el borrador según objetivo, con las claves de afirmaciones que usa | `GrowthBorrador` | Afirmar algo sin clave de afirmación vigente |
 | 6 | **Compliance Agent** | Reglas en backend + revisión LLM | Comprobaciones de § 3.2. El backend **rechaza** pasar a `pendiente_aprobacion` si una regla dura falla | `GrowthRevisionCumplimiento` | Saltarse una regla; aprobar |
-| 7 | **Backlink Intelligence** | LLM + importaciones | Perfil de enlaces propio y de competidores, huecos, oportunidades de tipo C, menciones sin enlace | Oportunidades C, `GrowthEnlaceEntrante` | Contactar a nadie |
+| 7 | **Backlink Intelligence** | LLM + importaciones | Perfil de enlaces propio y de competidores, huecos, menciones sin enlace, enlaces ganados o perdidos | Oportunidades C, `GrowthEnlaceEntrante` | Contactar a nadie |
 | 8 | **SEO & GEO Intelligence** | LLM + API de Search Console | Consultas y páginas (clics, impresiones, posición), indexación, huecos de contenido; panel fijo de preguntas para ver si Alhabla sale citada | `GrowthMetricaSeo`, `GrowthResultadoGeo` | Crear páginas (la web tiene tope de 75–85) |
 
 ### 3.1 Conocimiento real de Alhabla (módulo 4)
@@ -87,12 +113,12 @@ Fuentes que sincroniza, siempre con ruta, ancla y commit:
 | `sector` / nichos activos | `web/src/lib/sectores/*.ts` (los 8 de hoy) y `docs/investigacion-nichos.md` |
 | `comparativa` | `web/src/lib/comparativas.ts` (con la fecha `CONSULTADAS` de cada dato) |
 | `pagina` | `web/src/lib/paginas.ts` (registro de páginas indexables) y `web/content/blog/*.mdx` |
-| `prohibida` | Lista de lo retirado por falso (Telnyx no se nombra, etc.) y términos que no se usan |
+| `prohibida` | Lo retirado por falso y los términos que no se usan (por ejemplo, no se nombra a Telnyx) |
 
 - Cada afirmación lleva `clave` estable (`precio.plan.pro`), texto, valor, fuente y commit.
 - Un borrador solo puede afirmar cosas de Alhabla citando claves vigentes. El backend lo comprueba.
-- Si cambia `plans.ts`, `PRODUCT.md` u otra fuente, el siguiente run resincroniza **antes** de redactar y los borradores en cola con claves obsoletas pasan a `bloqueado`.
-- Las **limitaciones** son afirmaciones de primera clase, para que el Response Agent las diga cuando alguien pregunta por algo que Alhabla no hace.
+- Si cambia una fuente, el siguiente run resincroniza **antes** de redactar y los borradores en cola con claves obsoletas pasan a `bloqueado`.
+- Las **limitaciones** son afirmaciones de primera clase, para que el borrador no prometa lo que Alhabla no hace.
 
 ### 3.2 Comprobaciones de cumplimiento (módulo 6)
 
@@ -101,34 +127,33 @@ Reglas duras (bloquean, las evalúa el backend):
 1. Cada afirmación factual sobre Alhabla mapea a una clave vigente.
 2. Ninguna afirmación de la lista `prohibida`.
 3. Comparativas solo con dato verificable y fecha (art. 10 Ley 3/1991, como en `comparativas.ts`).
-4. Si menciona Alhabla, hay divulgación ("soy el fundador de Alhabla").
-5. Política de enlace de la comunidad respetada; reglas de la comunidad revisadas hace ≤ 30 días.
-6. Ratio de autopromoción de tus últimas publicaciones por debajo del tope (por defecto 10 %) y tope semanal por comunidad.
-7. Similitud con tus últimos borradores/publicaciones por debajo de un umbral (anti-plantilla).
-8. Sin datos personales de terceros; sin DM; sin petición de contacto.
+4. El mensaje identifica con claridad quién escribe y de parte de quién (fundador de Alhabla).
+5. **Sin esquemas de enlaces**: nada de enlaces de pago sin `sponsored`, intercambios recíprocos, anclas repetidas y optimizadas ni peticiones masivas.
+6. **Un contacto por dominio cada 90 días** y un tope semanal de contactos.
+7. Similitud con tus últimos borradores por debajo de un umbral (anti-plantilla).
+8. Solo direcciones o formularios profesionales publicados por el propio destino; sin datos personales de terceros.
 9. Tipo de borrador compatible con el objetivo.
 
-Reglas blandas (avisan, decides tú): tono, longitud, que la respuesta funcione sin el enlace, que no suene a anuncio.
+Reglas blandas (avisan, decides tú): tono, longitud, que el mensaje aporte algo al destinatario más allá de pedir un enlace.
 
 ### 3.3 Nichos
 
 - **Conoce los de hoy**: los 8 sectores de la web (`peluquería`, `barbería`, `centro de estética`, `salón de uñas`, `fisioterapia`, `pestañas y cejas`, `spa y masajes`, `peluquería canina`), cada uno con su vocabulario y su dolor.
-- **Descubre nuevos**: cuando un hilo o una búsqueda muestra un negocio con cita fuera de la lista (tatuadores, veterinarias, estudios de yoga o pilates, psicólogos, talleres…), Discovery crea un `GrowthNicho` en estado `candidato` con evidencia.
+- **Descubre nuevos**: cuando una búsqueda, una comparativa o Search Console muestran negocios con cita fuera de la lista (tatuadores, veterinarias, estudios de yoga o pilates, psicólogos, talleres…), Discovery crea un `GrowthNicho` en estado `candidato` con evidencia.
 - Cada candidato se puntúa por dolor telefónico visible, encaje con lo que Alhabla hace (cita + calendario), competencia, demanda de búsqueda (Search Console), riesgo regulatorio (datos de salud) y facilidad de llegar a ellos.
 - **Tú decides** en la vista Nichos: `activo` o `descartado`. Pasar a activo no crea páginas ni borradores solo: abre una propuesta para el plan de contenido (`PLAN-WEB-CONTENIDO.md`).
 
 ---
 
-## 4. Arquitectura técnica definitiva
+## 4. Arquitectura técnica
 
 ```
  Mac (Claude Code Max)
  ┌──────────────────────────────────────────────────────────┐
- │ Scheduled Task local «growth-diario» (L–V)                │
+ │ Scheduled Task local «growth-semanal»                     │
  │   orquestador  ──►  8 subagentes (.claude/agents/growth-*)│
- │   herramientas: WebSearch, web_fetch (hook: sin reddit),  │
- │   Read del repo, alhabla-dev (solo lectura),              │
- │   alhabla-growth (MCP nuevo, acotado)                     │
+ │   herramientas: WebSearch, web_fetch, Read del repo,      │
+ │   alhabla-dev (solo lectura), alhabla-growth (MCP nuevo)  │
  └───────────────┬──────────────────────────────────────────┘
                  │ HTTPS + token de agente (alcances mínimos)
                  ▼
@@ -137,55 +162,59 @@ Reglas blandas (avisan, decides tú): tono, longitud, que la respuesta funcione 
    /growth/admin/*   (sesión admin) │ Cloud Scheduler: purga de retención
                  ▲
                  │
- growth.alhabla.ai (Vercel, Next 16)  ◄──  tú: revisar · editar · aprobar · publicar a mano · descartar
+ growth.alhabla.ai (Vercel, Next 16)  ◄──  tú: revisar · editar · aprobar · ejecutar a mano · descartar
 ```
 
 **Decisiones**
 
-1. **Un solo backend**, un módulo nuevo. Cero servicios nuevos en GCP, `maxScale` 11 intacto (presupuesto de conexiones de Cloud SQL). Los endpoints son ligeros.
+1. **Un solo backend**, un módulo nuevo. Cero servicios nuevos en GCP, `maxScale` 11 intacto (presupuesto de conexiones de Cloud SQL). Endpoints ligeros.
 2. **Dashboard como tercera web** (`growth/`), no dentro de `frontend/`: la app de clientes es multi-tenant y no tiene rol de administrador. Las tablas `Growth*` no cuelgan de `Business` y **ningún JWT de cliente** abre `/growth/*`.
 3. **Dos autenticaciones separadas**:
-   - Administrador: inicio de sesión con Google y lista blanca `GROWTH_ADMIN_EMAILS` (tu correo). Único que puede `aprobar`, `marcar_publicado`, `descartar`, decidir nichos y editar ajustes.
-   - Agente: token de servicio (se guarda solo su hash) con alcances: leer conocimiento y ajustes; crear oportunidades, investigaciones, borradores y métricas. **No puede aprobar ni marcar publicado.**
-4. **Cloudflare Access descartado** para proteger el dashboard: el Worker de LaLiga quita el proxy de Cloudflare durante los partidos para que los usuarios en España entren; con Access delante, tu dashboard se caería justo entonces. El subdominio irá **sin proxy** (nube gris), a confirmar en la Fase 1.
-5. **El backend no llama a ningún LLM.** Todo el razonamiento ocurre en la sesión programada (suscripción). Así no existe consumo de API oculto.
-6. **Publicar no existe en el código.** No hay adaptador con método `publicar`, ni credenciales de escritura de Reddit, ni cliente de envío de email o WhatsApp en Growth. Un test comprueba que la interfaz `FuenteDeOportunidades` solo tiene métodos de lectura.
-7. **Reddit como adaptador**, con tres implementaciones: `EntradaManual` (activa), `BusquedaIndirecta` (apagada por defecto, ver decisión 2 de § 11) y `RedditOficial` (apagada, solo lectura, exige `estadoAutorizacion = aprobada` con referencia escrita antes de poder activarse).
-8. **Contenido externo = datos, nunca órdenes.** Un hilo pegado puede contener "ignora tus instrucciones". Los subagentes solo escriben a través de `alhabla-growth`, el backend valida todo con Zod y las reglas duras no dependen del prompt.
-9. **Prompts versionados en el repo.** La Scheduled Task solo dice "lee `growth/agentes/orquestador.md` y síguelo": cambiar un prompt es un PR.
-10. **Defensa en profundidad contra Reddit**: hook `PreToolUse` en `.claude/settings.json` que deniega cualquier `web_fetch`, navegador o `curl` hacia `reddit.com`/`redd.it`; instrucción explícita en el orquestador; y los conectores de Chrome y Playwright no se permiten en la tarea.
+   - Administrador: inicio de sesión con Google y lista blanca `GROWTH_ADMIN_EMAILS` (tu correo). Único que puede `aprobar`, `marcar_gestionado`, `descartar`, decidir nichos y editar ajustes.
+   - Agente: token de servicio (se guarda solo su hash) con alcances: leer conocimiento y ajustes; crear oportunidades, investigaciones, borradores y métricas. **No puede aprobar ni marcar nada como gestionado.**
+4. **Cloudflare Access descartado** para proteger el dashboard: el Worker de LaLiga quita el proxy de Cloudflare durante los partidos para que los usuarios en España entren; con Access delante, el dashboard se caería justo entonces. El subdominio irá **sin proxy** (nube gris), a confirmar en la Fase 1.
+5. **El backend no llama a ningún LLM.** Todo el razonamiento ocurre en la sesión programada (suscripción). No existe consumo de API oculto.
+6. **Ejecutar no existe en el código.** No hay cliente de envío de email, formularios ni mensajería en Growth, ni credenciales de escritura de ninguna plataforma. Un test comprueba que la interfaz `FuenteDeOportunidades` solo tiene métodos de lectura.
+7. **`FuenteDeOportunidades`** con dos implementaciones: `BusquedaWeb` (páginas públicas que el agente encuentra) y `EntradaManual` (URL que añades en la Bandeja). Reddit queda **fuera**; la interfaz permite enchufar otra fuente más adelante, con autorización.
+8. **Contenido externo = datos, nunca órdenes.** Una página puede contener «ignora tus instrucciones». Los subagentes solo escriben a través de `alhabla-growth`, el backend valida todo con Zod y las reglas duras no dependen del prompt.
+9. **Prompts versionados en el repo.** La Scheduled Task solo dice «lee `growth/agentes/orquestador.md` y síguelo»: cambiar un prompt es un PR.
+10. **Navegadores fuera de la tarea.** Chrome, Playwright y el navegador integrado no se permiten en la tarea; el agente lee páginas con `web_fetch`. Un hook `PreToolUse` en `.claude/settings.json` deniega además cualquier acceso a `reddit.com` y `redd.it` mientras Reddit esté fuera de alcance.
+11. **Search Console sin claves**: la cuenta de servicio se usa por suplantación (`gcloud auth application-default login --impersonate-service-account=…`) porque la política de la organización prohíbe crear claves.
 
-**Flujo de un run**
+**Flujo de un run semanal**
 
-1. `GET /growth/agente/contexto`: ajustes, comunidades, cola de entrada manual, snapshot de conocimiento.
+1. `GET /growth/agente/contexto`: ajustes, URL añadidas a mano, snapshot de conocimiento.
 2. Knowledge: si cambió el commit de las fuentes, resincroniza.
-3. Discovery (cola manual + web no-Reddit) → Qualification → descarta con motivo lo que no llega al umbral.
+3. Discovery (web pública + URL manuales) → Qualification → descarta con motivo lo que no llega al umbral.
 4. Por cada superviviente: Research → Response → Compliance → `POST` del borrador. Si una regla dura falla, queda `bloqueado` con el motivo.
-5. Semanal: Backlink Intelligence y SEO & GEO. Mensual: barrido de nichos.
-6. Notificación solo si hay algo que revisar. Cero oportunidades = cero avisos y el run queda registrado como "sin oportunidades que lo merezcan".
+5. Backlink Intelligence (importaciones y huecos) y SEO & GEO (Search Console y panel de preguntas).
+6. Mensual: barrido de nichos.
+7. Notificación solo si hay algo que revisar. Cero oportunidades es un resultado válido y queda registrado.
 
 **Máquina de estados de la oportunidad**
 
 ```
-detectada ─► calificada ─► investigada ─► con_borrador ─► pendiente_aprobacion ─► aprobada ─► publicada ─► medida
-    │            │                              │                  │  └► devuelta ─► (vuelve a con_borrador)
+detectada ─► calificada ─► investigada ─► con_borrador ─► pendiente_aprobacion ─► aprobada ─► gestionada ─► conseguida
+    │            │                              │                  │  └► devuelta ─► (vuelve a con_borrador)       └► sin_respuesta
     ▼            ▼                              ▼                  ▼
 descartada   descartada                     bloqueada          descartada        aprobada ─► caducada (si vence expiraEn)
 ```
 
-Solo el administrador puede entrar en `aprobada`, `publicada`, `devuelta` y `descartada` (por humano).
+`gestionada` = tú has enviado el email, rellenado el formulario o dado de alta la ficha, y lo
+registras con la fecha. `conseguida` = el enlace o la mención ya está publicada y la URL queda
+anotada. Solo el administrador entra en `aprobada`, `gestionada`, `devuelta` y `descartada`.
 
-**Scheduled Task: local o en la nube**
+**Scheduled Task: local o nube**
 
 | | Local (Desktop) | Nube (routine) |
 |---|---|---|
 | Funciona con el Mac apagado | No: solo con la app abierta y el Mac despierto; si duerme, ese run se omite y al volver hace **un** run de recuperación | Sí |
 | Acceso al repo y a MCP locales | Sí (carpeta local, `alhabla-dev`, `alhabla-growth`) | Clon limpio; conectores configurados por tarea |
-| Permisos | Configurables por tarea, "siempre permitir" por herramienta | Modo automático por defecto |
+| Permisos | Configurables por tarea, «siempre permitir» por herramienta | Modo automático por defecto |
 | Intervalo mínimo | 1 hora desde el formulario | 1 hora |
-| Límite diario | Sin tope específico | Tope de routines/día según plan (15 en Max según la nota de lanzamiento de abril; **comprobar vigente**) |
 
-**Recomendación**: local en las Fases 2–3 (más fácil de depurar y de acotar), con "Mantener el equipo despierto". Migrar a la nube si fallan los runs por el Mac, exponiendo el módulo Growth como MCP remoto.
+Con un run semanal, que el Mac duerma un día importa poco: **local**, con «Mantener el equipo
+despierto» o con el run de recuperación. La nube queda como migración si fallara.
 
 ---
 
@@ -194,17 +223,16 @@ Solo el administrador puede entrar en `aprobada`, `publicada`, `devuelta` y `des
 | Conector | Estado | Uso | Alcance |
 |---|---|---|---|
 | Claude Code Max + Scheduled Tasks | Existe | Razonamiento y ejecución | Tarea local; modelo y modo de permisos fijados en la tarea |
-| `alhabla-growth` (MCP stdio) | **Nuevo** | Única vía de escritura | Herramientas: `contexto`, `leer_conocimiento`, `crear_oportunidad`, `descartar_oportunidad` (motivo), `guardar_investigacion`, `crear_borrador`, `registrar_cumplimiento`, `guardar_metricas`, `cerrar_ejecucion`. **Ninguna** aprueba o publica |
-| `WebSearch` y `web_search`/`web_fetch` (Parallel) | Existen | Web pública no-Reddit: foros, Q&A, listicles, directorios, prensa | Lectura. Bloqueo de reddit.com por hook |
+| `alhabla-growth` (MCP stdio) | **Nuevo** | Única vía de escritura | Herramientas: `contexto`, `leer_conocimiento`, `crear_oportunidad`, `descartar_oportunidad` (motivo), `guardar_investigacion`, `crear_borrador`, `registrar_cumplimiento`, `guardar_metricas`, `cerrar_ejecucion`. **Ninguna** aprueba ni marca como gestionado |
+| `WebSearch` y `web_search`/`web_fetch` (Parallel) | Existen | Web pública: comparativas, directorios, asociaciones, prensa | Lectura |
 | `alhabla-dev` | Existe | `visitas_web`, `consultar_bd_prod` | **Solo lectura**; atribución de visitas y altas |
-| Google Search Console API | **Nuevo** | Consultas, páginas, indexación | Cuenta de servicio con permiso de **solo lectura** en la propiedad |
+| Google Search Console API | **Hecho** (acceso) | Consultas, páginas, indexación | Cuenta de servicio `growth-lectura-gsc` con permiso **Restringido** en `sc-domain:alhabla.ai`, usada por suplantación sin clave |
 | Importaciones CSV (GSC Enlaces, Bing Webmaster, Ahrefs Webmaster Tools) | Manual mensual | Enlaces propios | Subida por ti desde el dashboard |
 | Ahrefs / Semrush / Ubersuggest (registro MCP) | **No** al inicio | Enlaces de competidores | Opcional, de pago, decisión posterior |
-| Gmail, Zoho Mail, WhatsApp, Slack | **Prohibidos en la tarea** | — | Sin herramientas de envío: no hay DM, ni email, ni mensaje automático |
-| Chrome, Playwright, navegador integrado | **Prohibidos en la tarea** | — | Evitan cualquier acceso automatizado a Reddit |
-| Reddit API | **Apagado** | Futuro | Solo con aprobación escrita; lectura únicamente |
+| Gmail, Zoho Mail, WhatsApp, Slack | **Prohibidos en la tarea** | — | Sin herramientas de envío: no hay correo ni mensaje automático |
+| Chrome, Playwright, navegador integrado | **Prohibidos en la tarea** | — | Lectura solo con `web_fetch` |
 
-Permisos de la tarea: `Read`/`Grep` del repo, `Agent`, `WebSearch`, `web_search`/`web_fetch`, herramientas de `alhabla-growth`, `visitas_web` y `consultar_bd_prod`. Sin `Write`/`Edit` ni `Bash` salvo `git rev-parse`. Los secretos (token de agente, cuenta de servicio) en el llavero de macOS o en variables de entorno del Mac, nunca en el repo; variables nuevas en `.env.example` y `docker-compose.yml`.
+Permisos de la tarea: `Read`/`Grep` del repo, `Agent`, `WebSearch`, `web_search`/`web_fetch`, herramientas de `alhabla-growth`, `visitas_web` y `consultar_bd_prod`. Sin `Write`/`Edit` ni `Bash` salvo `git rev-parse`. Los secretos (token de agente) en el llavero de macOS o variables de entorno del Mac, nunca en el repo; variables nuevas en `.env.example` y `docker-compose.yml`.
 
 Los avisos al móvil, si los quieres, van por la notificación de Claude (sin conectar mensajería).
 
@@ -216,24 +244,24 @@ Los avisos al móvil, si los quieres, van por la notificación de Claude (sin co
 growth/                              # nueva web Next 16 → growth.alhabla.ai (dev :3003, vista previa :3103)
   src/app/(panel)/
     bandeja/ · oportunidad/[id]/ · borradores/ · revision/ · historial/
-    analitica/ · backlinks/ · seo-geo/ · nichos/ · conocimiento/ · comunidades/
-    entrada/ · ejecuciones/ · ajustes/
+    analitica/ · backlinks/ · seo-geo/ · nichos/ · conocimiento/
+    ejecuciones/ · ajustes/
   src/components/ · src/lib/api.ts
   agentes/
     orquestador.md                   # lo que lee la Scheduled Task
-    reglas/{politica-reddit.md, voz-de-marca.md, afirmaciones-prohibidas.md}
+    reglas/{voz-de-marca.md, afirmaciones-prohibidas.md, politica-de-enlaces.md}
 backend/src/modules/growth/
   routes.ts                          # /growth/admin/* y /growth/agente/*
   service.ts · estados.ts · puntuacion.ts · cumplimiento.ts · similitud.ts
   conocimiento/sincronizar.ts        # lee plans.ts, PRODUCT.md, sectores, paginas, comparativas
-  fuentes/{FuenteDeOportunidades.ts, entradaManual.ts, redditOficial.ts}   # redditOficial apagado
+  fuentes/{FuenteDeOportunidades.ts, busquedaWeb.ts, entradaManual.ts}
   analitica/{searchConsole.ts, utm.ts}
 backend/mcp/growth/                  # MCP stdio «alhabla-growth»
 .claude/agents/growth-{discovery,qualification,research,knowledge,response,compliance,backlinks,seo-geo}.md
-.claude/settings.json                # hook que bloquea reddit.com en la tarea de Growth
+.claude/settings.json                # hook que deniega reddit.com y redd.it en la tarea
 backend/prisma/schema.prisma         # modelos Growth* + migración
 backend/tests/growth/                # estados, cumplimiento, similitud, sincronización, alcances del token
-docs/growth/{registro-de-decisiones.md, politica-reddit.md}
+docs/growth/{registro-de-decisiones.md, fase-0-protocolo.md, fase-0-muestreo-backlinks.md}
 PLAN-GROWTH.md
 ```
 
@@ -250,38 +278,19 @@ enum GrowthObjetivo { TRAFICO_MARCA LEADS BACKLINKS }
 
 enum GrowthEstadoOportunidad {
   detectada calificada investigada con_borrador pendiente_aprobacion
-  aprobada publicada medida devuelta bloqueada descartada caducada
+  aprobada gestionada conseguida sin_respuesta devuelta bloqueada descartada caducada
 }
 
-enum GrowthEstadoBorrador { borrador bloqueado pendiente_aprobacion aprobado publicado descartado }
-enum GrowthTipoBorrador { comentario respuesta publicacion email ficha_directorio texto_invitado }
+enum GrowthEstadoBorrador { borrador bloqueado pendiente_aprobacion aprobado gestionado descartado }
+enum GrowthTipoBorrador { email formulario ficha_directorio texto_invitado }
 enum GrowthEstadoNicho { activo candidato descartado }
-enum GrowthAutorizacion { sin_autorizar solicitada aprobada }
 
 model GrowthFuente {
   id String @id @default(cuid())
-  tipo String            // reddit_manual | reddit_oficial | web | directorio
+  tipo String            // web | directorio | manual
   nombre String
-  activa Boolean @default(false)
-  autorizacion GrowthAutorizacion @default(sin_autorizar)
-  referenciaAutorizacion String?   // el escrito de Reddit, si algún día existe
+  activa Boolean @default(true)
   config Json?
-}
-
-model GrowthComunidad {          // un subreddit u otro foro
-  id String @id @default(cuid())
-  fuenteId String
-  nombre String                  // r/…
-  url String
-  idioma String @default("es")
-  reglasTexto String? @db.Text   // pegadas por ti
-  reglasRevisadasEn DateTime?
-  politicaEnlaces String @default("desconocida") // permite | prohibe | hilo_semanal | desconocida
-  permiteAutopromo Boolean @default(false)
-  prohibeIA Boolean @default(false)
-  limiteSemanal Int @default(1)
-  estado String @default("observando")           // observando | apta | vetada
-  notas String? @db.Text
 }
 
 model GrowthNicho {
@@ -320,28 +329,16 @@ model GrowthPagina {             // inventario SEO propio (de paginas.ts)
   comprobadaEn DateTime?
 }
 
-model GrowthEntradaManual {      // la cola que alimentas tú
-  id String @id @default(cuid())
-  url String
-  comunidad String?
-  textoPegado String @db.Text    // se purga a los 90 días
-  nota String?
-  creadaEn DateTime @default(now())
-  procesadaEn DateTime?
-  oportunidadId String?
-}
-
 model GrowthOportunidad {
   id String @id @default(cuid())
   claveExterna String @unique    // hash de la URL
   fuenteId String
-  comunidadId String?
   nichoId String?
   url String
+  dominio String
   titulo String
   extracto String                // ≤ 500 caracteres
   idioma String @default("es")
-  publicadaEn DateTime?
   detectadaEn DateTime @default(now())
   objetivoPrincipal GrowthObjetivo
   puntTrafico Int @default(0)
@@ -349,20 +346,21 @@ model GrowthOportunidad {
   puntBacklinks Int @default(0)
   estado GrowthEstadoOportunidad @default(detectada)
   motivoDescarte String?
-  datos Json?                    // tipo C: dominio, tipoEnlace, dificultad, dofollowEsperado
+  datos Json?                    // tipo de enlace, dofollow esperado, dificultad, vía de contacto
   expiraEn DateTime?
   retencionHasta DateTime
   ejecucionId String?
   @@index([estado, objetivoPrincipal])
+  @@index([dominio])
 }
 
 model GrowthInvestigacion {
   oportunidadId String @id
   resumen String @db.Text
-  intencion String
-  competidores Json?
+  quienEdita String?
+  viaDeContacto String?          // formulario | email_editorial | alta_directorio
+  competidoresEnlazados Json?
   contexto Json?
-  reglasAplicables Json?
   creadaEn DateTime @default(now())
 }
 
@@ -372,13 +370,13 @@ model GrowthBorrador {
   version Int @default(1)
   tipo GrowthTipoBorrador
   objetivo GrowthObjetivo
+  asunto String?
   texto String @db.Text
   enlaceUrl String?
   utm Json?
   afirmaciones String[]          // claves de GrowthAfirmacion usadas
-  divulgacion Boolean @default(false)
   estado GrowthEstadoBorrador @default(borrador)
-  textoFinal String? @db.Text    // lo que de verdad publicaste
+  textoFinal String? @db.Text    // lo que de verdad enviaste
   editadoPorHumano Boolean @default(false)
   creadoEn DateTime @default(now())
   @@index([oportunidadId, estado])
@@ -397,30 +395,31 @@ model GrowthDecision {           // registro inmutable
   id String @id @default(cuid())
   oportunidadId String?
   borradorId String?
-  accion String                  // aprobar | editar | devolver | descartar | marcar_publicado | anular
+  accion String                  // aprobar | editar | devolver | descartar | marcar_gestionado | anular
   motivo String?
   por String                     // email del admin
   en DateTime @default(now())
 }
 
-model GrowthPublicacion {
+model GrowthGestion {            // lo que hiciste a mano
   id String @id @default(cuid())
   borradorId String @unique
-  plataforma String
-  urlPublicada String
-  cuenta String
-  esAutopromo Boolean @default(false)
-  publicadaEn DateTime
-  retiradaPorModeracion Boolean @default(false)
+  canal String                   // email | formulario | alta_directorio | otro
+  dominio String
+  hechaEn DateTime
+  respuestaEn DateTime?
+  resultado String @default("pendiente")   // pendiente | aceptado | rechazado | sin_respuesta
+  urlConseguida String?
   notas String?
+  @@index([dominio, hechaEn])    // para el tope de un contacto por dominio cada 90 días
 }
 
 model GrowthMedicion {
   id String @id @default(cuid())
-  publicacionId String?
+  gestionId String?
   enlaceId String?
   fecha DateTime @default(now())
-  metricas Json                  // votos, respuestas, visitas por UTM, altas
+  metricas Json                  // visitas por UTM, altas, posición
   origen String                  // manual | analytics | search_console
 }
 
@@ -468,13 +467,13 @@ model GrowthEjecucion {
   inicio DateTime @default(now())
   fin DateTime?
   estado String                  // en_curso | ok | parcial | error
-  resumen Json?                  // candidatos, calificadas, descartadas por motivo, borradores, bloqueadas
+  resumen Json?                  // candidatas, calificadas, descartadas por motivo, borradores, bloqueadas
   modulos Json?
   versionPrompts String?         // sha de git
   error String?
 }
 
-model GrowthAjuste { clave String @id valor Json actualizadoEn DateTime @updatedAt }  // umbrales, tope de ratio, retención, fuentes
+model GrowthAjuste { clave String @id valor Json actualizadoEn DateTime @updatedAt }  // umbrales, topes de contacto, retención, fuentes
 model GrowthAdmin { email String @id creadoEn DateTime @default(now()) }
 model GrowthTokenAgente {
   id String @id @default(cuid())
@@ -487,43 +486,42 @@ model GrowthTokenAgente {
 }
 ```
 
-Retención: una tarea de Cloud Scheduler borra `textoPegado` y `extracto` pasados 90 días (las decisiones y métricas se conservan sin texto de terceros). No se guardan nombres de usuario de Reddit salvo lo imprescindible en la URL.
+Retención: una tarea de Cloud Scheduler borra los `extracto` pasados 180 días; las decisiones y
+métricas se conservan sin texto de terceros. **No se guardan nombres ni correos de personas**:
+el tope de contacto se controla por dominio y canal.
 
 ---
 
 ## 8. Diseño del dashboard
 
-Estética: la de Alhabla (tokens `tinta`, `morado`, `lavado`, `linea`; modo claro y oscuro; `DESIGN.md`), sobria, densa, sin adornos. **Pensado para el móvil**: revisar y copiar el texto en el sofá, abrir el hilo en la app de Reddit y publicar tú.
+Estética: la de Alhabla (tokens `tinta`, `morado`, `lavado`, `linea`; modo claro y oscuro; `DESIGN.md`), sobria, densa, sin adornos. **Pensado para el móvil**: revisar y copiar el texto desde donde estés, y enviar tú el correo o rellenar el formulario.
 
 | Vista | Para qué | Contenido y acciones |
 |---|---|---|
-| **Bandeja** | Lo que merece tu tiempo hoy | Tarjetas de oportunidades calificadas, ordenadas por puntuación, con filtro por objetivo (A/B/C), nicho y fuente; chip de caducidad. **Estado vacío honesto**: "Hoy no hay nada que merezca tu tiempo", con el recuento de candidatos descartados y sus motivos |
-| **Entrada** | Alimentar a Reddit a mano | Pegar URL + texto del hilo + nota; elegir comunidad; botón "Pegar reglas de la comunidad". Es el único modo de que un hilo de Reddit entre |
-| **Revisión** | El centro del sistema | Tres columnas (apiladas en móvil): contexto del hilo e investigación · borrador editable · panel de cumplimiento (reglas duras en rojo, avisos en ámbar, afirmaciones usadas con su fuente y commit). Acciones: **Aprobar**, **Aprobar con ediciones**, **Devolver con nota**, **Descartar (motivo)**, **Copiar texto**, **Abrir hilo** |
-| **Borradores** | Todo el trabajo en curso | Por estado: bloqueados (con el porqué), pendientes, aprobados sin publicar, caducados |
-| **Historial** | Qué hiciste y qué pasó | Registro inmutable de decisiones; publicaciones con enlace; "Marcar como publicado" exige pegar la URL de tu comentario; marca si la moderación la retiró |
-| **Analítica** | Si sirve para algo | Pestañas A / B / C. A: visitas por UTM, menciones, citas en IA. B: conversaciones, visitas a registro, altas atribuidas. C: dominios nuevos, enlaces ganados/perdidos, calidad. Embudo por fuente y comunidad; coste por hora tuya |
-| **Backlinks** | Pipeline de tipo C | Oportunidades por tipo (listicle, directorio, prensa, asociación, mención sin enlace), estado de contacto (lo registras tú), perfil propio vs competidores, importación de CSV |
+| **Bandeja** | Lo que merece tu tiempo esta semana | Tarjetas de oportunidades calificadas, ordenadas por puntuación, con filtro por objetivo (A/B/C), nicho y tipo. Botón **Añadir URL**. **Estado vacío honesto**: «Esta semana no hay nada que merezca tu tiempo», con el recuento de candidatas descartadas y sus motivos |
+| **Revisión** | El centro del sistema | Tres columnas (apiladas en móvil): destino e investigación · borrador editable · panel de cumplimiento (reglas duras en rojo, avisos en ámbar, afirmaciones usadas con su fuente y commit). Acciones: **Aprobar**, **Aprobar con ediciones**, **Devolver con nota**, **Descartar (motivo)**, **Copiar texto**, **Abrir página** |
+| **Borradores** | Todo el trabajo en curso | Por estado: bloqueados (con el porqué), pendientes, aprobados sin gestionar, caducados |
+| **Historial** | Qué hiciste y qué pasó | Registro inmutable de decisiones; gestiones con fecha; «Marcar como gestionado» pide el canal y la fecha; «Enlace conseguido» pide la URL |
+| **Analítica** | Si sirve para algo | Pestañas A / B / C. A: visitas por UTM, menciones, citas en IA. B: contactos que responden, visitas a registro, altas atribuidas. C: dominios nuevos, enlaces ganados y perdidos, calidad. Tasa de respuesta por tipo de destino |
+| **Backlinks** | Pipeline de tipo C | Oportunidades por tipo (comparativa, directorio, prensa, asociación, mención sin enlace), estado de contacto, perfil propio frente a competidores, importación de CSV |
 | **SEO & GEO** | Autoridad y visibilidad en IA | Consultas y páginas de Search Console, indexación del registro de páginas, huecos, panel GEO con su aviso de representatividad |
 | **Nichos** | Dónde crecer | Los 8 activos y los candidatos con evidencia y puntuación; activar o descartar |
-| **Conocimiento** | Qué sabe el sistema | Afirmaciones por tipo con fuente y commit, antigüedad del snapshot, limitaciones y lista de "prohibido decir" |
-| **Comunidades** | Las reglas | Reglas pegadas, política de enlaces, límites, fecha de revisión; caducadas en ámbar |
+| **Conocimiento** | Qué sabe el sistema | Afirmaciones por tipo con fuente y commit, antigüedad del snapshot, limitaciones y lista de «prohibido decir» |
 | **Ejecuciones** | Salud del sistema | Runs, duración por módulo, errores, versión de prompts, descartes por motivo (para calibrar umbrales) |
-| **Ajustes** | Control | Umbrales por objetivo, tope de ratio de autopromoción, tope semanal por comunidad, retención, fuentes activas, interruptor general de pausa |
+| **Ajustes** | Control | Umbrales por objetivo, topes de contacto, retención, fuentes activas, interruptor general de pausa |
 
 Esbozo de **Revisión**:
 
 ```
-┌ Oportunidad · LEADS · r/emprendedores · caduca en 31 h ───────────────────────────┐
-│ HILO (pegado por ti)        │ BORRADOR v2 (editable)        │ CUMPLIMIENTO        │
-│ «Pierdo clientes porque no  │ «Te entiendo, en mi caso …»   │ ✓ afirmaciones (3)  │
-│ cojo el teléfono…»          │ (sin enlace)                  │   precio.plan.pro   │
-│                             │                                │ ✓ divulgación       │
-│ INVESTIGACIÓN               │ Enlace: ninguno (UTM listo)    │ ✓ ratio 6 % < 10 %  │
-│ Intención: busca recepción  │                                │ ⚠ reglas hace 24 d  │
-│ Competidores: —             │ [Copiar] [Abrir hilo]          │                     │
-│ Reglas del sub: sin enlaces │ [Devolver] [Descartar]         │ [Aprobar]           │
-└─────────────────────────────┴───────────────────────────────┴─────────────────────┘
+┌ Oportunidad · BACKLINKS · listado «recepcionistas de IA en España» · caduca en 12 d ───────┐
+│ DESTINO E INVESTIGACIÓN      │ BORRADOR v2 (editable)        │ CUMPLIMIENTO              │
+│ Editor: medio digital        │ Asunto: Una recepcionista…    │ ✓ afirmaciones (3)        │
+│ Vía: formulario editorial    │ «Hola, soy … fundador de      │   precio.plan.pro         │
+│ Ya enlaza a: 4 competidores  │ Alhabla…» (con UTM)           │ ✓ identificación          │
+│ Última edición: sep-2026     │                               │ ✓ 1 contacto/dominio/90 d │
+│                              │ [Copiar] [Abrir página]       │ ⚠ similitud con v1: 38 %  │
+│                              │ [Devolver] [Descartar]        │ [Aprobar]                 │
+└──────────────────────────────┴───────────────────────────────┴───────────────────────────┘
 ```
 
 ---
@@ -534,13 +532,13 @@ Cada fase en su rama y PR, con criterio de salida. **No se avanza de fase sin tu
 
 | Fase | Contenido | Criterio de salida |
 |---|---|---|
-| **0. Validación (1–2 semanas, sin código)** | (a) Participar en Reddit con tu cuenta, sin promoción. (b) Muestreo manual de 7 días en los subreddits candidatos: ¿cuántos hilos relevantes en español por semana? (c) Mirar el `rel` real de un enlace. (d) Crear la cuenta de servicio de Search Console. (e) Un run de prueba a mano para medir el consumo de Max | **Puerta**: si hay menos de ~3 hilos de calidad por semana, Reddit queda como canal menor y el esfuerzo se mueve a C y SEO/GEO |
-| **1. Base** | Migración `Growth*`, módulo backend (estados, reglas duras, similitud, auth admin y token), sincronizador de conocimiento, MCP `alhabla-growth`, dashboard con Bandeja, Entrada, Revisión, Borradores e Historial sobre datos de prueba. Todo en dev | Tests en verde; un borrador sin clave de afirmación vigente es rechazado por el backend; un JWT de cliente recibe 403 |
-| **2. Agentes (manual)** | Subagentes 1, 2, 3, 5, 6 y orquestador; run lanzado por ti, con entrada manual y fuentes web no-Reddit. Calibrar umbrales dos semanas viendo los descartes | Tasa de borradores que apruebas con pocos cambios; cero bloqueos por afirmación falsa en producción |
-| **3. Scheduled Task** | Crear la tarea local L–V, "Run now" para fijar permisos, notificación solo si hay algo, analítica básica con UTM, paso a producción | Una semana de runs sin intervención y sin salirte del presupuesto de uso |
-| **4. Backlinks y SEO/GEO** | Módulos 7 y 8, importaciones CSV, Search Console, panel GEO, vistas Backlinks y SEO & GEO (tareas semanales) | Primeras oportunidades C aprobadas y medidas |
+| **0. Validación** | **Cerrada.** Hecho: muestreo de backlinks, medición del `rel`, cuenta de servicio de Search Console. Cancelado: todo lo de Reddit. Pendiente: línea base de uso de Max y revisión manual de las seis comparativas | — |
+| **1. Base** | Migración `Growth*`, módulo backend (estados, reglas duras, similitud, auth admin y token), sincronizador de conocimiento, MCP `alhabla-growth`, dashboard con Bandeja, Revisión, Borradores, Historial y Conocimiento sobre datos de prueba. Todo en dev | Tests en verde; un borrador sin clave de afirmación vigente es rechazado por el backend; un JWT de cliente recibe 403 |
+| **2. Backlinks (run manual)** | Subagentes 1, 2, 3, 5, 6 y 7 y orquestador; run lanzado por ti. Primera tanda: comparativas de «recepcionista de IA», Beautymarket y asociaciones. Calibrar umbrales dos semanas viendo los descartes | Tasa de borradores que apruebas con pocos cambios; cero bloqueos por afirmación falsa |
+| **3. Scheduled Task** | Crear la tarea local semanal, «Run now» para fijar permisos, notificación solo si hay algo, analítica básica con UTM, paso a producción | Tres semanas de runs sin intervención y sin salirte del presupuesto de uso |
+| **4. SEO & GEO** | Módulo 8: probar la suplantación de la cuenta de servicio, Search Console, panel GEO, vistas SEO & GEO y huecos de contenido | Primeras consultas y páginas en el dashboard; primer informe de huecos |
 | **5. Nichos y atribución** | Descubrimiento de nichos, vista Nichos, atribución de altas por UTM (requiere comprobar si el registro ya guarda el origen; si no, un cambio pequeño en producto que aprobarías aparte) | Un nicho candidato evaluado de punta a punta |
-| **6. Reddit autorizado (condicionada)** | Solo si hay aprobación escrita de Reddit: activar `RedditOficial` en solo lectura. **Publicar sigue siendo manual** | Referencia de la autorización guardada; revisión legal del uso de los datos |
+| **6. Otras fuentes (condicionada)** | Solo con autorización de la plataforma y evidencia de que merece la pena: enchufar otra fuente de conversaciones (por ejemplo Reddit) a `FuenteDeOportunidades`. **Ejecutar sigue siendo manual** | Referencia de la autorización guardada; revisión legal del uso de los datos |
 
 ---
 
@@ -550,27 +548,27 @@ Cada fase en su rama y PR, con criterio de salida. **No se avanza de fase sin tu
 
 | Riesgo | Mitigación |
 |---|---|
-| Sanción o *shadowban* de la cuenta | Persona real, cuenta única, divulgación, ratio y topes, sin DM, sin plantillas, tú publicas |
-| Reddit rinde poco en español | Puerta de la Fase 0; el sistema no depende de Reddit |
+| Contacto en frío y normativa de comunicaciones comerciales (LSSI, art. 21) | **No verificado**; consultar a un asesor antes de enviar correos en frío. Preferir formularios y altas que el propio destino ofrece |
+| Que Google considere los enlaces manipulación | Solo enlaces editoriales o ganados; nada de compra sin `sponsored`, intercambios masivos ni anclas repetidas (regla dura 5) |
+| Tasa de respuesta baja | Se mide en Analítica; calibrar tipos de destino y mensaje |
 | Afirmaciones falsas sobre Alhabla | Base con fuente, backend que rechaza lo no trazable, lista de prohibidos, tu revisión |
 | Conocimiento desfasado | Commit en cada afirmación, resincronización antes de redactar, bloqueo de borradores con claves obsoletas |
-| Inyección de instrucciones en un hilo pegado | Todo contenido externo es dato; el agente solo escribe vía MCP acotado; reglas duras en servidor |
-| Consumo de Max compite con tu uso interactivo | Un run diario, subagentes acotados, medir en Fase 0, vigilar `claude.ai/settings/usage`; no activar créditos de uso sin tope |
-| El Mac duerme | "Mantener despierto"; un run de recuperación; migrar a la nube si hace falta |
-| Datos personales (RGPD) | Extracto mínimo, 90 días, sin perfilar ni extraer contactos, sin DM |
-| Enlaces que Google considere manipulación | Solo enlaces editoriales o ganados: nada de compra, intercambios masivos ni spam en comentarios |
+| Inyección de instrucciones en una página leída | Todo contenido externo es dato; el agente solo escribe vía MCP acotado; reglas duras en servidor |
+| Consumo de Max compite con tu uso interactivo | Un run semanal, subagentes acotados, medir la línea base, vigilar `claude.ai/settings/usage`; no activar créditos de uso sin tope |
+| El Mac duerme | Un run semanal tolera un día perdido; run de recuperación; migrar a la nube si hace falta |
+| Suplantación de la cuenta de servicio sin probar | Se prueba al inicio de la Fase 4 antes de construir nada encima |
 | Publicidad comparativa | Mismo estándar que `comparativas.ts`: datos objetivos, fecha y URL |
 | Fuga del token de agente | Alcances mínimos, no aprueba nada, rotación y revocación |
 | Presupuesto de conexiones de Cloud SQL | Endpoints ligeros, sin servicio nuevo, `maxScale` 11 |
 
 ### Limitaciones
 
-- Reddit **no se lee solo**: lo que entre lo pegas tú. No hay vía oficial gratuita en español (Reddit Pro es solo inglés y prohíbe descargar contenido).
-- Votos, respuestas y retiradas por moderación de lo que publiques se anotan a mano.
+- **Sin canal de conversaciones.** Los objetivos A y B son más débiles; B se mide más de lo que se persigue.
+- Casi todo el material de la Fase 0 son extractos de búsqueda: no hay métricas de autoridad de dominio ni distinción fiable entre contenido editorial y de pago.
 - El panel GEO usa la búsqueda de Claude, **no ChatGPT ni Perplexity**: es una señal, no una medición de mercado.
 - Los backlinks de competidores exigen una herramienta de pago o trabajo manual; con las gratuitas ves los tuyos.
 - La atribución de altas es parcial (UTM de primer toque, sin cookies de seguimiento propias).
-- Un día sin oportunidades es un resultado válido, no un fallo.
+- Una semana sin oportunidades es un resultado válido, no un fallo.
 
 ### Costes (suscripción separada de API)
 
@@ -580,37 +578,41 @@ Cada fase en su rama y PR, con criterio de salida. **No se avanza de fase sin tu
 | Créditos de uso de Claude | Consumo adicional | 0 € mientras no los actives | Sin ellos, al llegar al límite los runs se rechazan. Si los activas, ponles tope |
 | **API de Anthropic** | Consumo adicional | **0 €** | El diseño no tiene ninguna llamada a la API: el backend no usa LLM. Los créditos de API que incluye Max no se pueden usar en Claude Code, así que tampoco cubren nada de esto |
 | Infraestructura propia | Infra | Marginal | Rutas y tablas en `alhabla-api` y Cloud SQL, sin recursos nuevos en GCP. Un proyecto más en Vercel: confirma si tu plan cobra por proyecto |
-| Search Console API | API de Google | 0 € | Cuenta de servicio de solo lectura |
+| Search Console API y cuenta de servicio | Google | 0 € | Solo lectura; ya creadas |
 | Ahrefs / Semrush / Ubersuggest | Suscripción de terceros | Apagado; no he verificado precios | Solo si decides pagar por backlinks de competidores |
-| Reddit API comercial | Contrato | ~12.000 $/mes según fuentes secundarias, **sin confirmar** | Fuera de alcance |
-| Tu tiempo | — | Objetivo: 15–20 min/día | Es el recurso escaso; la Bandeja está pensada para respetarlo |
+| Tu tiempo | — | Objetivo: 30–45 min/semana | La Bandeja está pensada para respetarlo |
+
+**Línea base de Max (pendiente):** al cerrar la semana, anota en `claude.ai/settings/usage` el
+% semanal consumido sin ningún run de Growth. Presupuesto provisional del sistema: **no más del
+10 % del límite semanal**. Es una propuesta sin medir y se ajusta con runs reales en la Fase 2.
 
 ---
 
-## 11. Decisiones tomadas (2026-10-30)
+## 11. Decisiones tomadas
 
-Aprobadas con las recomendaciones del diseño; el registro está en `docs/growth/registro-de-decisiones.md`.
+Registro completo en `docs/growth/registro-de-decisiones.md`.
 
-1. **Scheduled Task local** (Desktop) al principio; la nube queda como migración posible.
-2. **Búsqueda indirecta de Reddit apagada.** El User Agreement prohíbe "buscar o recoger datos" por medios automatizados y la frontera es discutible.
-3. **Cuenta de Reddit: la tuya, como fundador**, con divulgación natural.
-4. **Acceso al dashboard:** Google con lista blanca de tu correo, subdominio `growth.alhabla.ai` sin proxy de Cloudflare.
-5. **Fase 0 como puerta:** si el muestreo da poco en español, el peso pasa a backlinks y SEO/GEO.
+1. **Scheduled Task local** (Desktop); la nube queda como migración posible.
+2. **Dashboard:** Google con lista blanca de tu correo, `growth.alhabla.ai` sin proxy de Cloudflare (a confirmar en Fase 1).
+3. **Reddit y otras conversaciones: fuera del sistema** (2026-10-30). Se retoma solo con autorización y evidencia (Fase 6).
+4. **Search Console por suplantación**, sin claves, por la política de la organización.
+
+Abiertas: la línea base de Max y el momento de aprobar la Fase 1.
 
 ---
 
 ## Fuentes (consultadas 2026-10-30)
 
-- Reddit, Responsible Builder Policy: https://support.reddithelp.com/hc/en-us/articles/42728983564564-Responsible-Builder-Policy
-- Reddit, Data API Terms: https://redditinc.com/policies/data-api-terms
-- Reddit, Developer Terms: https://redditinc.com/policies/developer-terms
-- Reddit, User Agreement §7: https://www.reddit.com/help/useragreement
-- Reddit, política de spam: https://support.reddithelp.com/hc/en-us/articles/360043504051-Spam
-- Reddit, "How do I keep spam out of my community?": https://support.reddithelp.com/hc/en-us/articles/28012014962580-How-do-I-keep-spam-out-of-my-community
-- Reddit, Public Content Policy: https://support.reddithelp.com/hc/en-us/articles/26410290525844-Public-Content-Policy
-- Reddit Pro Trends: https://support.reddithelp.com/hc/en-us/articles/47619216411284-Reddit-Pro-Feature-Trends
-- Tarifa comercial (no oficial): https://prowlo.com/blog/reddit-api-pricing
 - Claude Code, tareas programadas de escritorio: https://code.claude.com/docs/en/desktop-scheduled-tasks
 - Claude Code, routines en la nube: https://code.claude.com/docs/en/routines
 - Límites de Pro y Max con Claude Code: https://support.claude.com/en/articles/11145838-use-claude-code-with-your-pro-or-max-plan
 - Precios de Claude: https://claude.com/pricing
+
+Referencias de Reddit, por si se retoma:
+
+- Responsible Builder Policy: https://support.reddithelp.com/hc/en-us/articles/42728983564564-Responsible-Builder-Policy
+- Data API Terms: https://redditinc.com/policies/data-api-terms
+- User Agreement §7: https://www.reddit.com/help/useragreement
+- Política de spam: https://support.reddithelp.com/hc/en-us/articles/360043504051-Spam
+- Reddit Pro Trends: https://support.reddithelp.com/hc/en-us/articles/47619216411284-Reddit-Pro-Feature-Trends
+- Tarifa comercial (no oficial): https://prowlo.com/blog/reddit-api-pricing
