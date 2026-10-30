@@ -461,6 +461,9 @@ export async function buscarFantasmas(fuentes: Fuentes = FUENTES) {
       "etiquetas de WhatsApp en Telnyx",
     ],
     referencias: ref,
+    // Para dar el motivo de un número en uso que una BD guarda por el
+    // número y no por el id de Telnyx.
+    numerosDeLaCuenta: numeros,
   };
 }
 
@@ -483,7 +486,8 @@ export async function simularBorrado(
   id: string,
   fuentes: Fuentes = FUENTES
 ): Promise<PlanDeBorrado> {
-  const { assistants, numeros, referencias } = await buscarFantasmas(fuentes);
+  const { assistants, numeros, referencias, numerosDeLaCuenta } =
+    await buscarFantasmas(fuentes);
   const assistant = assistants.find((a) => a.id === id);
   if (assistant) {
     return {
@@ -516,9 +520,20 @@ export async function simularBorrado(
       aviso: AVISO_SIN_VUELTA_ATRAS,
     };
   }
+  const delMismoNumero = numerosDeLaCuenta.find(
+    (n) => n.id === id || n.phoneNumber === id
+  );
   const motivo = [
-    ...(referencias.assistants.get(id) ?? []),
-    ...(referencias.numeros.get(id) ?? []),
+    ...new Set([
+      ...(referencias.assistants.get(id) ?? []),
+      ...(referencias.numeros.get(id) ?? []),
+      ...(delMismoNumero
+        ? [
+            ...(referencias.numeros.get(delMismoNumero.id) ?? []),
+            ...(referencias.numeros.get(delMismoNumero.phoneNumber) ?? []),
+          ]
+        : []),
+    ]),
   ];
   return {
     esFantasma: false,
@@ -852,4 +867,230 @@ export async function enlaceDeEntrada(businessId: string) {
   const url = urlDeBdDeDev(cargarEnv());
   const usuario = await buscarUsuarioDeDev(url, { businessId });
   return crearEnlaceDeEntradaDeDev(url, usuario, "/");
+}
+
+// ---------------------------------------------------------------------------
+// Números para una cuenta
+// ---------------------------------------------------------------------------
+
+/** La cuenta de servicio con la que firma el panel (IAM: solo
+ * admin@alhabla.ai puede pedir sus tokens; sin roles en el proyecto). */
+export const CUENTA_DEL_PANEL =
+  "alhabla-panel@project-84381467-a606-4b71-a6e.iam.gserviceaccount.com";
+
+/** A quién llama el panel en cada entorno y con qué audience pide el token
+ * (la INTERNAL_JOBS_BASE_URL de ese backend). */
+export const BACKEND_INTERNO: Record<
+  Entorno,
+  { base: string; audiencia: string }
+> = {
+  dev: {
+    base: "http://localhost:3000",
+    audiencia: "https://dev-api.alhabla.ai",
+  },
+  prod: { base: API_DE_PROD, audiencia: API_DE_PROD },
+};
+
+export async function tokenDelPanel(
+  audiencia: string,
+  gcloudFn: Gcloud = gcloud
+): Promise<string> {
+  const token = (
+    await gcloudFn([
+      "auth",
+      "print-identity-token",
+      `--impersonate-service-account=${CUENTA_DEL_PANEL}`,
+      `--audiences=${audiencia}`,
+      "--include-email",
+    ])
+  ).trim();
+  if (token.split(".").length !== 3) {
+    throw new Error("gcloud no devolvió un token OIDC para el panel");
+  }
+  return token;
+}
+
+export type LlamadorInterno = (
+  entorno: Entorno,
+  ruta: string,
+  cuerpo: unknown
+) => Promise<{ status: number; respuesta: unknown }>;
+
+export const LLAMADOR_INTERNO: LlamadorInterno = async (
+  entorno,
+  ruta,
+  cuerpo
+) => {
+  const { base, audiencia } = BACKEND_INTERNO[entorno];
+  const res = await fetch(new URL(ruta, base), {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${await tokenDelPanel(audiencia)}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify(cuerpo),
+    signal: AbortSignal.timeout(60_000),
+  });
+  const texto = await res.text();
+  let respuesta: unknown = texto;
+  try {
+    respuesta = JSON.parse(texto);
+  } catch {
+    // Se devuelve el texto.
+  }
+  return { status: res.status, respuesta };
+};
+
+const AsignarSchema = z.object({
+  entorno: z.enum(["dev", "prod"]),
+  businessId: IdSchema,
+  telnyxPhoneNumberId: z.string().regex(/^\d+$/, "id de número no válido"),
+  sustituir: z.boolean().optional(),
+  confirmacion: z.string().optional(),
+});
+
+function errorDeLaRespuesta(status: number, respuesta: unknown): string {
+  const error = (respuesta as { error?: unknown })?.error ?? `HTTP ${status}`;
+  return typeof error === "string" ? error : JSON.stringify(error);
+}
+
+/**
+ * Da a una cuenta un número que ya está en Telnyx y no usa nadie. El backend
+ * (POST /internal/panel/asignar-numero, asignarNumeroExistente) solo ve su
+ * BD; el cruce con las dos y con el WABA se hace aquí, con el mismo
+ * buscarFantasmas del borrado: solo se asigna un número fantasma.
+ */
+export async function asignarNumero(
+  cuerpo: unknown,
+  fuentes: Fuentes = FUENTES,
+  llamador: LlamadorInterno = LLAMADOR_INTERNO
+) {
+  const resultado = AsignarSchema.safeParse(cuerpo);
+  if (!resultado.success) {
+    throw new ErrorDeInventario(
+      resultado.error.errors.map((e) => e.message).join("; "),
+      400
+    );
+  }
+  const { entorno, businessId, telnyxPhoneNumberId, sustituir, confirmacion } =
+    resultado.data;
+  if (entorno === "prod" && confirmacion?.trim() !== telnyxPhoneNumberId) {
+    throw new ErrorDeInventario(
+      `En producción, escribe el id del número (${telnyxPhoneNumberId}) para confirmar`,
+      400
+    );
+  }
+  const anotacion = {
+    operacion: "asignar_numero",
+    entorno,
+    businessId,
+    telnyxPhoneNumberId,
+    sustituir: sustituir ?? false,
+  };
+  const plan = await simularBorrado(telnyxPhoneNumberId, fuentes);
+  if (!plan.esFantasma || plan.tipo !== "numero") {
+    const motivo = plan.esFantasma ? ["No es un número"] : plan.motivo;
+    anotarEnElLog({ ...anotacion, resultado: "rechazado", motivo });
+    throw new ErrorDeInventario(
+      `Ese número no está libre: ${motivo.join("; ")}`,
+      409
+    );
+  }
+  const { status, respuesta } = await llamador(
+    entorno,
+    "/internal/panel/asignar-numero",
+    { businessId, telnyxPhoneNumberId, sustituir: sustituir ?? false }
+  ).catch((error: Error) => {
+    anotarEnElLog({ ...anotacion, resultado: "fallo", error: error.message });
+    throw error;
+  });
+  if (status >= 400) {
+    const error = errorDeLaRespuesta(status, respuesta);
+    anotarEnElLog({ ...anotacion, resultado: "rechazado", status, error });
+    throw new ErrorDeInventario(
+      `El backend respondió ${status}: ${error}`,
+      status
+    );
+  }
+  anotarEnElLog({ ...anotacion, resultado: "hecho", respuesta });
+  const { phoneNumber, anterior } = respuesta as {
+    phoneNumber: string;
+    anterior: string | null;
+  };
+  return {
+    mensaje: `${phoneNumber} asignado${anterior ? `; ${anterior} queda sin uso` : ""}`,
+  };
+}
+
+const PedirSchema = z.object({
+  entorno: z.enum(["dev", "prod"]),
+  businessId: IdSchema,
+  confirmacion: z.string(),
+});
+
+/**
+ * Compra un número nuevo para la cuenta con la ruta de la app
+ * (POST /business/me/phone/provision, como el dueño): la misma búsqueda,
+ * Requirement Group, conexión y sincronización que en el alta, y la misma
+ * regla (402 sin suscripción activa o en prueba). Cuesta dinero: siempre con
+ * el id de la cuenta escrito, en los dos entornos.
+ */
+export async function pedirNumero(
+  cuerpo: unknown,
+  llamador: LlamadorDeApi = LLAMADOR
+) {
+  const resultado = PedirSchema.safeParse(cuerpo);
+  if (!resultado.success) {
+    throw new ErrorDeInventario(
+      resultado.error.errors.map((e) => e.message).join("; "),
+      400
+    );
+  }
+  const { entorno, businessId, confirmacion } = resultado.data;
+  if (confirmacion.trim() !== businessId) {
+    throw new ErrorDeInventario(
+      `Comprar un número cuesta dinero: escribe el id de la cuenta (${businessId}) para confirmar`,
+      400
+    );
+  }
+  const anotacion = { operacion: "pedir_numero", entorno, businessId };
+  const { status, respuesta } = await llamador(entorno, {
+    metodo: "POST",
+    ruta: "/business/me/phone/provision",
+    cuerpo: {},
+    businessId,
+  }).catch((error: Error) => {
+    anotarEnElLog({ ...anotacion, resultado: "fallo", error: error.message });
+    throw error;
+  });
+  const r = respuesta as {
+    success?: boolean;
+    phoneNumber?: string;
+    status?: string;
+    error?: string;
+  };
+  // En revisión regulatoria: el pedido ya está hecho (y cobrado); la app lo
+  // reanuda en el siguiente intento en vez de comprar otro.
+  if (status < 400 && r.status === "pending") {
+    anotarEnElLog({ ...anotacion, resultado: "pendiente", error: r.error });
+    return {
+      mensaje: `Pedido en revisión en Telnyx; vuelve a pulsar «Pedir número» más tarde para recogerlo (no compra otro)`,
+    };
+  }
+  if (status >= 400 || r.success === false) {
+    const error = r.error ?? errorDeLaRespuesta(status, respuesta);
+    anotarEnElLog({
+      ...anotacion,
+      resultado: "rechazado",
+      status,
+      error,
+      estado: r.status,
+    });
+    throw new ErrorDeInventario(
+      `La app no compró el número${r.status ? ` (${r.status})` : ""}: ${error}`,
+      status >= 400 ? status : 409
+    );
+  }
+  anotarEnElLog({ ...anotacion, resultado: "hecho", numero: r.phoneNumber });
+  return { mensaje: `Comprado ${r.phoneNumber}` };
 }

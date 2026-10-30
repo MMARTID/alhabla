@@ -26,9 +26,21 @@ import { attachUsagePricesJob } from "../../jobs/attachUsagePrices.js";
 import { retryUsageReportsJob } from "../../jobs/retryUsageReports.js";
 import { sendWeeklySummaryJob } from "../../jobs/sendWeeklySummary.js";
 import {
+  ErrorDeAsignacion,
+  asignarNumeroExistente,
+} from "../phone/service.js";
+import {
   E164_PHONE_REGEX,
   SENDER_ID_ALFANUMERICO_REGEX,
 } from "../../lib/phone.js";
+
+const AsignarNumeroSchema = z.object({
+  businessId: z.string().min(1),
+  telnyxPhoneNumberId: z
+    .string()
+    .regex(/^\d+$/, "id de número de Telnyx no válido"),
+  sustituir: z.boolean().optional(),
+});
 
 const ProcessRecordingSchema = z.object({
   callId: z.string(),
@@ -220,6 +232,38 @@ export const internalJobsRoutes: FastifyPluginAsync = async (fastify) => {
     preValidation: [fastify.verifyCloudTasks],
     config: { rateLimit: false as const },
   };
+
+  // Panel de desarrollo (backend/mcp/panel/): con su propia cuenta de
+  // servicio (verifyPanel), que no puede lanzar los jobs.
+  fastify.post(
+    "/panel/asignar-numero",
+    { preValidation: [fastify.verifyPanel] },
+    async (request, reply) => {
+      try {
+        const data = AsignarNumeroSchema.parse(request.body);
+        const resultado = await asignarNumeroExistente(
+          data.businessId,
+          data.telnyxPhoneNumberId,
+          { sustituir: data.sustituir }
+        );
+        return reply.send(resultado);
+      } catch (error) {
+        if (error instanceof z.ZodError) {
+          return reply.status(400).send({ error: error.errors });
+        }
+        if (error instanceof ErrorDeAsignacion) {
+          return reply.status(error.codigo).send({ error: error.message });
+        }
+        fastify.log.error(
+          { err: error, body: request.body },
+          "[Phone] Falló la asignación de un número desde el panel"
+        );
+        return reply
+          .status(500)
+          .send({ error: "No se pudo asignar el número" });
+      }
+    }
+  );
 
   fastify.post(
     "/jobs/process-recording",

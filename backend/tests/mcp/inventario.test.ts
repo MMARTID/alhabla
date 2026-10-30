@@ -3,7 +3,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  CUENTA_DEL_PANEL,
   ErrorDeInventario,
+  asignarNumero,
+  pedirNumero,
+  tokenDelPanel,
   SQL_DE_CUENTAS,
   borrarFantasma,
   buscarFantasmas,
@@ -515,5 +519,201 @@ describe("variablesDeCloudRun", () => {
       TELNYX_GESTOR_ASSISTANT_ID: GESTOR,
     });
     expect(gcloud.mock.calls[0][0]).toContain("describe");
+  });
+});
+
+describe("números para una cuenta", () => {
+  let carpeta: string;
+  beforeEach(() => {
+    carpeta = mkdtempSync(join(tmpdir(), "inventario-"));
+    vi.stubEnv("ALHABLA_INVENTARIO_LOG", join(carpeta, "inventario.log"));
+  });
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    rmSync(carpeta, { recursive: true, force: true });
+  });
+  const log = () =>
+    readFileSync(join(carpeta, "inventario.log"), "utf8")
+      .trim()
+      .split("\n")
+      .map((l) => JSON.parse(l) as Record<string, unknown>);
+
+  const asignacion = {
+    entorno: "dev",
+    businessId: "cuentadev000001",
+    telnyxPhoneNumberId: "n-libre",
+  };
+
+  it("asignar: solo un número fantasma, por la ruta interna del panel", async () => {
+    const llamador = vi.fn(async () => ({
+      status: 200,
+      respuesta: { phoneNumber: "+34930000009", anterior: "+34930000008" },
+    }));
+    // Los ids de número de Telnyx son numéricos.
+    const fuentesConIdNumerico = fuentes({
+      listarNumeros: async () => [
+        {
+          id: "3047548328515471109",
+          phoneNumber: "+34930000009",
+          status: "active",
+          connectionId: null,
+          tags: [],
+          createdAt: null,
+        },
+      ],
+    });
+    const r = await asignarNumero(
+      {
+        ...asignacion,
+        telnyxPhoneNumberId: "3047548328515471109",
+        sustituir: true,
+      },
+      fuentesConIdNumerico,
+      llamador
+    );
+    expect(r.mensaje).toBe("+34930000009 asignado; +34930000008 queda sin uso");
+    expect(llamador).toHaveBeenCalledWith(
+      "dev",
+      "/internal/panel/asignar-numero",
+      {
+        businessId: "cuentadev000001",
+        telnyxPhoneNumberId: "3047548328515471109",
+        sustituir: true,
+      }
+    );
+    expect(log().at(-1)).toMatchObject({
+      operacion: "asignar_numero",
+      resultado: "hecho",
+    });
+  });
+
+  it("asignar: rechaza un número en uso sin llamar al backend", async () => {
+    const llamador = vi.fn();
+    const fuentesEnUso = fuentes({
+      listarNumeros: async () => [
+        {
+          id: "3047548328515471100",
+          phoneNumber: "+34930000001",
+          status: "active",
+          connectionId: null,
+          tags: [],
+          createdAt: null,
+        },
+      ],
+    });
+    await expect(
+      asignarNumero(
+        { ...asignacion, telnyxPhoneNumberId: "3047548328515471100" },
+        fuentesEnUso,
+        llamador
+      )
+    ).rejects.toThrow(
+      "Ese número no está libre: prod · cuenta «Peluquería prod»"
+    );
+    expect(llamador).not.toHaveBeenCalled();
+  });
+
+  it("asignar en producción exige el id del número escrito", async () => {
+    const llamador = vi.fn();
+    await expect(
+      asignarNumero(
+        { ...asignacion, entorno: "prod", telnyxPhoneNumberId: "123" },
+        fuentes(),
+        llamador
+      )
+    ).rejects.toThrow("escribe el id del número (123)");
+    expect(llamador).not.toHaveBeenCalled();
+  });
+
+  it("pedir: siempre con el id de la cuenta y por la ruta de la app", async () => {
+    const llamador = vi.fn(async () => ({
+      status: 200,
+      respuesta: {
+        success: true,
+        phoneNumber: "+34930000010",
+        status: "active",
+      },
+    }));
+    await expect(
+      pedirNumero(
+        { entorno: "dev", businessId: "cuentadev000001", confirmacion: "" },
+        llamador
+      )
+    ).rejects.toThrow("cuesta dinero");
+    expect(llamador).not.toHaveBeenCalled();
+
+    const r = await pedirNumero(
+      {
+        entorno: "dev",
+        businessId: "cuentadev000001",
+        confirmacion: "cuentadev000001",
+      },
+      llamador
+    );
+    expect(r.mensaje).toBe("Comprado +34930000010");
+    expect(llamador).toHaveBeenCalledWith("dev", {
+      metodo: "POST",
+      ruta: "/business/me/phone/provision",
+      cuerpo: {},
+      businessId: "cuentadev000001",
+    });
+  });
+
+  it("pedir: el 402 de la app sale tal cual y un pedido en revisión no es un fallo", async () => {
+    const sinPlan = vi.fn(async () => ({
+      status: 402,
+      respuesta: {
+        error: "No tienes un plan activo para asignar un número de teléfono",
+      },
+    }));
+    await expect(
+      pedirNumero(
+        {
+          entorno: "dev",
+          businessId: "cuentadev000001",
+          confirmacion: "cuentadev000001",
+        },
+        sinPlan
+      )
+    ).rejects.toThrow("No tienes un plan activo");
+
+    const enRevision = vi.fn(async () => ({
+      status: 200,
+      respuesta: {
+        success: false,
+        status: "pending",
+        error: "revisión regulatoria",
+      },
+    }));
+    const r = await pedirNumero(
+      {
+        entorno: "prod",
+        businessId: "cuentadev000001",
+        confirmacion: "cuentadev000001",
+      },
+      enRevision
+    );
+    expect(r.mensaje).toContain("Pedido en revisión");
+    expect(log().map((l) => l.resultado)).toEqual(["rechazado", "pendiente"]);
+  });
+
+  it("el token lo firma la cuenta del panel con la audience del entorno", async () => {
+    const gcloud = vi.fn(async () => "aaa.bbb.ccc\n");
+    expect(await tokenDelPanel("https://dev-api.alhabla.ai", gcloud)).toBe(
+      "aaa.bbb.ccc"
+    );
+    expect(gcloud).toHaveBeenCalledWith([
+      "auth",
+      "print-identity-token",
+      `--impersonate-service-account=${CUENTA_DEL_PANEL}`,
+      "--audiences=https://dev-api.alhabla.ai",
+      "--include-email",
+    ]);
+    await expect(
+      tokenDelPanel(
+        "x",
+        vi.fn(async () => "Permission denied")
+      )
+    ).rejects.toThrow("no devolvió un token");
   });
 });

@@ -534,6 +534,25 @@ Para probar cambios de estos scripts antes de fusionarlos: un worktree de la ram
     marca nada. Borrar: dry-run, id escrito y la casilla «cuenta de producción»; se vuelve a comprobar
     y se usa la secuencia de la baja de cuenta (`releaseNumber`, o `deleteAssistant` y su app TeXML).
     Un fantasma puede ser de un PR abierto (p. ej. #325 y `demo-brain-to-train`): mira antes los PR.
+  - **Números de una cuenta** (desde el 30-10). Cada cuenta tiene un solo número de voz.
+    «Pedir número nuevo» va por la ruta de la app (`POST /business/me/phone/provision`, como el
+    dueño): misma compra que en el alta, 402 sin suscripción activa o en prueba, 1 $ + 1 $/mes, y
+    siempre con el id de la cuenta escrito. «Asignar número» da a la cuenta un número fantasma (el
+    cruce de arriba, con las dos BD) por `POST /internal/panel/asignar-numero`
+    (`asignarNumeroExistente` en `modules/phone/service.ts`: mismo cerrojo que la compra, comprueba
+    su BD, conecta el número al `TELNYX_CALL_CONTROL_APP_ID` del entorno, lo guarda, invalida la
+    caché de voz y resincroniza el assistant). Con número ya puesto, solo con «sustituir» (el viejo
+    queda fantasma). En producción, con el id del número escrito.
+  - **Cuenta de servicio del panel** `alhabla-panel@…`, sin roles en el proyecto; solo
+    `admin@alhabla.ai` puede pedir sus tokens (`roles/iam.serviceAccountTokenCreator` sobre ella).
+    El panel pide un token OIDC con `gcloud auth print-identity-token --impersonate-service-account`
+    y la audience del entorno (`https://dev-api.alhabla.ai` o `https://api.alhabla.ai`, la
+    `INTERNAL_JOBS_BASE_URL` de cada backend). `verifyPanel` (`plugins/internalAuth.ts`) acepta en
+    `/internal/panel/*` solo `PANEL_INVOKER_SERVICE_ACCOUNT`; los jobs siguen aceptando solo
+    `CLOUD_TASKS_INVOKER_SERVICE_ACCOUNT`. En dev, el `.env` necesita `INTERNAL_JOBS_BASE_URL` y
+    `PANEL_INVOKER_SERVICE_ACCOUNT` (sin ellas, 503).
+  - El borrado de un fantasma va en dos pasos: el dry-run solo enseña; «Quiero borrarlo de
+    verdad…» abre el id escrito y la casilla.
   - Cada escritura, también las rechazadas, va a `~/Library/Logs/alhabla-dev/inventario.log` (el
     prompt, solo su tamaño).
 - **Vistas previas de las sesiones** (`.claude/launch.json`): `:3101` (app) y `:3102` (web), contra

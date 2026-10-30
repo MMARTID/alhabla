@@ -15,11 +15,13 @@ import { leerErroresDeProd } from "../erroresDeProd.js";
 import { estadoDeProd } from "../estadoDeProd.js";
 import {
   ErrorDeInventario,
+  asignarNumero,
   borrarFantasma,
   buscarFantasmas,
   editar,
   enlaceDeEntrada,
   leerInventario,
+  pedirNumero,
   simularBorrado,
   urlDeBdDelEntorno,
 } from "../inventario.js";
@@ -96,6 +98,8 @@ export type Dependencias = {
   }) => Promise<unknown>;
   editar: (cuerpo: unknown) => Promise<unknown>;
   entrar: (businessId: string) => Promise<unknown>;
+  asignarNumero: (cuerpo: unknown) => Promise<unknown>;
+  pedirNumero: (cuerpo: unknown) => Promise<unknown>;
 };
 
 /** Lo que falla en una parte no tumba la sección entera. */
@@ -105,10 +109,11 @@ function aparte<T>(trabajo: () => Promise<T>) {
   }));
 }
 
-/** Sin el systemPrompt: va en el inventario, no en la lista de fantasmas. */
+/** Lo que la página enseña: sin las referencias ni la cuenta entera. */
 async function fantasmasParaLaPagina() {
-  const { referencias: _referencias, ...fantasmas } = await buscarFantasmas();
-  return fantasmas;
+  const { assistants, numeros, enLaCuenta, cruzadoCon } =
+    await buscarFantasmas();
+  return { assistants, numeros, enLaCuenta, cruzadoCon };
 }
 
 const DEPENDENCIAS: Dependencias = {
@@ -137,6 +142,8 @@ const DEPENDENCIAS: Dependencias = {
   borrarFantasma: (cuerpo) => borrarFantasma(cuerpo),
   editar: (cuerpo) => editar(cuerpo),
   entrar: (businessId) => enlaceDeEntrada(businessId),
+  asignarNumero: (cuerpo) => asignarNumero(cuerpo),
+  pedirNumero: (cuerpo) => pedirNumero(cuerpo),
 };
 
 function enviar(res: ServerResponse, codigo: number, cuerpo: unknown) {
@@ -266,6 +273,12 @@ export function crearServidorDelPanel(
         }
         if (ruta === "/api/inventario/editar") {
           return enviar(res, 200, await deps.editar(cuerpo));
+        }
+        if (ruta === "/api/inventario/asignar-numero") {
+          return enviar(res, 200, await deps.asignarNumero(cuerpo));
+        }
+        if (ruta === "/api/inventario/pedir-numero") {
+          return enviar(res, 200, await deps.pedirNumero(cuerpo));
         }
         if (ruta === "/api/entrar") {
           return enviar(
