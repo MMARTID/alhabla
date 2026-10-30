@@ -34,13 +34,9 @@ describe("sitemap", () => {
     }
   });
 
-  it("la portada declara las fotos de sector que enseña, no la de compartir", () => {
+  it("la portada no declara fotos: sus sectores son escenas dibujadas", () => {
     const portada = sitemap().find((e) => e.url === "https://alhabla.ai/");
-    expect(portada?.images).toEqual(
-      ["peluqueria", "barberia", "salon-de-unas", "centro-de-estetica", "fisioterapia"].map(
-        (s) => `https://alhabla.ai/heroes/${s}.jpg`
-      )
-    );
+    expect(portada?.images).toBeUndefined();
   });
 
   it("no escribe priority ni changefreq, que Google ignora", () => {

@@ -41,6 +41,7 @@ export function RangeSlider({
   hint,
   showTicks = true,
   bare = false,
+  compact = false,
   accent,
 }: {
   id: string;
@@ -61,6 +62,11 @@ export function RangeSlider({
   // varios sliders relacionados en una sola tarjeta compartida (ver
   // RevenueLossCalculator) en vez de repetir el mismo borde por cada uno.
   bare?: boolean;
+  // Compacto (la calculadora de la portada y los sectores): desde `sm` la
+  // etiqueta ocupa siempre dos líneas, para que dos deslizadores en fila
+  // queden a la misma altura, el valor no salta debajo de ella, y la burbuja flota sobre
+  // la fila de la etiqueta en vez de reservar su propio hueco encima.
+  compact?: boolean;
   // Acento de nicho: sin él, el slider cae en el morado de marca — el mismo
   // patrón que el resto del sistema (icon-tile, relleno, thumb).
   accent?: NicheAccent;
@@ -86,8 +92,14 @@ export function RangeSlider({
 
   return (
     <div className={bare ? "" : "rounded-2xl border border-linea bg-relleno p-5 sm:p-6"}>
-      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-        <div className="flex items-center gap-3">
+      <div
+        className={
+          compact
+            ? "flex items-start justify-between gap-4"
+            : "flex flex-wrap items-center justify-between gap-x-4 gap-y-2"
+        }
+      >
+        <div className={compact ? "flex min-w-0 flex-1 items-center gap-3" : "flex items-center gap-3"}>
           {Icon ? (
             <span
               className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl sm:h-10 sm:w-10"
@@ -96,7 +108,10 @@ export function RangeSlider({
               <Icon className="h-5 w-5" aria-hidden="true" />
             </span>
           ) : null}
-          <label htmlFor={id} className="max-w-[13rem] text-sm font-semibold leading-5 text-tinta-2">
+          <label
+            htmlFor={id}
+            className={`text-sm font-semibold leading-5 text-tinta-2 ${compact ? "sm:min-h-10" : "max-w-[13rem]"}`}
+          >
             {label}
           </label>
         </div>
@@ -106,8 +121,9 @@ export function RangeSlider({
       </div>
 
       {/* Espacio reservado arriba para la burbuja flotante: así no desplaza el
-          layout al aparecer en hover/foco/arrastre. */}
-      <div ref={trackRef} className="group relative mt-8 h-11 select-none">
+          layout al aparecer en hover/foco/arrastre. En compacto no se
+          reserva: la burbuja pasa por encima de la fila de la etiqueta. */}
+      <div ref={trackRef} className={`group relative h-11 select-none ${compact ? "mt-2" : "mt-8"}`}>
 
         {/* pista, siempre visible de extremo a extremo */}
         <div className="pointer-events-none absolute inset-x-0 top-1/2 h-2.5 -translate-y-1/2 overflow-hidden rounded-full bg-linea shadow-[inset_0_1px_2px_rgba(0,0,0,0.08)]">
@@ -178,7 +194,7 @@ export function RangeSlider({
         <span>{maxLabel}</span>
       </div>
 
-      {hint ? <p id={`${id}-hint`} className="mt-3 text-xs text-muted">{hint}</p> : null}
+      {hint ? <p id={`${id}-hint`} className={`${compact ? "mt-1.5 leading-5" : "mt-3"} text-xs text-muted`}>{hint}</p> : null}
     </div>
   );
 }

@@ -76,12 +76,10 @@ export const PAGINAS: readonly PaginaIndexable[] = [
     nombre: "Alhabla",
     resumen: "Recepcionista de IA que atiende las llamadas de tu negocio para que no pierdas ninguna; tú lo gestionas por WhatsApp o desde el panel.",
     seccion: "principal",
-    actualizado: "2026-10-29",
-    // Las fotos de los sectores que se ven en la portada (main-landing.tsx).
-    // general.jpg no: solo la usa la imagen para compartir.
-    imagenes: ["peluqueria", "barberia", "salon-de-unas", "centro-de-estetica", "fisioterapia"].map(
-      (sector) => `/heroes/${sector}.jpg`
-    ),
+    // Sin `imagenes` desde el 2026-10-30: los sectores de la portada son
+    // escenas dibujadas (escenas-de-oficio.tsx), no las fotos de public/heroes/,
+    // que siguen solo en las imágenes para compartir y el blog.
+    actualizado: "2026-10-30",
   },
   {
     ruta: "/planes",
@@ -111,7 +109,8 @@ export const PAGINAS: readonly PaginaIndexable[] = [
       nombre,
       resumen,
       seccion: "sectores",
-      actualizado: "2026-10-29",
+      // 30-10: la calculadora compacta antes del precio.
+      actualizado: "2026-10-30",
     })
   ),
   {
