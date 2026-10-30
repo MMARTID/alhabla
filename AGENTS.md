@@ -3591,6 +3591,56 @@ A landing niche is not a business type: an account registered from it arrives as
 it one (registration, Places detection, agent instructions, service templates) is separate work
 across the three projects — see § Business Type (`Business.businessType`).
 
+## Alhabla Growth (backend, desde 2026-10-30)
+
+Sistema interno de oportunidades de enlace y visibilidad (`PLAN-GROWTH.md`): una
+sesión programada de Claude Code propone oportunidades y borradores, y el
+fundador los revisa, los aprueba y los ejecuta a mano. **Fase 1a: solo el
+backend.** Aún no existen el dashboard (`growth/`), el MCP `alhabla-growth`, el
+sincronizador de conocimiento, un script para crear tokens ni la purga de
+retención; son la Fase 1b.
+
+**Excepción al aislamiento multi-tenant.** Las tablas `growth_*` y las rutas
+`/growth/*` no son de ningún negocio: no cuelgan de `Business` y no usan
+`authenticate` (el JWT de cliente). Un JWT de cliente recibe 401 en todas
+(`tests/modules/growth/routes.test.ts` lo comprueba). Hay dos puertas, en
+`plugins/growthAuth.ts`:
+
+- **Administrador** (`autenticarAdminGrowth`): un ID token de Google cuyo correo
+  está en `GROWTH_ADMIN_EMAILS` (coma-separado) y cuya audience es
+  `GROWTH_GOOGLE_CLIENT_ID`. Sin una de las dos variables responde 503. La
+  lista blanca vive en el entorno: no hay tabla de administradores.
+- **Agente** (`autenticarAgenteGrowth(alcance)`): un token `gta_…` cuyo SHA-256
+  está en `growth_tokens_agente`, con alcance `leer` y/o `escribir`. El token en
+  claro no se guarda. Sin el prefijo `gta_` ni se consulta la base de datos.
+
+| Ruta | Quién | Qué hace |
+|---|---|---|
+| `GET /growth/agente/contexto` | agente (`leer`) | Ajustes, afirmaciones vigentes, competidores, nichos y fuentes |
+| `POST /growth/agente/oportunidades` | agente (`escribir`) | Crea una oportunidad; la misma URL normalizada no se duplica |
+| `POST /growth/agente/oportunidades/:id/estado` | agente (`escribir`) | Solo `calificada`, `investigada` o `descartada` (con motivo) |
+| `PUT /growth/agente/oportunidades/:id/investigacion` | agente (`escribir`) | Guarda la investigación |
+| `POST /growth/agente/oportunidades/:id/borradores` | agente (`escribir`) | Crea el borrador y evalúa las reglas duras en la misma petición |
+| `GET /growth/admin/oportunidades` y `/:id` | administrador | Bandeja y detalle |
+| `POST /growth/admin/oportunidades/:id/decision` | administrador | `aprobar`, `devolver`, `descartar`, `marcar_gestionado`, `conseguido`, `sin_respuesta` |
+
+**Las reglas viven en el backend, no en el prompt del agente.**
+`modules/growth/estados.ts` es la única fuente de qué cambios de estado existen
+y quién los provoca (`agente`, `admin` o `sistema`); el agente no puede aprobar
+ni dar nada por gestionado. `modules/growth/cumplimiento.ts` evalúa las reglas
+duras (afirmaciones vigentes, precios trazables, términos prohibidos,
+comparativas con fuente, identificación, sin esquemas de enlaces, enlace solo a
+`alhabla.ai`, un contacto por dominio cada 90 días, tope semanal, sin plantillas
+repetidas, sin datos personales, tipo acorde con el objetivo) y las blandas. Un
+borrador solo llega a `pendiente_aprobacion` pasando por `crearBorrador`
+(`service.ts`); si una regla dura falla queda `bloqueado` y la oportunidad
+`bloqueada`.
+
+Migración `20261030120000_alhabla_growth`: aditiva, 19 tablas nuevas. El backend
+de Growth no llama a ningún LLM: el razonamiento es de la suscripción de Claude
+Code, sin consumo de API. Variables nuevas: `GROWTH_GOOGLE_CLIENT_ID` y
+`GROWTH_ADMIN_EMAILS` (en `.env.example` y `docker-compose.yml`).
+
 ## Lista de ramas por componente
 
 Convención ligera desde 2026-09-07: cuando queda pendiente pulir o rediseñar un

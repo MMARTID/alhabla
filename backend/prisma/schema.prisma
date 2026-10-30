@@ -1192,3 +1192,374 @@ enum SubscriptionStatus {
   UNPAID
   PAUSED
 }
+
+// ---------------------------------------------------------------------------
+// Alhabla Growth (PLAN-GROWTH.md, desde 2026-10-30)
+//
+// Sistema interno de oportunidades de enlace y visibilidad. NO es de ningún
+// negocio: ninguna de estas tablas cuelga de `Business` y solo las abre el
+// administrador (lista blanca GROWTH_ADMIN_EMAILS) o un token de agente
+// (GrowthTokenAgente). Es la única excepción al aislamiento multi-tenant;
+// ver AGENTS.md § Alhabla Growth.
+// ---------------------------------------------------------------------------
+
+enum GrowthObjetivo {
+  TRAFICO_MARCA
+  LEADS
+  BACKLINKS
+}
+
+enum GrowthEstadoOportunidad {
+  detectada
+  calificada
+  investigada
+  con_borrador
+  pendiente_aprobacion
+  aprobada
+  gestionada
+  conseguida
+  sin_respuesta
+  devuelta
+  bloqueada
+  descartada
+  caducada
+}
+
+enum GrowthEstadoBorrador {
+  borrador
+  bloqueado
+  pendiente_aprobacion
+  aprobado
+  gestionado
+  descartado
+}
+
+enum GrowthTipoBorrador {
+  email
+  formulario
+  ficha_directorio
+  texto_invitado
+}
+
+enum GrowthEstadoNicho {
+  activo
+  candidato
+  descartado
+}
+
+model GrowthFuente {
+  id            String              @id @default(cuid())
+  /// web | directorio | manual
+  tipo          String
+  nombre        String
+  activa        Boolean             @default(true)
+  config        Json?
+  oportunidades GrowthOportunidad[]
+
+  @@map("growth_fuentes")
+}
+
+model GrowthNicho {
+  id            String              @id @default(cuid())
+  slug          String              @unique
+  nombre        String
+  estado        GrowthEstadoNicho   @default(candidato)
+  /// web_sectores | investigacion | descubierto
+  origen        String
+  evidencia     Json?
+  puntuacion    Int?
+  decididoEn    DateTime?
+  notas         String?             @db.Text
+  oportunidades GrowthOportunidad[]
+
+  @@map("growth_nichos")
+}
+
+/// Base de conocimiento: una afirmación con su fuente en el repo y el commit.
+model GrowthAfirmacion {
+  id           String    @id @default(cuid())
+  /// Estable, p. ej. precio.plan.pro
+  clave        String
+  /// precio | funcion | limite | sector | comparativa | pagina | prohibida
+  tipo         String
+  texto        String    @db.Text
+  valor        Json?
+  /// ruta#ancla
+  fuente       String
+  commitSha    String
+  nichoSlug    String?
+  vigenteDesde DateTime  @default(now())
+  vigenteHasta DateTime?
+
+  @@index([clave, vigenteHasta])
+  @@map("growth_afirmaciones")
+}
+
+/// Inventario de las páginas propias indexables (de web/src/lib/paginas.ts).
+model GrowthPagina {
+  ruta         String    @id
+  nombre       String
+  seccion      String
+  nichoSlug    String?
+  actualizado  DateTime?
+  indexada     Boolean?
+  comprobadaEn DateTime?
+
+  @@map("growth_paginas")
+}
+
+model GrowthEjecucion {
+  id             String              @id @default(cuid())
+  /// programada | manual
+  disparador     String
+  inicio         DateTime            @default(now())
+  fin            DateTime?
+  /// en_curso | ok | parcial | error
+  estado         String
+  resumen        Json?
+  modulos        Json?
+  /// sha de git de los prompts
+  versionPrompts String?
+  error          String?
+  oportunidades  GrowthOportunidad[]
+
+  @@map("growth_ejecuciones")
+}
+
+model GrowthOportunidad {
+  id                String                  @id @default(cuid())
+  /// Hash de la URL normalizada: una misma página no entra dos veces.
+  claveExterna      String                  @unique
+  fuenteId          String
+  fuente            GrowthFuente            @relation(fields: [fuenteId], references: [id])
+  nichoId           String?
+  nicho             GrowthNicho?            @relation(fields: [nichoId], references: [id])
+  url               String
+  dominio           String
+  titulo            String
+  /// Máximo 500 caracteres; se borra a los 180 días.
+  extracto          String
+  idioma            String                  @default("es")
+  detectadaEn       DateTime                @default(now())
+  objetivoPrincipal GrowthObjetivo
+  puntTrafico       Int                     @default(0)
+  puntLeads         Int                     @default(0)
+  puntBacklinks     Int                     @default(0)
+  estado            GrowthEstadoOportunidad @default(detectada)
+  motivoDescarte    String?
+  /// Tipo de enlace, dofollow esperado, dificultad, vía de contacto…
+  datos             Json?
+  expiraEn          DateTime?
+  retencionHasta    DateTime
+  ejecucionId       String?
+  ejecucion         GrowthEjecucion?        @relation(fields: [ejecucionId], references: [id])
+
+  investigacion GrowthInvestigacion?
+  borradores    GrowthBorrador[]
+  decisiones    GrowthDecision[]
+  enlaces       GrowthEnlaceEntrante[]
+
+  @@index([estado, objetivoPrincipal])
+  @@index([dominio])
+  @@map("growth_oportunidades")
+}
+
+model GrowthInvestigacion {
+  oportunidadId         String            @id
+  oportunidad           GrowthOportunidad @relation(fields: [oportunidadId], references: [id], onDelete: Cascade)
+  resumen               String            @db.Text
+  quienEdita            String?
+  /// formulario | email_editorial | alta_directorio
+  viaDeContacto         String?
+  competidoresEnlazados Json?
+  contexto              Json?
+  creadaEn              DateTime          @default(now())
+
+  @@map("growth_investigaciones")
+}
+
+model GrowthBorrador {
+  id               String               @id @default(cuid())
+  oportunidadId    String
+  oportunidad      GrowthOportunidad    @relation(fields: [oportunidadId], references: [id], onDelete: Cascade)
+  version          Int                  @default(1)
+  tipo             GrowthTipoBorrador
+  objetivo         GrowthObjetivo
+  asunto           String?
+  texto            String               @db.Text
+  enlaceUrl        String?
+  utm              Json?
+  /// Claves de GrowthAfirmacion que usa el texto.
+  afirmaciones     String[]
+  estado           GrowthEstadoBorrador @default(borrador)
+  /// Lo que de verdad se envió.
+  textoFinal       String?              @db.Text
+  editadoPorHumano Boolean              @default(false)
+  creadoEn         DateTime             @default(now())
+
+  revisiones GrowthRevisionCumplimiento[]
+  decisiones GrowthDecision[]
+  gestion    GrowthGestion?
+
+  @@index([oportunidadId, estado])
+  @@map("growth_borradores")
+}
+
+model GrowthRevisionCumplimiento {
+  id             String         @id @default(cuid())
+  borradorId     String
+  borrador       GrowthBorrador @relation(fields: [borradorId], references: [id], onDelete: Cascade)
+  /// pasa | aviso | bloquea
+  resultado      String
+  /// [{regla, ok, dura, detalle}]
+  comprobaciones Json
+  /// reglas | llm
+  revisor        String
+  creadaEn       DateTime       @default(now())
+
+  @@map("growth_revisiones_cumplimiento")
+}
+
+/// Registro inmutable de lo que decide el administrador.
+model GrowthDecision {
+  id            String             @id @default(cuid())
+  oportunidadId String?
+  oportunidad   GrowthOportunidad? @relation(fields: [oportunidadId], references: [id])
+  borradorId    String?
+  borrador      GrowthBorrador?    @relation(fields: [borradorId], references: [id])
+  /// aprobar | devolver | descartar | marcar_gestionado | conseguido | sin_respuesta | anular
+  accion        String
+  motivo        String?
+  /// Correo del administrador.
+  por           String
+  en            DateTime           @default(now())
+
+  @@map("growth_decisiones")
+}
+
+/// Lo que se hizo a mano tras aprobar: enviar el correo, rellenar el formulario…
+model GrowthGestion {
+  id            String         @id @default(cuid())
+  borradorId    String         @unique
+  borrador      GrowthBorrador @relation(fields: [borradorId], references: [id])
+  /// email | formulario | alta_directorio | otro
+  canal         String
+  dominio       String
+  hechaEn       DateTime
+  respuestaEn   DateTime?
+  /// pendiente | aceptado | rechazado | sin_respuesta
+  resultado     String         @default("pendiente")
+  urlConseguida String?
+  notas         String?
+
+  mediciones GrowthMedicion[]
+
+  /// Para el tope de un contacto por dominio cada 90 días.
+  @@index([dominio, hechaEn])
+  @@map("growth_gestiones")
+}
+
+model GrowthMedicion {
+  id        String                @id @default(cuid())
+  gestionId String?
+  gestion   GrowthGestion?        @relation(fields: [gestionId], references: [id])
+  enlaceId  String?
+  enlace    GrowthEnlaceEntrante? @relation(fields: [enlaceId], references: [id])
+  fecha     DateTime              @default(now())
+  /// Visitas por UTM, altas, posición…
+  metricas  Json
+  /// manual | analytics | search_console
+  origen    String
+
+  @@map("growth_mediciones")
+}
+
+model GrowthCompetidor {
+  id      String  @id @default(cuid())
+  nombre  String
+  dominio String  @unique
+  notas   String?
+
+  @@map("growth_competidores")
+}
+
+model GrowthEnlaceEntrante {
+  id             String             @id @default(cuid())
+  dominioOrigen  String
+  urlOrigen      String
+  urlDestino     String
+  anchor         String?
+  /// dofollow | nofollow | ugc | sponsored
+  rel            String
+  primeraVistaEn DateTime
+  perdidoEn      DateTime?
+  /// gsc | bing | ahrefs_wmt | manual
+  fuente         String
+  oportunidadId  String?
+  oportunidad    GrowthOportunidad? @relation(fields: [oportunidadId], references: [id])
+  mediciones     GrowthMedicion[]
+
+  @@unique([urlOrigen, urlDestino])
+  @@map("growth_enlaces_entrantes")
+}
+
+model GrowthConsultaGeo {
+  id         String               @id @default(cuid())
+  prompt     String
+  nichoSlug  String?
+  activa     Boolean              @default(true)
+  resultados GrowthResultadoGeo[]
+
+  @@map("growth_consultas_geo")
+}
+
+model GrowthResultadoGeo {
+  id                  String            @id @default(cuid())
+  consultaId          String
+  consulta            GrowthConsultaGeo @relation(fields: [consultaId], references: [id], onDelete: Cascade)
+  ejecutadoEn         DateTime          @default(now())
+  /// claude_websearch: no representa a ChatGPT ni a Perplexity.
+  motor               String
+  mencionaAlhabla     Boolean
+  urlCitada           String?
+  competidoresCitados Json?
+
+  @@map("growth_resultados_geo")
+}
+
+model GrowthMetricaSeo {
+  id          String   @id @default(cuid())
+  fecha       DateTime @db.Date
+  /// consulta | pagina
+  tipo        String
+  clave       String
+  clics       Int
+  impresiones Int
+  posicion    Float
+
+  @@unique([fecha, tipo, clave])
+  @@map("growth_metricas_seo")
+}
+
+/// Umbrales, topes de contacto, retención y fuentes activas.
+model GrowthAjuste {
+  clave         String   @id
+  valor         Json
+  actualizadoEn DateTime @updatedAt
+
+  @@map("growth_ajustes")
+}
+
+model GrowthTokenAgente {
+  id         String    @id @default(cuid())
+  nombre     String
+  /// SHA-256 del token; el token en claro no se guarda.
+  hashToken  String    @unique
+  /// leer | escribir
+  alcances   String[]
+  creadoEn   DateTime  @default(now())
+  revocadoEn DateTime?
+  ultimoUso  DateTime?
+
+  @@map("growth_tokens_agente")
+}
