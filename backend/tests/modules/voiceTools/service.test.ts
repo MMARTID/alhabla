@@ -157,6 +157,15 @@ vi.mock("../../../src/lib/grabacion.js", () => ({
   tocaPreguntarPorGrabar: vi.fn().mockResolvedValue(false),
 }));
 
+// La plantilla de la lista de espera (si_no_le_vale de check_availability):
+// sin aprobar salvo que el test diga otra cosa; nunca va a Telnyx.
+vi.mock("../../../src/modules/whatsapp/service.js", async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import("../../../src/modules/whatsapp/service.js")
+  >()),
+  listaDeEsperaDisponible: vi.fn().mockResolvedValue(false),
+}));
+
 vi.mock("../../../src/modules/bookings/cancelacion.js", () => ({
   cancelarReserva: vi.fn().mockResolvedValue({ resultado: "cancelada" }),
 }));
@@ -978,8 +987,11 @@ describe("executeVoiceTool — catálogo y token de disponibilidad", () => {
       );
       expect(catalogo.services).not.toContain("€");
       expect(catalogo.services).not.toContain("sin precio");
-      expect(catalogo.precios).toBe(
-        "Este negocio no da precios: si preguntan cuánto cuesta algo, dile que ese precio se lo confirma el negocio."
+      expect(catalogo.precios).toContain(
+        "Este negocio no da precios: si preguntan cuánto cuesta algo, dile que ese precio se lo confirma el negocio"
+      );
+      expect(catalogo.precios).toContain(
+        "ni aproximado ni de la información del negocio"
       );
     });
 
@@ -4747,6 +4759,8 @@ describe("executeVoiceTool book_appointment — una cita por llamada", () => {
     expect(result.result!.message).not.toContain("+34600111222");
   });
 
+  // Desde F1 de PLAN-PROMPT-DINAMICO.md lo dice ya check_availability; la
+  // guarda de book_appointment sigue ahí aunque reserve sin comprobar.
   it("cambiar otra cita (replacesBookingId de otra llamada) con la de esta ya reservada tampoco la sustituye", async () => {
     mockedBookingFindFirst.mockResolvedValue({
       id: "booking_vieja",
@@ -4767,15 +4781,13 @@ describe("executeVoiceTool book_appointment — una cita por llamada", () => {
         replacesBookingId: "booking_vieja",
       },
     });
-    const result = await executeVoiceTool({
-      businessId: "business_123",
-      toolName: "book_appointment",
-      callId: "call_1",
-      params: {
-        clientName: "Lucía",
-        availabilityToken: comprobacion!.availabilityToken,
-      },
+    expect(comprobacion).toMatchObject({
+      available: false,
+      code: "YA_HAY_CITA_EN_ESTA_LLAMADA",
+      bookingId: "booking_1",
     });
+    expect(comprobacion!.availabilityToken).toBeUndefined();
+    const result = await reservarSinToken();
 
     expect(result.result).toMatchObject({
       code: "YA_HAY_CITA_EN_ESTA_LLAMADA",

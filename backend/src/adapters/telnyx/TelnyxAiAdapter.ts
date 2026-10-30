@@ -192,6 +192,9 @@ export interface TelnyxConversationMessage {
   text: string;
   createdAt?: string;
   sentAt?: string;
+  /** Tools que llamó el assistant en este mensaje (laboratorio de prompt:
+   * scripts/laboratorioDePrompt.ts). Solo viene si Telnyx las trae. */
+  toolCalls?: Array<{ id: string; nombre: string; argumentos: string }>;
 }
 
 export interface TelnyxRecording {
@@ -860,6 +863,32 @@ export class TelnyxAiAdapter {
     return typeof response?.content === "string" ? response.content : "";
   }
 
+  /** Borra una conversación (la limpieza de scripts/laboratorioDePrompt.ts). */
+  async deleteConversation(conversationId: string): Promise<void> {
+    const client = getTelnyxClient();
+    await client.ai.conversations.delete(conversationId);
+  }
+
+  /**
+   * Una respuesta de inferencia pública con un modelo alojado por Telnyx (el
+   * juez del laboratorio de prompt). No sirve para `openai/gpt-5.6-luna`: ese
+   * modelo solo va dentro de los assistants (400/10015 por inferencia).
+   */
+  async completarChat(input: {
+    modelo: string;
+    mensajes: Array<{ role: "system" | "user" | "assistant"; content: string }>;
+    temperatura?: number;
+  }): Promise<string> {
+    const client = getTelnyxClient();
+    const response = (await client.ai.openai.chat.createCompletion({
+      model: input.modelo,
+      messages: input.mensajes,
+      temperature: input.temperatura ?? 0,
+    })) as { choices?: Array<{ message?: { content?: unknown } }> };
+    const contenido = response?.choices?.[0]?.message?.content;
+    return typeof contenido === "string" ? contenido : "";
+  }
+
   // ---------------------------------------------------------------------
   // Grabación
   // ---------------------------------------------------------------------
@@ -1176,6 +1205,15 @@ function toConversationMessage(
     text: message.text,
     createdAt: message.created_at,
     sentAt: message.sent_at,
+    ...(message.tool_calls?.length
+      ? {
+          toolCalls: message.tool_calls.map((llamada) => ({
+            id: llamada.id,
+            nombre: llamada.function.name,
+            argumentos: llamada.function.arguments,
+          })),
+        }
+      : {}),
   };
 }
 
