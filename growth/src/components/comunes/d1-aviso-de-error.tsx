@@ -33,6 +33,9 @@ const AYUDA_POR_CODIGO: Record<string, string> = {
   analisis_antiguo:
     "El agente ha guardado un análisis más reciente: recarga y revisa ese.",
   ya_revisado: "Ya estaba revisado: recarga para ver cómo está ahora.",
+  // Las tareas a mano.
+  tarea_del_repositorio:
+    "Viene del repositorio y se volvería a sembrar. Descártala en vez de borrarla.",
 };
 
 /** Qué hacer ante un `codigo` conocido, o `null` si no hay consejo. */

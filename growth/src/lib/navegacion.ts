@@ -4,6 +4,7 @@ import {
   FileText,
   History,
   Inbox,
+  ListChecks,
   Settings,
   Swords,
   type LucideIcon,
@@ -18,8 +19,9 @@ export type Destino = {
 };
 
 /**
- * Las siete vistas del panel (las seis de la Fase 1b y la Competencia de la
- * 2a). Las otras del plan (Analítica, Backlinks…) llegan después.
+ * Las ocho vistas del panel (las seis de la Fase 1b, la Competencia de la 2a
+ * y las Tareas a mano). Las otras del plan (Analítica, Backlinks…) llegan
+ * después.
  */
 export const DESTINOS: readonly Destino[] = [
   {
@@ -32,12 +34,13 @@ export const DESTINOS: readonly Destino[] = [
   { href: "/historial", etiqueta: "Historial", icono: History },
   { href: "/conocimiento", etiqueta: "Conocimiento", icono: BookOpen },
   { href: "/competencia", etiqueta: "Competencia", icono: Swords },
+  { href: "/tareas", etiqueta: "Tareas", icono: ListChecks },
   { href: "/ejecuciones", etiqueta: "Ejecuciones", icono: Activity },
   { href: "/ajustes", etiqueta: "Ajustes", icono: Settings },
 ];
 
 /**
- * En la barra inferior del móvil caben cuatro; el resto (Competencia,
+ * En la barra inferior del móvil caben cuatro; el resto (Competencia, Tareas,
  * Ejecuciones y Ajustes) va en «Más».
  */
 export const DESTINOS_DE_LA_BARRA = DESTINOS.slice(0, 4);

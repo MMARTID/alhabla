@@ -1420,3 +1420,101 @@ export const RevisionDeAnalisisBody = z
   .object({ nota: sano(z.string().trim().max(500)).optional() })
   .strict();
 export type RevisionDeAnalisisBody = z.infer<typeof RevisionDeAnalisisBody>;
+
+// ── Tareas a mano ────────────────────────────────────────────────────────
+
+/** A qué tipo de destino pertenece una tarea (solo ordena y etiqueta). */
+export const CATEGORIAS_DE_TAREA = [
+  "directorio_software",
+  "directorio_ia",
+  "sector",
+  "asociacion",
+  "otro",
+] as const;
+export type CategoriaDeTarea = (typeof CATEGORIAS_DE_TAREA)[number];
+
+/** `repo`: la siembra el servidor y no se borra; `manual`: la añade el administrador. */
+export const ORIGENES_DE_TAREA = ["repo", "manual"] as const;
+export type OrigenDeTarea = (typeof ORIGENES_DE_TAREA)[number];
+
+export const ESTADOS_DE_TAREA = ["pendiente", "hecha", "descartada"] as const;
+export type EstadoDeTarea = (typeof ESTADOS_DE_TAREA)[number];
+
+/** Cómo acabó una tarea que se dio por hecha. */
+export const RESULTADOS_DE_TAREA = [
+  "alta_creada",
+  "en_revision",
+  "rechazada",
+  "sin_alta_gratuita",
+  "otro",
+] as const;
+export type ResultadoDeTarea = (typeof RESULTADOS_DE_TAREA)[number];
+
+export const MAXIMO_DE_PASOS_DE_UNA_TAREA = 12;
+export const MAXIMO_DE_CARACTERES_DE_UN_PASO = 300;
+export const MAXIMO_DE_CARACTERES_DE_LAS_NOTAS_DE_UNA_TAREA = 1000;
+export const MAXIMO_DE_CARACTERES_DE_LA_NOTA_DE_RESULTADO = 500;
+
+const tituloDeTarea = sano(z.string().trim().min(1).max(200));
+const pasosDeTarea = z
+  .array(sano(z.string().trim().min(1).max(MAXIMO_DE_CARACTERES_DE_UN_PASO)))
+  .max(MAXIMO_DE_PASOS_DE_UNA_TAREA);
+const notasDeTarea = sano(
+  z.string().trim().max(MAXIMO_DE_CARACTERES_DE_LAS_NOTAS_DE_UNA_TAREA)
+);
+const notaDeResultadoDeTarea = sano(
+  z.string().trim().max(MAXIMO_DE_CARACTERES_DE_LA_NOTA_DE_RESULTADO)
+);
+/** Un dominio sin `www.`; en blanco equivale a «el de la URL». */
+const dominioDeTarea = z.union([
+  z.literal("").transform(() => null),
+  dominioNormalizado,
+]);
+
+/** `POST /growth/admin/tareas`: el dominio, si no se da, sale de la URL. */
+export const AltaDeTareaBody = z
+  .object({
+    titulo: tituloDeTarea,
+    url: urlHttp,
+    categoria: z.enum(CATEGORIAS_DE_TAREA).optional(),
+    dominio: dominioDeTarea.nullable().optional(),
+    pasos: pasosDeTarea.optional(),
+    notas: notasDeTarea.nullable().optional(),
+  })
+  .strict();
+export type AltaDeTareaBody = z.infer<typeof AltaDeTareaBody>;
+
+/**
+ * `PATCH /growth/admin/tareas/:id`. Solo cambia lo que llega; `dominio: null`
+ * lo quita. Si cambia la URL a otro sitio y no llega `dominio`, el dominio se
+ * recalcula desde la URL nueva.
+ */
+export const CambioDeTareaBody = z
+  .object({
+    titulo: tituloDeTarea.optional(),
+    url: urlHttp.optional(),
+    categoria: z.enum(CATEGORIAS_DE_TAREA).optional(),
+    dominio: dominioDeTarea.nullable().optional(),
+    pasos: pasosDeTarea.optional(),
+    notas: notasDeTarea.nullable().optional(),
+  })
+  .strict()
+  .refine((v) => Object.values(v).some((valor) => valor !== undefined), {
+    message: "Indica al menos un campo que cambiar.",
+  });
+export type CambioDeTareaBody = z.infer<typeof CambioDeTareaBody>;
+
+/** `POST /growth/admin/tareas/:id/hecha`. */
+export const TareaHechaBody = z
+  .object({
+    resultado: z.enum(RESULTADOS_DE_TAREA).nullable().optional(),
+    nota: notaDeResultadoDeTarea.nullable().optional(),
+  })
+  .strict();
+export type TareaHechaBody = z.infer<typeof TareaHechaBody>;
+
+/** `POST /growth/admin/tareas/:id/descartar`. */
+export const TareaDescartadaBody = z
+  .object({ nota: notaDeResultadoDeTarea.nullable().optional() })
+  .strict();
+export type TareaDescartadaBody = z.infer<typeof TareaDescartadaBody>;

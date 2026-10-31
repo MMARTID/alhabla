@@ -476,7 +476,9 @@ describe("Competencia · el texto de terceros es texto", () => {
     const destinos = [...container.querySelectorAll("a")].map((a) =>
       a.getAttribute("href")
     );
-    for (const destino of destinos) expect(destino).toMatch(/^\/competencia\//);
+    for (const destino of destinos) {
+      expect(destino).toMatch(/^\/competencia(\/|$)/);
+    }
     expect(screen.getByText(/onerror=/)).toBeInTheDocument();
   });
 });

@@ -18,6 +18,7 @@ export function crearPrismaMock() {
     findFirst: vi.fn(),
     findMany: vi.fn(),
     create: vi.fn(),
+    createMany: vi.fn(),
     update: vi.fn(),
     updateMany: vi.fn(),
     upsert: vi.fn(),
@@ -41,6 +42,7 @@ export function crearPrismaMock() {
     growthFuente: modelo(),
     growthNicho: modelo(),
     growthEjecucion: modelo(),
+    growthTarea: modelo(),
     $transaction: vi.fn(),
     $executeRaw: vi.fn(),
   };
