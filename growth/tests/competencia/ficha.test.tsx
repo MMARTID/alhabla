@@ -696,7 +696,7 @@ describe("Competidor · editar", () => {
     };
   }
 
-  it("abre con lo que hay: nombre, URL y notas, y avisa de que el dominio no cambia", async () => {
+  it("abre con lo que hay: nombre, URL y notas, y enseña el dominio actual", async () => {
     const { dialogo } = await abrirEdicion();
     expect(within(dialogo).getByLabelText("Nombre")).toHaveValue(
       "Recepción Express (ejemplo)"
@@ -707,7 +707,6 @@ describe("Competidor · editar", () => {
     expect(within(dialogo).getByLabelText(/Notas/)).toHaveValue(
       "Lo vi en un directorio de software para estética."
     );
-    expect(dialogo).toHaveTextContent("El dominio no se puede cambiar");
     expect(dialogo).toHaveTextContent("recepcion-express.example");
   });
 
@@ -725,6 +724,24 @@ describe("Competidor · editar", () => {
     expect(
       await screen.findByRole("heading", { level: 1, name: "Express" })
     ).toBeInTheDocument();
+  });
+
+  it("una URL de otro dominio avisa del nuevo dominio y manda cambiarDominio", async () => {
+    const { usuario, cliente, dialogo } = await abrirEdicion();
+    const espia = vi.spyOn(cliente, "editarCompetidor");
+    const url = within(dialogo).getByLabelText(/Dirección de partida/);
+    await usuario.clear(url);
+    await usuario.type(url, "https://nuevo-dominio.example/es");
+    expect(dialogo).toHaveTextContent("pasará a ser nuevo-dominio.example");
+    await usuario.click(
+      within(dialogo).getByRole("button", { name: "Guardar" })
+    );
+    await waitFor(() =>
+      expect(espia).toHaveBeenCalledWith("demo-co-3", {
+        url: "https://nuevo-dominio.example/es",
+        cambiarDominio: true,
+      })
+    );
   });
 
   it("vaciar la URL y las notas las borra (manda null)", async () => {
@@ -754,21 +771,6 @@ describe("Competidor · editar", () => {
     expect(espia).not.toHaveBeenCalled();
   });
 
-  it("una URL de otro dominio no sale: se dice antes de llamar", async () => {
-    const { usuario, cliente, dialogo } = await abrirEdicion();
-    const espia = vi.spyOn(cliente, "editarCompetidor");
-    const url = within(dialogo).getByLabelText(/Dirección de partida/);
-    await usuario.clear(url);
-    await usuario.type(url, "https://otro-sitio.example/precios");
-    await usuario.click(
-      within(dialogo).getByRole("button", { name: "Guardar" })
-    );
-    expect(await within(dialogo).findByRole("alert")).toHaveTextContent(
-      "La dirección tiene que ser de recepcion-express.example"
-    );
-    expect(espia).not.toHaveBeenCalled();
-  });
-
   it("un nombre vacío o una URL que no es http(s) tampoco salen", async () => {
     const { usuario, cliente, dialogo } = await abrirEdicion();
     const espia = vi.spyOn(cliente, "editarCompetidor");
@@ -787,13 +789,13 @@ describe("Competidor · editar", () => {
     expect(espia).not.toHaveBeenCalled();
   });
 
-  it("si el backend dice que la URL es de otro dominio (400), lo enseña con qué hacer y deja lo escrito", async () => {
+  it("si el backend rechaza la URL de otro dominio (400), lo enseña con qué hacer y deja lo escrito", async () => {
     const usuario = userEvent.setup();
     montarFalso(detalleDeCompetidor({}, [analisisDeCompetidor()]), {
       editarCompetidor: async () => {
         throw new ErrorDeCliente(
           400,
-          "La URL debe ser de rival.example: el dominio de un competidor no cambia.",
+          "La URL es de otro dominio que rival.example. Si el competidor cambió de web, confirma el cambio de dominio.",
           { codigo: "url_de_otro_dominio" }
         );
       },
@@ -807,8 +809,8 @@ describe("Competidor · editar", () => {
       within(dialogo).getByRole("button", { name: "Guardar" })
     );
     const aviso = await within(dialogo).findByRole("alert");
-    expect(aviso).toHaveTextContent("el dominio de un competidor no cambia");
-    expect(aviso).toHaveTextContent("usa una página del mismo sitio");
+    expect(aviso).toHaveTextContent("es de otro dominio que rival.example");
+    expect(aviso).toHaveTextContent("confirma el cambio de dominio al guardar");
     expect(within(dialogo).getByLabelText("Nombre")).toHaveValue("Otro nombre");
   });
 });

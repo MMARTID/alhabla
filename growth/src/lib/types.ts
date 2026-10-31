@@ -993,8 +993,9 @@ export type AltaDeCompetidor = {
 export type CambioDeCompetidor = {
   nombre?: string;
   notas?: string | null;
-  /** Del mismo dominio que el competidor: el dominio no cambia. */
+  /** Si es de otro dominio, hace falta `cambiarDominio` y el dominio pasa a ser el de la URL. */
   url?: string | null;
+  cambiarDominio?: boolean;
 };
 
 /** Cuerpo de POST …/analisis/:analisisId/revisar. */

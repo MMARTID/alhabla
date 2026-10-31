@@ -288,32 +288,26 @@ describe("validar la edición", () => {
 
   it("el nombre no puede quedar vacío", () => {
     expect(
-      validarEdicionDeCompetidor({ ...valores, nombre: "  " }, "rival.example")
-        .nombre
+      validarEdicionDeCompetidor({ ...valores, nombre: "  " }).nombre
     ).toBe("Escribe un nombre.");
   });
 
-  it("la URL es opcional pero tiene que ser del mismo dominio (con o sin www)", () => {
-    expect(validarEdicionDeCompetidor(valores, "rival.example")).toEqual({});
+  it("la URL es opcional y puede ser de otro dominio (cambia el dominio)", () => {
+    expect(validarEdicionDeCompetidor(valores)).toEqual({});
     expect(
-      validarEdicionDeCompetidor(
-        { ...valores, url: "https://www.rival.example/precios" },
-        "rival.example"
-      )
+      validarEdicionDeCompetidor({
+        ...valores,
+        url: "https://www.rival.example/precios",
+      })
     ).toEqual({});
     expect(
-      validarEdicionDeCompetidor(
-        { ...valores, url: "https://otro.example/precios" },
-        "rival.example"
-      ).url
-    ).toBe(
-      "La dirección tiene que ser de rival.example: el dominio no se cambia."
-    );
+      validarEdicionDeCompetidor({
+        ...valores,
+        url: "https://otro.example/precios",
+      })
+    ).toEqual({});
     expect(
-      validarEdicionDeCompetidor(
-        { ...valores, url: "javascript:alert(1)" },
-        "rival.example"
-      ).url
+      validarEdicionDeCompetidor({ ...valores, url: "javascript:alert(1)" }).url
     ).toMatch(/http:\/\/ o https:\/\//);
   });
 });

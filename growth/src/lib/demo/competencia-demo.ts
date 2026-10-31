@@ -277,22 +277,35 @@ export function crearCompetenciaDeDemostracion(
           ? null
           : notasValidas(cambios.notas);
     let url: string | null | undefined;
+    let dominio: string | undefined;
     if (cambios.url === null) url = null;
     else if (cambios.url !== undefined) {
       const segura = urlValida(cambios.url);
       comprobarQueEsExterna(segura);
-      if (dominioDe(segura) !== c.dominio) {
-        throw new ErrorDeCliente(
-          400,
-          `La URL debe ser de ${c.dominio}: el dominio de un competidor no cambia.`,
-          { codigo: "url_de_otro_dominio" }
-        );
+      const dominioNuevo = dominioDe(segura);
+      if (dominioNuevo !== c.dominio) {
+        if (!cambios.cambiarDominio) {
+          throw new ErrorDeCliente(
+            400,
+            `La URL es de otro dominio que ${c.dominio}. Si el competidor cambió de web, confirma el cambio de dominio.`,
+            { codigo: "url_de_otro_dominio" }
+          );
+        }
+        if (almacen.competidores.some((x) => x.dominio === dominioNuevo)) {
+          throw new ErrorDeCliente(
+            409,
+            "Ya existe un competidor con ese dominio.",
+            { codigo: "competidor_existente" }
+          );
+        }
+        dominio = dominioNuevo;
       }
       url = limpiarUrl(segura);
     }
     if (nombre !== undefined) c.nombre = nombre;
     if (notas !== undefined) c.notas = notas;
     if (url !== undefined) c.url = url;
+    if (dominio !== undefined) c.dominio = dominio;
     return detalle(c);
   }
 

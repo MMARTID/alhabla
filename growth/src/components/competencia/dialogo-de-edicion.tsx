@@ -12,15 +12,16 @@ import {
 } from "@/lib/types";
 import { AvisoDeErrorDeCompetencia } from "./aviso-de-error";
 import {
+  dominioDeUrl,
   validarEdicionDeCompetidor,
   type ErroresDeCompetidor,
 } from "./utilidades";
 
 /**
- * Edita el nombre, las notas y la URL de partida de un competidor. El dominio
- * no se puede cambiar: una dirección de otro sitio se rechaza aquí y, por si
- * acaso, en el backend. Solo se manda lo que de verdad has cambiado; vaciar la
- * URL o las notas las borra.
+ * Edita el nombre, las notas y la URL de partida de un competidor. Una
+ * dirección de otro sitio cambia también su dominio: el diálogo lo avisa y se
+ * manda `cambiarDominio`. Solo se manda lo que de verdad has cambiado; vaciar
+ * la URL o las notas las borra.
  */
 export function DialogoDeEdicion({
   competidor,
@@ -38,14 +39,16 @@ export function DialogoDeEdicion({
   const [errorDeApi, setErrorDeApi] = useState<unknown>(null);
   const [enviando, setEnviando] = useState(false);
   const enCurso = useRef(false);
+  const dominioDeLaUrl = url.trim() === "" ? null : dominioDeUrl(url);
+  const dominioNuevo =
+    dominioDeLaUrl !== null && dominioDeLaUrl !== competidor.dominio
+      ? dominioDeLaUrl
+      : null;
 
   async function enviar(evento: FormEvent) {
     evento.preventDefault();
     if (enCurso.current) return;
-    const encontrados = validarEdicionDeCompetidor(
-      { nombre, url, notas },
-      competidor.dominio
-    );
+    const encontrados = validarEdicionDeCompetidor({ nombre, url, notas });
     setErrores(encontrados);
     if (Object.keys(encontrados).length > 0) return;
 
@@ -56,6 +59,7 @@ export function DialogoDeEdicion({
     }
     if (url.trim() !== (competidor.url ?? "")) {
       cambios.url = url.trim() === "" ? null : url.trim();
+      if (dominioNuevo !== null) cambios.cambiarDominio = true;
     }
     if (Object.keys(cambios).length === 0) return alCerrar();
 
@@ -76,7 +80,7 @@ export function DialogoDeEdicion({
   return (
     <Dialogo
       titulo="Editar competidor"
-      descripcion="El dominio no se puede cambiar. Si el competidor cambia de web, añade el nuevo y quita este."
+      descripcion="El dominio sale de la dirección de partida: si el competidor cambió de web, pega la nueva."
       alCerrar={alCerrar}
       ocupado={enviando}
     >
@@ -102,8 +106,15 @@ export function DialogoDeEdicion({
           opcional
           ayuda={
             <>
-              La página por la que el agente empieza a leer. Tiene que ser de{" "}
+              La página por la que el agente empieza a leer. Ahora el dominio es{" "}
               <span className="font-mono">{competidor.dominio}</span>.
+              {dominioNuevo !== null && (
+                <>
+                  {" "}
+                  Al guardar pasará a ser{" "}
+                  <span className="font-mono">{dominioNuevo}</span>.
+                </>
+              )}
             </>
           }
           error={errores.url}
