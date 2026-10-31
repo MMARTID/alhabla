@@ -26,8 +26,15 @@ beforeEach(() => {
 /** Intl separa la cifra y el símbolo con un espacio duro: se compara con uno normal. */
 const normal = (texto: string | null) => (texto ?? "").replace(/[  ]/g, " ");
 
+/**
+ * El demo fecha sus análisis respecto al reloj; este test escribe «28 oct» en
+ * sus expectativas, así que el reloj se fija (el 30-10-2026, el día en que se
+ * escribió). Con el reloj real el test se pudría al día siguiente.
+ */
+const AHORA_DEL_DEMO = new Date("2026-10-30T09:00:00.000Z");
+
 function montarDemo(id: string) {
-  const cliente = clienteDemo({ retardoMs: 0 });
+  const cliente = clienteDemo({ retardoMs: 0, ahora: () => AHORA_DEL_DEMO });
   renderConCliente(<VistaDeCompetidor id={id} />, cliente);
   return cliente;
 }
