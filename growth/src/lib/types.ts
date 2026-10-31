@@ -1000,3 +1000,172 @@ export type CambioDeCompetidor = {
 
 /** Cuerpo de POST …/analisis/:analisisId/revisar. */
 export type RevisionDeAnalisis = { nota?: string };
+
+// ---------------------------------------------------------------------------
+// Comparador de precios
+// ---------------------------------------------------------------------------
+
+/** Los tipos de dato que entran en el comparador (los demás se quedan en la ficha). */
+export const TIPOS_DE_DATO_DEL_COMPARADOR = [
+  "precio",
+  "plan",
+  "integracion",
+  "idioma",
+  "canal",
+  "limite",
+] as const;
+export type TipoDeDatoDelComparador =
+  (typeof TIPOS_DE_DATO_DEL_COMPARADOR)[number];
+
+/** Un competidor en el comparador, con los datos de su ÚLTIMO análisis. */
+export type FilaDelComparador = {
+  competidorId: string;
+  nombre: string;
+  /** Sin `www.`. Nunca se pinta como enlace. */
+  dominio: string;
+  url: string | null;
+  origen: OrigenDeCompetidor;
+  /** Los `propuesto` no salen. */
+  estado: "por_analizar" | "analizado" | "revisado";
+  analisis: {
+    id: string;
+    version: number;
+    creadoEn: string;
+    revisadoEn: string | null;
+    /** Tiene más de 90 días. */
+    caducado: boolean;
+  } | null;
+  /** Solo tipos precio, plan, integracion, idioma, canal y limite. */
+  datos: DatoDeCompetidor[];
+};
+
+/** GET /growth/admin/competidores/comparador */
+export type RespuestaDelComparador = {
+  /** Por nombre. */
+  data: FilaDelComparador[];
+  generadoEn: string;
+};
+
+// ---------------------------------------------------------------------------
+// Ficha de Alhabla
+// ---------------------------------------------------------------------------
+
+/** Un campo de la ficha de producto, compuesto en el servidor con afirmaciones vigentes. */
+export type CampoDeFicha = {
+  /** `nombre`, `web`, `descripcion_corta`, `descripcion_larga`, `precios`, `prueba`, `idiomas`, `categorias`. */
+  clave: string;
+  /** «Nombre del producto», «Descripción corta»… */
+  etiqueta: string;
+  /** `null` si faltan afirmaciones para componerlo. */
+  texto: string | null;
+  /** Caracteres orientativos (160 y 1.000 en las descripciones). */
+  limite?: number;
+  /** Las claves de afirmación que usa (`precio.plan.pro`…). */
+  afirmaciones: string[];
+  /** Las que se esperaban y no están vigentes. */
+  faltan: string[];
+};
+
+/** GET /growth/admin/ficha-de-alhabla */
+export type RespuestaDeFicha = {
+  campos: CampoDeFicha[];
+  /** Del snapshot de conocimiento; `null` si nunca se sincronizó. */
+  commit: string | null;
+  sincronizadaEn: string | null;
+  /** «campo X contiene …»: términos prohibidos que salen en un texto. */
+  avisos: string[];
+};
+
+// ---------------------------------------------------------------------------
+// Tareas a mano
+// ---------------------------------------------------------------------------
+
+export const CATEGORIAS_DE_TAREA = [
+  "directorio_software",
+  "directorio_ia",
+  "sector",
+  "asociacion",
+  "otro",
+] as const;
+export type CategoriaDeTarea = (typeof CATEGORIAS_DE_TAREA)[number];
+
+/** `repo`: la sembró el sistema (se descarta, no se borra). `manual`: la añadiste tú. */
+export const ORIGENES_DE_TAREA = ["repo", "manual"] as const;
+export type OrigenDeTarea = (typeof ORIGENES_DE_TAREA)[number];
+
+export const ESTADOS_DE_TAREA = ["pendiente", "hecha", "descartada"] as const;
+export type EstadoDeTarea = (typeof ESTADOS_DE_TAREA)[number];
+
+export const RESULTADOS_DE_TAREA = [
+  "alta_creada",
+  "en_revision",
+  "rechazada",
+  "sin_alta_gratuita",
+  "otro",
+] as const;
+export type ResultadoDeTarea = (typeof RESULTADOS_DE_TAREA)[number];
+
+/** Los topes del backend (cuerpos de `/growth/admin/tareas`). */
+export const LARGO_MAXIMO_DE_TITULO_DE_TAREA = 200;
+export const LARGO_MAXIMO_DE_URL_DE_TAREA = 2000;
+export const MAXIMO_DE_PASOS_DE_TAREA = 12;
+export const LARGO_MAXIMO_DE_PASO_DE_TAREA = 300;
+export const LARGO_MAXIMO_DE_NOTAS_DE_TAREA = 1000;
+export const LARGO_MAXIMO_DE_NOTA_DE_RESULTADO_DE_TAREA = 500;
+
+/** Una tarea a mano: un destino que el agente no puede abrir o que se hace mejor tú. */
+export type Tarea = {
+  id: string;
+  titulo: string;
+  /** Sin `www.`; `null` si no se sabe. Nunca se pinta como enlace. */
+  dominio: string | null;
+  url: string;
+  categoria: CategoriaDeTarea;
+  pasos: string[];
+  notas: string | null;
+  origen: OrigenDeTarea;
+  estado: EstadoDeTarea;
+  resultado: ResultadoDeTarea | null;
+  notaDeResultado: string | null;
+  hechaEn: string | null;
+  creadoEn: string;
+  orden: number;
+};
+
+/** GET /growth/admin/tareas */
+export type RespuestaDeTareas = { data: Tarea[] };
+
+/**
+ * Cuerpo de POST /growth/admin/tareas (Añadir tarea). Sin `dominio`, el
+ * backend lo saca de la URL; el panel no lo manda.
+ */
+export type AltaDeTarea = {
+  titulo: string;
+  url: string;
+  categoria?: CategoriaDeTarea;
+  dominio?: string | null;
+  pasos?: string[];
+  notas?: string | null;
+};
+
+/**
+ * Cuerpo de PATCH /growth/admin/tareas/:id (al menos un campo). `notas: null`
+ * las borra. Una URL de otro sitio sin `dominio` recalcula el dominio.
+ */
+export type CambioDeTarea = {
+  titulo?: string;
+  url?: string;
+  categoria?: CategoriaDeTarea;
+  dominio?: string | null;
+  pasos?: string[];
+  notas?: string | null;
+};
+
+/** Cuerpo de POST /growth/admin/tareas/:id/hecha. */
+export type MarcaDeTareaHecha = {
+  resultado?: ResultadoDeTarea | null;
+  nota?: string | null;
+};
+
+/** Cuerpo de POST /growth/admin/tareas/:id/descartar. */
+export type DescarteDeTarea = { nota?: string | null };

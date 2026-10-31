@@ -185,6 +185,7 @@ describe("las rutas que llama el panel existen en el backend", () => {
     await clienteHttp.aceptarCompetidor("ID1");
     await clienteHttp.reanalizarCompetidor("ID1");
     await clienteHttp.revisarAnalisis("ID1", "AN1", {});
+    await clienteHttp.comparadorDeCompetencia();
   });
 
   it("cada ruta del panel (método y ruta) está declarada en routesCompetencia.ts", () => {
@@ -195,7 +196,7 @@ describe("las rutas que llama el panel existen en el backend", () => {
         ),
       ].map((m) => `${m[1].toUpperCase()} ${m[2]}`)
     );
-    expect(declaradas.size).toBeGreaterThanOrEqual(9);
+    expect(declaradas.size).toBeGreaterThanOrEqual(10);
     const delPanel = new Set(
       llamadas.map(
         ({ metodo, ruta }) =>

@@ -5,9 +5,11 @@ import Ajustes from "@/app/(panel)/ajustes/page";
 import Bandeja from "@/app/(panel)/bandeja/page";
 import Borradores from "@/app/(panel)/borradores/page";
 import Competencia from "@/app/(panel)/competencia/page";
+import Comparador from "@/app/(panel)/competencia/comparador/page";
 import Conocimiento from "@/app/(panel)/conocimiento/page";
 import Ejecuciones from "@/app/(panel)/ejecuciones/page";
 import Historial from "@/app/(panel)/historial/page";
+import Tareas from "@/app/(panel)/tareas/page";
 import { VistaDeRevision } from "@/components/revision/vista-de-revision";
 import { clienteDemo } from "@/lib/demo/cliente-demo";
 import { renderConCliente } from "../helpers/render";
@@ -22,6 +24,8 @@ const RUTAS: Array<[string, string, () => ReactElement]> = [
   ["/historial", "Historial", () => <Historial />],
   ["/conocimiento", "Conocimiento", () => <Conocimiento />],
   ["/competencia", "Competencia", () => <Competencia />],
+  ["/competencia/comparador", "Competencia", () => <Comparador />],
+  ["/tareas", "Tareas", () => <Tareas />],
   ["/ejecuciones", "Ejecuciones", () => <Ejecuciones />],
   ["/ajustes", "Ajustes", () => <Ajustes />],
 ];

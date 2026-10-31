@@ -6,8 +6,10 @@ import {
   AbrirEjecucionBody,
   AjustesPutBody,
   AltaDeCompetidorBody,
+  AltaDeTareaBody,
   AnalisisDeCompetidorBody,
   CambioDeCompetidorBody,
+  CambioDeTareaBody,
   CerrarEjecucionBody,
   EvaluarBorradorBody,
   OportunidadManualBody,
@@ -15,6 +17,8 @@ import {
   PropuestaDeCompetidorBody,
   RevisionDeAnalisisBody,
   RevisionLlmBody,
+  TareaDescartadaBody,
+  TareaHechaBody,
 } from "../../../src/modules/growth/esquemas.js";
 import { CalificacionRutaBody } from "../../../src/modules/growth/servicioAgente.js";
 import type { PrismaMock } from "./ayudas.js";
@@ -217,6 +221,52 @@ const EJEMPLOS_DE_CUERPOS: {
     },
   },
   {
+    nombre: "añadir una tarea a mano",
+    metodo: "POST",
+    url: "/growth/admin/tareas",
+    quien: "admin",
+    esquema: AltaDeTareaBody,
+    cuerpo: {
+      titulo: "Directorio de ejemplo",
+      url: "https://directorio.ejemplo.es/proveedores",
+      categoria: "directorio_software",
+      dominio: "directorio.ejemplo.es",
+      pasos: ["Abre la página.", "Pega la Ficha de Alhabla."],
+      notas: "Por búsqueda, sin confirmar",
+    },
+  },
+  {
+    nombre: "editar una tarea a mano",
+    metodo: "PATCH",
+    url: "/growth/admin/tareas/t1",
+    quien: "admin",
+    esquema: CambioDeTareaBody,
+    cuerpo: {
+      titulo: "Otro título",
+      url: "https://otro.ejemplo.es/",
+      categoria: "otro",
+      dominio: null,
+      pasos: [],
+      notas: null,
+    },
+  },
+  {
+    nombre: "dar una tarea por hecha",
+    metodo: "POST",
+    url: "/growth/admin/tareas/t1/hecha",
+    quien: "admin",
+    esquema: TareaHechaBody,
+    cuerpo: { resultado: "en_revision", nota: "Ficha enviada" },
+  },
+  {
+    nombre: "descartar una tarea",
+    metodo: "POST",
+    url: "/growth/admin/tareas/t1/descartar",
+    quien: "admin",
+    esquema: TareaDescartadaBody,
+    cuerpo: { nota: "Pide pago" },
+  },
+  {
     nombre: "cerrar una ejecución",
     metodo: "POST",
     url: "/growth/agente/ejecuciones/e1/cierre",
@@ -304,6 +354,26 @@ describe("contratos de las rutas de Alhabla Growth", () => {
       motivoDescarte: null,
     });
     mock.growthCompetidor.create.mockResolvedValue({ id: "c1" });
+    // Las tareas a mano: lo justo para que el alta y los cambios lleguen al final.
+    const tarea = {
+      id: "t1",
+      titulo: "Una tarea",
+      dominio: null,
+      url: "https://ejemplo.com/",
+      categoria: "otro",
+      pasos: [],
+      notas: null,
+      origen: "manual",
+      estado: "pendiente",
+      resultado: null,
+      notaDeResultado: null,
+      hechaEn: null,
+      creadoEn: new Date(),
+      orden: 0,
+    };
+    mock.growthTarea.create.mockResolvedValue(tarea);
+    mock.growthTarea.update.mockResolvedValue(tarea);
+    mock.growthTarea.findUnique.mockResolvedValue(tarea);
 
     fastify = Fastify();
     await fastify.register(growthRoutes);

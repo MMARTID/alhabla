@@ -108,3 +108,13 @@ El primer run completo (`ligero`) dio 3 candidatas y 1 borrador (la ficha de Bea
 2. **Una semilla se salta si el servidor ya conoce el dominio** (`listar_oportunidades` con `dominio`): no hay que marcar nada al procesarla.
 3. **La lista sale de los datos**, no de suposiciones: Capterra, GetApp, Software Advice, G2, AlternativeTo, SourceForge y SelectHub (reseñas y comparativas), Stork, AI Agents Directory, Toolradar y topai.tools (directorios de IA), Beautymarket (hecha) y las pistas ANEPE, ANEIP y la asociación de peluquería de Asturias (sin web comprobada). Se descartan de antemano `openalternative.co` (solo código abierto) y los blogs de otros proveedores de IA de voz.
 4. **Topes del run al alza, sin tocar `ligero`:** búsquedas 26 → 28, páginas 64 → 72, oportunidades nuevas 20 → 26, subagentes 36 → 37. Sigue pendiente medir el coste de un run completo.
+
+## 2026-10-31 (9) — Un panel que sirve sin gastar cuota
+
+El fundador dijo que el panel era casi inútil: es una bandeja de revisión y, con un descubrimiento que casi no produce, no hay nada que revisar (el run completo con semillas dio 3 candidatas y todas se descartaron por bajo umbral). Se le da algo que usar ya, con datos que ya tenemos, **sin gastar cuota de Claude y sin que el backend llame a ningún modelo**.
+
+1. **Comparador de precios** (`/competencia/comparador`): Alhabla (de las afirmaciones `precio.*`) frente a los competidores analizados, con la fuente y la fecha de cada precio, en la moneda en que se publican (sin convertir). Sigue siendo inteligencia interna: no se cita en borradores.
+2. **Tareas a mano** (`/tareas`): destinos que el agente no puede abrir (Capterra, G2… dan 403 a la lectura de páginas) o que se hacen mejor a mano, con enlace, pasos, resultado y notas. Se siembran 11 (Beautymarket ya `hecha`); las del repositorio se descartan, no se borran.
+3. **Ficha de Alhabla** (en `/tareas`): el texto para rellenar un alta (nombre, web, descripción corta y larga, precios, prueba, idiomas, categorías), compuesto por el servidor con plantillas fijas y **solo con afirmaciones vigentes**, con las claves usadas visibles, y pasado por la comprobación de términos prohibidos de los borradores. Si falta una afirmación, el campo sale vacío y lo dice.
+4. **Sin cambios en agentes ni en el MCP.** Migración aditiva `20261031170000_growth_tareas`.
+5. **Pendiente de decidir**: si el descubrimiento sigue (los directorios globales puntúan bajo y los mejores bloquean al agente) o se pasa a la Fase 4 (SEO y GEO con Search Console), que da datos propios cada día.

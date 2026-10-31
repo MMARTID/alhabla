@@ -3684,6 +3684,32 @@ queda `bloqueado` y la oportunidad `bloqueada`.
   de una oportunidad (hasta 10 dominios) solo admite competidores no `propuesto` (400
   `competidor_desconocido`); `GET /growth/admin/oportunidades?menciona=<dominio>` filtra
   por ellos.
+- **Panel útil: comparador, Ficha de Alhabla y tareas a mano** (31-10-2026; solo administrador,
+  sin LLM ni peticiones salientes). `GET /growth/admin/competidores/comparador`
+  (`comparadorDePrecios.ts`) devuelve, por nombre, los competidores NO `propuesto` con su
+  último análisis (`analisis`: `id`, `version`, `creadoEn`, `revisadoEn`, `caducado`) y solo
+  los datos `precio|plan|integracion|idioma|canal|limite`, en una llamada a Prisma (sin N+1)
+  y sin volver a validar `consultadoEn`. `GET /growth/admin/ficha-de-alhabla`
+  (`fichaDeAlhabla.ts`) compone con plantillas fijas ocho campos (`nombre`, `web`,
+  `descripcion_corta` ≤ 160, `descripcion_larga` ≤ 1.000, `precios`, `prueba`, `idiomas`,
+  `categorias`) SOLO con afirmaciones vigentes (`pagina.inicio`, `funcion.*`, `precio.*`); si
+  falta una, ese campo sale `texto: null` con sus `faltan` (la descripción larga usa las
+  funciones que existan). Cada texto pasa por `sin_terminos_prohibidos` con las `prohibida.*`
+  vigentes (`terminosProhibidosEnTexto`, la misma comprobación que un borrador): si salta, el
+  campo sale igualmente y `avisos` lo dice; también avisa de la base sin sincronizar u
+  obsoleta o sin términos prohibidos. Un test recorre el extractor sobre el repo real: si una
+  clave de la ficha deja de existir en el mapa o cambia de nombre, rompe.
+  `growth_tareas` (`GrowthTarea`; `servicioTareas.ts`): destinos que el agente no puede abrir
+  (G2, Capterra… dan 403) o que se hacen a mano, con `url`, `pasos` (≤ 12 de 300),
+  `estado` (`pendiente|hecha|descartada`) y `resultado` (`alta_creada|en_revision|rechazada|
+  sin_alta_gratuita|otro`). `origen = repo` son las 11 de `tareasIniciales.ts`: el `GET` las
+  siembra (perezosa, idempotente: lectura, y si falta alguna, transacción con
+  `pg_advisory_xact_lock` + `createMany skipDuplicates`; el índice único de `siembra` es la
+  garantía última, NULL en las manuales) y NUNCA toca una existente; no se borran (409
+  `tarea_del_repositorio`), se descartan. Los cambios de estado son un `updateMany`
+  condicionado al estado de partida (atómico; «hecha» y «descartar» son idempotentes y solo
+  completan resultado o nota; `reabrir` limpia resultado y fecha y conserva la nota). Ni el
+  agente ni el MCP leen las tareas.
 - **Otros códigos del agente:** `ya_calificada` (409, con `diferencias`: recalificar con datos
   distintos), `pausa`, `fuente_inactiva`, `conflicto`. Abrir una ejecución otra vez en menos de
   30 s devuelve la misma (`reutilizada: true`, 200).
@@ -3713,6 +3739,9 @@ queda `bloqueado` y la oportunidad `bloqueada`.
 | `POST /growth/agente/conocimiento/sincronizar` | agente (`conocimiento`) | Sincroniza la base de afirmaciones (`?simular=true` no escribe) |
 | `/growth/admin/yo`, `resumen`, `oportunidades` (+`/:id`, `/:id/decision`; filtro `?menciona=`), `borradores` (+`/:id`, PATCH), `decisiones`, `gestiones`, `conocimiento` (+`/:clave/historial`), `ejecuciones` (+`/:id`), `ajustes` (GET y PUT) | administrador | Todo lo que ve y decide el dashboard (`aprobar`, `devolver`, `descartar`, `marcar_gestionado`, `conseguido`, `sin_respuesta`, `rechazado`). Fuera de la 1b: nichos, fuentes y tokens (los tokens, por script) |
 | `GET/POST /growth/admin/competidores`, `GET/PATCH/DELETE …/:id`, `POST …/:id/aceptar`, `POST …/:id/reanalizar`, `GET …/:id/analisis/:analisisId`, `POST …/:id/analisis/:analisisId/revisar` | administrador | Alta por URL (`origen = manual`, `por_analizar`; 400 `dominio_propio`, 409 `competidor_existente`), edición (el dominio no cambia), baja, aceptar un propuesto, volver a analizar, revisar un análisis (409 `analisis_antiguo` y `ya_revisado`). Cada resumen lleva `oportunidades` y `menciones` |
+| `GET /growth/admin/competidores/comparador` | administrador | Los competidores confirmados (no `propuesto`) con su último análisis y los datos comparables (`{ data: FilaDelComparador[], generadoEn }`) |
+| `GET /growth/admin/ficha-de-alhabla` | administrador | La Ficha de Alhabla: `{ campos, commit, sincronizadaEn, avisos }`, solo con afirmaciones vigentes |
+| `GET/POST /growth/admin/tareas`, `PATCH/DELETE …/:id`, `POST …/:id/hecha`, `…/descartar`, `…/reabrir` | administrador | Tareas a mano (`{ data: Tarea[] }`; el `GET` siembra las iniciales; 400 si la URL no es http(s); 409 `tarea_del_repositorio` al borrar una `repo`; 404 si no existe) |
 
 **Sincronizador de conocimiento.** El servidor vive en
 `backend/src/modules/growth/conocimiento/` (planificar, sincronizar, términos) y

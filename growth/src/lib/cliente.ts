@@ -8,12 +8,15 @@ import {
 } from "react";
 import type {
   AltaDeCompetidor,
+  AltaDeTarea,
   AnalisisDeCompetidor,
   Ajustes,
   CambioDeCompetidor,
+  CambioDeTarea,
   CambiosDeAjustes,
   CompetidorDetalle,
   Decision,
+  DescarteDeTarea,
   DetalleDeBorrador,
   DetalleDeEjecucion,
   DetalleDeOportunidad,
@@ -29,14 +32,19 @@ import type {
   ListaDeEjecuciones,
   ListaDeGestiones,
   ListaDeOportunidades,
+  MarcaDeTareaHecha,
   NuevaUrl,
   RespuestaDeConocimiento,
   RespuestaDeCompetidores,
   RespuestaDeDecision,
   RespuestaDeEdicion,
+  RespuestaDeFicha,
   RespuestaDeNuevaUrl,
+  RespuestaDeTareas,
+  RespuestaDelComparador,
   Resumen,
   RevisionDeAnalisis,
+  Tarea,
   TipoDeAfirmacion,
   Yo,
 } from "./types";
@@ -127,6 +135,27 @@ export interface ClienteGrowth {
     analisisId: string,
     revision: RevisionDeAnalisis
   ): Promise<CompetidorDetalle>;
+
+  /** GET /competidores/comparador: planes, precios y límites del último análisis de cada uno. */
+  comparadorDeCompetencia(): Promise<RespuestaDelComparador>;
+
+  /** GET /ficha-de-alhabla: los textos listos para pegar, solo con afirmaciones vigentes. */
+  fichaDeAlhabla(): Promise<RespuestaDeFicha>;
+
+  /** GET /tareas: la primera vez siembra las iniciales (idempotente). */
+  tareas(): Promise<RespuestaDeTareas>;
+  /** POST /tareas: «Añadir tarea» (201, `origen: manual`). 400 si la URL no es http(s). */
+  anadirTarea(alta: AltaDeTarea): Promise<Tarea>;
+  /** PATCH /tareas/:id */
+  editarTarea(id: string, cambios: CambioDeTarea): Promise<Tarea>;
+  /** POST /tareas/:id/hecha: idempotente. */
+  marcarTareaHecha(id: string, marca: MarcaDeTareaHecha): Promise<Tarea>;
+  /** POST /tareas/:id/descartar */
+  descartarTarea(id: string, descarte: DescarteDeTarea): Promise<Tarea>;
+  /** POST /tareas/:id/reabrir: vuelve a pendiente y limpia el resultado. */
+  reabrirTarea(id: string): Promise<Tarea>;
+  /** DELETE /tareas/:id (204). 409 `tarea_del_repositorio`: las del repositorio se descartan. */
+  borrarTarea(id: string): Promise<void>;
 }
 
 const ContextoDeCliente = createContext<ClienteGrowth | null>(null);

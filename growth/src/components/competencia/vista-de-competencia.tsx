@@ -9,6 +9,7 @@ import { EstadoVacio } from "@/components/estado-vacio";
 import { useCompetidores } from "@/lib/consultas";
 import type { CompetidorDetalle, EstadoDeCompetidor } from "@/lib/types";
 import { DialogoAnadirCompetidor } from "./dialogo-anadir-competidor";
+import { PestanasDeCompetencia } from "./pestanas-de-competencia";
 import { TarjetaDeCompetidor } from "./tarjeta-de-competidor";
 import { agruparCompetidores, rutaDeCompetidor } from "./utilidades";
 
@@ -105,6 +106,7 @@ export function VistaDeCompetencia() {
         descripcion="Quién compite contigo, qué ofrece y cuánto cobra. Es información interna: no se puede citar en un borrador."
         acciones={boton}
       />
+      <PestanasDeCompetencia activa="/competencia" />
 
       {anadido ? (
         <AvisoDeCompetidorAnadido

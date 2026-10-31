@@ -203,3 +203,77 @@ describe("clienteHttp · competencia", () => {
     });
   });
 });
+
+describe("clienteHttp · comparador, ficha y tareas", () => {
+  it("el comparador y la ficha son GET sin parámetros", async () => {
+    await clienteHttp.comparadorDeCompetencia();
+    expect(ultima?.method).toBe("get");
+    expect(ultima?.url).toBe("/growth/admin/competidores/comparador");
+    expect(ultima?.params).toBeUndefined();
+    await clienteHttp.fichaDeAlhabla();
+    expect(ultima?.method).toBe("get");
+    expect(ultima?.url).toBe("/growth/admin/ficha-de-alhabla");
+  });
+
+  it("lista las tareas con un GET", async () => {
+    await clienteHttp.tareas();
+    expect(ultima?.method).toBe("get");
+    expect(ultima?.url).toBe("/growth/admin/tareas");
+  });
+
+  it("añade una tarea con un POST y el cuerpo tal cual", async () => {
+    await clienteHttp.anadirTarea({
+      titulo: "Un directorio",
+      url: "https://directorio.example/",
+      categoria: "directorio_ia",
+      pasos: ["Abre la página."],
+      notas: "Una nota.",
+    });
+    expect(ultima?.method).toBe("post");
+    expect(ultima?.url).toBe("/growth/admin/tareas");
+    expect(JSON.parse(ultima?.data)).toEqual({
+      titulo: "Un directorio",
+      url: "https://directorio.example/",
+      categoria: "directorio_ia",
+      pasos: ["Abre la página."],
+      notas: "Una nota.",
+    });
+  });
+
+  it("edita con PATCH y el id codificado (y manda null para borrar las notas)", async () => {
+    await clienteHttp.editarTarea("a/b c", { notas: null, titulo: "Nuevo" });
+    expect(ultima?.method).toBe("patch");
+    expect(ultima?.url).toBe("/growth/admin/tareas/a%2Fb%20c");
+    expect(JSON.parse(ultima?.data)).toEqual({ notas: null, titulo: "Nuevo" });
+  });
+
+  it("marcar hecha, descartar y reabrir son POST a su ruta, con el cuerpo (vacío es {})", async () => {
+    await clienteHttp.marcarTareaHecha("ta-1", {
+      resultado: "alta_creada",
+      nota: "Gratis.",
+    });
+    expect(ultima?.method).toBe("post");
+    expect(ultima?.url).toBe("/growth/admin/tareas/ta-1/hecha");
+    expect(JSON.parse(ultima?.data)).toEqual({
+      resultado: "alta_creada",
+      nota: "Gratis.",
+    });
+    await clienteHttp.marcarTareaHecha("ta-1", {});
+    expect(JSON.parse(ultima?.data)).toEqual({});
+    await clienteHttp.descartarTarea("ta-1", { nota: "No admite altas." });
+    expect(ultima?.url).toBe("/growth/admin/tareas/ta-1/descartar");
+    expect(JSON.parse(ultima?.data)).toEqual({ nota: "No admite altas." });
+    await clienteHttp.reabrirTarea("ta-1");
+    expect(ultima?.method).toBe("post");
+    expect(ultima?.url).toBe("/growth/admin/tareas/ta-1/reabrir");
+    // Fastify no admite un POST JSON sin cuerpo.
+    expect(JSON.parse(ultima?.data)).toEqual({});
+  });
+
+  it("borra con DELETE, sin cuerpo, y no devuelve nada (204)", async () => {
+    await expect(clienteHttp.borrarTarea("ta-1")).resolves.toBeUndefined();
+    expect(ultima?.method).toBe("delete");
+    expect(ultima?.url).toBe("/growth/admin/tareas/ta-1");
+    expect(ultima?.data).toBeUndefined();
+  });
+});

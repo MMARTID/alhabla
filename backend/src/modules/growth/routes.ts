@@ -7,6 +7,7 @@ import { growthRoutesAgente } from "./routesAgente.js";
 import { growthRoutesAgenteExtra } from "./routesAgenteExtra.js";
 import { growthRoutesCompetencia } from "./routesCompetencia.js";
 import { growthRoutesConocimiento } from "./routesConocimiento.js";
+import { growthRoutesTareas } from "./routesTareas.js";
 import { ErrorDeGrowth } from "./service.js";
 
 /** Lo que se le dice a quien llama cuando el fallo es de Fastify (JSON mal formado, 413, 415…). */
@@ -114,4 +115,5 @@ export const growthRoutes: FastifyPluginAsync = async (fastify) => {
   await fastify.register(growthRoutesAdmin);
   await fastify.register(growthRoutesAdminExtra);
   await fastify.register(growthRoutesCompetencia);
+  await fastify.register(growthRoutesTareas);
 };

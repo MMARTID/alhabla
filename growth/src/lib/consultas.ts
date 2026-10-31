@@ -10,15 +10,19 @@ import {
 import { useCliente } from "./cliente";
 import type {
   AltaDeCompetidor,
+  AltaDeTarea,
   CambioDeCompetidor,
+  CambioDeTarea,
   CambiosDeAjustes,
   Decision,
+  DescarteDeTarea,
   EdicionDeBorrador,
   FiltrosDeBorradores,
   FiltrosDeDecisiones,
   FiltrosDeEjecuciones,
   FiltrosDeGestiones,
   FiltrosDeOportunidades,
+  MarcaDeTareaHecha,
   NuevaUrl,
   RevisionDeAnalisis,
   TipoDeAfirmacion,
@@ -65,6 +69,9 @@ export const claves = {
   competidor: (id: string) => [RAIZ, "competidor", id] as const,
   analisisDeCompetidor: (id: string, analisisId: string) =>
     [RAIZ, "competidor", id, "analisis", analisisId] as const,
+  comparador: () => [RAIZ, "comparador"] as const,
+  ficha: () => [RAIZ, "ficha-de-alhabla"] as const,
+  tareas: () => [RAIZ, "tareas"] as const,
 };
 
 /**
@@ -350,6 +357,98 @@ export function useRevisarAnalisis(id: string, analisisId: string) {
   return useMutation({
     mutationFn: (revision: RevisionDeAnalisis) =>
       cliente.revisarAnalisis(id, analisisId, revision),
+    onSettled: () => invalidarTodoGrowth(queryClient),
+  });
+}
+
+// --- Comparador, ficha y tareas ---------------------------------------------
+
+/**
+ * Los hooks de esta parte piden con `TIEMPO_DE_FRESCURA_MS` (15 s), como el
+ * resto del panel; y toda mutación invalida `["growth", …]`, así que el
+ * comparador y la ficha también se refrescan tras aceptar un competidor o
+ * sincronizar el conocimiento.
+ */
+
+export function useComparador() {
+  const cliente = useCliente();
+  return useQuery({
+    queryKey: claves.comparador(),
+    queryFn: () => cliente.comparadorDeCompetencia(),
+    staleTime: TIEMPO_DE_FRESCURA_MS,
+  });
+}
+
+export function useFichaDeAlhabla() {
+  const cliente = useCliente();
+  return useQuery({
+    queryKey: claves.ficha(),
+    queryFn: () => cliente.fichaDeAlhabla(),
+    staleTime: TIEMPO_DE_FRESCURA_MS,
+  });
+}
+
+export function useTareas() {
+  const cliente = useCliente();
+  return useQuery({
+    queryKey: claves.tareas(),
+    queryFn: () => cliente.tareas(),
+    staleTime: TIEMPO_DE_FRESCURA_MS,
+  });
+}
+
+export function useAnadirTarea() {
+  const cliente = useCliente();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (alta: AltaDeTarea) => cliente.anadirTarea(alta),
+    onSettled: () => invalidarTodoGrowth(queryClient),
+  });
+}
+
+export function useEditarTarea(id: string) {
+  const cliente = useCliente();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (cambios: CambioDeTarea) => cliente.editarTarea(id, cambios),
+    onSettled: () => invalidarTodoGrowth(queryClient),
+  });
+}
+
+export function useMarcarTareaHecha(id: string) {
+  const cliente = useCliente();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (marca: MarcaDeTareaHecha) =>
+      cliente.marcarTareaHecha(id, marca),
+    onSettled: () => invalidarTodoGrowth(queryClient),
+  });
+}
+
+export function useDescartarTarea(id: string) {
+  const cliente = useCliente();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (descarte: DescarteDeTarea) =>
+      cliente.descartarTarea(id, descarte),
+    onSettled: () => invalidarTodoGrowth(queryClient),
+  });
+}
+
+export function useReabrirTarea(id: string) {
+  const cliente = useCliente();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => cliente.reabrirTarea(id),
+    onSettled: () => invalidarTodoGrowth(queryClient),
+  });
+}
+
+export function useBorrarTarea(id: string) {
+  const cliente = useCliente();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => cliente.borrarTarea(id),
     onSettled: () => invalidarTodoGrowth(queryClient),
   });
 }

@@ -268,6 +268,38 @@ export function mencionaPalabra(
   return mencionaEnNormalizado(normalizar(texto), termino, opciones);
 }
 
+/**
+ * Los términos prohibidos que aparecen en un texto YA normalizado, tal como los
+ * escribe la lista. Es la comprobación de la regla dura 2
+ * (`sin_terminos_prohibidos`), sin volver a normalizar el texto por cada
+ * término.
+ */
+function terminosProhibidosEnNormalizado(
+  normalizado: string,
+  terminos: readonly TerminoProhibido[]
+): string[] {
+  return terminos
+    .filter((t) =>
+      mencionaEnNormalizado(normalizado, t.termino, {
+        palabraEntera: t.palabraEntera,
+      })
+    )
+    .map((t) => t.termino);
+}
+
+/**
+ * Los términos prohibidos que aparecen en un texto cualquiera: la misma
+ * comprobación que hace la regla dura `sin_terminos_prohibidos` con un
+ * borrador, para quien lo necesite fuera de un borrador (la Ficha de Alhabla
+ * del panel).
+ */
+export function terminosProhibidosEnTexto(
+  texto: string,
+  terminos: readonly TerminoProhibido[]
+): string[] {
+  return terminosProhibidosEnNormalizado(normalizar(texto), terminos);
+}
+
 /** ¿Hay algún correo en el texto? */
 export function contieneCorreo(texto: string): boolean {
   return new RegExp(CORREO.source, "i").test(limpiarInvisibles(texto));
@@ -524,13 +556,10 @@ export function evaluarCumplimiento(
   );
 
   // 2. Nada de lo que no se dice.
-  const prohibidos = contexto.terminosProhibidos
-    .filter((t) =>
-      mencionaEnNormalizado(normalizado, t.termino, {
-        palabraEntera: t.palabraEntera,
-      })
-    )
-    .map((t) => t.termino);
+  const prohibidos = terminosProhibidosEnNormalizado(
+    normalizado,
+    contexto.terminosProhibidos
+  );
   comprobaciones.push(
     comprobacion(
       "sin_terminos_prohibidos",

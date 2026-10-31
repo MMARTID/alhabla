@@ -26,6 +26,7 @@ export async function limpiarGrowth(): Promise<void> {
     prisma.growthCompetidor.deleteMany(),
     prisma.growthPagina.deleteMany(),
     prisma.growthAjuste.deleteMany(),
+    prisma.growthTarea.deleteMany(),
     prisma.growthTokenAgente.deleteMany(),
   ]);
 }
