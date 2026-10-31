@@ -534,6 +534,21 @@ export async function businessesRoutes(fastify: FastifyInstance) {
           });
         }
 
+        // La versión del prompt es un interruptor interno: el body no la
+        // cambia y un guardado de ajustes sin ella (la app no la manda)
+        // conserva la que ya tenía el negocio.
+        if (data.agentSettings !== undefined) {
+          const guardado = await prisma.business.findUnique({
+            where: { id: request.user!.businessId },
+            select: { agentSettings: true },
+          });
+          data.agentSettings = {
+            ...data.agentSettings,
+            versionDelPrompt: parseAgentSettings(guardado?.agentSettings)
+              .versionDelPrompt,
+          };
+        }
+
         // Elegir una voz que no es la de por defecto de su género es de Pro
         // y Scale (funcionQueExige, decisión del usuario del 2026-10-07); el
         // idioma principal, también catalán, euskera y gallego, y mujer u

@@ -192,6 +192,9 @@ export interface TelnyxConversationMessage {
   text: string;
   createdAt?: string;
   sentAt?: string;
+  /** Tools que llamó el assistant en este mensaje (laboratorio de prompt:
+   * scripts/laboratorioDePrompt.ts). Solo viene si Telnyx las trae. */
+  toolCalls?: Array<{ id: string; nombre: string; argumentos: string }>;
 }
 
 export interface TelnyxRecording {
@@ -852,12 +855,52 @@ export class TelnyxAiAdapter {
     input: { content: string; conversationId: string; name?: string }
   ): Promise<string> {
     const client = getTelnyxClient();
-    const response = await client.ai.assistants.chat(assistantId, {
-      content: input.content,
-      conversation_id: input.conversationId,
-      name: input.name,
-    });
+    // Un turno de chat incluye las tools que llame el modelo: con dos
+    // seguidas pasa de los 10 s del cliente (pensados para los webhooks de
+    // voz; en producción ya se vio un turno de 9,6 s el 13-10). 30 s, como
+    // el plazo por turno del chat de clientes (TIMEOUT_TURNO_MS).
+    const response = await client.ai.assistants.chat(
+      assistantId,
+      {
+        content: input.content,
+        conversation_id: input.conversationId,
+        name: input.name,
+      },
+      { timeout: 30_000 }
+    );
     return typeof response?.content === "string" ? response.content : "";
+  }
+
+  /** Borra una conversación (la limpieza de scripts/laboratorioDePrompt.ts). */
+  async deleteConversation(conversationId: string): Promise<void> {
+    const client = getTelnyxClient();
+    await client.ai.conversations.delete(conversationId);
+  }
+
+  /**
+   * Una respuesta de inferencia pública con un modelo alojado por Telnyx (el
+   * juez del laboratorio de prompt). No sirve para `openai/gpt-5.6-luna`: ese
+   * modelo solo va dentro de los assistants (400/10015 por inferencia).
+   */
+  async completarChat(input: {
+    modelo: string;
+    mensajes: Array<{ role: "system" | "user" | "assistant"; content: string }>;
+    temperatura?: number;
+  }): Promise<string> {
+    const client = getTelnyxClient();
+    // Kimi con el historial entero de una conversación pasa a veces de los
+    // 10 s del cliente (el 30-10 tiró 113 de 170 conversaciones del
+    // laboratorio): 60 s, que esto solo lo usan los scripts.
+    const response = (await client.ai.openai.chat.createCompletion(
+      {
+        model: input.modelo,
+        messages: input.mensajes,
+        temperature: input.temperatura ?? 0,
+      },
+      { timeout: 60_000 }
+    )) as { choices?: Array<{ message?: { content?: unknown } }> };
+    const contenido = response?.choices?.[0]?.message?.content;
+    return typeof contenido === "string" ? contenido : "";
   }
 
   // ---------------------------------------------------------------------
@@ -1176,6 +1219,15 @@ function toConversationMessage(
     text: message.text,
     createdAt: message.created_at,
     sentAt: message.sent_at,
+    ...(message.tool_calls?.length
+      ? {
+          toolCalls: message.tool_calls.map((llamada) => ({
+            id: llamada.id,
+            nombre: llamada.function.name,
+            argumentos: llamada.function.arguments,
+          })),
+        }
+      : {}),
   };
 }
 

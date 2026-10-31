@@ -15,6 +15,7 @@ import {
   callIdDeChat,
   conversacionVigente,
   conversarConRecepcionista,
+  esAvisoDeBucleDeTelnyx,
   formatearMomento,
   marcadorDeChat,
 } from "../../../src/modules/whatsapp/chatCliente.js";
@@ -631,6 +632,40 @@ describe("conversarConRecepcionista", () => {
     expect(resultado.atendido && resultado.resultado.handler).toBe(
       "chat:cliente:error"
     );
+  });
+
+  // Laboratorio del 30-10: en el chat, al despedirse, el modelo repite
+  // informar_al_negocio y Telnyx contesta con su texto fijo en inglés.
+  it("el texto de bucle de Telnyx no se le manda al cliente; el turno se anota", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    mockedChat.mockResolvedValueOnce(
+      "I'm stuck in a loop repeating the same tool action. This might be caused by the input question or a misconfigured assistant prompt. You can check the conversation history for more details."
+    );
+    const resultado = await conversarConRecepcionista({
+      message: entrante(),
+      businessId: "biz_1",
+      texto: "Gracias, adiós",
+    });
+
+    expect(resultado).toEqual({
+      atendido: true,
+      resultado: { handler: "chat:cliente:bucle" },
+    });
+    expect(mockedEnviarTexto).not.toHaveBeenCalled();
+    expect(mockedConvUpdate).toHaveBeenCalledWith({
+      where: { conversationId: "conv_1" },
+      data: expect.objectContaining({ turns: { increment: 1 } }),
+    });
+    expect(mockedRelease).toHaveBeenCalled();
+  });
+
+  it("esAvisoDeBucleDeTelnyx solo reconoce el texto fijo de Telnyx", () => {
+    expect(
+      esAvisoDeBucleDeTelnyx(
+        "I'm stuck in a loop repeating the same tool action."
+      )
+    ).toBe(true);
+    expect(esAvisoDeBucleDeTelnyx("¡Hasta luego, Marta!")).toBe(false);
   });
 
   it("la etiqueta personaliza el handler (botón «Cambiar»)", async () => {

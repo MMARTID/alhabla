@@ -128,3 +128,6 @@ coverage/
 playwright-report/
 test-results/
 *.tsbuildinfo
+
+# Informes del laboratorio de prompt (backend/scripts/laboratorioDePrompt.ts).
+backend/.laboratorio-de-prompt/

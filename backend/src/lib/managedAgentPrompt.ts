@@ -36,6 +36,12 @@ export const MODOS_DE_DAR_PRECIOS = [
 ] as const;
 export type ModoDeDarPrecios = (typeof MODOS_DE_DAR_PRECIOS)[number];
 
+/** Versiones del prompt de la recepcionista. Solo existe la actual («v1»);
+ * la siguiente se añade aquí y a SECCIONES_POR_VERSION
+ * (lib/seccionesDelPrompt.ts) para activarla negocio a negocio. */
+export const VERSIONES_DEL_PROMPT = ["v1"] as const;
+export type VersionDelPrompt = (typeof VERSIONES_DEL_PROMPT)[number];
+
 /** Los campos de AgentSettings por separado: parseAgentSettings los lee
  * uno a uno para que un valor inválido no se lleve por delante el resto. */
 const CAMPOS_DE_AJUSTES = {
@@ -75,6 +81,11 @@ const CAMPOS_DE_AJUSTES = {
   // solo si se lo preguntan o nunca. Con .default(), como voiceGender: los
   // negocios anteriores al ajuste lo tienen en «si se lo preguntan».
   darPrecios: z.enum(MODOS_DE_DAR_PRECIOS).default("si_preguntan"),
+  // Interruptor interno para pasar a un prompt nuevo negocio a negocio: no
+  // lo elige el dueño ni lo enseña la app, y PATCH /business/me conserva el
+  // guardado. Un valor ausente o desconocido se lee como «v1», el prompt de
+  // siempre (con «v1» el prompt y el payload no cambian ni un byte).
+  versionDelPrompt: z.enum(VERSIONES_DEL_PROMPT).default("v1"),
 };
 
 export const AgentSettingsSchema = z
@@ -121,6 +132,7 @@ export const DEFAULT_AGENT_SETTINGS: AgentSettings = {
   languages: idiomasQueHabla("es-ES"),
   voiceLanguage: "es-ES",
   darPrecios: "si_preguntan",
+  versionDelPrompt: "v1",
 };
 
 /**
@@ -187,6 +199,11 @@ export function parseAgentSettings(value: unknown): AgentSettings {
       z.enum(MODOS_DE_DAR_PRECIOS),
       bruto.darPrecios,
       porDefecto.darPrecios
+    ),
+    versionDelPrompt: campo(
+      z.enum(VERSIONES_DEL_PROMPT),
+      bruto.versionDelPrompt,
+      porDefecto.versionDelPrompt
     ),
     ...(pasarLlamadas ? { pasarLlamadas } : {}),
     ...(voz ? { voz } : {}),

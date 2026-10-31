@@ -1,6 +1,6 @@
 import type { BusinessType } from "./businessType.js";
 import type { TransferenciaAlDueno } from "./transferenciaAlDueno.js";
-import type { AgentSettings } from "./managedAgentPrompt.js";
+import type { AgentSettings, VersionDelPrompt } from "./managedAgentPrompt.js";
 
 /**
  * Las secciones del prompt gestionado de la recepcionista: una función por
@@ -495,10 +495,19 @@ export const SECCIONES_DEL_PROMPT: readonly Seccion[] = [
   seccionIdioma,
 ];
 
+/** La lista de secciones de cada versión del prompt
+ * (agentSettings.versionDelPrompt). */
+const SECCIONES_POR_VERSION: Record<VersionDelPrompt, readonly Seccion[]> = {
+  v1: SECCIONES_DEL_PROMPT,
+};
+
 /** Las secciones unidas: los párrafos vacíos fuera y una línea en blanco
  * entre los demás. */
 export function componerPrompt(contexto: ContextoDelPrompt): string {
-  return SECCIONES_DEL_PROMPT.flatMap((seccion) => seccion(contexto))
+  const secciones =
+    SECCIONES_POR_VERSION[contexto.settings.versionDelPrompt] ??
+    SECCIONES_DEL_PROMPT;
+  return secciones.flatMap((seccion) => seccion(contexto))
     .filter(Boolean)
     .join("\n\n");
 }

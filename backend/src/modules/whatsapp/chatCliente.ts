@@ -336,6 +336,11 @@ function esConversacionInexistente(error: unknown): boolean {
   return status === 404;
 }
 
+/** El texto fijo con el que Telnyx corta un turno en bucle de tools. */
+export function esAvisoDeBucleDeTelnyx(respuesta: string): boolean {
+  return /stuck in a loop repeating the same tool action/i.test(respuesta);
+}
+
 /**
  * Un turno del cliente con la recepcionista de su negocio. `texto` es lo
  * que ve el LLM tras el marcador (el mensaje del cliente, o el texto que
@@ -485,6 +490,35 @@ export async function conversarConRecepcionista(input: {
           )
         ),
       };
+    }
+
+    // Telnyx corta el turno con un texto fijo en inglés cuando el modelo
+    // repite la misma tool con los mismos argumentos. En el chat pasa al
+    // despedirse, con informar_al_negocio (147 de 269 conversaciones del
+    // laboratorio del 30-10, siempre en el último turno), y el modelo no hace
+    // caso de un «no la vuelvas a llamar» en la respuesta de la tool. El
+    // informe ya llegó al negocio con la primera llamada: al cliente no se le
+    // manda nada.
+    if (esAvisoDeBucleDeTelnyx(respuesta)) {
+      console.warn(
+        `[WhatsApp] Chat cliente ${business.id}/${from}: Telnyx cortó el turno por repetir una tool (conversación ${conversacion?.conversationId ?? "?"}); no se manda nada al cliente`
+      );
+      if (conversacion) {
+        await prisma.clientConversation
+          .update({
+            where: { conversationId: conversacion.conversationId },
+            data: {
+              lastInboundAt: message.receivedAt ?? new Date(),
+              turns: { increment: 1 },
+            },
+          })
+          .catch((error: unknown) => {
+            console.error(
+              `[WhatsApp] Chat cliente ${business.id}/${from}: no se pudo anotar el turno: ${errorMessage(error)}`
+            );
+          });
+      }
+      return { atendido: true, resultado: { handler: `${base}:bucle` } };
     }
 
     // El aviso de IA (Reglamento de IA, art. 50) lo garantiza el backend,

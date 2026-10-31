@@ -9,6 +9,8 @@ import { nombreParaElCliente } from "../../lib/nombreProfesional.js";
 import { precioParaDecir } from "../../lib/precio.js";
 import {
   modoDeDarPrecios,
+  parseAgentSettings,
+  type AgentSettings,
   type ModoDeDarPrecios,
 } from "../../lib/managedAgentPrompt.js";
 import { esNombreDeClienteValido } from "../../lib/nombreDelCliente.js";
@@ -88,6 +90,7 @@ import {
   sanearNombre,
 } from "../whatsapp/mensajesCliente.js";
 import { cancelarReserva } from "../bookings/cancelacion.js";
+import { listaDeEsperaDisponible } from "../whatsapp/service.js";
 import { isValidE164Phone, normalizarTelefono } from "../../lib/phone.js";
 import { procesarInformeFinal } from "../whatsapp/recados.js";
 import {
@@ -191,6 +194,68 @@ function instruccionesDeRecomendacion(
     : `${quien} es la persona más indicada`;
   const sinNombres = recomendado && pedido ? "" : " No digas nombres provisionales tipo «Profesional 1».";
   return `Propón UNA sola vez, en positivo, reservar con ${quien} (${porQue} y tiene hueco a esa hora); reserva con su availabilityToken si el cliente acepta. Si el cliente insiste en ${aQuien}, reserva con el availabilityToken principal y professionalConfirmed: true, sin explicar nada. Nunca digas ni insinúes que ${aQuien} no hace o no domina este servicio.${sinNombres}`;
+}
+
+/**
+ * `siguiente_paso` de check_availability (F1 de PLAN-PROMPT-DINAMICO.md):
+ * el paso 2 de «## Reserva» según lo que ha salido, para que la regla
+ * llegue justo cuando aplica. Las frases para el cliente van entre «…»
+ * para que las diga en el idioma de la conversación.
+ */
+function siguientePasoConHueco(
+  canal: "voice" | "client_chat",
+  conRecomendacion: boolean
+): string {
+  const antes = conRecomendacion ? "Primero sigue recommendation. " : "";
+  // En el chat, el nombre se pregunta aunque el perfil de WhatsApp muestre
+  // uno (paso 3 de «## Reserva» y «## Chat por WhatsApp»).
+  if (canal === "client_chat") {
+    return `${antes}Guarda el availabilityToken. Pídele su nombre aunque veas el de su perfil y resume en un solo turno servicio, día y hora (cuando) y nombre; pregunta solo si lo reservas. Sin confirmaciones sueltas como «¿te viene bien esa hora?».`;
+  }
+  return `${antes}Guarda el availabilityToken. Con su nombre (pídelo antes si falta), resume en un solo turno servicio, día y hora (cuando) y nombre y haz la pregunta del paso 3 de Reserva (la cita y el WhatsApp). No pidas confirmaciones sueltas como «¿te viene bien esa hora?».`;
+}
+
+const SIGUIENTE_PASO_CON_ALTERNATIVA =
+  "Esa hora no está libre. La de suggestedNextSlot ya está comprobada: ofrécela con su cuando, sin volver a comprobarla; si la acepta, usa su availabilityToken y sigue con el resumen del paso 3 de Reserva.";
+
+/** Los «no» de checkAvailability en los que otra hora sí podría valer. */
+const CODIGOS_DE_HORA_OCUPADA: ReadonlySet<string> = new Set([
+  "OUTSIDE_BUSINESS_HOURS",
+  "CAPACITY_REACHED",
+  "ALL_PROFESSIONALS_BUSY",
+]);
+
+const SIGUIENTE_PASO_SIN_HUECO =
+  "No hay hueco a esa hora ni una alternativa cercana. No propongas horas por tu cuenta: pídele otro día o franja y compruébalo con check_availability.";
+
+/** `si_no_le_vale`: qué ofrecer si ninguna hora le viene bien. El aviso
+ * por WhatsApp solo con la plantilla de la lista de espera aprobada
+ * (listaDeEsperaDisponible), igual que «## Uso de herramientas»; y con la
+ * hora que pidió, no con la alternativa. */
+function siNoLeVale(
+  listaDeEspera: boolean,
+  canal: "voice" | "client_chat",
+  horaPedida: string
+): string {
+  if (listaDeEspera) {
+    return `Si ninguna hora le viene bien, ofrécele «si quieres, te aviso por WhatsApp si se libera esa hora» y, con su sí, usa notify_when_available con la hora que pidió (startDateTime ${horaPedida}), no con la alternativa. Vale aunque reserve otra hora.`;
+  }
+  return `Si ninguna hora le viene bien, invítale a ${
+    canal === "client_chat" ? "escribir" : "volver a llamar"
+  } más adelante. No prometas avisos por WhatsApp ni uses notify_when_available.`;
+}
+
+/** `como_decirlo` cuando la cita queda con un especialista en lo que pidió:
+ * con el servicio ya escrito, que con un ejemplo genérico llegó a decir
+ * «especialista en color» de un corte (llamadas de prueba del 14-10). */
+function comoDecirloDelEspecialista(
+  nombre: string,
+  servicios: string[]
+): string | null {
+  if (servicios.length === 0) return null;
+  const servicio = servicios.join(" y ");
+  const texto = `Al confirmar, puedes decir en positivo que ${nombre} es especialista en ${servicio}: «${nombre} es especialista en ${servicio}». No hables de especialidades en otros servicios.`;
+  return texto.length <= MAX_CARACTERES_POR_INSTRUCCION ? texto : null;
 }
 
 function availabilityDraftKey(token: string): string {
@@ -523,6 +588,11 @@ async function executeCheckAvailability(
     // reales del catálogo). Ignorarlo en silencio acaba en reservas sin
     // servicio o con el profesional equivocado — mejor un error explícito
     // que el modelo sabe corregir volviendo a get_catalog.
+    // Los nombres, para decir de qué servicio es especialista quien lo hace.
+    let nombresDeServicios: string[] = [];
+    // La suma de los servicios, como la effectiveDuration de book_appointment:
+    // con ella se guardó la reserva de la llamada (guarda de una sola cita).
+    let duracionDeLosServicios: number | null = null;
     if (serviceIds?.length) {
       const knownServices = await prisma.service.findMany({
         where: {
@@ -531,7 +601,7 @@ async function executeCheckAvailability(
           active: true,
           deletedAt: null,
         },
-        select: { id: true },
+        select: { id: true, name: true, durationMinutes: true },
       });
       const knownIds = new Set(knownServices.map((service) => service.id));
       const unknownIds = serviceIds.filter((id) => !knownIds.has(id));
@@ -545,6 +615,19 @@ async function executeCheckAvailability(
               "Algún serviceId no existe en este negocio. Vuelve a consultar get_catalog y copia los IDs exactamente, carácter a carácter.",
           },
         };
+      }
+      nombresDeServicios = knownServices
+        .map((service) => service.name)
+        .filter((name): name is string => typeof name === "string" && !!name);
+      if (
+        knownServices.every(
+          (service) => typeof service.durationMinutes === "number"
+        )
+      ) {
+        duracionDeLosServicios = knownServices.reduce(
+          (suma, service) => suma + service.durationMinutes,
+          0
+        );
       }
     }
     let requestedProfessionalName = "la persona que pidió";
@@ -577,8 +660,11 @@ async function executeCheckAvailability(
     // persona en el negocio) y viaja en el token para que book_appointment
     // la anule solo si la nueva queda reservada.
     let citaCambiada: ReservaExcluida | null = null;
+    const call =
+      callId || replacesBookingId
+        ? await resolveCallForBusiness(callId, business.id, callLabel)
+        : null;
     if (replacesBookingId) {
-      const call = await resolveCallForBusiness(callId, business.id, callLabel);
       citaCambiada = await citaQueSeCambia(
         business.id,
         replacesBookingId,
@@ -603,6 +689,44 @@ async function executeCheckAvailability(
     const delCambio = citaCambiada
       ? { replacesBookingId: citaCambiada.bookingId }
       : {};
+
+    // Una sola cita por llamada: la misma guarda de book_appointment
+    // (esOtraCitaEnLaMismaLlamada y su respuesta), adelantada para que no
+    // compruebe ni ofrezca una hora que la reserva va a rechazar. La de
+    // book_appointment se queda como red de seguridad.
+    const reservaDeLaLlamada = call
+      ? await prisma.booking.findUnique({
+          where: { callId: call.id },
+          select: {
+            id: true,
+            isCancelled: true,
+            programedAt: true,
+            durationMinutes: true,
+            clientName: true,
+          },
+        })
+      : null;
+    if (
+      reservaDeLaLlamada &&
+      esOtraCitaEnLaMismaLlamada(reservaDeLaLlamada, citaCambiada, {
+        startDateTime,
+        durationMinutes: duracionDeLosServicios || durationMinutes,
+        clientName: undefined,
+      })
+    ) {
+      console.warn(
+        `[VoiceTools] ${callLabel} comprueba otra cita, pero la llamada ya tiene la reserva ${reservaDeLaLlamada.id} (negocio ${business.id}); no se ofrece ninguna hora`
+      );
+      const yaHayCita = resultadoYaHayCita(
+        reservaDeLaLlamada.id,
+        canalDeLaTool(callId),
+        telefonoParaClientes(business)
+      );
+      return {
+        ...yaHayCita,
+        result: { available: false, ...yaHayCita.result },
+      };
+    }
 
     // Sin calendario operativo (nunca conectado, o caducado) book_appointment
     // va a guardar la petición como pendiente en vez de reservar: no se
@@ -731,18 +855,37 @@ async function executeCheckAvailability(
       // Sin profesional pedido, el hueco va a availableProfessionals[0]: el
       // agente puede decir con quién queda y, si es especialista, decirlo en
       // positivo al confirmar.
+      const asignadoEsEspecialista =
+        !!asignado && (specialistIds?.includes(asignado.id) ?? false);
       const assignedProfessional =
         !professionalId && asignado
           ? {
               assignedProfessional: {
                 ...asignado,
-                isSpecialist: specialistIds?.includes(asignado.id) ?? false,
+                isSpecialist: asignadoEsEspecialista,
               },
             }
           : {};
+      const nombreDelAsignado = asignado
+        ? nombreParaElCliente(asignado.name)
+        : null;
+      const comoDecirlo =
+        !professionalId && asignadoEsEspecialista && nombreDelAsignado
+          ? comoDecirloDelEspecialista(nombreDelAsignado, nombresDeServicios)
+          : null;
       return {
         success: true,
-        result: { ...paraElAgente, availabilityToken, ...assignedProfessional, ...conRecomendacion },
+        result: {
+          ...paraElAgente,
+          availabilityToken,
+          ...assignedProfessional,
+          ...conRecomendacion,
+          siguiente_paso: siguientePasoConHueco(
+            canalDeLaTool(callId),
+            Boolean(recommendation)
+          ),
+          ...(comoDecirlo ? { como_decirlo: comoDecirlo } : {}),
+        },
       };
     }
 
@@ -760,6 +903,22 @@ async function executeCheckAvailability(
           ),
         }
       : null;
+    // La hora está ocupada o fuera de horario: qué ofrecer si nada le vale.
+    // Un negocio sin horario o sin nadie que haga el servicio no tiene otra
+    // hora que dar, así que ahí no se dice nada. Solo aquí se mira la
+    // plantilla de la lista de espera (con caché).
+    const hayOtrasHoras =
+      !availability.code || CODIGOS_DE_HORA_OCUPADA.has(availability.code);
+    const paraCuandoNoLeVale = hayOtrasHoras
+      ? {
+          siguiente_paso: SIGUIENTE_PASO_SIN_HUECO,
+          si_no_le_vale: siNoLeVale(
+            await listaDeEsperaDisponible(),
+            canalDeLaTool(callId),
+            startDateTime
+          ),
+        }
+      : {};
     if (alternativa) {
       // La alternativa puede caer hasta tres días después de la hora pedida
       // (findNextAvailableSlot): pedida a 119 días, la sugerencia pasaba del
@@ -774,7 +933,12 @@ async function executeCheckAvailability(
       ) {
         return {
           success: true,
-          result: { ...paraElAgente, suggestedNextSlot: null, ...conRecomendacion },
+          result: {
+            ...paraElAgente,
+            suggestedNextSlot: null,
+            ...conRecomendacion,
+            ...paraCuandoNoLeVale,
+          },
         };
       }
       const suggestedToken = await createAvailabilityDraft({
@@ -801,11 +965,20 @@ async function executeCheckAvailability(
             availabilityToken: suggestedToken,
           },
           ...conRecomendacion,
+          ...paraCuandoNoLeVale,
+          siguiente_paso: SIGUIENTE_PASO_CON_ALTERNATIVA,
         },
       };
     }
 
-    return { success: true, result: { ...paraElAgente, ...conRecomendacion } };
+    return {
+      success: true,
+      result: {
+        ...paraElAgente,
+        ...conRecomendacion,
+        ...paraCuandoNoLeVale,
+      },
+    };
   } catch (error) {
     console.error(
       `[VoiceTools] ${callLabel} no pudo comprobar disponibilidad: ${errorMessage(
@@ -825,17 +998,114 @@ async function executeCheckAvailability(
 
 const AUSENCIAS_LOOKAHEAD_MS = 60 * 24 * 60 * 60 * 1000;
 
+/** Lo que vale para «Siempre» y «Si se lo preguntan»: lo mismo que
+ * PRECIOS_DEL_CATALOGO de «## Precios» (seccionesDelPrompt.ts). */
+const PRECIOS_DEL_CATALOGO =
+  "Vale el de aquí aunque la información del negocio diga otro. Si un servicio está «sin precio», no lo inventes ni lo calcules: si la información del negocio explica cómo se fija (por ejemplo, «desde» o «con presupuesto»), cuéntalo tal cual, sin dar una cifra que no esté escrita; si no, dile que ese precio se lo confirma el negocio. Si das el total de varios servicios, que sea la suma exacta de sus precios. Di los euros como en España: 18 € es «dieciocho euros» y 12,50 €, «doce euros con cincuenta».";
+
+/** Con «Nunca», lo que se ofrece a quien pregunta un precio: lo mismo que
+ * OFERTA_SIN_PRECIO de seccionesDelPrompt.ts (su forma de escalar). */
+const OFERTA_SIN_PRECIO: Record<AgentSettings["escalation"], string> = {
+  take_message: "ofrécele dejar un recado para que se lo confirmen",
+  request_callback: "ofrécele que le llamen para confirmárselo",
+};
+
 /** La regla de «Dar precios» en la respuesta de get_catalog: la misma que
  * «## Precios» del prompt (seccionesDelPrompt.ts), para que valga aunque el
- * prompt del assistant aún no esté al día (cambio de ajuste o deploy). */
-const REGLA_DE_PRECIOS: Record<ModoDeDarPrecios, string> = {
-  siempre:
-    "Di el precio de cada servicio la primera vez que lo ofrezcas o lo confirmes. Vale el de aquí aunque la información del negocio diga otro. Si un servicio está «sin precio», no lo inventes: cuenta cómo se fija si la información del negocio lo explica, sin dar una cifra que no esté escrita; si no, dile que ese precio se lo confirma el negocio.",
-  si_preguntan:
-    "Di el precio de un servicio solo si el cliente pregunta cuánto cuesta. Vale el de aquí aunque la información del negocio diga otro. Si un servicio está «sin precio», no lo inventes: cuenta cómo se fija si la información del negocio lo explica, sin dar una cifra que no esté escrita; si no, dile que ese precio se lo confirma el negocio.",
-  nunca:
-    "Este negocio no da precios: si preguntan cuánto cuesta algo, dile que ese precio se lo confirma el negocio.",
-};
+ * prompt del assistant aún no esté al día (cambio de ajuste o deploy). Es
+ * la única de las respuestas que pasa de 300 caracteres: es la regla
+ * entera, que F2 de PLAN-PROMPT-DINAMICO.md quitará del prompt. */
+function reglaDePrecios(
+  darPrecios: ModoDeDarPrecios,
+  escalation: AgentSettings["escalation"]
+): string {
+  switch (darPrecios) {
+    case "siempre":
+      return `Di el precio de cada servicio la primera vez que lo ofrezcas o lo confirmes. ${PRECIOS_DEL_CATALOGO}`;
+    case "nunca":
+      return `Este negocio no da precios: si preguntan cuánto cuesta algo, dile que ese precio se lo confirma el negocio y ${OFERTA_SIN_PRECIO[escalation]}. No des ninguno, ni aproximado ni de la información del negocio.`;
+    default:
+      return `Di el precio de un servicio solo si el cliente pregunta cuánto cuesta. ${PRECIOS_DEL_CATALOGO}`;
+  }
+}
+
+/** Las respuestas de las tools dicen la duración a partir de aquí: el
+ * mismo umbral que el paso 1 de «## Reserva» (seccionesDelPrompt.ts). */
+const MINUTOS_PARA_DECIR_LA_DURACION = 80;
+
+/** Tope de cada campo de instrucciones de las respuestas (siguiente_paso,
+ * pautas, di_al_cliente…): viajan en el historial de la conversación. */
+export const MAX_CARACTERES_POR_INSTRUCCION = 300;
+
+/** «2 horas», «90 minutos»: como formatMinutesForHumans del prompt. */
+function minutosParaDecir(minutos: number): string {
+  if (minutos % 60 === 0) {
+    const horas = minutos / 60;
+    return `${horas} ${horas === 1 ? "hora" : "horas"}`;
+  }
+  return `${minutos} minutos`;
+}
+
+/**
+ * `pautas` de get_catalog: lo que hace falta al reservar y hoy está en el
+ * paso 1 de «## Reserva» (cuándo decir la duración, el servicio más corto
+ * si le da igual cuál) y en las restricciones del negocio. Si el nombre
+ * del servicio más corto no cabe en el tope, va sin él.
+ */
+function pautasDeReserva(
+  business: Pick<
+    BusinessVoiceConfig,
+    "minAdvanceBookingMinutes" | "maxAppointmentDurationMinutes"
+  >,
+  services: Array<{ name: string; durationMinutes: number }>
+): string {
+  const partes = [
+    `Di la duración solo si pasa de ${MINUTOS_PARA_DECIR_LA_DURACION} minutos o te la preguntan.`,
+  ];
+  const restricciones: string[] = [];
+  if (business.minAdvanceBookingMinutes) {
+    restricciones.push(
+      `No ofrezcas citas con menos de ${minutosParaDecir(business.minAdvanceBookingMinutes)} de antelación.`
+    );
+  }
+  if (business.maxAppointmentDurationMinutes) {
+    restricciones.push(
+      `Ninguna cita puede durar más de ${business.maxAppointmentDurationMinutes} minutos.`
+    );
+  }
+  const masCorto = services.reduce<(typeof services)[number] | null>(
+    (corto, servicio) =>
+      !corto || servicio.durationMinutes < corto.durationMinutes
+        ? servicio
+        : corto,
+    null
+  );
+  if (masCorto) {
+    const conNombre = [
+      ...partes,
+      `Si le da igual el servicio, comprueba con la duración del más corto (${masCorto.name}, ${masCorto.durationMinutes} min) y aclara el servicio al reservar.`,
+      ...restricciones,
+    ].join(" ");
+    if (conNombre.length <= MAX_CARACTERES_POR_INSTRUCCION) return conNombre;
+    partes.push(
+      "Si le da igual el servicio, comprueba con la duración del más corto y aclara el servicio al reservar."
+    );
+  }
+  return [...partes, ...restricciones].join(" ");
+}
+
+/** ¿Está abierto ahora, según su horario y su zona? null si el negocio no
+ * tiene horario estructurado: entonces no se dice ni que sí ni que no. */
+function abiertoAhora(business: BusinessVoiceConfig): boolean | null {
+  const horario = checkBusinessHours(
+    business.schedule,
+    business.timezone || "Europe/Madrid",
+    new Date().toISOString(),
+    0
+  );
+  if (!horario || !horario.success) return null;
+  return horario.isOpen === true;
+}
 
 /** «[id] Corte (30 min, 18 €)»: con «Nunca», sin el precio, que así no
  * llega a la llamada. */
@@ -857,7 +1127,8 @@ function lineaDelServicio(
 
 async function executeGetCatalog(
   business: BusinessVoiceConfig,
-  callLabel: string
+  callLabel: string,
+  callId?: string
 ): Promise<ResultadoDeTool> {
   try {
     const ahora = new Date();
@@ -894,6 +1165,11 @@ async function executeGetCatalog(
         take: MAX_CATALOG_ITEMS,
       }),
     ]);
+    // En el chat no: la conversación dura hasta 30 días y get_catalog no se
+    // repite, así que el dato caducaría. Allí compara el horario con la hora
+    // del marcador [WhatsApp · fecha y hora].
+    const abierto =
+      canalDeLaTool(callId) === "client_chat" ? null : abiertoAhora(business);
     const ausenciasDe = (professionalId: string) =>
       ausencias
         .filter((a) => a.professionalId === professionalId)
@@ -907,7 +1183,11 @@ async function executeGetCatalog(
               .map((service) => lineaDelServicio(service, darPrecios))
               .join("\n")
           : "No hay servicios configurados.",
-        precios: REGLA_DE_PRECIOS[darPrecios],
+        precios: reglaDePrecios(
+          darPrecios,
+          parseAgentSettings(business.agentSettings).escalation
+        ),
+        pautas: pautasDeReserva(business, services),
         professionals: professionals.length
           ? professionals
               .map((professional) => {
@@ -922,6 +1202,9 @@ async function executeGetCatalog(
               .join("\n")
           : "No hay profesionales individuales configurados.",
         schedule: formatScheduleForPrompt(business.schedule),
+        // Para «¿estáis abiertos?» y para pasar la llamada solo en horario:
+        // que el modelo no compare horas.
+        ...(abierto === null ? {} : { abierto_ahora: abierto }),
       },
     };
   } catch (error) {
@@ -1657,11 +1940,111 @@ function buildClientReminderSmsText(input: {
   return parts.join(" — ");
 }
 
+/** Respuestas de book_appointment tras las que se vuelve a intentar la
+ * misma reserva: no son el final del cambio de una cita. */
+const RESERVA_QUE_SE_REINTENTA: ReadonlySet<string> = new Set([
+  "CLIENT_NAME_REQUIRED",
+  "CLIENT_PHONE_INVALID",
+  "CLIENT_PHONE_REQUIRED",
+  "PROFESSIONAL_CONFIRMATION_REQUIRED",
+  "AVAILABILITY_TOKEN_EXPIRED",
+]);
+
+/**
+ * `di_al_cliente` de book_appointment (F1 de PLAN-PROMPT-DINAMICO.md): el
+ * paso 5 de «## Reserva» según lo que de verdad ha salido. Lo del WhatsApp
+ * de Alhabla, solo con mensajeCliente = "whatsapp" (en el chat, que la
+ * confirmación le llega por aquí, como dice «## Chat por WhatsApp»). Si
+ * falla el cambio de una cita, la que tenía sigue en pie: solo se anula
+ * cuando la nueva queda reservada. Si la petición quedó pendiente, el
+ * reintento (retryFailedBooking) la anulará si la nueva entra.
+ */
+function conLoQueDecirAlCliente(
+  respuesta: ResultadoDeTool,
+  canal: "voice" | "client_chat",
+  intento: IntentoDeReserva
+): ResultadoDeTool {
+  const resultado = respuesta.result;
+  if (!resultado) return respuesta;
+  let diAlCliente: string | null = null;
+  if (resultado.success === true) {
+    const cuando =
+      typeof resultado.cuando === "string" ? ` (${resultado.cuando})` : "";
+    if (resultado.citaAnterior === "sigue_reservada") {
+      // La nueva entró pero la anterior no se pudo anular: que no se
+      // despida con dos citas a su nombre. Más corto, para no pasar de
+      // MAX_CARACTERES_POR_INSTRUCCION.
+      const queda = `Anula la anterior con cancel_appointment antes de despedirte: sigue activa. Dile que la nueva queda reservada${cuando}`;
+      diAlCliente =
+        resultado.mensajeCliente === "whatsapp"
+          ? canal === "client_chat"
+            ? `${queda} y que la confirmación le llega por aquí: «te llega la confirmación por este chat».`
+            : `${queda} y que le llegará un WhatsApp de Alhabla con la confirmación: «te llegará un WhatsApp de Alhabla con la confirmación».`
+          : `${queda}. No menciones ningún mensaje ni WhatsApp.`;
+    } else {
+      const queda =
+        resultado.citaAnterior === "anulada"
+          ? `Dile que su cita queda cambiada${cuando}`
+          : `Dile que la cita queda reservada${cuando}`;
+      diAlCliente =
+        resultado.mensajeCliente === "whatsapp"
+          ? canal === "client_chat"
+            ? `${queda} y que la confirmación le llega por aquí: «te llega la confirmación por este chat».`
+            : `${queda} y, en la misma frase, que le llegará un WhatsApp de Alhabla con la confirmación: «te llegará un WhatsApp de Alhabla con la confirmación de la cita».`
+          : `${queda}. No menciones ningún mensaje ni WhatsApp.`;
+    }
+  } else if (intento.cambiaUnaCita && intento.peticionPendiente) {
+    diAlCliente =
+      "Su cita de antes sigue en pie hasta que se confirme la nueva; si se confirma, la anterior se anula. Díselo en una frase: «tu cita de antes sigue hasta que te confirmemos la nueva; si se confirma, la anterior se anula».";
+  } else if (
+    intento.cambiaUnaCita &&
+    !RESERVA_QUE_SE_REINTENTA.has(String(resultado.code))
+  ) {
+    diAlCliente =
+      "No se ha cambiado nada: la cita que tenía sigue en pie. Díselo con el motivo en una frase: «tu cita de antes sigue como estaba».";
+  }
+  if (!diAlCliente) return respuesta;
+  return {
+    ...respuesta,
+    result: { ...resultado, di_al_cliente: diAlCliente },
+  };
+}
+
+/** Lo que reservarCita anota para conLoQueDecirAlCliente. */
+interface IntentoDeReserva {
+  /** El token era de un cambio de cita y esa cita sigue activa. */
+  cambiaUnaCita: boolean;
+  /** La petición quedó guardada como pendiente con la cita que cambia. */
+  peticionPendiente: boolean;
+}
+
 async function executeBookAppointment(
   business: BusinessVoiceConfig,
   params: Record<string, unknown>,
   callLabel: string,
   callId?: string
+): Promise<ResultadoDeTool> {
+  const intento: IntentoDeReserva = {
+    cambiaUnaCita: false,
+    peticionPendiente: false,
+  };
+  const respuesta = await reservarCita(
+    business,
+    params,
+    callLabel,
+    callId,
+    intento
+  );
+  return conLoQueDecirAlCliente(respuesta, canalDeLaTool(callId), intento);
+}
+
+async function reservarCita(
+  business: BusinessVoiceConfig,
+  params: Record<string, unknown>,
+  callLabel: string,
+  callId: string | undefined,
+  /** Lo rellena: si cambia una cita y si la petición quedó pendiente. */
+  intento: IntentoDeReserva
 ): Promise<ResultadoDeTool> {
   const rawParams = params as {
     clientName?: string;
@@ -1695,6 +2078,7 @@ async function executeBookAppointment(
       callId
     )
     : null;
+  intento.cambiaUnaCita = Boolean(draft?.replacesBookingId);
 
   if (rawParams.availabilityToken && !draft) {
     return {
@@ -1936,8 +2320,19 @@ async function executeBookAppointment(
       console.warn(
         `[VoiceTools] ${callLabel} la cita que se cambia (${draft.replacesBookingId}) ya no es una cita activa de quien llama (negocio ${business.id}); se reserva la nueva sin anular nada`
       );
+      // Ya no hay cita de antes que siga en pie si esta reserva falla.
+      intento.cambiaUnaCita = false;
     }
     const replacesBookingId = citaCambiada?.bookingId;
+    // Guarda la petición como pendiente y anota si lleva la cita que cambia:
+    // el reintento la anulará si la nueva acaba entrando.
+    const guardarComoPendiente = async (
+      datos: Parameters<typeof capturePendingBookingLead>[0]
+    ): Promise<string | null> => {
+      const leadId = await capturePendingBookingLead(datos);
+      if (leadId && datos.replacesBookingId) intento.peticionPendiente = true;
+      return leadId;
+    };
 
     // Una sola cita por llamada. Se mira aquí, antes de los caminos que
     // guardan la petición como pendiente (sin calendario, cerrojo ocupado):
@@ -1986,7 +2381,7 @@ async function executeBookAppointment(
           ? `[VoiceTools] ${callLabel} no puede reservar: el negocio no tiene ningún calendario conectado; la petición se guarda como pendiente`
           : `[VoiceTools] ${callLabel} no puede reservar: ${providerLabel} requiere reconexión; la petición se guarda como pendiente`
       );
-      await capturePendingBookingLead({
+      await guardarComoPendiente({
         resolvedCall: call,
         businessId: business.id,
         clientName,
@@ -2087,7 +2482,7 @@ async function executeBookAppointment(
           ? `[VoiceTools] ${callLabel} no pudo adquirir el lock de reserva de ${business.id} a tiempo: otra reserva lo tenía`
           : `[VoiceTools] ${callLabel} no pudo adquirir el lock de reserva de ${business.id}: el almacén falló (${cerrojo.motivo})`
       );
-      const leadId = await capturePendingBookingLead({
+      const leadId = await guardarComoPendiente({
         resolvedCall: call,
         businessId: business.id,
         clientName,
@@ -2223,7 +2618,7 @@ async function executeBookAppointment(
         console.warn(
           `[VoiceTools] ${callLabel}: no se pudo leer el calendario del negocio; la reserva se guarda como pendiente en vez de confirmarse a ciegas`
         );
-        const leadCalendarioIlegible = await capturePendingBookingLead({
+        const leadCalendarioIlegible = await guardarComoPendiente({
           resolvedCall: call,
           businessId: business.id,
           clientName,
@@ -2626,7 +3021,7 @@ async function executeBookAppointment(
 
           // Reconectar el calendario requiere una acción manual del negocio:
           // guardamos la solicitud pero NO la reintentamos sola en segundo plano.
-          const leadReconexion = await capturePendingBookingLead({
+          const leadReconexion = await guardarComoPendiente({
             resolvedCall: call,
             businessId: business.id,
             clientName,
@@ -2673,7 +3068,7 @@ async function executeBookAppointment(
           `[VoiceTools] ${callLabel} no pudo agendar la cita (${code}): ${errorMessage(error)}`
         );
 
-        const leadId = await capturePendingBookingLead({
+        const leadId = await guardarComoPendiente({
           resolvedCall: call,
           businessId: business.id,
           clientName,
@@ -2737,13 +3132,17 @@ async function executeFindMyAppointment(
   const call = await resolveCallForBusiness(callId, business.id, callLabel);
   const callerNumber = call?.fromNumber;
 
+  // «## Cita existente»: si no la encuentra, nada de dar a entender que
+  // pueda haber una cita a otro nombre (de otra persona).
   const notFoundResult = {
     success: true,
     result: {
       success: false,
       code: "APPOINTMENT_NOT_FOUND",
       message:
-        "No encuentro ninguna cita con este número. ¿Puedes darme el nombre con el que reservaste?",
+        "No hay ninguna cita próxima con este número. Dile «no encuentro ninguna cita con este número» y pide los datos con naturalidad.",
+      siguiente_paso:
+        "No des a entender que pueda haber una cita a otro nombre ni de otra persona, y no prometas cambiar ni anular ninguna. Si quiere una cita nueva, resérvala con el flujo normal.",
     },
   };
 
@@ -2802,8 +3201,25 @@ async function executeFindMyAppointment(
       // nombre de "titular anterior" (llamada real del 2026-09-15). Puede
       // venir null en reservas anteriores a la columna Booking.clientName.
       clientName: booking.clientName ?? null,
+      siguiente_paso: siguientePasoConLaCita(booking.id, booking.clientName),
     },
   };
+}
+
+/** `siguiente_paso` de find_my_appointment: el flujo de «## Cita
+ * existente» con el id ya escrito. Para cambiarla no se anula: la vieja la
+ * anula book_appointment solo si la nueva queda reservada. */
+function siguientePasoConLaCita(
+  bookingId: string,
+  clientName: string | null
+): string {
+  const nombre = clientName
+    ? " Al mismo nombre: usa su clientName."
+    : " Si es al mismo nombre, pregúntaselo.";
+  const texto = `Confírmasela antes de tocarla. Anular: cancel_appointment, tras su sí claro. Cambiar: no la anules; comprueba la nueva con replacesBookingId = ${bookingId} y resérvala: la vieja se anula sola y, si la nueva falla, sigue en pie.`;
+  return texto.length + nombre.length <= MAX_CARACTERES_POR_INSTRUCCION
+    ? texto + nombre
+    : texto;
 }
 
 /**
@@ -3128,6 +3544,20 @@ async function conPreguntaDeGrabacion(
   };
 }
 
+/**
+ * `siguiente_paso` de informar_al_negocio. En el chat de WhatsApp no hay
+ * post-conversación: el modelo informa al despedirse y, con una respuesta
+ * muda, repetía la tool con los mismos argumentos en el mismo turno; Telnyx
+ * cortaba entonces con su texto fijo en inglés («I'm stuck in a loop…»), que
+ * el backend habría mandado al cliente (laboratorio del 30-10, E17).
+ */
+export function siguientePasoTrasElInforme(outcome: string): string {
+  const inicio = outcome.startsWith("duplicado")
+    ? "Ya estaba informado. "
+    : "Informe recibido. ";
+  return `${inicio}No vuelvas a llamar a informar_al_negocio en esta conversación. Si el cliente se ha despedido, despídete con una frase breve.`;
+}
+
 export async function executeVoiceTool(
   input: ExecuteVoiceToolInput
 ): Promise<ResultadoDeTool> {
@@ -3149,7 +3579,7 @@ export async function executeVoiceTool(
 
   switch (toolName) {
     case "get_catalog":
-      return executeGetCatalog(business, callLabel);
+      return executeGetCatalog(business, callLabel, callId);
     case "check_availability":
       return conPreguntaDeGrabacion(
         await executeCheckAvailability(business, params, callLabel, callId),
@@ -3210,7 +3640,14 @@ export async function executeVoiceTool(
         idioma: params.idioma_del_cliente,
         etiqueta: callLabel,
       });
-      return { success: true, result: { success: true, outcome: informe.outcome } };
+      return {
+        success: true,
+        result: {
+          success: true,
+          outcome: informe.outcome,
+          siguiente_paso: siguientePasoTrasElInforme(informe.outcome),
+        },
+      };
     }
     default:
       console.warn(`[VoiceTools] Tool desconocida: ${toolName}`);
