@@ -42,6 +42,10 @@ presupuesto, usa 6 búsquedas, 8 páginas, 8 oportunidades y 2 propuestas.
 
 ## Focos
 
+- `semillas`: **no se busca, se abre.** El orquestador te pasa una lista corta de
+  semillas de `growth/agentes/semillas.md` (dominio, página de partida y nota):
+  directorios de software y de herramientas de IA donde ya aparecen los
+  competidores. Ver «Foco `semillas`» más abajo.
 - `comparativas`: comparativas, rankings y artículos de «recepcionista de IA»
   (o asistente de IA para atender llamadas y reservar citas) en España.
 - `directorios`: directorios de empresas y proveedores del sector (Beautymarket y
@@ -57,6 +61,37 @@ para negocios España», «comparativa recepcionistas virtuales con IA 2026»,
 empresas peluquería estética», «asociación empresas peluquería estética España»,
 «alternativas a {competidor}», «{competidor} opiniones». Busca siempre en
 español. Nunca `site:reddit.com` ni nada de Reddit.
+
+## Foco `semillas`
+
+Solo cuando `foco` es `semillas`; en los demás focos sáltate esta sección. Para
+cada semilla que te pasen, de una en una:
+
+1. **Abre su página de partida** con `WebFetch` (cuenta como una página de tu
+   presupuesto) con un `prompt` concreto: «¿Hay una vía para que una empresa de
+   software dé de alta su producto o se proponga como herramienta (alta de
+   proveedor, “para proveedores”, “añadir producto”, “sugerir herramienta”,
+   formulario de alta)? Si la hay, dime la URL exacta de esa página y si el alta es
+   gratuita, de pago o exige reseñas o verificación. No me des el texto entero».
+2. **Si localizas la página de alta**, ábrela solo si necesitas confirmar el coste
+   y te queda presupuesto de páginas; y crea la oportunidad con esa URL.
+   **Si no la localizas**, crea la oportunidad con la portada y dilo en la `nota`
+   («no se localizó la vía de alta»). Si la página dice claramente que el alta es
+   solo de pago o por invitación, créala igualmente y dilo en la `nota`: el
+   calificador y el fundador deciden.
+3. Rellena `crear_oportunidad` como en «Cómo trabajas» (paso 6) con
+   `fuenteTipo: directorio`, `objetivoPrincipal: TRAFICO_MARCA` y `datos.tipoDestino:
+   directorio`. En `competidoresMencionados` pon los competidores confirmados que
+   la propia semilla lista, **solo si lo has visto en la página que abres**; si
+   no, déjalo vacío. En `extracto` y `nota`, texto tuyo: qué es el directorio, qué
+   vía de alta tiene y cuánto cuesta.
+4. Si el dominio ya tiene una oportunidad (`listar_oportunidades` con `dominio`),
+   no la repitas y apúntalo en `existentes`.
+5. Si una semilla no carga o su página no existe, apúntalo en `sin crear` con el
+   motivo. Usa `WebSearch` solo para encontrar la web oficial de una semilla sin
+   página comprobada (por ejemplo, una asociación que solo es una pista) y nunca
+   para ampliar la lista: si algo parece prometedor pero no está en las semillas,
+   dilo en `nota` para que el fundador la añada al fichero.
 
 ## Cómo trabajas
 

@@ -99,3 +99,12 @@ El primer run (`competencia ligero`, 31-10-2026, ejecución cerrada como `parcia
 2. **Modelos fijados en todos los subagentes:** redacción pasa de `inherit` a `opus` (esfuerzo alto) y cumplimiento de `inherit` a `sonnet`; el resto sigue en `sonnet`, esfuerzo medio. Con `inherit` el coste dependía de cómo se abriera la sesión. Tabla y motivos en `growth/agentes/README.md`. La calificación es candidata a `haiku` cuando los umbrales estén calibrados.
 3. **`ligero` se aplica también al reparto por competidor:** hasta 2 competidores, con 3 páginas y 1 búsqueda cada uno (la sesión del run lo interpretó así por sí sola y el documento no lo decía).
 4. **Los subagentes arrancaron en segundo plano** aunque el orquestador pide primer plano, y funcionaron con `WebFetch` y `WebSearch`. Se vigila en los siguientes runs.
+
+## 2026-10-31 (8) — Semillas de descubrimiento
+
+El primer run completo (`ligero`) dio 3 candidatas y 1 borrador (la ficha de Beautymarket, que el fundador envió). Gastó 7 de 13 búsquedas y 11 de 32 páginas: el límite no fue el presupuesto sino la estrategia de búsqueda (unas pocas consultas genéricas; las de asociaciones devolvieron BOE y noticias locales). Mientras, los análisis de los competidores ya listaban, con su URL, los directorios donde ellos aparecen.
+
+1. **Nuevo foco `semillas`**, el primero del paso 4: el descubrimiento **abre** una lista corta de páginas conocidas (`growth/agentes/semillas.md`) en vez de buscar. Presupuesto 2 búsquedas / 8 páginas / 6 oportunidades; hasta 6 semillas por run (3 en `ligero`).
+2. **Una semilla se salta si el servidor ya conoce el dominio** (`listar_oportunidades` con `dominio`): no hay que marcar nada al procesarla.
+3. **La lista sale de los datos**, no de suposiciones: Capterra, GetApp, Software Advice, G2, AlternativeTo, SourceForge y SelectHub (reseñas y comparativas), Stork, AI Agents Directory, Toolradar y topai.tools (directorios de IA), Beautymarket (hecha) y las pistas ANEPE, ANEIP y la asociación de peluquería de Asturias (sin web comprobada). Se descartan de antemano `openalternative.co` (solo código abierto) y los blogs de otros proveedores de IA de voz.
+4. **Topes del run al alza, sin tocar `ligero`:** búsquedas 26 → 28, páginas 64 → 72, oportunidades nuevas 20 → 26, subagentes 36 → 37. Sigue pendiente medir el coste de un run completo.
