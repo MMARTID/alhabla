@@ -487,19 +487,14 @@ const REGLAS: readonly Regla[] = [
     lugares: [
       {
         en: "prompt",
-        versiones: ["v2"],
-        seccion: "Rol",
-        texto:
-          "En las llamadas el saludo ya lo dice el sistema al descolgar y es el primer mensaje: no lo repitas.",
-      },
-      {
-        en: "prompt",
+        versiones: ["v1", "v2"],
         seccion: "Rol",
         texto:
           "En las llamadas el saludo ya lo dice al descolgar: no lo repitas.",
       },
       {
         en: "prompt",
+        versiones: ["v1", "v2"],
         seccion: "Rol",
         texto: "no lo repitas. Desde tu primera respuesta",
       },
@@ -1833,11 +1828,13 @@ const REGLAS: readonly Regla[] = [
     lugares: [
       {
         en: "prompt",
+        versiones: ["v1", "v2"],
         seccion: "Al terminar la llamada",
         texto: "llama UNA sola vez a informar_al_negocio",
       },
       {
         en: "prompt",
+        versiones: ["v1", "v2"],
         seccion: "Al terminar la llamada",
         texto: "dudas_sin_respuesta",
       },

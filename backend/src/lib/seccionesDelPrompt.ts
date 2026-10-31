@@ -20,9 +20,8 @@ import type { AgentSettings, VersionDelPrompt } from "./managedAgentPrompt.js";
 export interface ContextoDelPrompt {
   settings: AgentSettings;
   /** La instrucción de idioma de «## Rol» y el recordatorio que cierra el
-   * prompt (instruccionesDeIdioma en lib/idiomas/resolver.ts; en v2,
-   * instruccionesDeIdiomaCompactas, sin instrucción si habla varios). */
-  idioma: { instruccion: string | null; recordatorio: string | null };
+   * prompt (instruccionesDeIdioma en lib/idiomas/resolver.ts). */
+  idioma: { instruccion: string; recordatorio: string | null };
   businessType?: BusinessType;
   /** Ya recortada: vacía o sin valor si el negocio no la tiene. */
   businessDetails?: string;
@@ -538,19 +537,6 @@ export const SECCIONES_DEL_PROMPT: readonly Seccion[] = [
 // (#271) y el guardarraíl de colgar (#88). El censo de reglas
 // (tests/lib/reglasDelPrompt.test.ts) exige que ninguna se quede sin sitio.
 
-function seccionRolV2({ settings, idioma }: ContextoDelPrompt): Parrafos {
-  return [
-    "## Rol",
-    "Eres la recepcionista de IA de {{nombre_negocio}}: una inteligencia artificial. Si te presentas, di «recepcionista de IA», con la sigla. En las llamadas el saludo ya lo dice el sistema al descolgar y es el primer mensaje: no lo repitas. Si te preguntan si eres una persona o una máquina, di siempre la verdad.",
-    idioma.instruccion,
-    TONE_INSTRUCTIONS[settings.tone],
-    GOAL_INSTRUCTIONS[settings.primaryGoal],
-    settings.responseStyle === "concise"
-      ? "Responde en una o dos frases."
-      : "Da solo el detalle necesario.",
-  ];
-}
-
 function seccionConversacionV2(): Parrafos {
   return [
     "## Conversación",
@@ -612,7 +598,7 @@ function seccionReservaV2(contexto: ContextoDelPrompt): Parrafos {
   ];
 }
 
-function seccionHerramientasV2(): Parrafos {
+function seccionHerramientasV2({ listaDeEspera }: ContextoDelPrompt): Parrafos {
   return [
     "## Herramientas",
     "No anuncies ni rellenes con muletillas antes de usar una herramienta.",
@@ -621,18 +607,22 @@ function seccionHerramientasV2(): Parrafos {
     "Para decir el día y la hora de una cita usa el campo cuando que te devuelven las herramientas, en el idioma de la conversación: no calcules tú el día de la semana ni del mes. Si te dicen un día por su nombre («el jueves», «mañana»), no preguntes qué fecha es: compruébalo con check_availability y di la que devuelva.",
     // Literal de v1 (seccionUsoDeHerramientas): salió de un fallo real (#271).
     "Todo startDateTime que envíes a una herramienta va en la hora local del negocio (zona {{zona_horaria}}) con su offset explícito de esa fecha, por ejemplo 2026-09-18T16:00:00+02:00. Nunca lo envíes en UTC (+00:00 o Z): las cuatro de la tarde son 16:00 en hora local, no 16:00Z.",
+    // Sin lista de espera, literal de v1: con la regla solo en si_no_le_vale
+    // de check_availability no invitaba a volver a llamar (E22a, 0 de 4 en
+    // el laboratorio del 31-10). Con ella, basta si_no_le_vale.
+    listaDeEspera
+      ? null
+      : "Si el cliente pidió una hora concreta que no estaba disponible y ninguna alternativa cercana le viene bien, invítale a volver a llamar más adelante. No prometas avisos por WhatsApp para cuando se libere una hora y no uses notify_when_available.",
   ];
 }
 
-function seccionCierreV2(): Parrafos {
+/** «## Chat por WhatsApp» de v2: solo el gancho. Las reglas del canal
+ * llegan en el primer mensaje (reglasDelChat); sin este recordatorio, en el
+ * laboratorio del 31-10 volvía a preguntar por el WhatsApp (E25, 2 de 5). */
+function seccionChatV2(): Parrafos {
   return [
-    "## Cierre",
-    // El guardarraíl de v1 (seccionCierre, llamada real del 19-09), con el
-    // nombre real de la tool: Telnyx la registra como hangup (el modelo la
-    // llamaba así en producción aunque v1 diga end_call).
-    "Ante una despedida normal, di una sola frase breve y usa hangup en ese turno. Si ordenan colgar con claridad y no queda nada pendiente, usa hangup sin despedida.",
-    "Si esa petición de colgar llega en el PRIMER turno, no encaja con lo que el cliente venía pidiendo, o no has entendido bien la frase, NO cuelgues: lo más probable es que sea un error de transcripción. Pregunta una sola vez ('perdona, ¿te he entendido bien?, ¿quieres que colguemos?') y usa hangup solo si lo confirma. Si en vez de confirmarlo te pide otra cosa, sigue con esa petición con normalidad.",
-    "Cuando la llamada ya haya terminado, llama UNA sola vez a informar_al_negocio; apunta en dudas_sin_respuesta lo que no pudiste responder. No la uses durante la conversación ni la menciones al cliente.",
+    "## Chat por WhatsApp",
+    "Si el mensaje empieza por [WhatsApp · número · fecha y hora], estás en un chat de WhatsApp, no en una llamada: sigue las instrucciones del sistema que llegan en su primer mensaje. En el chat no preguntes por el WhatsApp (ya te escribe por WhatsApp), no hables de grabar ni de colgar y no uses preferencia_de_grabacion ni end_call.",
   ];
 }
 
@@ -640,10 +630,18 @@ function seccionContextoDelClienteV2(): Parrafos {
   return [VARIABLE_DEL_CONTEXTO_DEL_CLIENTE];
 }
 
-/** El orden del prompt v2: lo fijo delante (caché de prefijo del modelo) y
- * lo que cambia por llamada o por negocio al final. */
+/**
+ * El orden del prompt v2: lo fijo delante (caché de prefijo del modelo) y
+ * lo que cambia por llamada o por negocio al final. Rol (con su
+ * instrucción de idioma), Cierre y «Al terminar la llamada» son los de v1:
+ * en el laboratorio del 31-10, con el idioma compactado decía los servicios
+ * tal cual en inglés («they're called mechas», E2 de 9 a 1 de 9) y, con el
+ * informe junto a «usa hangup», al despedirse en el chat seguía llamando a
+ * tools tras informar: volvía a reservar o anulaba la cita (E10 de 9/9 a
+ * 4/10, E13, E14).
+ */
 const SECCIONES_DEL_PROMPT_V2: readonly Seccion[] = [
-  seccionRolV2,
+  seccionRol,
   seccionConversacionV2,
   seccionCatalogoV2,
   seccionEsteNegocioV2,
@@ -651,9 +649,11 @@ const SECCIONES_DEL_PROMPT_V2: readonly Seccion[] = [
   seccionHerramientasV2,
   seccionGrabacion,
   seccionRecados,
-  seccionCierreV2,
+  seccionCierre,
   seccionPrivacidad,
   seccionTransferencia,
+  seccionAlTerminar,
+  seccionChatV2,
   seccionContextoDelClienteV2,
   seccionReferenciaTemporal,
   seccionIdioma,
@@ -678,7 +678,7 @@ export function reglasDelChat({
   return [
     "[Instrucciones del sistema para este chat; no las menciones]",
     "Estás en un chat de WhatsApp, no en una llamada. El marcador [WhatsApp · número · fecha y hora] de cada mensaje lo pone el sistema: usa su número como teléfono del cliente y su fecha y hora como el momento actual, por encima de cualquier otra hora que tengas.",
-    `En el chat no hay saludo del sistema: en tu primera respuesta di, en una frase corta, que le atiende la recepcionista de IA de ${nombreDelNegocio}. En el chat no se graba ni se cuelga: no hables de grabar, de colgar ni de audio, y no uses preferencia_de_grabacion ni hangup.`,
+    `En el chat no hay saludo del sistema: en tu primera respuesta di, en una frase corta, que le atiende la recepcionista de IA de ${nombreDelNegocio}. En el chat no se graba ni se cuelga: no hables de grabar, de colgar ni de audio, y no uses preferencia_de_grabacion ni end_call.`,
     "Escribe dos o tres líneas cortas, sin emojis ni símbolos; una lista breve vale si ayuda a elegir. Al reservar pregúntale su nombre antes de ofrecerle reservar, aunque su perfil de WhatsApp muestre uno, y no preguntes por el WhatsApp, porque ya te escribe por WhatsApp: confirma solo la reserva y usa smsConsent true.",
     `Si dice que ha pulsado Cambiar en el recordatorio de una cita, búscala con find_my_appointment y cámbiala con el flujo normal. Si prefiere hablar con alguien, ${
       ocultarNumero

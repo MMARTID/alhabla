@@ -175,39 +175,6 @@ export function instruccionesDeIdioma(
 }
 
 /**
- * Lo mismo que instruccionesDeIdioma en un solo bloque, para el prompt
- * compacto (v2, F2 de PLAN-PROMPT-DINAMICO.md): la instrucción de «## Rol» y
- * el recordatorio decían casi lo mismo dos veces. Se queda todo en el
- * recordatorio, que sigue cerrando el prompt (con la regla solo en «## Rol»
- * volvía al castellano, laboratorio del 05-10), con sus dos frases medidas:
- * «aunque te conteste en castellano» y «no cambies de idioma por tu cuenta».
- * Lo de no repetir el saludo ya lo dice «## Rol» de v2. Con un solo idioma,
- * la de siempre en «## Rol» y sin recordatorio.
- */
-export function instruccionesDeIdiomaCompactas(
-  idiomas: readonly CodigoDeIdioma[]
-): { instruccion: string | null; recordatorio: string | null } {
-  if (idiomas.length === 1) {
-    return {
-      instruccion: `Habla siempre en ${IDIOMAS[idiomas[0]].nombreEnPrompt}.`,
-      recordatorio: null,
-    };
-  }
-  const lista = idiomas
-    .map((idioma) => IDIOMAS[idioma].nombreEnPrompt)
-    .join(", ");
-  const notas = idiomas
-    .map((idioma) => IDIOMAS[idioma].notaParaElPrompt)
-    .filter((nota): nota is string => Boolean(nota))
-    .map((nota) => ` ${nota}`)
-    .join("");
-  return {
-    instruccion: null,
-    recordatorio: `## Idioma\nContesta cada turno en el idioma en que te habla quien llama si es uno de estos: ${lista}; si cambia entre ellos, acompáñale sin pedirle que elija. También tu primera respuesta, lo que digas después de usar una herramienta (aunque te conteste en castellano), el resumen de la reserva, la pregunta del WhatsApp y la despedida. Las frases entre comillas de estas instrucciones y los nombres de los servicios están en castellano: dilos traducidos (salvo los que no tienen traducción, como «balayage»).${notas} No cambies de idioma por tu cuenta mientras siga hablando en el suyo.`,
-  };
-}
-
-/**
  * La voz que atiende, entre `voces` (las de su principal): la elegida si
  * está entre ellas y habla todos sus idiomas; si no, la primera de su
  * género (o del pedido) que los hable. Sustituir una elegida que no los

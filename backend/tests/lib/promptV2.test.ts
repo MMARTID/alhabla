@@ -11,10 +11,7 @@ import {
   VARIABLE_DEL_CONTEXTO_DEL_CLIENTE,
 } from "../../src/lib/seccionesDelPrompt.js";
 import { buildTelnyxAssistantPayload } from "../../src/lib/telnyxAssistantPayload.js";
-import {
-  instruccionesDeIdiomaCompactas,
-  resolverIdiomas,
-} from "../../src/lib/idiomas/resolver.js";
+import { resolverIdiomas } from "../../src/lib/idiomas/resolver.js";
 import { idiomasQueHabla } from "../../src/lib/idiomas/catalogo.js";
 
 /**
@@ -56,8 +53,6 @@ describe("prompt v2", () => {
       "## Límites",
       "## Uso de herramientas",
       "## Cita existente",
-      "## Al terminar la llamada",
-      "## Chat por WhatsApp",
       "## Cliente",
       "## Información del negocio",
     ]) {
@@ -73,6 +68,8 @@ describe("prompt v2", () => {
       "## Grabación",
       "## Recados",
       "## Cierre",
+      "## Al terminar la llamada",
+      "## Chat por WhatsApp",
       "## Referencia temporal",
       "## Idioma",
     ]);
@@ -83,12 +80,31 @@ describe("prompt v2", () => {
       ...ENTRADA,
       settings: DEFAULT_AGENT_SETTINGS,
     });
-    expect(prompt.length).toBeLessThan(v1.length * 0.65);
+    expect(prompt.length).toBeLessThan(v1.length * 0.7);
   });
 
-  it("usa hangup, el nombre real de la tool de colgar, y nunca end_call", () => {
-    expect(prompt).toContain("usa hangup en ese turno");
-    expect(prompt).not.toContain("end_call");
+  // Laboratorio del 31-10: con el cierre y el informe reescritos, al
+  // despedirse en el chat seguía llamando a tools; vuelven los de v1.
+  it("el cierre y el informe son los de v1", () => {
+    const v1 = buildManagedAgentPrompt({
+      ...ENTRADA,
+      settings: DEFAULT_AGENT_SETTINGS,
+    });
+    const bloque = (texto: string, titulo: string) => {
+      const desde = texto.indexOf(titulo);
+      return texto.slice(desde, texto.indexOf("\n\n## ", desde));
+    };
+    for (const titulo of ["## Cierre", "## Al terminar la llamada"]) {
+      expect(bloque(prompt, titulo), titulo).toBe(bloque(v1, titulo));
+    }
+  });
+
+  it("el chat, solo el gancho: las reglas llegan en el primer mensaje", () => {
+    const desde = prompt.indexOf("## Chat por WhatsApp");
+    const chat = prompt.slice(desde, prompt.indexOf("\n\n## ", desde));
+    expect(chat).toContain("sigue las instrucciones del sistema");
+    expect(chat).toContain("no preguntes por el WhatsApp");
+    expect(chat.length).toBeLessThan(500);
   });
 
   it("lleva {{contexto_cliente}} antes de la referencia temporal y el idioma al final", () => {
@@ -118,16 +134,20 @@ describe("prompt v2", () => {
     expect(titulos(uno)).not.toContain("## Idioma");
   });
 
-  it("con varios idiomas, una sola instrucción y al final, con sus frases medidas", () => {
-    const { instruccion, recordatorio } = instruccionesDeIdiomaCompactas(
-      idiomasQueHabla("ca-ES")
-    );
-    expect(instruccion).toBeNull();
-    expect(recordatorio).toContain("(aunque te conteste en castellano)");
-    expect(recordatorio).toContain(
-      "No cambies de idioma por tu cuenta mientras siga hablando en el suyo."
-    );
-    expect(recordatorio).toContain("formas valencianas o baleares");
+  // Laboratorio del 31-10: con el idioma compactado decía «they're called
+  // mechas» (E2, 1 de 9): vuelven la instrucción de Rol y el recordatorio
+  // de v1.
+  it("el idioma, como en v1: instrucción en Rol y recordatorio al final", () => {
+    expect(prompt).toContain("no son nombres propios");
+    expect(prompt).toContain("(aunque te conteste en castellano)");
+  });
+
+  it("sin lista de espera, invita a volver a llamar; con ella, lo dice la tool", () => {
+    const frase = "invítale a volver a llamar más adelante";
+    expect(prompt).not.toContain(frase);
+    expect(
+      buildManagedAgentPrompt({ ...ENTRADA, listaDeEspera: false })
+    ).toContain(frase);
   });
 
   it("la pregunta del WhatsApp depende del plan, como en v1", () => {
@@ -173,7 +193,7 @@ describe("reglasDelChat", () => {
     expect(reglas).toContain(
       "que le atiende la recepcionista de IA de El petit saló"
     );
-    expect(reglas).toContain("no uses preferencia_de_grabacion ni hangup");
+    expect(reglas).toContain("no uses preferencia_de_grabacion ni end_call");
     expect(reglas).toContain("llama UNA sola vez a informar_al_negocio");
     expect(reglas).toContain("dale el teléfono del negocio");
   });

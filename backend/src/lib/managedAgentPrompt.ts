@@ -17,11 +17,7 @@ import {
   idiomasConocidos,
   normalizarIdiomas,
 } from "./idiomas/ajustes.js";
-import {
-  instruccionesDeIdioma,
-  instruccionesDeIdiomaCompactas,
-  resolverIdiomas,
-} from "./idiomas/resolver.js";
+import { instruccionesDeIdioma, resolverIdiomas } from "./idiomas/resolver.js";
 import { componerPrompt } from "./seccionesDelPrompt.js";
 
 // Lo que otros módulos importan de aquí desde antes de partir el prompt en
@@ -274,17 +270,16 @@ export function buildManagedAgentPrompt(input: {
   idiomas?: readonly CodigoDeIdioma[];
 }) {
   const settings = parseAgentSettings(input.settings);
-  // parseAgentSettings ya deja en `languages` los que habla con su
-  // principal (normalizarIdiomas).
-  const idiomas = input.idiomas ?? settings.languages;
   // Las secciones, su orden y su texto viven en lib/seccionesDelPrompt.ts;
   // aquí solo se resuelve lo que necesitan.
   return componerPrompt({
     settings,
-    idioma:
-      settings.versionDelPrompt === "v2"
-        ? instruccionesDeIdiomaCompactas(idiomas)
-        : instruccionesDeIdioma(idiomas, settings.voiceLanguage),
+    // parseAgentSettings ya deja en `languages` los que habla con su
+    // principal (normalizarIdiomas).
+    idioma: instruccionesDeIdioma(
+      input.idiomas ?? settings.languages,
+      settings.voiceLanguage
+    ),
     businessType: input.businessType,
     businessDetails: input.businessDetails?.trim(),
     timezone: resolveManagedPromptTimezone(input.timezone),
