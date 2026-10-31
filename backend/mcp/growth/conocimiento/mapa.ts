@@ -553,14 +553,17 @@ export const FEATURES_EXCLUIDAS: Record<string, string> = {
  * los nombre se bloquea mientras no cite un dato verificable de cada uno
  * (art. 10 Ley 3/1991); afirmaciones-prohibidas.md los da por existentes.
  *
- * PENDIENTE DE CONFIRMAR POR EL FUNDADOR: que esta lista sea esa y no otra.
- * Solo se dan de alta (nunca se tocan ni se borran los que ya hay).
+ * Confirmados por el fundador el 30-10-2026. El dominio de HeyDiga es
+ * `heydiga.com` (se sembró `heydiga.ai`, que no resuelve; corregido el
+ * 31-10-2026). Solo se dan de alta (nunca se tocan ni se borran los que ya
+ * hay): si cambias un dominio aquí, renombra antes la fila en producción o el
+ * sincronizador creará una duplicada.
  */
 export const COMPETIDORES_ADICIONALES: readonly {
   nombre: string;
   dominio: string;
 }[] = [
-  { nombre: "HeyDiga", dominio: "heydiga.ai" },
+  { nombre: "HeyDiga", dominio: "heydiga.com" },
   { nombre: "fonio", dominio: "fonio.ai" },
 ];
 

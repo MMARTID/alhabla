@@ -101,7 +101,7 @@ function describir<T extends z.ZodTypeAny>(
 const datosConCompetidores = DatosDeOportunidad.extend({
   competidoresMencionados: describir(
     DatosDeOportunidad.shape.competidoresMencionados,
-    `Dominios de los competidores CONFIRMADOS que esta página menciona, lista o compara (p. ej. heydiga.ai en un «mejores recepcionistas de IA»), hasta ${MAXIMO_DE_COMPETIDORES_MENCIONADOS}. Solo valen los que salen en leer_contexto (competidores) o en listar_competidores sin estado «propuesto»: un dominio desconocido o aún propuesto se rechaza con 400 competidor_desconocido`
+    `Dominios de los competidores CONFIRMADOS que esta página menciona, lista o compara (p. ej. heydiga.com en un «mejores recepcionistas de IA»), hasta ${MAXIMO_DE_COMPETIDORES_MENCIONADOS}. Solo valen los que salen en leer_contexto (competidores) o en listar_competidores sin estado «propuesto»: un dominio desconocido o aún propuesto se rechaza con 400 competidor_desconocido`
   ),
 })
   .optional()

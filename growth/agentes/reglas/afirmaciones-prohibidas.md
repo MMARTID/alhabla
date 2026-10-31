@@ -62,7 +62,7 @@ Lo que el repo NO dice y no se ha añadido a la tabla:
 - Competidores que no son comparables (HeyDiga, fonio…): se nombran con
   `growth_competidores`, no con esta lista. El sincronizador los siembra desde
   `backend/mcp/growth/conocimiento/mapa.ts` (`COMPETIDORES_ADICIONALES`:
-  HeyDiga, `heydiga.ai`, y fonio, `fonio.ai`), además de las siete plataformas
+  HeyDiga, `heydiga.com`, y fonio, `fonio.ai`), además de las siete plataformas
   de `comparativas.ts`; **el fundador confirmó HeyDiga y fonio el
   2026-10-30**. Con ellos sembrados, la regla dura 3 bloquea cualquier borrador
   que los nombre sin citar un dato comparativo suyo, y no hay ninguno. Un

@@ -298,7 +298,7 @@ describe.skipIf(!hayRepo)("construirAfirmaciones sobre el repo real", () => {
         "bland.ai",
         "elevenlabs.io",
         "fonio.ai",
-        "heydiga.ai",
+        "heydiga.com",
         "poly.ai",
         "retellai.com",
         "synthflow.ai",
