@@ -215,13 +215,15 @@ export function validarAltaDeCompetidor(
 }
 
 /**
- * Valida la edición: el nombre no puede quedar vacío, la URL es opcional pero
- * tiene que ser del mismo dominio que el competidor (el dominio no se cambia).
+ * Valida la edición: el nombre no puede quedar vacío y la URL es opcional. Una
+ * URL de otro dominio es válida: cambia el dominio del competidor (el diálogo
+ * lo avisa y el backend lo exige con `cambiarDominio`).
  */
-export function validarEdicionDeCompetidor(
-  valores: { nombre: string; url: string; notas: string },
-  dominio: string
-): ErroresDeCompetidor {
+export function validarEdicionDeCompetidor(valores: {
+  nombre: string;
+  url: string;
+  notas: string;
+}): ErroresDeCompetidor {
   const errores: ErroresDeCompetidor = {};
   const nombre = valores.nombre.trim();
   if (nombre === "") errores.nombre = "Escribe un nombre.";
@@ -230,9 +232,6 @@ export function validarEdicionDeCompetidor(
   }
   const deUrl = errorDeUrl(valores.url, false);
   if (deUrl) errores.url = deUrl;
-  else if (valores.url.trim() !== "" && dominioDeUrl(valores.url) !== dominio) {
-    errores.url = `La dirección tiene que ser de ${dominio}: el dominio no se cambia.`;
-  }
   if (valores.notas.trim().length > LARGO_MAXIMO_DE_NOTAS_DE_COMPETIDOR) {
     errores.notas = `Las notas no pueden pasar de ${LARGO_MAXIMO_DE_NOTAS_DE_COMPETIDOR} caracteres.`;
   }

@@ -549,6 +549,43 @@ describe("Fase 2a: competencia (Prisma de mentira)", () => {
       expect(interna.statusCode).toBe(400);
     });
 
+    it("PATCH con una URL de otro dominio y cambiarDominio cambia el dominio; si ya existe es un 409 y sin la confirmación un 400", async () => {
+      competidorPorId(filaDeCompetidor());
+      mock.growthCompetidor.update.mockResolvedValue({});
+
+      const cambio = await comoAdminPide(
+        "PATCH",
+        "/growth/admin/competidores/c1",
+        { url: "https://www.fonio.com/es?utm_campaign=z", cambiarDominio: true }
+      );
+      expect(cambio.statusCode).toBe(200);
+      expect(mock.growthCompetidor.update.mock.calls[0]![0].data).toEqual({
+        url: "https://www.fonio.com/es",
+        dominio: "fonio.com",
+      });
+
+      mock.growthCompetidor.update.mockClear();
+      mock.growthCompetidor.findUnique.mockImplementation(
+        async ({ where }: { where: { id?: string; dominio?: string } }) =>
+          where.id ? filaDeCompetidor() : { id: "c2" }
+      );
+      const repetido = await comoAdminPide(
+        "PATCH",
+        "/growth/admin/competidores/c1",
+        { url: "https://fonio.com/es", cambiarDominio: true }
+      );
+      expect(repetido.statusCode).toBe(409);
+      expect(repetido.json().codigo).toBe("competidor_existente");
+
+      const propio = await comoAdminPide(
+        "PATCH",
+        "/growth/admin/competidores/c1",
+        { url: "https://alhabla.ai/x", cambiarDominio: true }
+      );
+      expect(propio.statusCode).toBe(400);
+      expect(mock.growthCompetidor.update).not.toHaveBeenCalled();
+    });
+
     it("PATCH sin cambios o con campos ajenos (dominio, estado) es un 400; un id que no existe, 404", async () => {
       competidorPorId(filaDeCompetidor());
       for (const cuerpo of [

@@ -1387,12 +1387,16 @@ export const AltaDeCompetidorBody = z
   .strict();
 export type AltaDeCompetidorBody = z.infer<typeof AltaDeCompetidorBody>;
 
-/** `PATCH /growth/admin/competidores/:id`. El dominio no se cambia. */
+/**
+ * `PATCH /growth/admin/competidores/:id`. El dominio solo cambia si la URL es de
+ * otro dominio y `cambiarDominio` es `true` (el dominio sale de la URL).
+ */
 export const CambioDeCompetidorBody = z
   .object({
     nombre: sano(z.string().trim().min(1).max(120)).optional(),
     notas: sano(z.string().trim().max(500)).nullable().optional(),
     url: urlHttp.nullable().optional(),
+    cambiarDominio: z.boolean().optional(),
   })
   .strict()
   .refine(
