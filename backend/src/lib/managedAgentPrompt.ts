@@ -17,7 +17,11 @@ import {
   idiomasConocidos,
   normalizarIdiomas,
 } from "./idiomas/ajustes.js";
-import { instruccionesDeIdioma, resolverIdiomas } from "./idiomas/resolver.js";
+import {
+  instruccionesDeIdioma,
+  instruccionesDeIdiomaCompactas,
+  resolverIdiomas,
+} from "./idiomas/resolver.js";
 import { componerPrompt } from "./seccionesDelPrompt.js";
 
 // Lo que otros módulos importan de aquí desde antes de partir el prompt en
@@ -36,10 +40,11 @@ export const MODOS_DE_DAR_PRECIOS = [
 ] as const;
 export type ModoDeDarPrecios = (typeof MODOS_DE_DAR_PRECIOS)[number];
 
-/** Versiones del prompt de la recepcionista. Solo existe la actual («v1»);
- * la siguiente se añade aquí y a SECCIONES_POR_VERSION
- * (lib/seccionesDelPrompt.ts) para activarla negocio a negocio. */
-export const VERSIONES_DEL_PROMPT = ["v1"] as const;
+/** Versiones del prompt de la recepcionista: «v1», la de siempre, y «v2»,
+ * la compacta (F2 de PLAN-PROMPT-DINAMICO.md), que se activa negocio a
+ * negocio. Sus secciones, en SECCIONES_POR_VERSION
+ * (lib/seccionesDelPrompt.ts). */
+export const VERSIONES_DEL_PROMPT = ["v1", "v2"] as const;
 export type VersionDelPrompt = (typeof VERSIONES_DEL_PROMPT)[number];
 
 /** Los campos de AgentSettings por separado: parseAgentSettings los lee
@@ -269,16 +274,17 @@ export function buildManagedAgentPrompt(input: {
   idiomas?: readonly CodigoDeIdioma[];
 }) {
   const settings = parseAgentSettings(input.settings);
+  // parseAgentSettings ya deja en `languages` los que habla con su
+  // principal (normalizarIdiomas).
+  const idiomas = input.idiomas ?? settings.languages;
   // Las secciones, su orden y su texto viven en lib/seccionesDelPrompt.ts;
   // aquí solo se resuelve lo que necesitan.
   return componerPrompt({
     settings,
-    // parseAgentSettings ya deja en `languages` los que habla con su
-    // principal (normalizarIdiomas).
-    idioma: instruccionesDeIdioma(
-      input.idiomas ?? settings.languages,
-      settings.voiceLanguage
-    ),
+    idioma:
+      settings.versionDelPrompt === "v2"
+        ? instruccionesDeIdiomaCompactas(idiomas)
+        : instruccionesDeIdioma(idiomas, settings.voiceLanguage),
     businessType: input.businessType,
     businessDetails: input.businessDetails?.trim(),
     timezone: resolveManagedPromptTimezone(input.timezone),

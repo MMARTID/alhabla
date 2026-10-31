@@ -2322,6 +2322,10 @@ export interface ContextoDelNegocio {
   porLlamada?: Record<string, ContextoDeLaLlamada>;
   /** Un payload por variante pedida, ya con el nombre del laboratorio. */
   payloads: Record<NombreDeVariante, CreateTelnyxAssistantInput>;
+  /** Las reglas del canal que el chat real antepone al primer mensaje de
+   * cada conversación con el prompt v2 (reglasDelChat), por variante. Sin
+   * entrada, ninguna (v1 las lleva en el prompt). */
+  reglasDelChat?: Partial<Record<NombreDeVariante, string>>;
   /** `callId` de llamadas antiguas sin cita, las más recientes primero. */
   llamadas: string[];
   /** El `fromNumber` de esas llamadas: a él va el WhatsApp de una reserva. */
@@ -2681,13 +2685,18 @@ async function ejecutarRepeticion(
         break;
       }
       const mensaje = decision.mensaje;
-      const contenido =
+      const reglas =
+        guion.canal === "chat" && turno === 1
+          ? entorno.contexto.reglasDelChat?.[tarea.variante]
+          : undefined;
+      const marcado =
         guion.canal === "chat" && turno === 1
           ? `${await deps.marcadorDeChat({
               clientPhone: telefonoDelCliente,
               timezone: entorno.contexto.zonaHoraria,
             })} ${mensaje}`
           : mensaje;
+      const contenido = reglas ? `${reglas}\n\n${marcado}` : marcado;
       const desde = Date.now();
       const respuesta = await enElPaso(`Assistant (turno ${turno})`, () =>
         conReintentos(deps, () =>
@@ -3535,6 +3544,8 @@ async function cargarContextoReal(input: {
     { getPublicWebhookBaseUrl },
     { isBusinessType },
     contextoLib,
+    seccionesLib,
+    mensajesClienteLib,
   ] = await Promise.all([
     import("../src/lib/prisma.js"),
     import("../src/lib/managedAgentPrompt.js"),
@@ -3546,6 +3557,8 @@ async function cargarContextoReal(input: {
     import("../src/lib/serverUrl.js"),
     import("../src/lib/businessType.js"),
     import("../src/lib/contextoDeLlamada.js"),
+    import("../src/lib/seccionesDelPrompt.js"),
+    import("../src/modules/whatsapp/mensajesCliente.js"),
   ]);
 
   const negocio = await prisma.business.findUnique({
@@ -3748,6 +3761,17 @@ async function cargarContextoReal(input: {
     }
   }
 
+  // Lo que el chat real antepone con v2 (chatCliente.ts).
+  const reglasDelChat: Partial<Record<NombreDeVariante, string>> = {};
+  for (const variante of input.variantes) {
+    if (VARIANTES[variante].version === "v2") {
+      reglasDelChat[variante] = seccionesLib.reglasDelChat({
+        nombreDelNegocio: mensajesClienteLib.nombreParaCliente(negocio),
+        ocultarNumero: negocio.hideOwnerNumberFromClients,
+      });
+    }
+  }
+
   const textos = input.variantes.map((v) => payloads[v].instructions);
   if (new Set(textos).size < textos.length) {
     throw new ErrorDeUso(
@@ -3762,6 +3786,7 @@ async function cargarContextoReal(input: {
     saludo: payloads[input.variantes[0]!].greeting ?? "",
     porLlamada,
     payloads,
+    reglasDelChat,
     llamadas: llamadas.map((llamada) => llamada.callId),
     telefonos: Object.fromEntries(
       llamadas.map((llamada) => [llamada.callId, llamada.fromNumber])

@@ -7,6 +7,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { filaDeConexion } from "../../helpers/conexionDeCalendario.js";
 import {
   executeVoiceTool,
+  informacionParaElCatalogo,
   MAX_CARACTERES_POR_INSTRUCCION,
   siguientePasoTrasElInforme,
 } from "../../../src/modules/voiceTools/service.js";
@@ -1193,5 +1194,37 @@ describe("siguiente_paso de informar_al_negocio", () => {
     expect(siguientePasoTrasElInforme("duplicado")).toMatch(
       /^Ya estaba informado/
     );
+  });
+});
+
+// F2 de PLAN-PROMPT-DINAMICO.md: con el prompt v2 la información del negocio
+// que no cabe en el prompt (más de 300 caracteres) la da get_catalog.
+describe("informacionParaElCatalogo", () => {
+  const larga = "Aparcamiento detrás del local. ".repeat(20);
+
+  it("con v2 y la información larga, la devuelve (con tope)", () => {
+    const informacion = informacionParaElCatalogo({
+      agentSettings: { versionDelPrompt: "v2" },
+      businessDetails: larga.repeat(3),
+    });
+    expect(informacion?.startsWith("Aparcamiento detrás del local.")).toBe(
+      true
+    );
+    expect(informacion!.length).toBeLessThanOrEqual(1_000);
+  });
+
+  it("con v2 y la corta, null: ya va en el prompt", () => {
+    expect(
+      informacionParaElCatalogo({
+        agentSettings: { versionDelPrompt: "v2" },
+        businessDetails: "Aceptamos Bizum.",
+      })
+    ).toBeNull();
+  });
+
+  it("con v1, nunca: v1 la lleva siempre en el prompt", () => {
+    expect(
+      informacionParaElCatalogo({ agentSettings: {}, businessDetails: larga })
+    ).toBeNull();
   });
 });

@@ -9,7 +9,10 @@ import type {
 } from "../adapters/telnyx/TelnyxAiAdapter.js";
 import type { FlowNodeReq } from "telnyx/resources/ai/assistants/assistants.js";
 import { resolveManagedPromptTimezone } from "./managedAgentPrompt.js";
-import { VARIABLES_DE_LA_LLAMADA_POR_DEFECTO } from "./seccionesDelPrompt.js";
+import {
+  VARIABLE_DEL_CONTEXTO_DEL_CLIENTE,
+  VARIABLES_DE_LA_LLAMADA_POR_DEFECTO,
+} from "./seccionesDelPrompt.js";
 import type { CooficialDeLaZona, PerfilDeIdiomas } from "./idiomas/resolver.js";
 import { CODIGOS_DE_IDIOMA, IDIOMAS } from "./idiomas/catalogo.js";
 import { IDIOMA_OBLIGATORIO } from "./idiomas/ajustes.js";
@@ -974,7 +977,14 @@ export function buildTelnyxAssistantPayload(
     // Lo de quien llama lo manda el backend en cada llamada
     // (lib/contextoDeLlamada.ts); estos valores quedan para el chat y para
     // una llamada en la que no se pudo mirar nada.
-    dynamicVariables: { ...VARIABLES_DE_LA_LLAMADA_POR_DEFECTO },
+    // `contexto_cliente`, solo si el prompt lo usa (v2): vacío en el chat y
+    // si no se pudo mirar nada; el de v1 no cambia ni un byte.
+    dynamicVariables: {
+      ...VARIABLES_DE_LA_LLAMADA_POR_DEFECTO,
+      ...(input.instructions.includes(VARIABLE_DEL_CONTEXTO_DEL_CLIENTE)
+        ? { contexto_cliente: "" }
+        : {}),
+    },
     tools,
     // null y no ausente: un negocio que deja la zona (cambia de dirección)
     // pierde el nodo al sincronizar.

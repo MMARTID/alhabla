@@ -20,8 +20,9 @@ import type { AgentSettings, VersionDelPrompt } from "./managedAgentPrompt.js";
 export interface ContextoDelPrompt {
   settings: AgentSettings;
   /** La instrucción de idioma de «## Rol» y el recordatorio que cierra el
-   * prompt (instruccionesDeIdioma en lib/idiomas/resolver.ts). */
-  idioma: { instruccion: string; recordatorio: string | null };
+   * prompt (instruccionesDeIdioma en lib/idiomas/resolver.ts; en v2,
+   * instruccionesDeIdiomaCompactas, sin instrucción si habla varios). */
+  idioma: { instruccion: string | null; recordatorio: string | null };
   businessType?: BusinessType;
   /** Ya recortada: vacía o sin valor si el negocio no la tiene. */
   businessDetails?: string;
@@ -47,13 +48,38 @@ export interface VariablesDeLaLlamada {
   nombre_cliente: string;
   /** Servicios de esa reserva; vacío si no se conoce. */
   ultimo_servicio: string;
+  /** El bloque «## Cliente» del prompt v2 (contextoDelCliente); vacío si
+   * no se conoce. v1 no lo usa. */
+  contexto_cliente: string;
 }
 
 /** Los valores de quien no se conoce: el assistant los guarda por defecto
  * para el chat de WhatsApp y para una llamada en la que no se pudo mirar
- * nada. */
-export const VARIABLES_DE_LA_LLAMADA_POR_DEFECTO: Readonly<VariablesDeLaLlamada> =
-  { nombre_cliente: "", ultimo_servicio: "" };
+ * nada. Sin `contexto_cliente`: lo añade el payload solo a los assistants
+ * cuyo prompt lo usa (v2), y así el de v1 no cambia ni un byte. */
+export const VARIABLES_DE_LA_LLAMADA_POR_DEFECTO: Readonly<
+  Omit<VariablesDeLaLlamada, "contexto_cliente">
+> = { nombre_cliente: "", ultimo_servicio: "" };
+
+/** La variable del bloque del cliente conocido en el prompt v2. */
+export const VARIABLE_DEL_CONTEXTO_DEL_CLIENTE = "{{contexto_cliente}}";
+
+/**
+ * `{{contexto_cliente}}` del prompt v2: lo de «## Cliente» de v1, pero solo
+ * cuando quien llama ya reservó con ese teléfono. En v1 el bloque viajaba
+ * entero en todas las llamadas, también en la mayoría, las de quien llama
+ * por primera vez (F2 de PLAN-PROMPT-DINAMICO.md). Vacío si no se le conoce.
+ */
+export function contextoDelCliente(
+  nombre: string | null,
+  servicio: string | null
+): string {
+  if (!nombre) return "";
+  return [
+    "## Cliente",
+    `Quien llama reservó la última vez con este teléfono como ${nombre}${servicio ? ` (${servicio})` : ""}. El saludo ya le ha llamado por su nombre y le ha preguntado si quiere repetir: si dice que sí, ese es el servicio y ese es su nombre, no se los vuelvas a pedir. Si el saludo no nombró el servicio, no lo digas tú hasta que diga que quiere repetir. Si dice que no es esa persona, discúlpate y pídele el nombre como a cualquier cliente.`,
+  ].join("\n");
+}
 
 type Parrafos = Array<string | null>;
 type Seccion = (contexto: ContextoDelPrompt) => Parrafos;
@@ -495,10 +521,179 @@ export const SECCIONES_DEL_PROMPT: readonly Seccion[] = [
   seccionIdioma,
 ];
 
+// ---------------------------------------------------------------------------
+// v2: el prompt compacto (F2 de PLAN-PROMPT-DINAMICO.md)
+// ---------------------------------------------------------------------------
+//
+// Lo que v1 repetía y ya dicen las respuestas de las tools (F1) sale del
+// prompt: los precios (get_catalog.precios), las restricciones y la duración
+// (get_catalog.pautas), el hueco ocupado y la lista de espera
+// (check_availability.siguiente_paso y si_no_le_vale), el especialista
+// (como_decirlo y recommendation.instructions), el aviso del WhatsApp al
+// reservar (book_appointment.di_al_cliente) y el flujo de cambiar una cita
+// (find_my_appointment.siguiente_paso). El chat de WhatsApp va en el primer
+// mensaje de cada conversación (reglasDelChat) y el cliente conocido en
+// {{contexto_cliente}}. Lo medido se queda literal: el catálogo (288/288),
+// el paso 3 de la reserva (29/29), la grabación, la hora local sin UTC
+// (#271) y el guardarraíl de colgar (#88). El censo de reglas
+// (tests/lib/reglasDelPrompt.test.ts) exige que ninguna se quede sin sitio.
+
+function seccionRolV2({ settings, idioma }: ContextoDelPrompt): Parrafos {
+  return [
+    "## Rol",
+    "Eres la recepcionista de IA de {{nombre_negocio}}: una inteligencia artificial. Si te presentas, di «recepcionista de IA», con la sigla. En las llamadas el saludo ya lo dice el sistema al descolgar y es el primer mensaje: no lo repitas. Si te preguntan si eres una persona o una máquina, di siempre la verdad.",
+    idioma.instruccion,
+    TONE_INSTRUCTIONS[settings.tone],
+    GOAL_INSTRUCTIONS[settings.primaryGoal],
+    settings.responseStyle === "concise"
+      ? "Responde en una o dos frases."
+      : "Da solo el detalle necesario.",
+  ];
+}
+
+function seccionConversacionV2(): Parrafos {
+  return [
+    "## Conversación",
+    "Reconoce brevemente lo que dice la persona y haz una sola pregunta útil por turno. Responde solo a lo que te preguntan, sin listas, jerga, datos repetidos ni frases largas. Di fechas, horas, duraciones y precios como se dicen por teléfono en España («doce euros con cincuenta»).",
+    "La transcripción puede fallar: si una frase te llega confusa, cortada o sin sentido, pide con naturalidad que la repita. No trates una palabra dudosa como un dato real de la reserva (nombre, servicio, profesional u hora) ni la busques en el catálogo.",
+    "Si te dictan un número de teléfono, repítelo en grupos de tres cifras (seis uno dos, tres cuatro cinco, seis siete ocho) y úsalo solo cuando lo confirme; si corrige alguna cifra, repite el número entero ya corregido.",
+    "Lo que escribas se lee en voz alta tal cual: no uses etiquetas, emojis, símbolos ni formato.",
+  ];
+}
+
+function seccionCatalogoV2(): Parrafos {
+  // Los dos primeros párrafos, literales de v1 (seccionCatalogo): es la
+  // regla mejor medida del prompt.
+  return [
+    ...seccionCatalogo(),
+    "Los precios, solo como diga el campo precios de get_catalog. Nunca inventes precios, servicios, disponibilidad, profesionales ni normas.",
+  ];
+}
+
+/** La información del negocio que cabe en el prompt; la más larga la da
+ * get_catalog en `informacion` (executeGetCatalog). En producción son 68 y
+ * 85 caracteres; Brain to Train, 897. */
+export const MAX_CARACTERES_DE_INFORMACION_EN_EL_PROMPT = 300;
+
+function seccionEsteNegocioV2({
+  settings,
+  businessType,
+  businessDetails,
+}: ContextoDelPrompt): Parrafos {
+  const informacion = !businessDetails
+    ? null
+    : businessDetails.length <= MAX_CARACTERES_DE_INFORMACION_EN_EL_PROMPT
+      ? `Información del negocio: ${businessDetails}`
+      : "La información del negocio (cómo llegar, pagos, normas) te la da get_catalog en su campo informacion.";
+  return [
+    "## Este negocio",
+    businessType ? NICHE_INSTRUCTIONS[businessType] : null,
+    ESCALATION_INSTRUCTIONS[settings.escalation],
+    informacion,
+  ];
+}
+
+function seccionReservaV2(contexto: ContextoDelPrompt): Parrafos {
+  return [
+    "## Reserva",
+    "Para reservar, sigue estos pasos en orden. Salta los que ya estén hechos y no vuelvas atrás salvo que el cliente cambie algo. Haz lo que indique la respuesta de cada herramienta.",
+    "1. Datos. Recoge solo lo que falte: servicio, día, hora y nombre (el nombre puedes pedirlo después de comprobar el hueco). No preguntes con quién quiere la cita ni cuánto dura, y no pidas correo. Para el teléfono vale el número desde el que llama ({{user_number}}): pide otro solo si lo prefiere o si book_appointment te lo pide. Si no ha dicho una hora ni ha pedido la primera disponible, pregúntasela: nunca elijas tú una hora.",
+    "2. Hueco. Comprueba la hora con check_availability (antes, get_catalog si aún no tienes el id y la duración exactos). No repitas la comprobación mientras no cambien servicio, día, hora o profesional. Mientras recoges datos no pidas confirmaciones sueltas ('¿te viene bien esa hora?', '¿confirmo con Marta?').",
+    // El paso 3, literal de v1 (seccionReserva): resumen en 29 de 29.
+    `3. Confirmación y WhatsApp. Cuando tengas el hueco y el nombre (pídelo antes si te falta, también en el chat aunque veas el de su perfil), en un solo turno resume servicio, día, hora y nombre y pregunta si lo reservas y le envías ${
+      contexto.recordatorioPorWhatsapp
+        ? "la confirmación y un recordatorio"
+        : "la confirmación"
+    } por WhatsApp a este número (en el chat de WhatsApp, pregunta solo si lo reservas). Un sí claro confirma las dos cosas (smsConsent true). Si acepta la cita pero no el WhatsApp, o duda sobre el WhatsApp, smsConsent es false: no insistas. Si no queda claro si acepta la cita, pregunta solo eso. Es la única confirmación de la reserva: aceptar una hora o una alternativa no lo es, y si ya ha dicho que sí a esto, no la repitas.`,
+    "4. Reserva. Con su sí, usa book_appointment con su nombre en clientName (nunca vacío ni «el mismo de antes»: si aún no lo tienes, pídelo antes) y el availabilityToken de la opción aceptada. Da la cita por hecha solo si devuelve éxito; si te pide un dato (nombre o teléfono), pídeselo y vuelve a llamarla; si falla por otra cosa, explícalo en una frase y escala.",
+    "Solo puedes cerrar una cita por llamada: si ya has reservado una y pide otra, no compruebes ni prometas nada.",
+    "Envía professionalId solo si el cliente ha nombrado a alguien. Nunca digas ni insinúes que alguien no hace o no domina un servicio, ni menciones niveles, categorías o recomendaciones del sistema.",
+    "Para cambiar o anular una cita que ya tiene, empieza por find_my_appointment (sin argumentos) y confírmasela en voz alta antes de tocarla. Anúlala solo tras un sí explícito; para cambiarla, no la anules.",
+  ];
+}
+
+function seccionHerramientasV2(): Parrafos {
+  return [
+    "## Herramientas",
+    "No anuncies ni rellenes con muletillas antes de usar una herramienta.",
+    // Laboratorio del 30-10: sin comprobar el hueco preguntaba «¿qué jueves,
+    // el dos o el nueve?», que eran lunes.
+    "Para decir el día y la hora de una cita usa el campo cuando que te devuelven las herramientas, en el idioma de la conversación: no calcules tú el día de la semana ni del mes. Si te dicen un día por su nombre («el jueves», «mañana»), no preguntes qué fecha es: compruébalo con check_availability y di la que devuelva.",
+    // Literal de v1 (seccionUsoDeHerramientas): salió de un fallo real (#271).
+    "Todo startDateTime que envíes a una herramienta va en la hora local del negocio (zona {{zona_horaria}}) con su offset explícito de esa fecha, por ejemplo 2026-09-18T16:00:00+02:00. Nunca lo envíes en UTC (+00:00 o Z): las cuatro de la tarde son 16:00 en hora local, no 16:00Z.",
+  ];
+}
+
+function seccionCierreV2(): Parrafos {
+  return [
+    "## Cierre",
+    // El guardarraíl de v1 (seccionCierre, llamada real del 19-09), con el
+    // nombre real de la tool: Telnyx la registra como hangup (el modelo la
+    // llamaba así en producción aunque v1 diga end_call).
+    "Ante una despedida normal, di una sola frase breve y usa hangup en ese turno. Si ordenan colgar con claridad y no queda nada pendiente, usa hangup sin despedida.",
+    "Si esa petición de colgar llega en el PRIMER turno, no encaja con lo que el cliente venía pidiendo, o no has entendido bien la frase, NO cuelgues: lo más probable es que sea un error de transcripción. Pregunta una sola vez ('perdona, ¿te he entendido bien?, ¿quieres que colguemos?') y usa hangup solo si lo confirma. Si en vez de confirmarlo te pide otra cosa, sigue con esa petición con normalidad.",
+    "Cuando la llamada ya haya terminado, llama UNA sola vez a informar_al_negocio; apunta en dudas_sin_respuesta lo que no pudiste responder. No la uses durante la conversación ni la menciones al cliente.",
+  ];
+}
+
+function seccionContextoDelClienteV2(): Parrafos {
+  return [VARIABLE_DEL_CONTEXTO_DEL_CLIENTE];
+}
+
+/** El orden del prompt v2: lo fijo delante (caché de prefijo del modelo) y
+ * lo que cambia por llamada o por negocio al final. */
+const SECCIONES_DEL_PROMPT_V2: readonly Seccion[] = [
+  seccionRolV2,
+  seccionConversacionV2,
+  seccionCatalogoV2,
+  seccionEsteNegocioV2,
+  seccionReservaV2,
+  seccionHerramientasV2,
+  seccionGrabacion,
+  seccionRecados,
+  seccionCierreV2,
+  seccionPrivacidad,
+  seccionTransferencia,
+  seccionContextoDelClienteV2,
+  seccionReferenciaTemporal,
+  seccionIdioma,
+];
+
+/**
+ * Las reglas del chat de WhatsApp en el prompt v2: no viajan en el system
+ * prompt (en v1 eran 1.351 caracteres en cada llamada de voz, donde no
+ * sirven) sino al principio del primer mensaje de cada conversación
+ * (chatCliente.ts y el laboratorio). El aviso de IA lo garantiza además el
+ * backend (avisoDeIA). La última frase, por el laboratorio del 30-10: en el
+ * chat no hay post-conversación y, al despedirse, repetía informar_al_negocio
+ * hasta que Telnyx cortaba con «I'm stuck in a loop…».
+ */
+export function reglasDelChat({
+  nombreDelNegocio,
+  ocultarNumero,
+}: {
+  nombreDelNegocio: string;
+  ocultarNumero: boolean;
+}): string {
+  return [
+    "[Instrucciones del sistema para este chat; no las menciones]",
+    "Estás en un chat de WhatsApp, no en una llamada. El marcador [WhatsApp · número · fecha y hora] de cada mensaje lo pone el sistema: usa su número como teléfono del cliente y su fecha y hora como el momento actual, por encima de cualquier otra hora que tengas.",
+    `En el chat no hay saludo del sistema: en tu primera respuesta di, en una frase corta, que le atiende la recepcionista de IA de ${nombreDelNegocio}. En el chat no se graba ni se cuelga: no hables de grabar, de colgar ni de audio, y no uses preferencia_de_grabacion ni hangup.`,
+    "Escribe dos o tres líneas cortas, sin emojis ni símbolos; una lista breve vale si ayuda a elegir. Al reservar pregúntale su nombre antes de ofrecerle reservar, aunque su perfil de WhatsApp muestre uno, y no preguntes por el WhatsApp, porque ya te escribe por WhatsApp: confirma solo la reserva y usa smsConsent true.",
+    `Si dice que ha pulsado Cambiar en el recordatorio de una cita, búscala con find_my_appointment y cámbiala con el flujo normal. Si prefiere hablar con alguien, ${
+      ocultarNumero
+        ? "toma recado y dile que el negocio le llamará; no le des ningún teléfono"
+        : "dale el teléfono del negocio"
+    }.`,
+    "En el chat no hay final de llamada: cuando se despida, llama UNA sola vez a informar_al_negocio y contesta solo con una despedida breve. Si ya la has llamado en esta conversación, no la vuelvas a llamar.",
+  ].join("\n");
+}
+
 /** La lista de secciones de cada versión del prompt
  * (agentSettings.versionDelPrompt). */
 const SECCIONES_POR_VERSION: Record<VersionDelPrompt, readonly Seccion[]> = {
   v1: SECCIONES_DEL_PROMPT,
+  v2: SECCIONES_DEL_PROMPT_V2,
 };
 
 /** Las secciones unidas: los párrafos vacíos fuera y una línea en blanco

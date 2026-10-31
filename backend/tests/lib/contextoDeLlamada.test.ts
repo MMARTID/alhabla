@@ -52,6 +52,7 @@ describe("resolverContextoDeLlamada", () => {
       variables: {
         nombre_cliente: "",
         ultimo_servicio: "",
+        contexto_cliente: "",
       },
     });
     // Solo los datos de ese negocio y ese teléfono.
@@ -132,6 +133,9 @@ describe("resolverContextoDeLlamada", () => {
       variables: {
         nombre_cliente: "Lucía",
         ultimo_servicio: "Corte",
+        contexto_cliente: expect.stringMatching(
+          /^## Cliente\nQuien llama reservó la última vez con este teléfono como Lucía \(Corte\)\./
+        ),
       },
     });
     // Solo servicios activos de ese negocio.

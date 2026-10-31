@@ -19,6 +19,7 @@ import { idiomaGuardadoDelCliente } from "../../lib/idiomaDelCliente.js";
 import { cooficialDeLaZona } from "../../lib/idiomas/zona.js";
 import { resolverIdiomas } from "../../lib/idiomas/resolver.js";
 import { parseAgentSettings } from "../../lib/managedAgentPrompt.js";
+import { reglasDelChat } from "../../lib/seccionesDelPrompt.js";
 
 /**
  * La recepcionista por chat (PLAN-CANAL-DUENO.md § 7, fase 2 / PR 1): el
@@ -434,8 +435,19 @@ export async function conversarConRecepcionista(input: {
     if (conversacion) {
       await anotarActividadDelChat(conversacion.callId, business.id, from);
     }
+    // Con el prompt v2, las reglas del canal van al principio del primer
+    // mensaje de cada conversación, no en el system prompt (reglasDelChat).
+    const reglas =
+      parseAgentSettings(business.agentSettings).versionDelPrompt === "v2"
+        ? reglasDelChat({
+            nombreDelNegocio: negocio,
+            ocultarNumero: business.hideOwnerNumberFromClients,
+          })
+        : null;
     for (let intento = 0; conversacion && intento < 2; intento++) {
-      const content = `${marcadorDeChat({ clientPhone: from, timezone: business.timezone })} ${texto}`;
+      const marcado = `${marcadorDeChat({ clientPhone: from, timezone: business.timezone })} ${texto}`;
+      const content =
+        reglas && conversacion.nueva ? `${reglas}\n\n${marcado}` : marcado;
       const t0 = Date.now();
       try {
         respuesta = await conTimeout(

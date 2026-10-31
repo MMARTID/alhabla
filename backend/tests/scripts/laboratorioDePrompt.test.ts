@@ -1771,6 +1771,42 @@ describe("ejecutarLaboratorio", () => {
     );
   });
 
+  // F2: con v2 las reglas del canal van en el primer mensaje del chat, como
+  // las antepone chatCliente.ts; el control (v1) las lleva en el prompt.
+  it("con v2, el primer mensaje del chat lleva las reglas del canal; con el control, no", async () => {
+    const adaptador = adaptadorFalso();
+    const { deps } = dependencias(adaptador, {
+      marcadorDeChat: vi.fn(
+        ({ clientPhone }: { clientPhone: string }) =>
+          `[WhatsApp · ${clientPhone} · hoy]`
+      ),
+      cargarContexto: vi.fn(async (input) => ({
+        ...contextoFalso(input.negocioId, input.fecha, input.variantes),
+        reglasDelChat: { v2: "REGLAS DEL CHAT" },
+      })),
+    });
+
+    await ejecutarLaboratorio(
+      opciones([
+        "--escenarios",
+        "E7b",
+        "--n",
+        "1",
+        "--variantes",
+        "control,v2",
+      ]),
+      deps
+    );
+
+    const contenidos = vi
+      .mocked(adaptador.chatWithAssistant)
+      .mock.calls.map(([, turno]) => turno.content);
+    expect(contenidos).toContain("[WhatsApp · +34611222333 · hoy] hola");
+    expect(contenidos).toContain(
+      "REGLAS DEL CHAT\n\n[WhatsApp · +34611222333 · hoy] hola"
+    );
+  });
+
   it("sin conversaciones de WhatsApp antiguas, salta los guiones de chat y lo avisa", async () => {
     const adaptador = adaptadorFalso();
     const { deps } = dependencias(adaptador, {

@@ -4,6 +4,8 @@ import { fileURLToPath } from "node:url";
 import {
   buildManagedAgentPrompt,
   DEFAULT_AGENT_SETTINGS,
+  VERSIONES_DEL_PROMPT,
+  type VersionDelPrompt,
 } from "../../src/lib/managedAgentPrompt.js";
 import {
   buildTelnyxAssistantPayload,
@@ -21,6 +23,7 @@ import {
   normalizeVoiceToolDateTime,
 } from "../../src/lib/voiceDateTime.js";
 import type { TransferenciaAlDueno } from "../../src/lib/transferenciaAlDueno.js";
+import { reglasDelChat } from "../../src/lib/seccionesDelPrompt.js";
 
 /**
  * Censo de reglas del prompt de la recepcionista (F0 de
@@ -277,12 +280,38 @@ const VARIANTES = {
 
 type IdDeVariante = keyof typeof VARIANTES;
 
-const PROMPTS: Record<IdDeVariante, string> = Object.fromEntries(
-  (Object.keys(VARIANTES) as IdDeVariante[]).map((id) => [
-    id,
-    buildManagedAgentPrompt(VARIANTES[id]),
+/** La variante con su versión del prompt (agentSettings.versionDelPrompt). */
+function conVersion(
+  entrada: EntradaDelPrompt,
+  version: VersionDelPrompt
+): EntradaDelPrompt {
+  return {
+    ...entrada,
+    settings: {
+      ...(entrada.settings as Record<string, unknown>),
+      versionDelPrompt: version,
+    },
+  };
+}
+
+/** El prompt de cada variante en cada versión. */
+const PROMPTS_POR_VERSION: Record<
+  VersionDelPrompt,
+  Record<IdDeVariante, string>
+> = Object.fromEntries(
+  VERSIONES_DEL_PROMPT.map((version) => [
+    version,
+    Object.fromEntries(
+      (Object.keys(VARIANTES) as IdDeVariante[]).map((id) => [
+        id,
+        buildManagedAgentPrompt(conVersion(VARIANTES[id], version)),
+      ])
+    ),
   ])
-) as Record<IdDeVariante, string>;
+) as Record<VersionDelPrompt, Record<IdDeVariante, string>>;
+
+/** Los de v1, el prompt de siempre. */
+const PROMPTS = PROMPTS_POR_VERSION.v1;
 
 /** El prompt partido por secciones: «Rol» → «## Rol\n\n…». Un título es la
  * primera línea de cada bloque que empieza por «## ». */
@@ -351,18 +380,24 @@ const NOMBRES_DE_LAS_TOOLS = new Set(
 type Lugar =
   /** Una frase del prompt, dentro de la sección `seccion` ("Rol", sin las
    * almohadillas), en cada variante de `variantes` (por defecto, solo la
-   * base; «todas» las recorre). `alFinal`: además tiene que ser la última
-   * sección del prompt. */
+   * base; «todas» las recorre) y en cada versión de `versiones` (por
+   * defecto, solo v1). `alFinal`: además tiene que ser la última sección
+   * del prompt. Los demás lugares valen para todas las versiones. */
   | {
       en: "prompt";
       seccion: string;
       texto: string;
       variantes?: readonly IdDeVariante[] | "todas";
+      versiones?: readonly VersionDelPrompt[];
       alFinal?: boolean;
     }
   /** Una frase de la descripción de la tool o del esquema de sus parámetros
    * (también `hangup` y `transfer`). */
   | { en: "descripcionDeTool"; tool: string; texto: string }
+  /** Una frase de las reglas que el chat de WhatsApp antepone al primer
+   * mensaje de cada conversación con el prompt v2 (reglasDelChat). Solo
+   * cuenta para v2: con v1 van en el prompt. */
+  | { en: "reglasDelChat"; texto: string; ocultarNumero?: boolean }
   /** Un campo que la respuesta de la tool devuelve: se busca como clave de
    * un objeto en el código de voiceTools/service.ts (o en `fichero`), sin
    * contar comentarios, textos, declaraciones ni tipos (devuelveElCampo). */
@@ -436,6 +471,7 @@ const REGLAS: readonly Regla[] = [
     lugares: [
       {
         en: "prompt",
+        versiones: ["v1", "v2"],
         seccion: "Rol",
         texto:
           "Si te preguntan si eres una persona o una máquina, di siempre la verdad.",
@@ -449,6 +485,13 @@ const REGLAS: readonly Regla[] = [
     origen:
       "Llamadas del 05 y 07-10: con «empieza con el saludo» lo repetía en su primera respuesta (idiomas/resolver.ts, instruccionesDeIdioma).",
     lugares: [
+      {
+        en: "prompt",
+        versiones: ["v2"],
+        seccion: "Rol",
+        texto:
+          "En las llamadas el saludo ya lo dice el sistema al descolgar y es el primer mensaje: no lo repitas.",
+      },
       {
         en: "prompt",
         seccion: "Rol",
@@ -522,6 +565,7 @@ const REGLAS: readonly Regla[] = [
     lugares: [
       {
         en: "prompt",
+        versiones: ["v1", "v2"],
         seccion: "Lo que ofrece el negocio",
         texto:
           "sin volver a llamarla en la misma conversación (salvo que una herramienta te diga que un ID no existe)",
@@ -537,11 +581,13 @@ const REGLAS: readonly Regla[] = [
     lugares: [
       {
         en: "prompt",
+        versiones: ["v1", "v2"],
         seccion: "Lo que ofrece el negocio",
         texto: "aunque lo llame de otra forma o en otro idioma",
       },
       {
         en: "prompt",
+        versiones: ["v1", "v2"],
         seccion: "Lo que ofrece el negocio",
         texto: "dile que ese servicio no lo tenéis",
       },
@@ -616,6 +662,7 @@ const REGLAS: readonly Regla[] = [
     lugares: [
       {
         en: "prompt",
+        versiones: ["v1", "v2"],
         seccion: "Reserva",
         texto: "nunca elijas tú una hora",
       },
@@ -629,7 +676,13 @@ const REGLAS: readonly Regla[] = [
       "Llamada real del 14-09 (PR #33/#48): preguntaba la duración y pedía confirmaciones sueltas; PR #65 (f7c6b31, asignación por especialidad).",
     lugares: [
       {
+        en: "respuestaDeTool",
+        tool: "get_catalog",
+        campo: "pautas",
+      },
+      {
         en: "prompt",
+        versiones: ["v1", "v2"],
         seccion: "Reserva",
         texto: "No preguntes con quién quiere la cita",
       },
@@ -729,11 +782,13 @@ const REGLAS: readonly Regla[] = [
     lugares: [
       {
         en: "prompt",
+        versiones: ["v1", "v2"],
         seccion: "Reserva",
         texto: "la confirmación y un recordatorio por WhatsApp a este número",
       },
       {
         en: "prompt",
+        versiones: ["v1", "v2"],
         seccion: "Reserva",
         texto:
           "pregunta si lo reservas y le envías la confirmación por WhatsApp a este número",
@@ -1135,11 +1190,13 @@ const REGLAS: readonly Regla[] = [
     lugares: [
       {
         en: "prompt",
+        versiones: ["v1", "v2"],
         seccion: "Grabación",
         texto: "{{nombre_negocio}} los usa solo para gestionar sus citas",
       },
       {
         en: "prompt",
+        versiones: ["v1", "v2"],
         seccion: "Grabación",
         texto:
           "Si pregunta si le estás grabando: solo si el saludo lo dijo o si lo ha aceptado en esta llamada.",
@@ -1155,16 +1212,19 @@ const REGLAS: readonly Regla[] = [
     lugares: [
       {
         en: "prompt",
+        versiones: ["v1", "v2"],
         seccion: "Cierre",
         texto: "Si esa petición de colgar llega en el PRIMER turno",
       },
       {
         en: "prompt",
+        versiones: ["v1", "v2"],
         seccion: "Cierre",
         texto: "NO cuelgues",
       },
       {
         en: "prompt",
+        versiones: ["v1", "v2"],
         seccion: "Cierre",
         texto: "Pregunta una sola vez",
       },
@@ -1285,7 +1345,13 @@ const REGLAS: readonly Regla[] = [
       "PR #153 (7286a25, fase 0 de telefonía, 21-09; docs/historico/PLAN-TELEFONIA-UX.md § 3): móvil personal como línea de clientes.",
     lugares: [
       {
+        en: "reglasDelChat",
+        texto: "no le des ningún teléfono",
+        ocultarNumero: true,
+      },
+      {
         en: "prompt",
+        versiones: ["v1", "v2"],
         seccion: "Privacidad",
         texto:
           "No digas nunca el número de teléfono del negocio ni del propietario",
@@ -1400,12 +1466,14 @@ const REGLAS: readonly Regla[] = [
     lugares: [
       {
         en: "prompt",
+        versiones: ["v1", "v2"],
         seccion: "Conversación",
         texto:
           "La transcripción puede fallar: si una frase te llega confusa, cortada o sin sentido, pide con naturalidad que la repita.",
       },
       {
         en: "prompt",
+        versiones: ["v1", "v2"],
         seccion: "Conversación",
         texto: "No trates una palabra dudosa como un dato real de la reserva",
       },
@@ -1420,11 +1488,13 @@ const REGLAS: readonly Regla[] = [
     lugares: [
       {
         en: "prompt",
+        versiones: ["v1", "v2"],
         seccion: "Conversación",
         texto: "haz una sola pregunta útil por turno",
       },
       {
         en: "prompt",
+        versiones: ["v1", "v2"],
         seccion: "Conversación",
         texto: "Lo que escribas se lee en voz alta tal cual",
       },
@@ -1439,12 +1509,20 @@ const REGLAS: readonly Regla[] = [
     lugares: [
       {
         en: "prompt",
+        versiones: ["v2"],
+        seccion: "Herramientas",
+        texto:
+          "No anuncies ni rellenes con muletillas antes de usar una herramienta.",
+      },
+      {
+        en: "prompt",
         seccion: "Uso de herramientas",
         texto:
           "No anuncies ni generes una muletilla antes de llamar a una herramienta.",
       },
       {
         en: "prompt",
+        versiones: ["v1", "v2"],
         seccion: "Lo que ofrece el negocio",
         texto: "llama a la herramienta en ese turno sin anunciarlo",
       },
@@ -1490,12 +1568,14 @@ const REGLAS: readonly Regla[] = [
     lugares: [
       {
         en: "prompt",
+        versiones: ["v1", "v2"],
         seccion: "Idioma",
         texto: "(aunque te conteste en castellano)",
         alFinal: true,
       },
       {
         en: "prompt",
+        versiones: ["v1", "v2"],
         seccion: "Idioma",
         texto:
           "No cambies de idioma por tu cuenta mientras siga hablando en el suyo.",
@@ -1568,6 +1648,17 @@ const REGLAS: readonly Regla[] = [
       "Desde que el dueño la amplía por WhatsApp (actualizar_informacion del Gestor) es lo que la recepcionista consulta para dudas de pagos, cómo llegar o políticas.",
     lugares: [
       {
+        en: "respuestaDeTool",
+        tool: "get_catalog",
+        campo: "informacion",
+      },
+      {
+        en: "prompt",
+        versiones: ["v2"],
+        seccion: "Este negocio",
+        texto: "Información del negocio: Aceptamos tarjeta y Bizum.",
+      },
+      {
         en: "prompt",
         seccion: "Información del negocio",
         texto: "Aceptamos tarjeta y Bizum.",
@@ -1581,6 +1672,27 @@ const REGLAS: readonly Regla[] = [
     origen:
       "Nota del RGPD (art. 9): no hay DPA con Telnyx para datos de salud; NICHE_INSTRUCTIONS desde 1202ec2.",
     lugares: [
+      {
+        en: "prompt",
+        versiones: ["v2"],
+        seccion: "Este negocio",
+        texto: "No diagnostiques, no pautes ejercicios",
+        variantes: ["fisioterapia"],
+      },
+      {
+        en: "prompt",
+        versiones: ["v2"],
+        seccion: "Este negocio",
+        texto: "contacte con emergencias",
+        variantes: ["fisioterapia"],
+      },
+      {
+        en: "prompt",
+        versiones: ["v2"],
+        seccion: "Este negocio",
+        texto: "No asegures resultados estéticos",
+        variantes: ["centroDeEstetica"],
+      },
       {
         en: "prompt",
         seccion: "Límites",
@@ -1658,6 +1770,15 @@ const REGLAS: readonly Regla[] = [
       "PR #295 (fc4c4d9, 14-10): el nombre del perfil de WhatsApp no es el que quiere para la reserva; ya escribe por WhatsApp.",
     lugares: [
       {
+        en: "reglasDelChat",
+        texto:
+          "Al reservar pregúntale su nombre antes de ofrecerle reservar, aunque su perfil de WhatsApp muestre uno",
+      },
+      {
+        en: "reglasDelChat",
+        texto: "usa smsConsent true",
+      },
+      {
         en: "prompt",
         seccion: "Chat por WhatsApp",
         texto:
@@ -1670,6 +1791,7 @@ const REGLAS: readonly Regla[] = [
       },
       {
         en: "prompt",
+        versiones: ["v1", "v2"],
         seccion: "Reserva",
         texto: "también en el chat aunque veas el de su perfil",
       },
@@ -1682,6 +1804,14 @@ const REGLAS: readonly Regla[] = [
     origen:
       "PR #121 y PR #153 (7286a25): el botón Cambiar de la plantilla de recordatorio entra por el chat.",
     lugares: [
+      {
+        en: "reglasDelChat",
+        texto: "Si dice que ha pulsado Cambiar en el recordatorio de una cita",
+      },
+      {
+        en: "reglasDelChat",
+        texto: "dale el teléfono del negocio",
+      },
       {
         en: "prompt",
         seccion: "Chat por WhatsApp",
@@ -1744,9 +1874,11 @@ interface Resultado {
 function describirLugar(lugar: Lugar): string {
   switch (lugar.en) {
     case "prompt":
-      return `prompt › ## ${lugar.seccion} › «${lugar.texto}»`;
+      return `prompt ${(lugar.versiones ?? ["v1"]).join("+")} › ## ${lugar.seccion} › «${lugar.texto}»`;
     case "descripcionDeTool":
       return `descripción de ${lugar.tool} › «${lugar.texto}»`;
+    case "reglasDelChat":
+      return `reglas del chat (v2)${lugar.ocultarNumero ? " con el número oculto" : ""} › «${lugar.texto}»`;
     case "respuestaDeTool":
       return `respuesta de ${lugar.tool} › campo ${lugar.campo}`;
     case "guardaDelBackend":
@@ -1762,22 +1894,21 @@ function evaluarLugar(lugar: Lugar): Resultado {
           ? (Object.keys(VARIANTES) as IdDeVariante[])
           : (lugar.variantes ?? (["base"] as const));
       const fallos: string[] = [];
-      for (const variante of variantes) {
-        const secciones = seccionesDe(PROMPTS[variante]);
-        const cuerpo = secciones.get(lugar.seccion);
-        if (cuerpo === undefined) {
-          fallos.push(
-            `variante ${variante}: no hay sección «${lugar.seccion}»`
-          );
-        } else if (!cuerpo.includes(lugar.texto)) {
-          fallos.push(`variante ${variante}: la sección no dice ese texto`);
-        } else if (
-          lugar.alFinal &&
-          [...secciones.keys()].at(-1) !== lugar.seccion
-        ) {
-          fallos.push(
-            `variante ${variante}: la sección ya no cierra el prompt`
-          );
+      for (const version of lugar.versiones ?? (["v1"] as const)) {
+        for (const variante of variantes) {
+          const donde = `${version}, variante ${variante}`;
+          const secciones = seccionesDe(PROMPTS_POR_VERSION[version][variante]);
+          const cuerpo = secciones.get(lugar.seccion);
+          if (cuerpo === undefined) {
+            fallos.push(`${donde}: no hay sección «${lugar.seccion}»`);
+          } else if (!cuerpo.includes(lugar.texto)) {
+            fallos.push(`${donde}: la sección no dice ese texto`);
+          } else if (
+            lugar.alFinal &&
+            [...secciones.keys()].at(-1) !== lugar.seccion
+          ) {
+            fallos.push(`${donde}: la sección ya no cierra el prompt`);
+          }
         }
       }
       return { ok: fallos.length === 0, detalle: fallos.join("; ") };
@@ -1790,6 +1921,15 @@ function evaluarLugar(lugar: Lugar): Resultado {
       return texto.includes(lugar.texto)
         ? { ok: true, detalle: "" }
         : { ok: false, detalle: "ni la descripción ni el esquema lo dicen" };
+    }
+    case "reglasDelChat": {
+      const reglas = reglasDelChat({
+        nombreDelNegocio: "Peluquería Ana",
+        ocultarNumero: lugar.ocultarNumero === true,
+      });
+      return reglas.includes(lugar.texto)
+        ? { ok: true, detalle: "" }
+        : { ok: false, detalle: "las reglas del chat no lo dicen" };
     }
     case "respuestaDeTool": {
       if (!NOMBRES_DE_LAS_TOOLS.has(lugar.tool)) {
@@ -1877,26 +2017,40 @@ describe("censo de reglas del prompt", () => {
     expect(tieneLaGuarda(devuelto, "YA_HAY_CITA_EN_ESTA_LLAMADA")).toBe(true);
   });
 
-  describe("cada regla vive en algún sitio", () => {
-    for (const regla of REGLAS) {
-      it(regla.id, () => {
-        const resultados = regla.lugares.map((lugar) => ({
-          lugar,
-          ...evaluarLugar(lugar),
-        }));
-        const sitios = resultados
-          .map(
-            (r) =>
-              `  ${r.ok ? "sí  " : "NO  "}${describirLugar(r.lugar)}${r.ok ? "" : ` -> ${r.detalle}`}`
-          )
-          .join("\n");
-        expect(
-          resultados.some((r) => r.ok),
-          `La regla «${regla.id}» se ha quedado sin sitio: ${regla.descripcion}\nOrigen: ${regla.origen}\n${sitios}`
-        ).toBe(true);
-      });
+  /** Los lugares que cuentan para una versión: los del prompt de esa
+   * versión y todos los demás (tools y guardas valen para las dos). */
+  const lugaresDe = (regla: Regla, version: VersionDelPrompt): Lugar[] =>
+    regla.lugares.filter((lugar) =>
+      lugar.en === "prompt"
+        ? (lugar.versiones ?? ["v1"]).includes(version)
+        : lugar.en === "reglasDelChat"
+          ? version === "v2"
+          : true
+    );
+
+  describe.each(VERSIONES_DEL_PROMPT)(
+    "cada regla vive en algún sitio (%s)",
+    (version) => {
+      for (const regla of REGLAS) {
+        it(regla.id, () => {
+          const resultados = lugaresDe(regla, version).map((lugar) => ({
+            lugar,
+            ...evaluarLugar(lugar),
+          }));
+          const sitios = resultados
+            .map(
+              (r) =>
+                `  ${r.ok ? "sí  " : "NO  "}${describirLugar(r.lugar)}${r.ok ? "" : ` -> ${r.detalle}`}`
+            )
+            .join("\n");
+          expect(
+            resultados.some((r) => r.ok),
+            `La regla «${regla.id}» se ha quedado sin sitio en ${version}: ${regla.descripcion}\nOrigen: ${regla.origen}\n${sitios}`
+          ).toBe(true);
+        });
+      }
     }
-  });
+  );
 
   describe("la tabla dice la verdad: cada sitio declarado existe", () => {
     for (const regla of REGLAS) {
@@ -1933,30 +2087,33 @@ describe("censo de reglas del prompt", () => {
  * 955 caracteres de información y catalán) 17.195; con todo activo 18.870.
  * En producción (BD del 30-10): El petit saló 16.427, Brain to Train 17.129.
  */
-const LIMITES_DEL_PROMPT = {
+const LIMITES_DEL_PROMPT: Record<
+  VersionDelPrompt,
+  { techo: number; techoConTodoActivo: number }
+> = {
   v1: { techo: 18_000, techoConTodoActivo: 19_500 },
-  // F2 (PLAN-PROMPT-DINAMICO.md): el prompt compacto debe quedar por debajo
-  // de 12.000 en cualquier combinación de ajustes (objetivo ~8.400 en El
-  // petit saló, ~9.300 con todo activo). Descomentar cuando exista la versión
-  // y la bandera `agentSettings.versionDelPrompt`.
-  // v2: { techo: 12_000, techoConTodoActivo: 12_000 },
-} as const;
+  // F2 (PLAN-PROMPT-DINAMICO.md): el prompt compacto, por debajo de 12.000
+  // en cualquier combinación de ajustes. Medidas del 31-10: base 9.316,
+  // catalán de principal 9.405, un solo idioma 8.700, «cargada» 9.257 y con
+  // todo activo unos 10.700.
+  v2: { techo: 12_000, techoConTodoActivo: 12_000 },
+};
 
-describe("tamaño del prompt (v1)", () => {
-  const medidas = (Object.keys(PROMPTS) as IdDeVariante[]).map((id) => ({
+describe.each(VERSIONES_DEL_PROMPT)("tamaño del prompt (%s)", (version) => {
+  const prompts = PROMPTS_POR_VERSION[version];
+  const limites = LIMITES_DEL_PROMPT[version];
+  const medidas = (Object.keys(prompts) as IdDeVariante[]).map((id) => ({
     id,
-    caracteres: PROMPTS[id].length,
+    caracteres: prompts[id].length,
   }));
   const techoDe = (id: IdDeVariante): number =>
-    id === "todoActivo"
-      ? LIMITES_DEL_PROMPT.v1.techoConTodoActivo
-      : LIMITES_DEL_PROMPT.v1.techo;
+    id === "todoActivo" ? limites.techoConTodoActivo : limites.techo;
 
   for (const { id, caracteres } of medidas) {
     it(`la variante «${id}» queda por debajo de ${techoDe(id)} caracteres`, () => {
       expect(
         caracteres,
-        `El prompt de «${id}» mide ${caracteres} caracteres y el techo de v1 es ${techoDe(id)}: el prompt no debe seguir creciendo (PLAN-PROMPT-DINAMICO.md).`
+        `El prompt de «${id}» mide ${caracteres} caracteres y el techo de ${version} es ${techoDe(id)}: el prompt no debe seguir creciendo (PLAN-PROMPT-DINAMICO.md).`
       ).toBeLessThan(techoDe(id));
     });
   }
@@ -1969,19 +2126,18 @@ describe("tamaño del prompt (v1)", () => {
     expect(
       mayor.caracteres,
       `La más cargada es «${mayor.id}» con ${mayor.caracteres}`
-    ).toBeLessThan(LIMITES_DEL_PROMPT.v1.techo);
+    ).toBeLessThan(limites.techo);
   });
 
   it("con todo activo, ningún nicho pasa del techo teórico", () => {
     for (const businessType of BUSINESS_TYPES) {
-      const largo = buildManagedAgentPrompt({
-        ...VARIANTES.todoActivo,
-        businessType,
-      }).length;
+      const largo = buildManagedAgentPrompt(
+        conVersion({ ...VARIANTES.todoActivo, businessType }, version)
+      ).length;
       expect(
         largo,
         `El prompt de «${businessType}» con todo activo mide ${largo}`
-      ).toBeLessThan(LIMITES_DEL_PROMPT.v1.techoConTodoActivo);
+      ).toBeLessThan(limites.techoConTodoActivo);
     }
   });
 });

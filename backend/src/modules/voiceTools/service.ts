@@ -13,6 +13,7 @@ import {
   type AgentSettings,
   type ModoDeDarPrecios,
 } from "../../lib/managedAgentPrompt.js";
+import { MAX_CARACTERES_DE_INFORMACION_EN_EL_PROMPT } from "../../lib/seccionesDelPrompt.js";
 import { esNombreDeClienteValido } from "../../lib/nombreDelCliente.js";
 import { guardarIdiomaDelCliente } from "../../lib/idiomaDelCliente.js";
 import {
@@ -343,6 +344,9 @@ type BusinessVoiceConfig = FilaDeConexionDeCalendario & {
   // lleva el precio. Puede faltar en entradas de caché anteriores: sin él,
   // el de por defecto. PATCH /business/me invalida la caché al cambiarlo.
   agentSettings?: unknown;
+  // La información del negocio, para `informacion` de get_catalog con el
+  // prompt v2. Puede faltar en entradas de caché anteriores.
+  businessDetails?: string | null;
 };
 
 /** Lo que oye el cliente cuando el pago del negocio corta las reservas. */
@@ -383,6 +387,7 @@ async function loadBusinessConfig(
       callsSuspendedAt: true,
       paymentFailureSuspensionAt: true,
       agentSettings: true,
+      businessDetails: true,
     },
   });
 }
@@ -1094,6 +1099,28 @@ function pautasDeReserva(
   return [...partes, ...restricciones].join(" ");
 }
 
+/** Tope de `informacion` en get_catalog: viaja en el historial. */
+const MAX_CARACTERES_DE_INFORMACION_EN_EL_CATALOGO = 1_000;
+
+/**
+ * `informacion` de get_catalog con el prompt v2: la información del negocio
+ * que no cabe en el prompt (más de MAX_CARACTERES_DE_INFORMACION_EN_EL_PROMPT;
+ * Brain to Train tiene 897). La corta va en «## Este negocio», y con v1 va
+ * siempre en el prompt: entonces null.
+ */
+export function informacionParaElCatalogo(
+  business: Pick<BusinessVoiceConfig, "agentSettings" | "businessDetails">
+): string | null {
+  if (parseAgentSettings(business.agentSettings).versionDelPrompt !== "v2") {
+    return null;
+  }
+  const texto = business.businessDetails?.trim();
+  if (!texto || texto.length <= MAX_CARACTERES_DE_INFORMACION_EN_EL_PROMPT) {
+    return null;
+  }
+  return texto.slice(0, MAX_CARACTERES_DE_INFORMACION_EN_EL_CATALOGO);
+}
+
 /** ¿Está abierto ahora, según su horario y su zona? null si el negocio no
  * tiene horario estructurado: entonces no se dice ni que sí ni que no. */
 function abiertoAhora(business: BusinessVoiceConfig): boolean | null {
@@ -1170,6 +1197,7 @@ async function executeGetCatalog(
     // del marcador [WhatsApp · fecha y hora].
     const abierto =
       canalDeLaTool(callId) === "client_chat" ? null : abiertoAhora(business);
+    const informacion = informacionParaElCatalogo(business);
     const ausenciasDe = (professionalId: string) =>
       ausencias
         .filter((a) => a.professionalId === professionalId)
@@ -1205,6 +1233,7 @@ async function executeGetCatalog(
         // Para «¿estáis abiertos?» y para pasar la llamada solo en horario:
         // que el modelo no compare horas.
         ...(abierto === null ? {} : { abierto_ahora: abierto }),
+        ...(informacion ? { informacion } : {}),
       },
     };
   } catch (error) {

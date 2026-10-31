@@ -423,6 +423,54 @@ describe("conversarConRecepcionista", () => {
     );
   });
 
+  // F2 de PLAN-PROMPT-DINAMICO.md: con el prompt v2 las reglas del canal no
+  // van en el system prompt sino al principio del primer mensaje.
+  it("con el prompt v2, las reglas del chat van solo en el primer mensaje de una conversación nueva", async () => {
+    const conV2 = {
+      ...NEGOCIO,
+      agentSettings: { versionDelPrompt: "v2" },
+      hideOwnerNumberFromClients: false,
+    };
+    mockedBizFindUnique.mockResolvedValue(conV2 as never);
+    mockedConvFindUnique.mockResolvedValueOnce(null);
+
+    await conversarConRecepcionista({
+      message: entrante(),
+      businessId: "biz_1",
+      texto: "hola",
+    });
+    const primero = mockedChat.mock.calls[0]![1].content;
+    expect(
+      primero.startsWith(
+        "[Instrucciones del sistema para este chat; no las menciones]"
+      )
+    ).toBe(true);
+    expect(primero).toContain("recepcionista de IA de Peluquería Ana");
+    expect(primero).toMatch(/\n\n\[WhatsApp · \+34600123456 · .*\] hola$/);
+
+    // La conversación ya existe: solo el marcador.
+    await conversarConRecepcionista({
+      message: entrante(),
+      businessId: "biz_1",
+      texto: "¿y el viernes?",
+    });
+    const segundo = mockedChat.mock.calls[1]![1].content;
+    expect(segundo.startsWith("[WhatsApp · ")).toBe(true);
+    expect(segundo).not.toContain("Instrucciones del sistema");
+  });
+
+  it("con v1, ninguna regla en el mensaje: van en el prompt", async () => {
+    mockedConvFindUnique.mockResolvedValueOnce(null);
+    await conversarConRecepcionista({
+      message: entrante(),
+      businessId: "biz_1",
+      texto: "hola",
+    });
+    expect(
+      mockedChat.mock.calls[0]![1].content.startsWith("[WhatsApp · ")
+    ).toBe(true);
+  });
+
   it("el aviso va en el idioma en que habló la última vez", async () => {
     mockedConvFindUnique.mockResolvedValueOnce(null);
     mockedClienteFindUnique.mockResolvedValueOnce({ idioma: "en-GB" } as any);

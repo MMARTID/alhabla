@@ -15,7 +15,10 @@ import {
   telefonoDelCliente,
   type TelefonosDelNegocio,
 } from "./grabacion.js";
-import type { VariablesDeLaLlamada } from "./seccionesDelPrompt.js";
+import {
+  contextoDelCliente,
+  type VariablesDeLaLlamada,
+} from "./seccionesDelPrompt.js";
 
 /**
  * Lo que la recepcionista sabe de una llamada antes de descolgar
@@ -177,6 +180,8 @@ export async function resolverContextoDeLlamada(input: {
     variables: {
       nombre_cliente: nombre ?? "",
       ultimo_servicio: ultimoServicio ?? "",
+      // El bloque del prompt v2; v1 no lo usa y Telnyx lo ignora.
+      contexto_cliente: contextoDelCliente(nombre, ultimoServicio),
     },
   };
 }
