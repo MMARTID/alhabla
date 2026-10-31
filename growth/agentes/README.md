@@ -118,10 +118,27 @@ Max, compartido con tu uso interactivo. Es una propuesta sin medir.
    `docs/growth/registro-de-decisiones.md`.
 5. No actives los créditos de uso de Claude para esto, o ponles tope.
 
-Dos cosas a tener en cuenta: el % semanal tiene poca resolución para un run
-pequeño (repite `ligero` varias veces si no se mueve), y los subagentes de lectura
-corren con `model: sonnet` mientras que redacción y cumplimiento heredan el modelo
-de tu sesión.
+El % semanal tiene poca resolución para un run pequeño (repite `ligero` varias
+veces si no se mueve): el primer run real (`competencia ligero`, 2 competidores)
+no movió el semanal del 42 %.
+
+### Modelo de cada agente
+
+Todos los subagentes fijan su modelo y su esfuerzo en el `.claude/agents/growth-*.md`
+(ninguno hereda el de tu sesión, para que el gasto no dependa de cómo abras Claude):
+
+| Subagente | Modelo | Esfuerzo | Por qué |
+|---|---|---|---|
+| `growth-descubrimiento` | `sonnet` | medio | Lee mucha web ajena y decide qué es relevante; un modelo más flojo aumenta el riesgo de inyección |
+| `growth-calificacion` | `sonnet` | medio | El de más volumen (una llamada por oportunidad). Candidato a `haiku` cuando los umbrales estén calibrados y se puedan comparar descartes |
+| `growth-investigacion` | `sonnet` | medio | Extrae hechos verificables y no debe capturar correos ni teléfonos |
+| `growth-redaccion` | `opus` | alto | Es el texto que apruebas; pocas llamadas por run, así que el coste es bajo |
+| `growth-cumplimiento` | `sonnet` | medio | Segunda opinión independiente del redactor; no necesita el modelo más caro |
+| `growth-enlaces-y-competencia` | `sonnet` | medio | Precisión de cada dato con su fuente; subir a esfuerzo alto si el análisis sale flojo |
+
+El orquestador es la sesión (o la tarea programada): `sonnet` basta, porque solo
+coordina y aplica topes. Cualquier cambio de modelo se mide con el procedimiento de
+arriba y se registra en `docs/growth/registro-de-decisiones.md`.
 
 ## Qué NO hace el sistema
 

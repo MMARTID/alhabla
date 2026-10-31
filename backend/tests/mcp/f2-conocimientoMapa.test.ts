@@ -211,17 +211,17 @@ describe.skipIf(!hayRepo)("el mapa sobre el repo real", () => {
   describe("competidores sembrados", () => {
     it("además de los de comparativas.ts van HeyDiga y fonio (pendientes de confirmar por el fundador)", () => {
       expect(COMPETIDORES_ADICIONALES).toEqual([
-        { nombre: "HeyDiga", dominio: "heydiga.ai" },
+        { nombre: "HeyDiga", dominio: "heydiga.com" },
         { nombre: "fonio", dominio: "fonio.ai" },
       ]);
       const dominios = resultado.competidores.map((c) => c.dominio);
       expect(dominios).toEqual(
-        expect.arrayContaining(["heydiga.ai", "fonio.ai", "vapi.ai"])
+        expect.arrayContaining(["heydiga.com", "fonio.ai", "vapi.ai"])
       );
       expect(new Set(dominios).size).toBe(dominios.length);
       expect(resultado.competidores).toContainEqual({
         nombre: "HeyDiga",
-        dominio: "heydiga.ai",
+        dominio: "heydiga.com",
       });
     });
 
@@ -230,7 +230,7 @@ describe.skipIf(!hayRepo)("el mapa sobre el repo real", () => {
         resultado.afirmaciones.filter(
           (a) =>
             a.tipo === "comparativa" &&
-            ["heydiga.ai", "fonio.ai"].includes(
+            ["heydiga.com", "fonio.ai"].includes(
               (a.valor as { competidorDominio: string }).competidorDominio
             )
         )
@@ -256,13 +256,13 @@ describe.skipIf(!hayRepo)("el mapa sobre el repo real", () => {
           ? {
               ...f,
               nombre: f.nombre.replace("Retell AI", "HeyDiga"),
-              url: "https://heydiga.ai/p",
+              url: "https://heydiga.com/p",
             }
           : f
       );
       const r = construirAfirmaciones(rota);
       expect(
-        r.competidores.filter((c) => c.dominio === "heydiga.ai")
+        r.competidores.filter((c) => c.dominio === "heydiga.com")
       ).toHaveLength(1);
     });
   });

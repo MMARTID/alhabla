@@ -65,7 +65,7 @@ Tomadas por el asistente al repartir la Fase 1b, a revisar por el fundador (cual
 
 Tres revisores independientes (seguridad y corrección del backend, sincronizador y jobs, extremo a extremo con base de datos real) encontraron fallos, y se corrigieron antes de abrir los PR. Decisiones de esa tanda, a revisar:
 
-1. **Competidores:** además de los 7 de `comparativas.ts`, se siembran **HeyDiga (heydiga.ai) y fonio (fonio.ai)**. Pendiente de que el fundador los confirme. La regla de comparativas detecta al competidor por alias (nombre con y sin espacios, sin «AI», dominio y su primera etiqueta).
+1. **Competidores:** además de los 7 de `comparativas.ts`, se siembran **HeyDiga (heydiga.com) y fonio (fonio.ai)**. Pendiente de que el fundador los confirme. La regla de comparativas detecta al competidor por alias (nombre con y sin espacios, sin «AI», dominio y su primera etiqueta).
 2. **Un token con alcance `conocimiento` solo puede endurecer las prohibiciones**: retirar una `prohibida`, quitar un término o pasar `palabrasEnteras` a falso es 409 `prohibida_debilitada`; renombrar una clave cuenta como retirada. Un debilitamiento deliberado o un cambio masivo legítimo exige un administrador y **todavía no existe esa ruta** (`forzarCierres` no está expuesto).
 3. **Guardas de cierres por tipo:** más de 2 o más del 25 % de un tipo, más del 60 % y 30 cambios en total contando modificaciones, o un tipo vaciado.
 4. **Aprobar y editar no bloquean el texto por reglas de agenda**: responden 409 con su código (`tope_semanal`, `dominio_en_enfriamiento`, `dominio_ya_aprobado`) sin cambiar nada. Consecuencia: con el tope semanal lleno no se puede ni corregir una errata de un pendiente (alternativa si molesta: guardar y avisar).
@@ -90,3 +90,12 @@ El fundador pidió, antes de lanzar el primer run, poder gestionar la competenci
 7. **El backend nunca visita la URL de un competidor.** Solo lo hace el agente con `web_fetch`; el backend sigue sin llamar a ningún LLM. El MCP pasa de 15 a 18 herramientas (`listar_competidores`, `guardar_analisis_de_competidor`, `proponer_competidor`) y ninguna acepta un competidor ni aprueba nada.
 8. **Fase 2 dividida:** 2a Competencia (backend, MCP y panel) y 2b Agentes y run manual (`PLAN-GROWTH.md` § 9). Presupuesto de uso provisional del run, sin medir: no más del 10 % del límite semanal; la línea base sigue pendiente.
 9. **Decisiones de los agentes (Fase 2b), por defecto del encargo y a revisar:** 6 subagentes (Knowledge es el sincronizador determinista y SEO & GEO es de la Fase 4); presupuestos duros por run escritos en `growth/agentes/orquestador.md` (provisionales hasta medir); el run se lanza con `/growth-run` desde Claude Code, con el token de alcances `leer` y `escribir` y sin `Bash`; un hook en `.claude/settings.json` deniega reddit.com y redd.it en la lectura web de **todas** las sesiones del repo.
+
+## 2026-10-31 (7) — Tras el primer run real
+
+El primer run (`competencia ligero`, 31-10-2026, ejecución cerrada como `parcial`) analizó fonio (21 datos, con fuente y fecha) y HeyDiga (7 datos de prensa, sin web). No movió el consumo semanal de Max (42 % antes y después) y subió la ventana de 5 horas del 4 % al 5 %, con esta conversación incluida.
+
+1. **Corrección del dominio de HeyDiga:** es `heydiga.com`, no `heydiga.ai` (que no resuelve; la auditoría del 27-10 ya citaba `heydiga.com/es/precios`). Se corrige la siembra del sincronizador (`COMPETIDORES_ADICIONALES`). En producción la fila sembrada con el dominio viejo se renombra a mano **antes** de la siguiente sincronización: el sincronizador solo da de alta y, si no, crearía una fila duplicada.
+2. **Modelos fijados en todos los subagentes:** redacción pasa de `inherit` a `opus` (esfuerzo alto) y cumplimiento de `inherit` a `sonnet`; el resto sigue en `sonnet`, esfuerzo medio. Con `inherit` el coste dependía de cómo se abriera la sesión. Tabla y motivos en `growth/agentes/README.md`. La calificación es candidata a `haiku` cuando los umbrales estén calibrados.
+3. **`ligero` se aplica también al reparto por competidor:** hasta 2 competidores, con 3 páginas y 1 búsqueda cada uno (la sesión del run lo interpretó así por sí sola y el documento no lo decía).
+4. **Los subagentes arrancaron en segundo plano** aunque el orquestador pide primer plano, y funcionaron con `WebFetch` y `WebSearch`. Se vigila en los siguientes runs.

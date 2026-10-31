@@ -33,7 +33,7 @@ opcionalmente, palabras clave:
 | (ninguna) | Run completo: pasos 0 a 8 |
 | `comprobar` | Solo los pasos 0 y 1, sin abrir ejecución y sin leer la web. Informa de si el sistema está listo y de qué haría |
 | `competencia` | Pasos 0, 1, 2 (solo si hace falta), 7 y 8 |
-| `ligero` | Multiplica por 0,5 (redondeando hacia arriba) todos los topes de la tabla de presupuestos. Para el primer run y para medir el consumo |
+| `ligero` | Multiplica por 0,5 (redondeando hacia arriba) todos los topes de la tabla de presupuestos, también el número de competidores a analizar y lo que se gasta en cada uno (§ 7). Para el primer run y para medir el consumo |
 
 ## Presupuestos duros por run
 
@@ -197,12 +197,14 @@ c. **Cumplimiento (revisión del modelo)**: si el borrador quedó pendiente de
 Primera tanda: `competidoresPorAnalizar` de `leer_contexto` (o
 `listar_competidores` con `soloPendientes: true`; el filtro por estado es la lista
 `estados`, p. ej. `["propuesto"]`). Prioridad: primero los de
-`origen: manual` (los pidió el fundador), luego HeyDiga (`heydiga.ai`) y fonio
+`origen: manual` (los pidió el fundador), luego HeyDiga (`heydiga.com`) y fonio
 (`fonio.ai`), luego el resto por nombre; hasta 3. Un `propuesto` no se analiza
 nunca. Para cada uno lanza `growth-enlaces-y-competencia` con
 `{ id, dominio, motivoDeAnalisis }` (`por_analizar` o `caducado`) y `ahoraDelRun`;
 el subagente lee el nombre y la URL con `listar_competidores`. Presupuesto de
-cada uno: 6 páginas y 2 búsquedas. Un 409 `analisis_reciente` no se reintenta.
+cada uno: 6 páginas y 2 búsquedas. En `ligero` todo se reduce a la mitad
+(redondeando hacia arriba): hasta 2 competidores, con 3 páginas y 1 búsqueda cada
+uno. Un 409 `analisis_reciente` no se reintenta.
 
 Esto es inteligencia interna: ni su contenido ni sus nombres pasan a ningún
 borrador ni a ningún prompt de redacción.
@@ -253,7 +255,7 @@ que ese subagente necesita. Plantilla:
 ahoraDelRun: <inicio de abrir_ejecucion>
 <datos de la tarea: foco, id, competidor…>
 presupuesto: <lo que le toca>
-competidores confirmados: heydiga.ai (HeyDiga), fonio.ai (fonio), …
+competidores confirmados: heydiga.com (HeyDiga), fonio.ai (fonio), …
 Devuelve el informe en el formato de tu definición.
 ```
 

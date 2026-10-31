@@ -8,7 +8,7 @@ tools:
   - mcp__alhabla-growth__evaluar_borrador
   - mcp__alhabla-growth__crear_borrador
 disallowedTools: Write, Edit, Bash, NotebookEdit, WebFetch, WebSearch
-model: inherit
+model: opus
 effort: high
 maxTurns: 25
 ---

@@ -7,7 +7,7 @@ tools:
   - mcp__alhabla-growth__leer_conocimiento
   - mcp__alhabla-growth__registrar_cumplimiento
 disallowedTools: Write, Edit, Bash, NotebookEdit, WebFetch, WebSearch
-model: inherit
+model: sonnet
 effort: medium
 maxTurns: 12
 ---
