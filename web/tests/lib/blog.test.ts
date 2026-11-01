@@ -7,6 +7,7 @@ import {
   minutosDeLectura,
   type ArticuloMeta,
 } from "@/lib/blog";
+import { GUIAS_POR_SECTOR, SIGUE_LEYENDO } from "@/lib/blog-enlaces";
 
 function meta(
   slug: string,
@@ -50,11 +51,69 @@ describe("blog", () => {
       meta("e", "fisioterapia", "2026-09-01"),
     ];
     expect(
-      articulosRelacionados(meta("a", "barberia"), todos).map((a) => a.slug)
+      articulosRelacionados(meta("a", "barberia"), todos, 3).map((a) => a.slug)
     ).toEqual(["c", "b", "d"]);
     expect(
       articulosRelacionados(meta("d"), todos, 2).map((a) => a.slug)
     ).toEqual(["a", "b"]);
+    // Sin tope, enseña hasta ENLACES_DE_SIGUE_LEYENDO (cuatro).
+    expect(
+      articulosRelacionados(meta("a", "barberia"), todos).map((a) => a.slug)
+    ).toEqual(["c", "b", "d", "e"]);
+  });
+
+  it("«Sigue leyendo»: lo escrito a mano va primero, aunque sea de otro sector y más viejo", () => {
+    const [primero, segundo, tercero, cuarto] =
+      SIGUE_LEYENDO["agenda-para-spa"];
+    const todos = [
+      meta("nuevo", undefined, "2026-10-30"),
+      meta("agenda-para-spa", undefined, "2026-09-22"),
+      meta(cuarto, "salon-de-unas", "2026-09-01"),
+      meta(tercero, undefined, "2026-09-02"),
+      meta("otro-del-mismo-sector", "spa", "2026-10-29"),
+      meta(segundo, "peluqueria", "2026-09-03"),
+      meta(primero, "centro-de-estetica", "2026-09-04"),
+    ];
+    expect(
+      articulosRelacionados(meta("agenda-para-spa", "spa"), todos).map(
+        (a) => a.slug
+      )
+    ).toEqual([primero, segundo, tercero, cuarto]);
+    // Con menos hueco, se queda con los primeros de la lista a mano.
+    expect(
+      articulosRelacionados(meta("agenda-para-spa", "spa"), todos, 2).map(
+        (a) => a.slug
+      )
+    ).toEqual([primero, segundo]);
+    // Si uno de los escritos a mano no existe (borrador, retirado), se rellena.
+    const sinUno = todos.filter((a) => a.slug !== segundo);
+    expect(
+      articulosRelacionados(meta("agenda-para-spa", "spa"), sinUno).map(
+        (a) => a.slug
+      )
+    ).toEqual([primero, tercero, cuarto, "otro-del-mismo-sector"]);
+  });
+
+  it("guías de un sector: las escritas a mano para su oficio van antes que las de la ficha", () => {
+    const [primera, segunda, tercera] = GUIAS_POR_SECTOR.barberia;
+    const todos = [
+      meta("de-ficha", "barberia", "2026-10-30"),
+      meta(tercera),
+      meta(ARTICULOS_PARA_TODOS[0]),
+      meta(primera),
+      meta(segunda),
+    ];
+    expect(articulosParaSector("barberia", todos).map((a) => a.slug)).toEqual([
+      primera,
+      segunda,
+      tercera,
+    ]);
+    // Con solo una escrita a mano disponible, rellena por ficha y luego generales.
+    expect(
+      articulosParaSector("barberia", [todos[0], todos[2], todos[3]]).map(
+        (a) => a.slug
+      )
+    ).toEqual([primera, "de-ficha", ARTICULOS_PARA_TODOS[0]]);
   });
 
   it("guías de un sector: primero las suyas y luego las generales, sin repetir", () => {
