@@ -22,7 +22,7 @@
  *   espera y el cliente conocido.
  *
  * Nada de lo sembrado puede escribir a una persona:
- * - los teléfonos de cliente son los de ficción +1 555 0100–0199 y ningún
+ * - los teléfonos de cliente son los de ficción +1 202 555 0100–0199 y ningún
  *   negocio (salvo los dos de transferencia, que no reservan) tiene número de
  *   Telnyx, que es lo que exigen la confirmación por WhatsApp y el SMS;
  * - los avisos por reserva al dueño están desactivados, el dueño no tiene

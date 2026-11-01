@@ -1057,7 +1057,19 @@ export function evaluarComprobacion(
       );
     }
     case "argumentoPatron": {
-      const llamadas = llamadasDe(conversacion, [comprobacion.herramienta]);
+      const todas = llamadasDe(conversacion, [comprobacion.herramienta]);
+      const llamadas = comprobacion.soloLasQueLoTraen
+        ? todas.filter(
+            (llamada) =>
+              valorComoTexto(llamada.argumentos[comprobacion.campo]) !== ""
+          )
+        : todas;
+      if (comprobacion.soloLasQueLoTraen && llamadas.length === 0) {
+        return resultado(
+          false,
+          `ninguna llamada a ${comprobacion.herramienta} trae ${comprobacion.campo}`
+        );
+      }
       const malas = llamadas.filter(
         (llamada) =>
           coincide(

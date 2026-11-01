@@ -17,7 +17,9 @@
  * comparten el de la peluquería base.
  *
  * Los teléfonos de los clientes sembrados son números de ficción: nadie puede
- * contestar a +1 555 0100–0199 (ni existe el prefijo 555 como zona), y ningún
+ * contestar a +1 202 555 0100–0199 (el 555-0100 a 0199 está reservado para
+ * ficción en toda Norteamérica; con diez cifras, como uno de verdad, para
+ * que la recepcionista no diga que le faltan, E21 del 01-11), y ningún
  * negocio sembrado tiene número de Telnyx para enviar (salvo los dos de
  * transferencia, que no reservan). Así una repetición del laboratorio no
  * escribe a nadie.
@@ -213,17 +215,17 @@ export const ESCENARIOS_NO_DISPONIBLES: Readonly<Record<string, string>> = {
 // Teléfonos de ficción
 // ---------------------------------------------------------------------------
 
-/** Cuántos teléfonos de cliente de ficción hay: +1 555 0100 … +1 555 0199. */
+/** Cuántos teléfonos de cliente de ficción hay: +1 202 555 0100 … +1 202 555 0199. */
 export const CANTIDAD_DE_TELEFONOS_DE_FICCION = 100;
 
-/** El teléfono de ficción número `indice` (0–99): +15550100 … +15550199. Dan
+/** El teléfono de ficción número `indice` (0–99): +12025550100 … +12025550199. Dan
  * la vuelta si el índice pasa de 99. */
 export function telefonoDeFiccion(indice: number): string {
   const posicion =
     ((Math.trunc(indice) % CANTIDAD_DE_TELEFONOS_DE_FICCION) +
       CANTIDAD_DE_TELEFONOS_DE_FICCION) %
     CANTIDAD_DE_TELEFONOS_DE_FICCION;
-  return `+1555${String(100 + posicion).padStart(4, "0")}`;
+  return `+1202555${String(100 + posicion).padStart(4, "0")}`;
 }
 
 /** Los teléfonos de cliente sembrados (los `fromNumber` de las llamadas y
@@ -233,7 +235,7 @@ export const TELEFONOS_DE_CLIENTE_DE_LABORATORIO: readonly string[] =
     telefonoDeFiccion(indice)
   );
 
-/** ¿Es un teléfono de ficción de cliente (+1 555 0100–0199)? */
+/** ¿Es un teléfono de ficción de cliente (+1 202 555 0100–0199)? */
 export function esTelefonoDeFiccion(telefono: string | null | undefined) {
   return (
     typeof telefono === "string" &&
@@ -250,8 +252,8 @@ export function esTelefonoDeFiccion(telefono: string | null | undefined) {
  * dicte cualquier otro.
  */
 export const TELEFONOS_DICTADOS_DE_LABORATORIO = [
-  "+15550198",
-  "+15550199",
+  "+12025550198",
+  "+12025550199",
 ] as const;
 
 /**

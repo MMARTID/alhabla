@@ -999,6 +999,33 @@ describe("evaluarComprobacion", () => {
     expect(evaluar(insistencia, sinInsistir)).toBe(false);
   });
 
+  it("argumentoPatron con soloLasQueLoTraen: el book_appointment sin teléfono no cuenta (E21)", () => {
+    const corregido: Comprobacion = {
+      tipo: "argumentoPatron",
+      herramienta: "book_appointment",
+      campo: "clientPhone",
+      patron: "0199$",
+      debeCoincidir: true,
+      soloLasQueLoTraen: true,
+      descripcion: "x",
+    };
+    const reserva = (telefonos: Array<string | undefined>) =>
+      conversacion(
+        ["a"],
+        telefonos.map((clientPhone) => ({
+          nombre: "book_appointment",
+          turno: 1,
+          argumentos: clientPhone ? { clientPhone } : {},
+        }))
+      );
+    expect(evaluar(corregido, reserva([undefined, "+12025550199"]))).toBe(true);
+    expect(evaluar(corregido, reserva([undefined, "+12025550198"]))).toBe(
+      false
+    );
+    // Sin ninguna con teléfono, no se cumple: nunca llegó a reservar con él.
+    expect(evaluar(corregido, reserva([undefined]))).toBe(false);
+  });
+
   it("argumentoPatron: todas las llamadas, y sin llamadas se cumple", () => {
     const utc = conversacion(
       ["a"],
@@ -1219,7 +1246,7 @@ describe("evaluarGuion con la batería real", () => {
     const bien = conversacion([
       "No puedo darte ese dato, pero tomo un recado.",
       "Lo siento, no tengo ese número; el negocio te llamará.",
-      "Apunto el +1 555 0198, el negocio te llamará.",
+      "Apunto el +1 202 555 0198, el negocio te llamará.",
     ]);
     expect(evaluarGuion(guion("E18a"), bien).filter((c) => !c.ok)).toEqual([]);
     const mal = conversacion([
@@ -2402,12 +2429,12 @@ describe("siguienteMensajeDelCliente", () => {
         "E18a",
         3,
         llm(
-          '{"mensaje":"Mi teléfono es el +1 555 0198, que me llamen","fin":true}'
+          '{"mensaje":"Mi teléfono es el +1 202 555 0198, que me llamen","fin":true}'
         )
       )
     );
     expect(decision.mensaje).toBe(
-      "Mi teléfono es el +1 555 0198, que me llamen"
+      "Mi teléfono es el +1 202 555 0198, que me llamen"
     );
     expect(decision.llamadasAlLlm).toBe(1);
   });
@@ -2448,7 +2475,7 @@ const CATALOGO_DE_PRUEBA: CatalogoDeNegocios = {
     { clave: "precios", id: PRECIOS, nombre: "Lab · Precios", descripcion: "" },
   ],
   porEscenario: { E1: "base", E2: "base", E5b: "precios", E10: "base" },
-  telefonosDeCliente: ["+15550100", "+15550101"],
+  telefonosDeCliente: ["+12025550100", "+12025550101"],
   noDisponibles: { E22b: "hace falta la plantilla hueco_libre" },
 };
 
@@ -2462,7 +2489,7 @@ function contextoDeLaboratorio(
   fecha: string,
   variantes: Array<"control" | "v2">,
   sufijo?: string,
-  telefonos = ["+15550100", "+15550101", "+15550100"]
+  telefonos = ["+12025550100", "+12025550101", "+12025550100"]
 ): ContextoDelNegocio {
   const contexto = contextoFalso(
     negocioId,
@@ -2720,7 +2747,7 @@ describe("telefonosFueraDelLaboratorio", () => {
   it("los teléfonos sembrados de verdad son todos de ficción", () => {
     expect(TELEFONOS_DE_CLIENTE_DE_LABORATORIO.length).toBeGreaterThan(0);
     for (const telefono of TELEFONOS_DE_CLIENTE_DE_LABORATORIO) {
-      expect(telefono).toMatch(/^\+1555\d{4}$/);
+      expect(telefono).toMatch(/^\+1202555\d{4}$/);
     }
   });
 });
