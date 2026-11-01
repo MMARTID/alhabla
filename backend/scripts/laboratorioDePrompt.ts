@@ -85,6 +85,7 @@ import {
 } from "../src/adapters/telnyx/TelnyxAiAdapter.js";
 import { cargarEnv, urlDeBdDeDev } from "../mcp/entorno.js";
 import { normalizarTelefono as normalizarTelefonoDictado } from "../src/lib/phone.js";
+import { esAvisoDeBucleDeTelnyx } from "../src/lib/avisoDeBucleDeTelnyx.js";
 import {
   ESCENARIOS,
   topeDeTurnos,
@@ -561,6 +562,13 @@ export function planificar(
   const saltados: GuionSaltado[] = [];
   const tareas: Tarea[] = [];
   for (const guion of seleccionados) {
+    if (guion.soloEnVoz) {
+      saltados.push({
+        guion,
+        motivo: `solo se puede medir en una llamada de voz: ${guion.soloEnVoz}`,
+      });
+      continue;
+    }
     const negocio = negocioDelGuion(guion, opciones, catalogo);
     if ("motivo" in negocio) {
       saltados.push({ guion, motivo: negocio.motivo });
@@ -737,7 +745,14 @@ export function reconstruirConversacion(
       textoPrevio = false;
     } else if (mensaje.role === "assistant") {
       const texto = mensaje.text?.trim() ?? "";
-      if (texto) {
+      // Como en producción (chatCliente.ts), el aviso de bucle de Telnyx no
+      // es una respuesta: no le llega al cliente. Contaba como respuesta en
+      // inglés y hacía fallar «Contesta en catalán» (E4, 30-10).
+      if (texto && esAvisoDeBucleDeTelnyx(texto)) {
+        avisos.push(
+          `Turno ${turno}: Telnyx cortó un bucle de tools (en producción no se le manda al cliente)`
+        );
+      } else if (texto) {
         textoPrevio = true;
         if (turno >= 1) textos[turno - 1]?.push(texto);
       }
@@ -770,7 +785,9 @@ export function reconstruirConversacion(
       cliente: dato.cliente,
       respuesta: textos[indice]?.length
         ? textos[indice]!.join("\n")
-        : dato.respuestaDelChat,
+        : esAvisoDeBucleDeTelnyx(dato.respuestaDelChat)
+          ? ""
+          : dato.respuestaDelChat,
       duracionMs: dato.duracionMs,
     })),
     llamadas,
@@ -1040,7 +1057,19 @@ export function evaluarComprobacion(
       );
     }
     case "argumentoPatron": {
-      const llamadas = llamadasDe(conversacion, [comprobacion.herramienta]);
+      const todas = llamadasDe(conversacion, [comprobacion.herramienta]);
+      const llamadas = comprobacion.soloLasQueLoTraen
+        ? todas.filter(
+            (llamada) =>
+              valorComoTexto(llamada.argumentos[comprobacion.campo]) !== ""
+          )
+        : todas;
+      if (comprobacion.soloLasQueLoTraen && llamadas.length === 0) {
+        return resultado(
+          false,
+          `ninguna llamada a ${comprobacion.herramienta} trae ${comprobacion.campo}`
+        );
+      }
       const malas = llamadas.filter(
         (llamada) =>
           coincide(
@@ -2898,7 +2927,11 @@ export function telefonosFueraDelLaboratorio(
       continue;
     }
     const llamada = asignacion.porTarea.get(tarea);
-    if (!llamada?.telefono) continue;
+    // Número oculto («anonymous», como lo guarda Telnyx): no es un teléfono
+    // y no recibe nada; vale lo mismo que una llamada sin número.
+    if (!llamada?.telefono || !normalizarTelefonoDictado(llamada.telefono)) {
+      continue;
+    }
     if (!permitidos.has(normalizarTelefono(llamada.telefono))) {
       problemas.add(
         `${tarea.guion.clave} (negocio ${tarea.negocioId}): la llamada ${llamada.callId} tiene el número ${enmascararTelefono(llamada.telefono)}, que no es de laboratorio`
