@@ -2685,6 +2685,23 @@ describe("telefonosFueraDelLaboratorio", () => {
     ).toEqual([]);
   });
 
+  it("una llamada con número oculto («anonymous») no recibe nada: vale", () => {
+    const plan = planificar(
+      sinForzar(["--escenarios", "E10", "--n", "1", "--con-citas"]),
+      CATALOGO_DE_PRUEBA
+    );
+    const oculto = contextoDeLaboratorio(BASE, "f", ["control"], undefined, [
+      "anonymous",
+    ]);
+    expect(
+      telefonosFueraDelLaboratorio(
+        plan.tareas,
+        asignarLlamadas(plan.tareas, new Map([[BASE, oculto]])),
+        CATALOGO_DE_PRUEBA
+      )
+    ).toEqual([]);
+  });
+
   it("un negocio que no es de laboratorio no se comprueba", () => {
     const plan = planificar(
       opciones(["--escenarios", "E10", "--n", "1", "--con-citas"]),

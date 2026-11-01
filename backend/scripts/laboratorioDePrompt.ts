@@ -2915,7 +2915,11 @@ export function telefonosFueraDelLaboratorio(
       continue;
     }
     const llamada = asignacion.porTarea.get(tarea);
-    if (!llamada?.telefono) continue;
+    // Número oculto («anonymous», como lo guarda Telnyx): no es un teléfono
+    // y no recibe nada; vale lo mismo que una llamada sin número.
+    if (!llamada?.telefono || !normalizarTelefonoDictado(llamada.telefono)) {
+      continue;
+    }
     if (!permitidos.has(normalizarTelefono(llamada.telefono))) {
       problemas.add(
         `${tarea.guion.clave} (negocio ${tarea.negocioId}): la llamada ${llamada.callId} tiene el número ${enmascararTelefono(llamada.telefono)}, que no es de laboratorio`
