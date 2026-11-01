@@ -302,7 +302,11 @@ describe("«Comprobar desvío» de punta a punta (integración)", () => {
       "assistant_test",
       {
         greeting: expect.stringContaining("recepcionista de IA"),
-        dynamicVariables: { nombre_cliente: "", ultimo_servicio: "" },
+        dynamicVariables: {
+          nombre_cliente: "",
+          ultimo_servicio: "",
+          proximos_dias: expect.stringMatching(/^Próximos días: hoy, /),
+        },
         grabar: false,
         // Sin idioma guardado: la voz del assistant.
         voiceSettings: null,

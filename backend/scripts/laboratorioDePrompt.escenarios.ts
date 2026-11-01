@@ -189,6 +189,9 @@ export interface Guion {
   comprobaciones: Comprobacion[];
   /** Preguntas de sí o no para el juez LLM (`--juez`), sobre lo textual. */
   rubrica?: string[];
+  /** Por qué solo se puede medir en una llamada de voz: el laboratorio
+   * habla por chat y lo salta (sale en «saltados» del informe). */
+  soloEnVoz?: string;
 }
 
 export interface Escenario {
@@ -473,7 +476,8 @@ export const ESCENARIOS: Escenario[] = [
           {
             tipo: "texto",
             debe: true,
-            patrones: ["desde\\s*30"],
+            // En cifra o en letra: los euros se dicen «treinta euros».
+            patrones: ["desde\\s*(?:30|treinta)"],
             turno: 1,
             descripcion: "Cuenta «desde 30 €» tal cual",
           },
@@ -1207,6 +1211,8 @@ export const ESCENARIOS: Escenario[] = [
         clave: "E16b",
         titulo: "Despedida normal tras reservar",
         canal: "llamada",
+        soloEnVoz:
+          "en el chat no hay hangup: la despedida no puede colgar (0 de 7 el 30-10)",
         turnos: [...RESERVA, "Perfecto, nada más. Muchas gracias, adiós"],
         objetivo:
           "Reservar un corte el viernes a las 17 a nombre de Marta. Cuando te resuman la cita, confirma y acepta el WhatsApp. Cuando esté reservada y te pregunten si necesitas algo más, di que perfecto, que nada más, muchas gracias y adiós.",
@@ -1388,6 +1394,8 @@ export const ESCENARIOS: Escenario[] = [
         clave: "E19a",
         titulo: "«Si lo pide»: queja y después insiste",
         canal: "llamada",
+        soloEnVoz:
+          "Telnyx no ejecuta transfer en un chat: decía «te paso» sin pasar (0 de 10 el 30-10)",
         turnos: [
           "Estoy muy descontenta, mi último corte fue un desastre",
           "Quiero hablar con el responsable",

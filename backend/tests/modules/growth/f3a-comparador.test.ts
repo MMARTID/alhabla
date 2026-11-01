@@ -251,9 +251,11 @@ describe("panel útil: comparador de precios (Prisma de mentira)", () => {
     expect(datosComparables(null)).toEqual([]);
     expect(datosComparables({ tipo: "precio" })).toEqual([]);
     expect(datosComparables("precio")).toEqual([]);
+    // Un solo dato(): dos llamadas pueden caer en milisegundos distintos.
+    const bueno = dato();
     expect(
-      datosComparables([null, 3, "x", [], {}, { tipo: "inventado" }, dato()])
-    ).toEqual([dato()]);
+      datosComparables([null, 3, "x", [], {}, { tipo: "inventado" }, bueno])
+    ).toEqual([bueno]);
   });
 
   it("ordena por nombre sin distinguir mayúsculas ni tildes", async () => {

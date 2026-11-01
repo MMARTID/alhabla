@@ -373,6 +373,7 @@ exports[`payloads de asistentes (instantáneas) > assistant de la recepcionista,
   "conversationFlow": null,
   "dynamicVariables": {
     "nombre_cliente": "",
+    "proximos_dias": "",
     "ultimo_servicio": "",
   },
   "fallbackConfig": {
@@ -831,6 +832,7 @@ exports[`payloads de asistentes (instantáneas) > assistant de la recepcionista,
   "conversationFlow": null,
   "dynamicVariables": {
     "nombre_cliente": "",
+    "proximos_dias": "",
     "ultimo_servicio": "",
   },
   "fallbackConfig": {
@@ -1227,7 +1229,7 @@ Si te escriben en catalán, gallego, euskera o inglés, responde en ese idioma; 
 exports[`payloads de asistentes (instantáneas) > el JSON enviado es idéntico byte a byte (hash) 1`] = `
 {
   "gestor": "e98c3bfa972a5bd367381ff26a58c6d2b9ee626c5ac52e24ac7c18fe833f1d96",
-  "recepcionista": "07aa1616968b7a14412d7f0681df3ef94134707afbb69ba93dcc955928b7f207",
+  "recepcionista": "510cba6ff213f7c44f96dc0b032a0785f0e6b44574f5be72e4f2d3d5463db095",
 }
 `;
 

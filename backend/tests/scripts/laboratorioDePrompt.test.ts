@@ -686,6 +686,27 @@ describe("reconstruirConversacion", () => {
     { cliente: "Gracias", respuestaDelChat: "Hasta luego.", duracionMs: 4 },
   ];
 
+  it("el aviso de bucle de Telnyx no cuenta como respuesta, como en producción", () => {
+    const bucle =
+      "I'm stuck in a loop repeating the same tool action. This might be caused by the input question or a misconfigured assistant prompt.";
+    const mensajes: TelnyxConversationMessage[] = [
+      { role: "user", text: "¿Hacéis keratina?" },
+      { role: "assistant", text: "No la tenemos." },
+      { role: "user", text: "Gracias" },
+      { role: "assistant", text: bucle },
+    ];
+
+    const c = reconstruirConversacion(mensajes, [
+      entrada[0]!,
+      { cliente: "Gracias", respuestaDelChat: bucle, duracionMs: 4 },
+    ]);
+
+    expect(c.turnos.map((t) => t.respuesta)).toEqual(["No la tenemos.", ""]);
+    expect(c.avisos).toEqual([
+      "Turno 2: Telnyx cortó un bucle de tools (en producción no se le manda al cliente)",
+    ]);
+  });
+
   it("reparte las tools por turno y apunta si habló antes", () => {
     const mensajes: TelnyxConversationMessage[] = [
       { role: "assistant", text: "Hola, gracias por llamar." },
@@ -2562,13 +2583,26 @@ describe("planificar con los negocios de laboratorio", () => {
 
   it("con el catálogo real solo se salta lo que lleva una razón", () => {
     const plan = planificar(sinForzar(["--con-citas", "--n", "1"]));
-    expect(plan.saltados.map((s) => s.guion.clave)).toEqual(["E22b"]);
+    const saltados = plan.saltados.map((s) => s.guion.clave);
+    expect(saltados).toEqual(["E16b", "E19a", "E22b"]);
     expect(plan.negocios.length).toBe(
       new Set(
-        Object.values(NEGOCIO_POR_ESCENARIO).map(
-          (clave) => NEGOCIOS_DE_LABORATORIO.find((n) => n.clave === clave)!.id
-        )
+        Object.entries(NEGOCIO_POR_ESCENARIO)
+          .filter(([guion]) => !saltados.includes(guion))
+          .map(
+            ([, clave]) =>
+              NEGOCIOS_DE_LABORATORIO.find((n) => n.clave === clave)!.id
+          )
       ).size
+    );
+  });
+
+  it("los guiones que solo se miden en voz se saltan con su motivo", () => {
+    const plan = planificar(sinForzar(["--escenarios", "E19", "--n", "1"]));
+    expect(plan.guiones.map((g) => g.clave)).toEqual(["E19b"]);
+    expect(plan.saltados).toHaveLength(1);
+    expect(plan.saltados[0]!.motivo).toMatch(
+      /^solo se puede medir en una llamada de voz: Telnyx no ejecuta transfer/
     );
   });
 

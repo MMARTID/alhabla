@@ -47,13 +47,16 @@ export interface VariablesDeLaLlamada {
   nombre_cliente: string;
   /** Servicios de esa reserva; vacío si no se conoce. */
   ultimo_servicio: string;
+  /** Hoy y los 13 días siguientes con su día de la semana (lib/
+   * proximosDias.ts). Vacío en el chat: cada mensaje trae su fecha. */
+  proximos_dias: string;
 }
 
 /** Los valores de quien no se conoce: el assistant los guarda por defecto
  * para el chat de WhatsApp y para una llamada en la que no se pudo mirar
  * nada. */
 export const VARIABLES_DE_LA_LLAMADA_POR_DEFECTO: Readonly<VariablesDeLaLlamada> =
-  { nombre_cliente: "", ultimo_servicio: "" };
+  { nombre_cliente: "", ultimo_servicio: "", proximos_dias: "" };
 
 type Parrafos = Array<string | null>;
 type Seccion = (contexto: ContextoDelPrompt) => Parrafos;
@@ -357,6 +360,9 @@ function seccionUsoDeHerramientas({ listaDeEspera }: ContextoDelPrompt): Parrafo
     // Llamada de producción del 14-10: dijo «dijous setze» de una cita del
     // jueves 15. Las tools devuelven el día ya escrito (voiceDateTime.ts).
     "Para decir el día y la hora de una cita usa el campo cuando que te devuelven las herramientas, en el idioma de la conversación: no calcules tú el día de la semana ni del mes.",
+    // Laboratorio, E4 (30-10): a «dijous» contestó «¿el dos o el nueve?»,
+    // dos lunes, sin consultar nada.
+    "Si te dicen un día por su nombre («el jueves»), no preguntes qué fecha es ni la calcules: es el próximo con ese nombre de «Próximos días», si la tienes; compruébalo directamente con check_availability y usa el cuando que te devuelve.",
     "Todo startDateTime que envíes a una herramienta va en la hora local del negocio (zona {{zona_horaria}}) con su offset explícito de esa fecha, por ejemplo 2026-09-18T16:00:00+02:00. Nunca lo envíes en UTC (+00:00 o Z): las cuatro de la tarde son 16:00 en hora local, no 16:00Z.",
     // La oferta de aviso solo entra cuando la plantilla `hueco_libre` está
     // aprobada en Meta (gate `listaDeEspera`); si no, la recepcionista no
@@ -460,7 +466,8 @@ function seccionReferenciaTemporal({ timezone }: ContextoDelPrompt): Parrafos {
     // el proveedor resuelva una variable dentro de otra, y si no la resuelve el
     // agente se queda sin saber qué día es hoy — "mañana" o "el martes" se
     // convierten en una fecha inventada y la cita acaba en el día equivocado.
-    `Momento actual en la zona del negocio:\n{{current_time_${timezone}}}`,
+    // {{proximos_dias}}: vacía en el chat (el marcador trae la fecha).
+    `Momento actual en la zona del negocio:\n{{current_time_${timezone}}}\n{{proximos_dias}}`,
   ];
 }
 

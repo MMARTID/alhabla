@@ -927,11 +927,14 @@ describe("executeVoiceTool — catálogo y token de disponibilidad", () => {
       { id: "svc_barba", name: "Barba", durationMinutes: 20, priceCents: null },
     ];
 
-    async function catalogoCon(agentSettings: unknown) {
+    async function catalogoCon(
+      agentSettings: unknown,
+      businessDetails: string | null = null
+    ) {
       // Sin la caché de voz de la vuelta anterior: se lee de la BD.
       reiniciarAlmacenEnMemoria();
       mockedBusinessFindUnique.mockResolvedValue(
-        buildBusiness({ agentSettings }) as any
+        buildBusiness({ agentSettings, businessDetails }) as any
       );
       mockedServiceFindMany.mockResolvedValue(SERVICIOS as any);
       mockedProfessionalFindMany.mockResolvedValue([] as any);
@@ -973,6 +976,34 @@ describe("executeVoiceTool — catálogo y token de disponibilidad", () => {
       expect(catalogo.precios).toContain(
         "Vale el de aquí aunque la información del negocio diga otro."
       );
+    });
+
+    // Laboratorio E5b (30-10): con «Barba, sin precio» en el catálogo y
+    // «desde» solo en la información del prompt, decía que no tenía precio.
+    it("sin precio en el catálogo, lo que diga la información del negocio va en su línea", async () => {
+      const catalogo = await catalogoCon(
+        { darPrecios: "si_preguntan" },
+        "Barbería de barrio. Corte 15 €, barbas desde 10 €. Aparcamiento en la calle."
+      );
+
+      expect(catalogo.services).toBe(
+        [
+          // El precio del catálogo manda: la información no se añade.
+          "[svc_corte] Corte (30 min, 18 €)",
+          "[svc_color] Color (90 min, 12,50 €)",
+          "[svc_barba] Barba (20 min, sin precio; la información del negocio dice: «barbas desde 10 €»)",
+        ].join("\n")
+      );
+    });
+
+    it("«Nunca» no saca el precio de la información del negocio", async () => {
+      const catalogo = await catalogoCon(
+        { darPrecios: "nunca" },
+        "Barbas desde 10 €."
+      );
+
+      expect(catalogo.services).toContain("[svc_barba] Barba (20 min)");
+      expect(catalogo.services).not.toContain("desde");
     });
 
     it("«Nunca»: el precio no llega a la llamada", async () => {

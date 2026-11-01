@@ -18,6 +18,7 @@ import { todosLosGuiones } from "../../scripts/laboratorioDePrompt.escenarios.js
 import {
   AYUDA,
   ErrorDeUso,
+  NUMERO_OCULTO,
   aplicarPlan,
   borrarSiembra,
   diaDeLaSemanaDe,
@@ -208,6 +209,7 @@ describe("teléfonos de ficción", () => {
       for (const llamada of p.llamadas) {
         expect(
           llamada.fromNumber === null ||
+            llamada.fromNumber === NUMERO_OCULTO ||
             esTelefonoDeFiccion(llamada.fromNumber),
           `${p.clave} ${llamada.callId}`
         ).toBe(true);
@@ -455,10 +457,12 @@ describe("planificarSiembra: lo que cubre cada negocio", () => {
     }
   });
 
-  it("número oculto: las llamadas no traen teléfono", () => {
+  it("número oculto: las llamadas llegan como «anonymous», igual que de Telnyx", () => {
     const p = plan("peluqueria-telefono-oculto");
     const voz = p.llamadas.filter((l) => l.voiceProvider === "telnyx");
-    expect(voz.every((l) => l.fromNumber === null)).toBe(true);
+    // Con null, book_appointment no pedía el teléfono (E21, 30-10).
+    expect(voz.every((l) => l.fromNumber === NUMERO_OCULTO)).toBe(true);
+    expect(p.clientesQueAceptaron).toEqual([]);
     // Sin teléfono, check_availability no puede mirar al cliente: la llamada
     // ya trae el permiso para que no pregunte por la grabación.
     expect(voz.every((l) => l.grabacionPermitida === true)).toBe(true);

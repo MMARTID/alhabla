@@ -85,6 +85,7 @@ import {
 } from "../src/adapters/telnyx/TelnyxAiAdapter.js";
 import { cargarEnv, urlDeBdDeDev } from "../mcp/entorno.js";
 import { normalizarTelefono as normalizarTelefonoDictado } from "../src/lib/phone.js";
+import { esAvisoDeBucleDeTelnyx } from "../src/lib/avisoDeBucleDeTelnyx.js";
 import {
   ESCENARIOS,
   topeDeTurnos,
@@ -561,6 +562,13 @@ export function planificar(
   const saltados: GuionSaltado[] = [];
   const tareas: Tarea[] = [];
   for (const guion of seleccionados) {
+    if (guion.soloEnVoz) {
+      saltados.push({
+        guion,
+        motivo: `solo se puede medir en una llamada de voz: ${guion.soloEnVoz}`,
+      });
+      continue;
+    }
     const negocio = negocioDelGuion(guion, opciones, catalogo);
     if ("motivo" in negocio) {
       saltados.push({ guion, motivo: negocio.motivo });
@@ -737,7 +745,14 @@ export function reconstruirConversacion(
       textoPrevio = false;
     } else if (mensaje.role === "assistant") {
       const texto = mensaje.text?.trim() ?? "";
-      if (texto) {
+      // Como en producción (chatCliente.ts), el aviso de bucle de Telnyx no
+      // es una respuesta: no le llega al cliente. Contaba como respuesta en
+      // inglés y hacía fallar «Contesta en catalán» (E4, 30-10).
+      if (texto && esAvisoDeBucleDeTelnyx(texto)) {
+        avisos.push(
+          `Turno ${turno}: Telnyx cortó un bucle de tools (en producción no se le manda al cliente)`
+        );
+      } else if (texto) {
         textoPrevio = true;
         if (turno >= 1) textos[turno - 1]?.push(texto);
       }
@@ -770,7 +785,9 @@ export function reconstruirConversacion(
       cliente: dato.cliente,
       respuesta: textos[indice]?.length
         ? textos[indice]!.join("\n")
-        : dato.respuestaDelChat,
+        : esAvisoDeBucleDeTelnyx(dato.respuestaDelChat)
+          ? ""
+          : dato.respuestaDelChat,
       duracionMs: dato.duracionMs,
     })),
     llamadas,

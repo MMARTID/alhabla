@@ -148,7 +148,8 @@ export interface ProfesionalDeSiembra {
  *   graben (check_availability no pregunta);
  * - `sin_decidir`: teléfonos que aún no han decidido (la pregunta de
  *   grabación sale en check_availability);
- * - `ocultos`: sin número (book_appointment pide el teléfono);
+ * - `ocultos`: con número oculto, «anonymous» como lo guarda Telnyx
+ *   (book_appointment pide el teléfono; con `null` no lo pedía, E21);
  * - `con_cita_futura`: cada llamada libre es de un teléfono distinto que
  *   tiene una cita el próximo jueves, reservada en otra llamada;
  * - `cliente_conocido`: todas del mismo teléfono, que ya reservó un Corte
@@ -564,6 +565,10 @@ function elementoDe<T>(lista: readonly T[], indice: number): T {
   return lista[indice % lista.length]!;
 }
 
+/** El `from` de una llamada con número oculto, como lo guarda Telnyx. Un
+ * `fromNumber` vacío no cuenta como oculto (esNumeroOculto, voiceTools). */
+export const NUMERO_OCULTO = "anonymous";
+
 /** Qué teléfono tiene la llamada libre número `indice` (0, 1, 2…). */
 function telefonoDeLaLlamada(
   tipo: TipoDeLlamadas,
@@ -571,7 +576,7 @@ function telefonoDeLaLlamada(
 ): string | null {
   switch (tipo) {
     case "ocultos":
-      return null;
+      return NUMERO_OCULTO;
     case "cliente_conocido":
       return telefonoDeFiccion(0);
     default:
@@ -734,7 +739,9 @@ export function planificarSiembra(
       grabacionPermitida: grabacionPermitidaDe(tipo),
       conCita: false,
     });
-    if (telefono && tipo !== "sin_decidir") clientes.add(telefono);
+    if (telefono && tipo !== "sin_decidir" && tipo !== "ocultos") {
+      clientes.add(telefono);
+    }
   }
   for (let i = 0; i < chats; i++) {
     const telefono = telefonoDeFiccion(50 + i);
@@ -863,7 +870,9 @@ export function planificarSiembra(
       llamadasConCita: llamadas.filter((l) => l.conCita).length,
       citas: citas.length,
       telefonosDistintos: new Set(
-        llamadas.map((l) => l.fromNumber).filter(Boolean)
+        llamadas
+          .map((l) => l.fromNumber)
+          .filter((telefono) => telefono && telefono !== NUMERO_OCULTO)
       ).size,
     },
   };
@@ -942,6 +951,7 @@ export function exigirSiembraSinDestinatarios(planes: PlanDeNegocio[]): void {
     for (const llamada of plan.llamadas) {
       if (
         llamada.fromNumber !== null &&
+        llamada.fromNumber !== NUMERO_OCULTO &&
         !esTelefonoDeFiccion(llamada.fromNumber)
       ) {
         throw new Error(

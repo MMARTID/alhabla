@@ -16,6 +16,7 @@ import {
   type TelefonosDelNegocio,
 } from "./grabacion.js";
 import type { VariablesDeLaLlamada } from "./seccionesDelPrompt.js";
+import { proximosDias } from "./proximosDias.js";
 
 /**
  * Lo que la recepcionista sabe de una llamada antes de descolgar
@@ -61,6 +62,8 @@ export async function resolverContextoDeLlamada(input: {
     /** Para la cooficial de la zona (lib/idiomas/zona.ts). */
     address?: string | null;
     businessDetails?: string | null;
+    /** Para {{proximos_dias}}; sin ella, la de Madrid. */
+    timezone?: string | null;
   };
   /** `from` de la llamada; null o «anonymous» si llama con número oculto. */
   telefono: string | null;
@@ -177,6 +180,7 @@ export async function resolverContextoDeLlamada(input: {
     variables: {
       nombre_cliente: nombre ?? "",
       ultimo_servicio: ultimoServicio ?? "",
+      proximos_dias: proximosDias(ahora, business.timezone ?? "Europe/Madrid"),
     },
   };
 }
