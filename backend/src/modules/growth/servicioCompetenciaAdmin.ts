@@ -420,7 +420,13 @@ export async function darDeAltaUnCompetidor(
   return detalleDeCompetidor(id);
 }
 
-/** `PATCH /growth/admin/competidores/:id`. El dominio no cambia. */
+/**
+ * `PATCH /growth/admin/competidores/:id`. El dominio solo cambia si la URL es
+ * de otro dominio y viene `cambiarDominio: true` (si no, 400): así un cambio
+ * de web es una decisión explícita y no un despiste. El análisis cuelga del
+ * `id`; los recuentos de oportunidades y menciones van por dominio. Un dominio
+ * ya registrado es un 409.
+ */
 export async function editarCompetidor(
   id: string,
   cambiosCrudos: CambioDeCompetidorBody
@@ -440,18 +446,36 @@ export async function editarCompetidor(
       data.url = null;
     } else {
       validarUrlExterna(cambios.url);
-      if (dominioDeUrl(cambios.url) !== competidor.dominio) {
-        throw new ErrorDeGrowth(
-          400,
-          `La URL debe ser de ${competidor.dominio}: el dominio de un competidor no cambia.`,
-          "url_de_otro_dominio"
-        );
+      const dominioNuevo = dominioDeUrl(cambios.url);
+      if (dominioNuevo !== competidor.dominio) {
+        if (!cambios.cambiarDominio) {
+          throw new ErrorDeGrowth(
+            400,
+            `La URL es de otro dominio que ${competidor.dominio}. Si el competidor cambió de web, confirma el cambio de dominio.`,
+            "url_de_otro_dominio"
+          );
+        }
+        if (!dominioNormalizado.safeParse(dominioNuevo).success) {
+          throw new ErrorDeGrowth(400, "La URL no tiene un dominio válido.");
+        }
+        const previo = await prisma.growthCompetidor.findUnique({
+          where: { dominio: dominioNuevo },
+          select: { id: true },
+        });
+        if (previo) throw competidorExistente(previo.id);
+        data.dominio = dominioNuevo;
       }
       data.url = urlParaAbrir(cambios.url);
     }
   }
 
-  await prisma.growthCompetidor.update({ where: { id }, data });
+  try {
+    await prisma.growthCompetidor.update({ where: { id }, data });
+  } catch (error) {
+    // Dos cambios a la vez al mismo dominio: gana el primero (índice único).
+    if (codigoDePrisma(error) === "P2002") throw competidorExistente(undefined);
+    throw error;
+  }
   return detalleDeCompetidor(id);
 }
 

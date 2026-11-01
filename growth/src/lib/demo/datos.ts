@@ -20,6 +20,7 @@ import type {
   FuenteTipo,
   OrigenDeCompetidor,
   EstadoDeCompetidor,
+  Tarea,
   TipoDeAfirmacion,
 } from "../types";
 
@@ -71,6 +72,9 @@ export type RegistroDeDecisionDemo = RegistroDeDecision & {
 };
 export type RegistroDeAfirmacion = Afirmacion & { vigenteHasta: string | null };
 
+/** Una tarea a mano con su identidad de siembra (`null` en las manuales); la API no la manda. */
+export type RegistroDeTarea = Tarea & { siembra: string | null };
+
 /** Un competidor con todas las versiones de su análisis (de la 1 en adelante). */
 export type RegistroDeCompetidor = {
   id: string;
@@ -100,6 +104,12 @@ export type AlmacenDeDemostracion = {
   fuentes: Array<{ id: string; tipo: FuenteTipo; nombre: string }>;
   nichos: Array<{ id: string; slug: string; nombre: string }>;
   competidores: RegistroDeCompetidor[];
+  /**
+   * Las tareas a mano. Empiezan con unas pocas que ya tocó el fundador; las
+   * iniciales (`TAREAS_INICIALES`) se siembran al pedir la lista, como en el
+   * backend, sin pisar las que ya estén.
+   */
+  tareas: RegistroDeTarea[];
   ajustes: {
     valores: ValoresDeAjustes;
     actualizadoEn: Record<string, string | null>;
@@ -1127,21 +1137,45 @@ export function crearAlmacenDeDemostracion(
       "precio",
       "El plan Inicio cuesta 59 € al mes más IVA e incluye 200 minutos de llamadas.",
       fuente("demo/plans.ts", "inicio"),
-      { valor: { precio: 59, minutos: 200 } }
+      {
+        valor: {
+          plan: "inicio",
+          cuotaEur: 59,
+          minutosIncluidos: 200,
+          minutoExtraEur: 0.3,
+          ivaIncluido: false,
+        },
+      }
     ),
     afirmacion(
       "precio.plan.pro",
       "precio",
       "El plan Pro cuesta 139 € al mes más IVA e incluye 600 minutos de llamadas.",
       fuente("demo/plans.ts", "pro"),
-      { valor: { precio: 139, minutos: 600 } }
+      {
+        valor: {
+          plan: "pro",
+          cuotaEur: 139,
+          minutosIncluidos: 600,
+          minutoExtraEur: 0.25,
+          ivaIncluido: false,
+        },
+      }
     ),
     afirmacion(
       "precio.plan.scale",
       "precio",
       "El plan Scale cuesta 269 € al mes más IVA e incluye 1.500 minutos de llamadas.",
       fuente("demo/plans.ts", "scale"),
-      { valor: { precio: 269, minutos: 1500 } }
+      {
+        valor: {
+          plan: "scale",
+          cuotaEur: 269,
+          minutosIncluidos: 1500,
+          minutoExtraEur: 0.2,
+          ivaIncluido: false,
+        },
+      }
     ),
     afirmacion(
       "funcion.agenda_propia",
@@ -1154,6 +1188,76 @@ export function crearAlmacenDeDemostracion(
       "funcion",
       "Alhabla habla español y otros idiomas, y el catalán, euskera o gallego de la zona.",
       fuente("demo/producto.md", "idiomas")
+    ),
+    // Las que componen la «Ficha de Alhabla» (descripciones, precios, prueba).
+    afirmacion(
+      "pagina.inicio",
+      "pagina",
+      "Alhabla: Recepcionista de IA que atiende las llamadas de tu negocio y reserva las citas en su calendario.",
+      fuente("demo/paginas.ts", "inicio")
+    ),
+    afirmacion(
+      "funcion.atiende_a_cualquier_hora",
+      "funcion",
+      "Atiende las llamadas a cualquier hora, también fuera del horario del negocio.",
+      fuente("demo/producto.md", "disponibilidad")
+    ),
+    afirmacion(
+      "funcion.calendarios",
+      "funcion",
+      "Se conecta con Google Calendar, Outlook e iCloud, o usa la agenda de Alhabla.",
+      fuente("demo/plans.ts", "calendarios")
+    ),
+    afirmacion(
+      "funcion.confirmacion_por_whatsapp",
+      "funcion",
+      "Confirma la cita al cliente por WhatsApp.",
+      fuente("demo/plans.ts", "confirmacion")
+    ),
+    afirmacion(
+      "funcion.numero_de_espana",
+      "funcion",
+      "Da al negocio un número de teléfono de España.",
+      fuente("demo/producto.md", "numero")
+    ),
+    afirmacion(
+      "funcion.registro_de_llamadas",
+      "funcion",
+      "Guarda un registro de las llamadas con su transcripción.",
+      fuente("demo/producto.md", "registro")
+    ),
+    afirmacion(
+      "funcion.horario_servicios_y_equipo",
+      "funcion",
+      "Conoce el horario, los servicios y el equipo del negocio.",
+      fuente("demo/producto.md", "negocio")
+    ),
+    afirmacion(
+      "funcion.asistente_por_whatsapp",
+      "funcion",
+      "El dueño habla con su asistente por WhatsApp: avisos y consultas de la agenda.",
+      fuente("demo/producto.md", "asistente")
+    ),
+    afirmacion(
+      "precio.desde",
+      "precio",
+      "Los planes de Alhabla empiezan en 59 € + IVA al mes.",
+      fuente("demo/plans.ts", "PRECIO_DESDE"),
+      { valor: { cuotaEur: 59 } }
+    ),
+    afirmacion(
+      "precio.iva",
+      "precio",
+      "Los precios se publican sin IVA; se añade el 21 %.",
+      fuente("demo/plans.ts", "IVA_PORCENTAJE"),
+      { valor: { ivaPorcentaje: 21 } }
+    ),
+    afirmacion(
+      "precio.prueba",
+      "precio",
+      "14 días de prueba. Sin permanencia. Cancela cuando quieras.",
+      fuente("demo/plans.ts", "TRIAL_REASSURANCE"),
+      { valor: { diasDePrueba: 14, permanencia: false } }
     ),
     afirmacion(
       "limite.profesionales_inicio",
@@ -1377,6 +1481,7 @@ export function crearAlmacenDeDemostracion(
     fuentes,
     nichos,
     competidores: competidoresDeEjemplo(hace),
+    tareas: tareasDeEjemplo(hace),
     ajustes: {
       valores: copiar(AJUSTES_POR_DEFECTO),
       actualizadoEn: {
@@ -1608,6 +1713,60 @@ function competidoresDeEjemplo(
       creadoEn: hace(1),
       analisisSolicitadoEn: null,
       analisis: [],
+    },
+  ];
+}
+
+/**
+ * Las tareas que ya tocó el fundador en la demostración: una descartada de las
+ * del repositorio (AlternativeTo, que solo tiene registro de usuario) y una
+ * añadida a mano ya hecha. Las iniciales que faltan las siembra la propia
+ * demostración al pedir la lista (`tareas-demo.ts`).
+ */
+function tareasDeEjemplo(
+  hace: (dias: number, horas?: number) => string
+): RegistroDeTarea[] {
+  return [
+    {
+      id: "demo-ta-alternativeto",
+      siembra: "alternativeto",
+      titulo: "AlternativeTo",
+      dominio: "alternativeto.net",
+      url: "https://alternativeto.net/",
+      categoria: "directorio_software",
+      pasos: [
+        "Abre la página.",
+        "Busca «para proveedores», «añadir producto» o «sugerir herramienta».",
+      ],
+      notas: "Solo se localizó registro de usuario.",
+      origen: "repo",
+      estado: "descartada",
+      resultado: null,
+      notaDeResultado:
+        "Solo deja sugerir alternativas con una cuenta de usuario.",
+      hechaEn: null,
+      creadoEn: hace(30),
+      orden: 5,
+    },
+    {
+      id: "demo-ta-guia-de-pymes",
+      siembra: null,
+      titulo: "Guía de herramientas para pymes (ejemplo)",
+      dominio: "guia-de-pymes.example",
+      url: "https://guia-de-pymes.example/herramientas",
+      categoria: "otro",
+      pasos: [
+        "Abre la página.",
+        "Rellena el formulario de «Sugerir una herramienta» con la Ficha de Alhabla.",
+      ],
+      notas: "Añadida a mano desde un artículo de comparativas.",
+      origen: "manual",
+      estado: "hecha",
+      resultado: "alta_creada",
+      notaDeResultado: "Publicada con el enlace a la página de planes.",
+      hechaEn: hace(6),
+      creadoEn: hace(9),
+      orden: 0,
     },
   ];
 }

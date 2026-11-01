@@ -104,4 +104,24 @@ export const clienteHttp: ClienteGrowth = {
         revision
       )
     ).data,
+
+  comparadorDeCompetencia: async () =>
+    (await api.get(`${RUTA}/competidores/comparador`)).data,
+
+  fichaDeAlhabla: async () => (await api.get(`${RUTA}/ficha-de-alhabla`)).data,
+
+  tareas: async () => (await api.get(`${RUTA}/tareas`)).data,
+  anadirTarea: async (alta) => (await api.post(`${RUTA}/tareas`, alta)).data,
+  editarTarea: async (id, cambios) =>
+    (await api.patch(`${RUTA}/tareas/${segmento(id)}`, cambios)).data,
+  marcarTareaHecha: async (id, marca) =>
+    (await api.post(`${RUTA}/tareas/${segmento(id)}/hecha`, marca)).data,
+  descartarTarea: async (id, descarte) =>
+    (await api.post(`${RUTA}/tareas/${segmento(id)}/descartar`, descarte)).data,
+  reabrirTarea: async (id) =>
+    (await api.post(`${RUTA}/tareas/${segmento(id)}/reabrir`, {})).data,
+  borrarTarea: async (id) => {
+    // 204 sin cuerpo.
+    await api.delete(`${RUTA}/tareas/${segmento(id)}`);
+  },
 };

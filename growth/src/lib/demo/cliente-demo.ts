@@ -15,6 +15,8 @@ import {
   transicionesPosibles,
 } from "./estados-demo";
 import { crearCompetenciaDeDemostracion } from "./competencia-demo";
+import { componerFichaDeAlhabla } from "./ficha-demo";
+import { crearTareasDeDemostracion } from "./tareas-demo";
 import { gruposDeBorrador } from "./grupos-de-borradores";
 import {
   DIAS_ENTRE_CONTACTOS_AL_MISMO_DOMINIO,
@@ -400,6 +402,9 @@ export function clienteDemo(
     ahoraIso,
     nuevoId,
   });
+
+  // Las tareas a mano, igual: su propio módulo, sin rastro en el Historial.
+  const tareas = crearTareasDeDemostracion({ almacen, ahoraIso, nuevoId });
 
   // --- Topes y contactos ---------------------------------------------------------
 
@@ -1803,5 +1808,37 @@ export function clienteDemo(
     reanalizarCompetidor: (id) => responder(() => competencia.reanalizar(id)),
     revisarAnalisis: (id, analisisId, revision) =>
       responder(() => competencia.revisar(id, analisisId, revision)),
+
+    comparadorDeCompetencia: () => responder(() => competencia.comparador()),
+
+    fichaDeAlhabla: () =>
+      responder(() => {
+        const snapshot = snapshotActual();
+        return componerFichaDeAlhabla(
+          afirmacionesVigentes(),
+          snapshot
+            ? {
+                commitSha: snapshot.commitSha,
+                sincronizadoEn: snapshot.sincronizadoEn,
+                antiguedadHoras: snapshot.antiguedadHoras,
+                obsoleto: snapshot.obsoleto,
+              }
+            : null
+        );
+      }),
+
+    tareas: () => responder(() => ({ data: tareas.listar() })),
+    anadirTarea: (alta) => responder(() => tareas.anadir(alta)),
+    editarTarea: (id, cambios) => responder(() => tareas.editar(id, cambios)),
+    marcarTareaHecha: (id, marca) =>
+      responder(() => tareas.marcarHecha(id, marca)),
+    descartarTarea: (id, descarte) =>
+      responder(() => tareas.descartar(id, descarte)),
+    reabrirTarea: (id) => responder(() => tareas.reabrir(id)),
+    // 204 sin cuerpo: no hay nada que copiar.
+    borrarTarea: async (id) => {
+      await esperar();
+      tareas.borrar(id);
+    },
   };
 }

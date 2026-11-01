@@ -343,9 +343,12 @@ describe("lecturas", () => {
       Object.values(todo.conteos).reduce((a, b) => a + b, 0)
     );
     expect(todo.porTipo.precio.map((a) => a.clave)).toEqual([
+      "precio.desde",
+      "precio.iva",
       "precio.plan.inicio",
       "precio.plan.pro",
       "precio.plan.scale",
+      "precio.prueba",
     ]);
     expect(todo.porTipo.prohibida.length).toBeGreaterThan(0);
     expect(
@@ -354,7 +357,7 @@ describe("lecturas", () => {
       )
     ).toBe(true);
     const soloPrecios = await cliente.conocimiento("precio");
-    expect(soloPrecios.porTipo.precio).toHaveLength(3);
+    expect(soloPrecios.porTipo.precio).toHaveLength(6);
     expect(soloPrecios.porTipo.funcion).toEqual([]);
     expect(soloPrecios.conteos.funcion).toBeGreaterThan(0);
   });

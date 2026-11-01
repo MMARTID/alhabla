@@ -73,6 +73,28 @@ análisis caducado) y las mismas transiciones y errores que el backend (`src/lib
 códigos o las transiciones. El agente no existe en la demostración: nadie escribe un análisis nuevo, así que un
 competidor recién añadido se queda «por analizar».
 
+El **Comparador** (`/competencia/comparador`, pestaña junto a la lista de Competencia) pone a Alhabla en la
+primera fila (de las afirmaciones `precio.plan.*` vigentes: cuota, minutos incluidos y minuto extra) y debajo cada
+competidor confirmado con los planes, precios y límites de su último análisis, cada precio con su fuente (enlace https
+`nofollow`) y el día en que se leyó. Se ordena por precio de entrada (un precio anual cuenta dividido entre 12; las monedas
+no se convierten ni se mezclan) y se filtra con «Solo revisados». Desde `lg` es una tabla; por debajo, una tarjeta por
+competidor. No llama a ningún modelo: son análisis ya guardados. En la demostración salen tres competidores (el propuesto
+no) y los precios de Alhabla de la semilla.
+
+Las **Tareas** (`/tareas`; en el móvil, dentro de «Más») son una lista de trabajo tuya: destinos que el agente no puede
+abrir (G2, Capterra… le dan 403) o que salen mejor a mano, cada uno con su enlace «Abrir» (solo si es https), sus pasos y
+las acciones **Marcar hecha** (resultado y nota opcionales), **Descartar**, **Reabrir**, **Editar** y **Añadir tarea**; las
+del repositorio se descartan, no se borran. Arriba, la **Ficha de Alhabla**: los textos para pegar (nombre, web,
+descripciones, precios, prueba, idiomas, categorías), compuestos en el servidor solo con afirmaciones vigentes, cada campo
+con su botón **Copiar** (copia exactamente lo que ves), el contador de caracteres frente al límite orientativo, las claves
+de las que sale, las que faltan y los avisos (términos prohibidos, conocimiento sin sincronizar). En la demostración la
+siembra de las 11 tareas iniciales es perezosa e idempotente como la del backend (`src/lib/demo/tareas-demo.ts`; una
+descartada y una hecha ya vienen de antes), la Ficha se compone con las mismas plantillas (`src/lib/demo/ficha-demo.ts`) y
+los errores son los mismos (`404`, `400` por topes y URL, `409 tarea_del_repositorio`).
+`tests/lib/paridad-del-panel-util.test.ts` lee `backend/src/modules/growth/` y falla si se separan las constantes, los
+topes, los campos de las respuestas, las rutas, el código de error, las transiciones, las tareas iniciales o las claves,
+etiquetas y textos fijos de la Ficha. Los tests que escriben fechas fijan el reloj del demo (`ahora: () => …`).
+
 Si cambias el contrato con el backend (`types.ts`), cambia también la demostración y las fixtures de
 `tests/fixtures/` (respuestas reales del servidor): `tests/components/acciones-contrato.test.tsx` ejecuta el
 mismo caso del contrato de `acciones` contra la demostración y contra una respuesta con la forma real.

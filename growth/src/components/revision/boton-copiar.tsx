@@ -32,6 +32,7 @@ export function BotonCopiar({
   className = "btn-secondary h-11",
   deshabilitado = false,
   soloIcono = false,
+  contexto,
 }: {
   texto: string;
   etiqueta?: string;
@@ -39,6 +40,12 @@ export function BotonCopiar({
   deshabilitado?: boolean;
   /** Solo el icono (la etiqueta queda para lectores de pantalla): para filas estrechas. */
   soloIcono?: boolean;
+  /**
+   * Qué se copia, solo para lectores de pantalla («Copiar» + «Nombre del
+   * producto»): en una lista de botones iguales cada uno dice a qué campo
+   * pertenece sin ensanchar el botón.
+   */
+  contexto?: string;
 }) {
   const [estado, setEstado] = useState<"reposo" | "copiado" | "fallo">(
     "reposo"
@@ -82,6 +89,12 @@ export function BotonCopiar({
     >
       <Icono className="h-4 w-4 shrink-0" aria-hidden="true" />
       <span className={soloIcono ? "sr-only" : undefined}>{rotulo}</span>
+      {contexto ? (
+        <>
+          {" "}
+          <span className="sr-only">{contexto}</span>
+        </>
+      ) : null}
     </button>
   );
 }

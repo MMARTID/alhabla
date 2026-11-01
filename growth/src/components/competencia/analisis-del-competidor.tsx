@@ -1,13 +1,12 @@
-import { EnlaceExterno } from "@/components/enlace-externo";
 import { Insignia } from "@/components/insignia";
-import { formatearFecha, formatearFechaYHora } from "@/lib/formato";
+import { formatearFechaYHora } from "@/lib/formato";
 import {
   DIAS_PARA_CADUCAR_UN_ANALISIS,
   type AnalisisDeCompetidor,
   type DatoDeCompetidor,
 } from "@/lib/types";
-import { urlHttpsSegura } from "@/lib/url-segura";
-import { agruparDatos, formatearPrecio, fuenteLegible } from "./utilidades";
+import { FuenteDeDato } from "./fuente-de-dato";
+import { agruparDatos, formatearPrecio } from "./utilidades";
 
 /**
  * Un dato del análisis: lo que dice, su precio si lo tiene, de qué página
@@ -16,7 +15,6 @@ import { agruparDatos, formatearPrecio, fuenteLegible } from "./utilidades";
  * `http://` o cualquier otra cosa se enseña como texto.
  */
 function FilaDeDato({ dato }: { dato: DatoDeCompetidor }) {
-  const enlace = urlHttpsSegura(dato.urlFuente);
   return (
     <li className="px-4 py-3.5 sm:px-5">
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
@@ -37,19 +35,7 @@ function FilaDeDato({ dato }: { dato: DatoDeCompetidor }) {
       <p className="mt-1 whitespace-pre-line text-sm text-tinta-2 [overflow-wrap:anywhere]">
         {dato.texto}
       </p>
-      <p className="mt-1.5 text-xs text-muted [overflow-wrap:anywhere]">
-        Fuente:{" "}
-        {enlace ? (
-          <EnlaceExterno href={enlace} conIcono className="text-morado-tinta">
-            {fuenteLegible(dato.urlFuente)}
-          </EnlaceExterno>
-        ) : (
-          <span>
-            {dato.urlFuente} (no se enlaza: no es una dirección https)
-          </span>
-        )}{" "}
-        · Consultado el {formatearFecha(dato.consultadoEn)}
-      </p>
+      <FuenteDeDato dato={dato} className="mt-1.5" />
     </li>
   );
 }

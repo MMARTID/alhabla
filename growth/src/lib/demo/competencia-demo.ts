@@ -4,12 +4,15 @@ import {
   LARGO_MAXIMO_DE_NOMBRE_DE_COMPETIDOR,
   LARGO_MAXIMO_DE_NOTAS_DE_COMPETIDOR,
   LARGO_MAXIMO_DE_URL_DE_COMPETIDOR,
+  TIPOS_DE_DATO_DEL_COMPARADOR,
   type AltaDeCompetidor,
   type AnalisisDeCompetidor,
   type CambioDeCompetidor,
   type CompetidorDetalle,
   type CompetidorResumen,
   type EstadoDeCompetidor,
+  type FilaDelComparador,
+  type RespuestaDelComparador,
   type RevisionDeAnalisis,
 } from "../types";
 import { urlSegura } from "../url-segura";
@@ -200,6 +203,47 @@ export function crearCompetenciaDeDemostracion(
       .map(resumen);
   }
 
+  /**
+   * El comparador: todos menos los propuestos, por nombre, con los datos de
+   * comparación del ÚLTIMO análisis. Sin análisis, la fila sale con `datos`
+   * vacío. Como el backend, una sola pasada y sin tocar nada.
+   */
+  function comparador(): RespuestaDelComparador {
+    const tipos: readonly string[] = TIPOS_DE_DATO_DEL_COMPARADOR;
+    const data = [...almacen.competidores]
+      .filter((c) => c.estado !== "propuesto")
+      .sort(
+        (a, b) =>
+          a.nombre.localeCompare(b.nombre, "es") || a.id.localeCompare(b.id)
+      )
+      .map((c): FilaDelComparador => {
+        const ultimo = c.analisis[c.analisis.length - 1] ?? null;
+        return {
+          competidorId: c.id,
+          nombre: c.nombre,
+          dominio: c.dominio,
+          url: c.url,
+          origen: c.origen,
+          estado: c.estado as FilaDelComparador["estado"],
+          analisis: ultimo
+            ? {
+                id: ultimo.id,
+                version: ultimo.version,
+                creadoEn: ultimo.creadoEn,
+                revisadoEn: ultimo.revisadoEn,
+                caducado:
+                  ahoraMs() - Date.parse(ultimo.creadoEn) >
+                  DIAS_PARA_CADUCAR_UN_ANALISIS * DIA,
+              }
+            : null,
+          datos: ultimo
+            ? ultimo.datos.filter((d) => tipos.includes(d.tipo))
+            : [],
+        };
+      });
+    return { data, generadoEn: ahoraIso() };
+  }
+
   function analisisDe(id: string, analisisId: string): AnalisisDeCompetidor {
     const c = obligatorio(id);
     const encontrado = c.analisis.find((a) => a.id === analisisId);
@@ -277,22 +321,35 @@ export function crearCompetenciaDeDemostracion(
           ? null
           : notasValidas(cambios.notas);
     let url: string | null | undefined;
+    let dominio: string | undefined;
     if (cambios.url === null) url = null;
     else if (cambios.url !== undefined) {
       const segura = urlValida(cambios.url);
       comprobarQueEsExterna(segura);
-      if (dominioDe(segura) !== c.dominio) {
-        throw new ErrorDeCliente(
-          400,
-          `La URL debe ser de ${c.dominio}: el dominio de un competidor no cambia.`,
-          { codigo: "url_de_otro_dominio" }
-        );
+      const dominioNuevo = dominioDe(segura);
+      if (dominioNuevo !== c.dominio) {
+        if (!cambios.cambiarDominio) {
+          throw new ErrorDeCliente(
+            400,
+            `La URL es de otro dominio que ${c.dominio}. Si el competidor cambió de web, confirma el cambio de dominio.`,
+            { codigo: "url_de_otro_dominio" }
+          );
+        }
+        if (almacen.competidores.some((x) => x.dominio === dominioNuevo)) {
+          throw new ErrorDeCliente(
+            409,
+            "Ya existe un competidor con ese dominio.",
+            { codigo: "competidor_existente" }
+          );
+        }
+        dominio = dominioNuevo;
       }
       url = limpiarUrl(segura);
     }
     if (nombre !== undefined) c.nombre = nombre;
     if (notas !== undefined) c.notas = notas;
     if (url !== undefined) c.url = url;
+    if (dominio !== undefined) c.dominio = dominio;
     return detalle(c);
   }
 
@@ -387,6 +444,7 @@ export function crearCompetenciaDeDemostracion(
 
   return {
     listar,
+    comparador,
     detalle: (id: string) => detalle(obligatorio(id)),
     analisis: analisisDe,
     anadir,

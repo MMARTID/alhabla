@@ -25,7 +25,7 @@ const AYUDA_POR_CODIGO: Record<string, string> = {
   dominio_propio:
     "Un competidor tiene que ser otra empresa: pega la web del competidor, no la de Alhabla.",
   url_de_otro_dominio:
-    "El dominio de un competidor no se cambia: usa una página del mismo sitio o deja la dirección vacía.",
+    "La dirección es de otro dominio: confirma el cambio de dominio al guardar.",
   competidor_del_repositorio:
     "Viene del repositorio y el sincronizador lo volvería a crear. Si ya no compite contigo, se quita allí.",
   estado_incorrecto:
@@ -33,6 +33,9 @@ const AYUDA_POR_CODIGO: Record<string, string> = {
   analisis_antiguo:
     "El agente ha guardado un análisis más reciente: recarga y revisa ese.",
   ya_revisado: "Ya estaba revisado: recarga para ver cómo está ahora.",
+  // Las tareas a mano.
+  tarea_del_repositorio:
+    "Viene del repositorio y se volvería a sembrar. Descártala en vez de borrarla.",
 };
 
 /** Qué hacer ante un `codigo` conocido, o `null` si no hay consejo. */

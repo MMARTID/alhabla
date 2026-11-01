@@ -1,16 +1,20 @@
 import type {
   AccionDeDecision,
+  CategoriaDeTarea,
   Canal,
   CodigoDescarte,
   EstadoDeBorrador,
   EstadoDeCompetidor,
   EstadoDeEjecucion,
   EstadoDeOportunidad,
+  EstadoDeTarea,
   GrupoDeBorradores,
   Objetivo,
   OrigenDeCompetidor,
+  OrigenDeTarea,
   Resultado,
   ResultadoDeGestion,
+  ResultadoDeTarea,
   TipoDeAfirmacion,
   TipoDeBorrador,
   TipoDeDatoDeCompetidor,
@@ -357,3 +361,42 @@ export const GRUPOS_DE_DATOS_DE_COMPETIDOR: ReadonlyArray<{
   },
   { clave: "otros", titulo: "Otros datos", tipos: ["otro"] },
 ];
+
+// --- Tareas a mano --------------------------------------------------------
+
+export const ETIQUETA_DE_CATEGORIA_DE_TAREA: Record<CategoriaDeTarea, string> =
+  {
+    directorio_software: "Directorio de software",
+    directorio_ia: "Directorio de IA",
+    sector: "Sector",
+    asociacion: "Asociación",
+    otro: "Otro",
+  };
+
+export const ETIQUETA_DE_ESTADO_DE_TAREA: Record<EstadoDeTarea, string> = {
+  pendiente: "Pendiente",
+  hecha: "Hecha",
+  descartada: "Descartada",
+};
+
+export const ETIQUETA_DE_ORIGEN_DE_TAREA: Record<OrigenDeTarea, string> = {
+  repo: "Del repositorio",
+  manual: "Añadida por ti",
+};
+
+export const ETIQUETA_DE_RESULTADO_DE_TAREA: Record<ResultadoDeTarea, string> =
+  {
+    alta_creada: "Alta creada",
+    en_revision: "En revisión",
+    rechazada: "Rechazada",
+    sin_alta_gratuita: "Sin alta gratuita",
+    otro: "Otro",
+  };
+
+export const TONO_DE_RESULTADO_DE_TAREA: Record<ResultadoDeTarea, Tono> = {
+  alta_creada: "exito",
+  en_revision: "morado",
+  rechazada: "error",
+  sin_alta_gratuita: "aviso",
+  otro: "neutro",
+};

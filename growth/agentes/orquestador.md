@@ -46,16 +46,16 @@ siguiente.** Al llegar a un tope, ese concepto se acaba; no pidas más.
 
 | Concepto | Tope |
 |---|---|
-| Búsquedas web (`WebSearch`) | 26 en total: descubrimiento 14, investigación 6, competencia 6 |
-| Páginas leídas (`WebFetch`) | 64 en total: descubrimiento 18, calificación 10, investigación 18, competencia 18 |
-| Oportunidades nuevas (`crear_oportunidad`) | 20 |
+| Búsquedas web (`WebSearch`) | 28 en total: descubrimiento 16, investigación 6, competencia 6 |
+| Páginas leídas (`WebFetch`) | 72 en total: descubrimiento 26, calificación 10, investigación 18, competencia 18 |
+| Oportunidades nuevas (`crear_oportunidad`) | 26 |
 | Propuestas de competidor | 5 |
 | Oportunidades que pasan a investigación | `min(6, max(tope − estaSemana, 0) + 1)`, con `tope` y `estaSemana` de `leer_contexto › contactos` |
 | Versiones de borrador por oportunidad | 2 (la primera y una corrección); los que siguen bloqueados se dejan así |
 | Oportunidades devueltas o bloqueadas que se reescriben | 3 |
 | URL manuales del fundador que se procesan | 5 |
 | Competidores que se analizan | 3 |
-| Subagentes lanzados | 36 |
+| Subagentes lanzados | 37 |
 
 Para que el panel no se llene: si `listar_oportunidades` con
 `estados: ["pendiente_aprobacion"]` (límite 1) da `total ≥ 8`, no se crean
@@ -137,16 +137,26 @@ Antes de buscar nada nuevo, lo que ya existe y es del fundador:
 
 ### 4. Descubrimiento (primera tanda)
 
-Cuatro lanzamientos de `growth-descubrimiento`, uno por foco, en este orden.
+Cinco lanzamientos de `growth-descubrimiento`, uno por foco, en este orden.
 Presupuesto de cada uno entre paréntesis (búsquedas / páginas / oportunidades /
 propuestas) y suma el total de la tabla:
 
 | Foco | Qué busca | Presupuesto |
 |---|---|---|
+| `semillas` | Las semillas de `growth/agentes/semillas.md`: directorios de software y de herramientas de IA donde ya aparecen los competidores, y las pistas locales | 2 / 8 / 6 / 0 |
 | `comparativas` | Comparativas, rankings y artículos de «recepcionista de IA» en España | 4 / 6 / 6 / 2 |
 | `directorios` | Beautymarket y directorios del sector con ficha gratuita | 3 / 4 / 4 / 0 |
 | `asociaciones` | Asociaciones y clústeres de peluquería, estética, uñas y fisioterapia (ANEPE, asociaciones regionales…) | 3 / 4 / 4 / 0 |
 | `menciones` | Páginas que listan o comparan a los competidores confirmados («alternativas a…»); marca `competidoresMencionados` y propone competidores nuevos | 4 / 4 / 6 / 3 |
+
+**Para `semillas`**, antes de lanzarlo lee con `Read` `growth/agentes/semillas.md`
+y quédate con las filas de las tres primeras secciones que **no** estén marcadas
+«Hecha» ni «No aplican». Para cada dominio, `listar_oportunidades` con `dominio`
+(límite 1, cualquier estado): si ya hay una oportunidad, sáltala. Pásale al
+subagente hasta 6 semillas (3 en `ligero`), en el orden del fichero, con su
+dominio, su página de partida y su nota. Si no queda ninguna, el foco queda
+`omitido` y lo dices en el informe: significa que el fundador tiene que ampliar
+la lista.
 
 Qué le pasas a cada uno (en el `prompt`, como texto plano): `ahoraDelRun`, el
 foco, el presupuesto, los competidores confirmados (nombre y dominio),

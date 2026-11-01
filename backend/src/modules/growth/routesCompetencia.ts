@@ -8,6 +8,7 @@ import {
   PropuestaDeCompetidorBody,
   RevisionDeAnalisisBody,
 } from "./esquemas.js";
+import { comparadorDePrecios } from "./comparadorDePrecios.js";
 import { guardiaDePausa } from "./service.js";
 import {
   aceptarCompetidor,
@@ -31,10 +32,11 @@ import {
  * `Cache-Control: no-store` y el manejador de errores.
  *
  * - `/growth/admin/competidores/*`: el administrador da de alta por URL,
- *   edita, quita, acepta lo que propone el agente, pide volver a analizar y
- *   revisa. Pasa por `autenticarAdminGrowth` (ID token de Google): un token de
- *   agente no abre NINGUNA de estas rutas, así que el agente no puede
- *   aceptar, quitar ni revisar.
+ *   edita, quita, acepta lo que propone el agente, pide volver a analizar,
+ *   revisa y ve el comparador de precios (`/comparador`). Pasa por
+ *   `autenticarAdminGrowth` (ID token de Google): un token de agente no abre
+ *   NINGUNA de estas rutas, así que el agente no puede aceptar, quitar ni
+ *   revisar.
  * - `/growth/agente/competidores/*`: el agente lee la lista, propone y guarda
  *   análisis. Escribir pasa por `guardiaDePausa`.
  *
@@ -53,6 +55,11 @@ export const growthRoutesCompetencia: FastifyPluginAsync = async (fastify) => {
 
   fastify.get("/growth/admin/competidores", admin, async () =>
     listarCompetidores()
+  );
+
+  // Antes que `/:id` solo por legibilidad: el router da prioridad a la ruta fija.
+  fastify.get("/growth/admin/competidores/comparador", admin, async () =>
+    comparadorDePrecios()
   );
 
   fastify.post("/growth/admin/competidores", admin, async (request, reply) => {

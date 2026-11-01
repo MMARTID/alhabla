@@ -678,6 +678,15 @@ describe("competencia contra Postgres real (Fase 2a)", () => {
       });
       expect(otro.statusCode).toBe(400);
       expect(otro.json().codigo).toBe("url_de_otro_dominio");
+      const nueva = await admin("PATCH", `/growth/admin/competidores/${id}`, {
+        url: "https://rival.es/inicio",
+        cambiarDominio: true,
+      });
+      expect(nueva.statusCode).toBe(200);
+      expect(nueva.json()).toMatchObject({
+        dominio: "rival.es",
+        url: "https://rival.es/inicio",
+      });
       const borrada = await admin("PATCH", `/growth/admin/competidores/${id}`, {
         notas: null,
         url: null,

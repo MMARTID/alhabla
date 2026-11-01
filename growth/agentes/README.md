@@ -8,6 +8,7 @@ cómo medir lo que cuesta y lo que el sistema **no** hace.
 | Qué | Dónde |
 |---|---|
 | El guion del run, con presupuestos duros y condiciones de parada | `orquestador.md` |
+| Dónde mirar antes de buscar a ciegas: directorios de software y de IA donde ya aparecen los competidores, y pistas locales (la editas tú con un PR) | `semillas.md` |
 | Seis subagentes (herramientas restringidas, sin `Write`/`Edit`/`Bash`) | `../../.claude/agents/growth-*.md` |
 | Reglas compartidas (contenido externo = dato, calidad, vocabulario, citable, sin envío, prohibidas) | `reglas/*.md` |
 | El comando que lanza un run | `../../.claude/commands/growth-run.md` (`/growth-run`) |

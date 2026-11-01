@@ -21,6 +21,7 @@ const DESTINOS = [
   ["Historial", "/historial"],
   ["Conocimiento", "/conocimiento"],
   ["Competencia", "/competencia"],
+  ["Tareas", "/tareas"],
   ["Ejecuciones", "/ejecuciones"],
   ["Ajustes", "/ajustes"],
 ] as const;
@@ -45,7 +46,7 @@ afterEach(() => {
 });
 
 describe("PanelShell", () => {
-  it("la barra lateral enlaza a las siete vistas y marca la actual", async () => {
+  it("la barra lateral enlaza a las ocho vistas y marca la actual", async () => {
     ruta = "/historial";
     montar();
     const [lateral] = screen.getAllByRole("navigation", { name: "Principal" });
@@ -99,7 +100,7 @@ describe("PanelShell", () => {
     );
   });
 
-  it("«Más» abre Competencia, Ejecuciones, Ajustes, la apariencia y cerrar sesión; Escape lo cierra", async () => {
+  it("«Más» abre Competencia, Tareas, Ejecuciones, Ajustes, la apariencia y cerrar sesión; Escape lo cierra", async () => {
     const user = userEvent.setup();
     montar();
     const mas = screen.getByRole("button", { name: "Más" });
@@ -110,6 +111,10 @@ describe("PanelShell", () => {
     expect(
       within(menu).getByRole("link", { name: "Competencia" })
     ).toHaveAttribute("href", "/competencia");
+    expect(within(menu).getByRole("link", { name: "Tareas" })).toHaveAttribute(
+      "href",
+      "/tareas"
+    );
     expect(
       within(menu).getByRole("link", { name: "Ejecuciones" })
     ).toHaveAttribute("href", "/ejecuciones");
@@ -147,6 +152,39 @@ describe("PanelShell", () => {
     ruta = "/ajustes";
     montar();
     const barra = screen.getAllByRole("navigation", { name: "Principal" })[1];
+    expect(
+      within(barra).getByRole("button", { name: "Más" }).className
+    ).toContain("text-morado-tinta");
+  });
+
+  it("el comparador cuelga de Competencia, y Tareas vive en «Más» en el móvil", () => {
+    ruta = "/competencia/comparador";
+    montar();
+    const [lateral, barra] = screen.getAllByRole("navigation", {
+      name: "Principal",
+    });
+    expect(
+      within(lateral).getByRole("link", { name: "Competencia" })
+    ).toHaveAttribute("aria-current", "page");
+    expect(
+      within(lateral).getByRole("link", { name: "Tareas" })
+    ).not.toHaveAttribute("aria-current");
+    expect(
+      within(barra)
+        .getAllByRole("link")
+        .map((l) => l.textContent)
+    ).not.toContain("Tareas");
+  });
+
+  it("Tareas se marca en el lateral y deja marcado «Más» en el móvil", () => {
+    ruta = "/tareas";
+    montar();
+    const [lateral, barra] = screen.getAllByRole("navigation", {
+      name: "Principal",
+    });
+    expect(
+      within(lateral).getByRole("link", { name: "Tareas" })
+    ).toHaveAttribute("aria-current", "page");
     expect(
       within(barra).getByRole("button", { name: "Más" }).className
     ).toContain("text-morado-tinta");

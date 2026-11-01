@@ -1526,6 +1526,43 @@ model GrowthCompetidorAnalisis {
   @@map("growth_competidor_analisis")
 }
 
+/// Una tarea a mano del fundador: un destino que el agente no puede abrir
+/// (G2, Capterra… dan 403) o que se hace mejor a mano. Lleva su enlace, sus
+/// pasos y la marca de hecho con el resultado. Las `origen = repo` las siembra
+/// el servidor la primera vez que se piden (`tareasIniciales.ts`) y no se
+/// borran, solo se descartan; las `manual` las añade el administrador. No
+/// cuelga de ninguna oportunidad ni la lee el agente.
+model GrowthTarea {
+  id              String    @id @default(cuid())
+  titulo          String
+  /// Sin `www.`. Informativo: el enlace es `url`.
+  dominio         String?
+  url             String
+  /// directorio_software | directorio_ia | sector | asociacion | otro
+  categoria       String    @default("otro")
+  /// `string[]` (hasta 12 pasos de 300 caracteres), validado con Zod.
+  pasos           Json      @default("[]")
+  notas           String?
+  /// repo | manual
+  origen          String    @default("repo")
+  /// Identidad estable de una tarea sembrada (`capterra`, `g2`…): el índice
+  /// único hace la siembra idempotente aunque dos peticiones lleguen a la vez.
+  /// Null en las manuales (Postgres admite varios NULL en un índice único), así
+  /// que un dominio puede tener varias tareas y editar uno no duplica la siembra.
+  siembra         String?   @unique
+  /// pendiente | hecha | descartada
+  estado          String    @default("pendiente")
+  /// alta_creada | en_revision | rechazada | sin_alta_gratuita | otro
+  resultado       String?
+  notaDeResultado String?
+  hechaEn         DateTime?
+  creadoEn        DateTime  @default(now())
+  orden           Int       @default(0)
+
+  @@index([estado, orden])
+  @@map("growth_tareas")
+}
+
 model GrowthEnlaceEntrante {
   id             String             @id @default(cuid())
   dominioOrigen  String
