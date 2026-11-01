@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { resolverContextoDeLlamada } from "../../src/lib/contextoDeLlamada.js";
+import { proximosDias } from "../../src/lib/proximosDias.js";
 import { prisma } from "../../src/lib/prisma.js";
 import { DEFAULT_AGENT_SETTINGS } from "../../src/lib/managedAgentPrompt.js";
 
@@ -53,6 +54,7 @@ describe("resolverContextoDeLlamada", () => {
         nombre_cliente: "",
         ultimo_servicio: "",
         contexto_cliente: "",
+        proximos_dias: proximosDias(AHORA, "Europe/Madrid"),
       },
     });
     // Solo los datos de ese negocio y ese teléfono.
@@ -136,6 +138,7 @@ describe("resolverContextoDeLlamada", () => {
         contexto_cliente: expect.stringMatching(
           /^## Cliente\nQuien llama reservó la última vez con este teléfono como Lucía \(Corte\)\./
         ),
+        proximos_dias: proximosDias(AHORA, "Europe/Madrid"),
       },
     });
     // Solo servicios activos de ese negocio.

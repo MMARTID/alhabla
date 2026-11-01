@@ -101,6 +101,7 @@ Si el mensaje empieza por [WhatsApp · número · fecha y hora], estás en un ch
 
 Momento actual en la zona del negocio:
 {{current_time_Europe/Madrid}}
+{{proximos_dias}}
 
 ## Idioma
 Contesta cada turno en el idioma en que te habla quien llama si es uno de estos: español de España, inglés, francés, catalán, alemán, italiano, portugués, neerlandés, ruso; también tu primera respuesta, lo que digas después de usar una herramienta (aunque te conteste en castellano), los nombres de los servicios, el resumen de la reserva, la pregunta del WhatsApp y la despedida. No cambies de idioma por tu cuenta mientras siga hablando en el suyo."

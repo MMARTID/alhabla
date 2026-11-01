@@ -20,6 +20,7 @@ import { cooficialDeLaZona } from "../../lib/idiomas/zona.js";
 import { resolverIdiomas } from "../../lib/idiomas/resolver.js";
 import { parseAgentSettings } from "../../lib/managedAgentPrompt.js";
 import { reglasDelChat } from "../../lib/seccionesDelPrompt.js";
+import { esAvisoDeBucleDeTelnyx } from "../../lib/avisoDeBucleDeTelnyx.js";
 
 /**
  * La recepcionista por chat (PLAN-CANAL-DUENO.md § 7, fase 2 / PR 1): el
@@ -337,10 +338,7 @@ function esConversacionInexistente(error: unknown): boolean {
   return status === 404;
 }
 
-/** El texto fijo con el que Telnyx corta un turno en bucle de tools. */
-export function esAvisoDeBucleDeTelnyx(respuesta: string): boolean {
-  return /stuck in a loop repeating the same tool action/i.test(respuesta);
-}
+export { esAvisoDeBucleDeTelnyx };
 
 /**
  * Un turno del cliente con la recepcionista de su negocio. `texto` es lo

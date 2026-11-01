@@ -10,6 +10,7 @@ import {
 } from "./idiomas/catalogo.js";
 import { vozDeLaCooficial } from "./telnyxAssistantPayload.js";
 import { isBusinessType, type BusinessType } from "./businessType.js";
+import { PERFILES_DE_SECTOR } from "./sectores/perfiles.js";
 import {
   estadoDeGrabacion,
   telefonoDelCliente,
@@ -19,6 +20,7 @@ import {
   contextoDelCliente,
   type VariablesDeLaLlamada,
 } from "./seccionesDelPrompt.js";
+import { proximosDias } from "./proximosDias.js";
 
 /**
  * Lo que la recepcionista sabe de una llamada antes de descolgar
@@ -42,17 +44,6 @@ export interface ContextoDeLlamada {
   voz: ReturnType<typeof vozDeLaCooficial> | null;
 }
 
-/**
- * Nichos en los que el saludo no nombra el último servicio: puede ser un
- * dato de salud y el teléfono puede usarlo otra persona de la casa. Se dice
- * «lo de la última vez»; el servicio sigue llegando al prompt.
- */
-const SIN_SERVICIO_EN_EL_SALUDO: ReadonlySet<BusinessType> = new Set([
-  "fisioterapia",
-  "centro-de-estetica",
-  "other",
-]);
-
 const UNA_SEMANA_MS = 7 * 24 * 60 * 60 * 1000;
 
 export async function resolverContextoDeLlamada(input: {
@@ -64,6 +55,8 @@ export async function resolverContextoDeLlamada(input: {
     /** Para la cooficial de la zona (lib/idiomas/zona.ts). */
     address?: string | null;
     businessDetails?: string | null;
+    /** Para {{proximos_dias}}; sin ella, la de Madrid. */
+    timezone?: string | null;
   };
   /** `from` de la llamada; null o «anonymous» si llama con número oculto. */
   telefono: string | null;
@@ -159,7 +152,11 @@ export async function resolverContextoDeLlamada(input: {
   // idioma del negocio, que leídos dentro de otro suenan mal. Si no, «lo de
   // la última vez».
   const servicioDelSaludo =
-    !SIN_SERVICIO_EN_EL_SALUDO.has(tipo) &&
+    // En los sectores con datoSensible el saludo no nombra el último
+    // servicio: puede ser un dato de salud y el teléfono puede usarlo otra
+    // persona de la casa. Se dice «lo de la última vez»; el servicio sigue
+    // llegando al prompt.
+    !PERFILES_DE_SECTOR[tipo].datoSensible &&
     perfil.principal === IDIOMA_OBLIGATORIO &&
     idiomaDelSaludo === IDIOMA_OBLIGATORIO &&
     nombresDeServicios.length === 1
@@ -182,6 +179,7 @@ export async function resolverContextoDeLlamada(input: {
       ultimo_servicio: ultimoServicio ?? "",
       // El bloque del prompt v2; v1 no lo usa y Telnyx lo ignora.
       contexto_cliente: contextoDelCliente(nombre, ultimoServicio),
+      proximos_dias: proximosDias(ahora, business.timezone ?? "Europe/Madrid"),
     },
   };
 }

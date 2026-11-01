@@ -1,4 +1,5 @@
 import type { BusinessType } from "./businessType.js";
+import { PERFILES_DE_SECTOR } from "./sectores/perfiles.js";
 import type { TransferenciaAlDueno } from "./transferenciaAlDueno.js";
 import type { AgentSettings, VersionDelPrompt } from "./managedAgentPrompt.js";
 
@@ -50,6 +51,9 @@ export interface VariablesDeLaLlamada {
   /** El bloque «## Cliente» del prompt v2 (contextoDelCliente); vacío si
    * no se conoce. v1 no lo usa. */
   contexto_cliente: string;
+  /** Hoy y los 13 días siguientes con su día de la semana (lib/
+   * proximosDias.ts). Vacío en el chat: cada mensaje trae su fecha. */
+  proximos_dias: string;
 }
 
 /** Los valores de quien no se conoce: el assistant los guarda por defecto
@@ -58,7 +62,7 @@ export interface VariablesDeLaLlamada {
  * cuyo prompt lo usa (v2), y así el de v1 no cambia ni un byte. */
 export const VARIABLES_DE_LA_LLAMADA_POR_DEFECTO: Readonly<
   Omit<VariablesDeLaLlamada, "contexto_cliente">
-> = { nombre_cliente: "", ultimo_servicio: "" };
+> = { nombre_cliente: "", ultimo_servicio: "", proximos_dias: "" };
 
 /** La variable del bloque del cliente conocido en el prompt v2. */
 export const VARIABLE_DEL_CONTEXTO_DEL_CLIENTE = "{{contexto_cliente}}";
@@ -98,27 +102,6 @@ const GOAL_INSTRUCTIONS: Record<AgentSettings["primaryGoal"], string> = {
 const ESCALATION_INSTRUCTIONS: Record<AgentSettings["escalation"], string> = {
   take_message: "Si no puedes resolver algo con información verificada, toma un recado claro con nombre, teléfono y motivo.",
   request_callback: "Si no puedes resolver algo con información verificada, solicita nombre y teléfono para que el equipo devuelva la llamada.",
-};
-
-/**
- * Instrucciones específicas por tipo de negocio: qué preguntar además de los
- * datos básicos de la reserva. Añadir un nicho nuevo es una línea aquí, no
- * una rama de código nueva. La de fisioterapia pide el motivo en términos
- * generales a propósito: no solicita datos de salud estructurados.
- */
-const NICHE_INSTRUCTIONS: Record<BusinessType, string> = {
-  peluqueria:
-    "Si la petición es ambigua (por ejemplo, \"quiero cambiar de look\"), pregunta primero si busca corte, color o peinado. Si ya sabe lo que quiere, no le interrogues de nuevo. Para trabajos técnicos o dudas sobre el resultado, no prometas un resultado: ofrece una valoración o que el equipo le oriente.",
-  barberia:
-    "Aclara solo lo necesario entre corte, barba o ambos. Si pide un estilo sin concretar, pregunta una sola preferencia útil (por ejemplo, si quiere mantener largo o un degradado); no recomiendes ni prometas un resultado técnico que el barbero deba valorar en persona.",
-  fisioterapia:
-    "Pregunta el motivo de la consulta en términos generales (primera visita, seguimiento, rehabilitación o descarga), sin solicitar historial clínico ni detalles médicos innecesarios. No diagnostiques, no pautes ejercicios ni afirmes qué lesión tiene. Si describe una urgencia clara, indícale que contacte con emergencias o un profesional sanitario sin demorar esa atención.",
-  "salon-de-unas":
-    "Aclara solo si es manicura o pedicura, el acabado principal y, cuando aplique, si es una aplicación nueva, mantenimiento o retirada. Si el servicio está claro, pasa a la cita sin repasar todos los acabados ni decoraciones posibles.",
-  "centro-de-estetica":
-    "Aclara el tratamiento que busca y pregunta si es la primera vez únicamente cuando sea relevante para una valoración previa. No asegures resultados estéticos ni aconsejes sobre contraindicaciones: si la duda requiere valoración profesional, toma el recado o ofrece que el centro contacte con la persona.",
-  other:
-    "Aclara con una pregunta breve qué necesita antes de hablar de una cita. Si no existe un servicio verificable que encaje, no lo inventes: toma un recado o propone que el equipo le contacte.",
 };
 
 function formatMinutesForHumans(minutes: number): string {
@@ -243,7 +226,11 @@ function seccionGrabacion(): Parrafos {
   ];
 }
 
-function seccionCatalogo(): Parrafos {
+function seccionCatalogo({ businessType }: ContextoDelPrompt): Parrafos {
+  // Los ejemplos, del perfil del sector (lib/sectores/perfiles.ts): los de
+  // los sectores de antes son los de siempre, con los que se midió.
+  const { preguntas, sinonimos } =
+    PERFILES_DE_SECTOR[businessType ?? "other"].catalogo;
   return [
     // Llamadas de prueba del 2026-10-05 y medición del 07-10 (chat de
     // assistants de Telnyx, mismo modelo y tools): ante «do you do
@@ -259,8 +246,8 @@ function seccionCatalogo(): Parrafos {
     // con flux y ~3,4 s con Soniox. «Sin volver a llamarla» porque con la
     // primera redacción la repetía en cada pregunta (hasta 3 por llamada).
     TITULO_DEL_BLOQUE_DEL_CATALOGO,
-    "Qué servicios hace este negocio, quién trabaja en él y cuándo abre solo lo sabes por get_catalog, no por lo que suele hacer un negocio como este. La primera vez que pregunten por eso, también si es de sí o no («¿hacéis mechas?», «do you do beard trims?») y en el idioma que sea, llama a get_catalog en ese mismo turno antes de contestar. Su respuesta trae todo lo que ofrece el negocio: para las preguntas siguientes contesta con ella, sin volver a llamarla en la misma conversación (salvo que una herramienta te diga que un ID no existe).",
-    "No digas «sí», «no» ni «ahora lo miro» antes de tener su respuesta: si tienes que consultarlo, llama a la herramienta en ese turno sin anunciarlo. Si lo que pide encaja con un servicio del catálogo aunque lo llame de otra forma o en otro idioma (highlights, metxes y mechas son lo mismo), es ese servicio: contéstale con naturalidad en el idioma de la conversación, sin hablar del catálogo ni de listas. Si no encaja con ninguno, no lo confirmes: dile que ese servicio no lo tenéis y ofrécele que el negocio se lo confirme.",
+    `Qué servicios hace este negocio, quién trabaja en él y cuándo abre solo lo sabes por get_catalog, no por lo que suele hacer un negocio como este. La primera vez que pregunten por eso, también si es de sí o no (${preguntas}) y en el idioma que sea, llama a get_catalog en ese mismo turno antes de contestar. Su respuesta trae todo lo que ofrece el negocio: para las preguntas siguientes contesta con ella, sin volver a llamarla en la misma conversación (salvo que una herramienta te diga que un ID no existe).`,
+    `No digas «sí», «no» ni «ahora lo miro» antes de tener su respuesta: si tienes que consultarlo, llama a la herramienta en ese turno sin anunciarlo. Si lo que pide encaja con un servicio del catálogo aunque lo llame de otra forma o en otro idioma (${sinonimos} son lo mismo), es ese servicio: contéstale con naturalidad en el idioma de la conversación, sin hablar del catálogo ni de listas. Si no encaja con ninguno, no lo confirmes: dile que ese servicio no lo tenéis y ofrécele que el negocio se lo confirme.`,
   ];
 }
 
@@ -307,7 +294,7 @@ function seccionPrecios({ settings }: ContextoDelPrompt): Parrafos {
 function seccionLimites({ settings, businessType }: ContextoDelPrompt): Parrafos {
   return [
     "## Límites",
-    businessType ? NICHE_INSTRUCTIONS[businessType] : null,
+    businessType ? PERFILES_DE_SECTOR[businessType].pautas : null,
     ESCALATION_INSTRUCTIONS[settings.escalation],
     "No inventes precios, servicios, disponibilidad, profesionales ni políticas. Si falta información verificada, dilo y escala.",
   ];
@@ -382,6 +369,9 @@ function seccionUsoDeHerramientas({ listaDeEspera }: ContextoDelPrompt): Parrafo
     // Llamada de producción del 14-10: dijo «dijous setze» de una cita del
     // jueves 15. Las tools devuelven el día ya escrito (voiceDateTime.ts).
     "Para decir el día y la hora de una cita usa el campo cuando que te devuelven las herramientas, en el idioma de la conversación: no calcules tú el día de la semana ni del mes.",
+    // Laboratorio, E4 (30-10): a «dijous» contestó «¿el dos o el nueve?»,
+    // dos lunes, sin consultar nada.
+    "Si te dicen un día por su nombre («el jueves»), no preguntes qué fecha es ni la calcules: es el próximo con ese nombre de «Próximos días», si la tienes; compruébalo directamente con check_availability y usa el cuando que te devuelve.",
     "Todo startDateTime que envíes a una herramienta va en la hora local del negocio (zona {{zona_horaria}}) con su offset explícito de esa fecha, por ejemplo 2026-09-18T16:00:00+02:00. Nunca lo envíes en UTC (+00:00 o Z): las cuatro de la tarde son 16:00 en hora local, no 16:00Z.",
     // La oferta de aviso solo entra cuando la plantilla `hueco_libre` está
     // aprobada en Meta (gate `listaDeEspera`); si no, la recepcionista no
@@ -485,7 +475,8 @@ function seccionReferenciaTemporal({ timezone }: ContextoDelPrompt): Parrafos {
     // el proveedor resuelva una variable dentro de otra, y si no la resuelve el
     // agente se queda sin saber qué día es hoy — "mañana" o "el martes" se
     // convierten en una fecha inventada y la cita acaba en el día equivocado.
-    `Momento actual en la zona del negocio:\n{{current_time_${timezone}}}`,
+    // {{proximos_dias}}: vacía en el chat (el marcador trae la fecha).
+    `Momento actual en la zona del negocio:\n{{current_time_${timezone}}}\n{{proximos_dias}}`,
   ];
 }
 
@@ -547,11 +538,11 @@ function seccionConversacionV2(): Parrafos {
   ];
 }
 
-function seccionCatalogoV2(): Parrafos {
+function seccionCatalogoV2(contexto: ContextoDelPrompt): Parrafos {
   // Los dos primeros párrafos, literales de v1 (seccionCatalogo): es la
   // regla mejor medida del prompt.
   return [
-    ...seccionCatalogo(),
+    ...seccionCatalogo(contexto),
     "Los precios, solo como diga el campo precios de get_catalog. Nunca inventes precios, servicios, disponibilidad, profesionales ni normas.",
   ];
 }
@@ -573,7 +564,7 @@ function seccionEsteNegocioV2({
       : "La información del negocio (cómo llegar, pagos, normas) te la da get_catalog en su campo informacion.";
   return [
     "## Este negocio",
-    businessType ? NICHE_INSTRUCTIONS[businessType] : null,
+    businessType ? PERFILES_DE_SECTOR[businessType].pautas : null,
     ESCALATION_INSTRUCTIONS[settings.escalation],
     informacion,
   ];

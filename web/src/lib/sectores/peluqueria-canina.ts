@@ -8,8 +8,9 @@ import type { SectorLanding } from "@/lib/sectores/tipos";
  * lib/gestor-guiones.ts) Álex falta y su cita pasa a Iván, quien mejor lo
  * hace de los libres. Los móviles empiezan por 79, un rango sin atribuir.
  *
- * Verdad del sector: en el alta es «Otros», sin servicios propios de
- * peluquería canina; el dueño da de alta un servicio por tamaño. La reserva
+ * Verdad del sector: en el alta tiene su tipo de negocio, «Peluquería
+ * canina» (backend/src/lib/sectores/perfiles.ts), con una plantilla de
+ * servicios por tamaño (frontend/src/lib/service-templates.ts). La reserva
  * no lleva notas (Booking: dueño, teléfono, servicios y profesional): el
  * nombre del perro y lo que cuente el dueño quedan en la transcripción. Una
  * llamada, una cita, que puede llevar varios servicios seguidos. Los móviles

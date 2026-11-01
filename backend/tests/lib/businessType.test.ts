@@ -1,10 +1,13 @@
 import { describe, it, expect } from "vitest";
 import {
+  BUSINESS_TYPES,
+  BUSINESS_TYPE_LABELS,
   detectBusinessTypeFromPlace,
   detectBusinessTypeFromPlaceTypes,
   isBusinessType,
   normalizeBusinessType,
 } from "../../src/lib/businessType.js";
+import { PERFILES_DE_SECTOR } from "../../src/lib/sectores/perfiles.js";
 
 describe("businessType", () => {
   describe("isBusinessType", () => {
@@ -124,5 +127,53 @@ describe("detectBusinessTypeFromPlace", () => {
 
   it("sin señales devuelve other", () => {
     expect(detectBusinessTypeFromPlace({ primaryType: null, types: [] })).toBe("other");
+  });
+});
+
+describe("sectores nuevos (perfiles de sector, F4)", () => {
+  it("pestañas y cejas, spa y masajes y peluquería canina son tipos de negocio con su etiqueta", () => {
+    expect(BUSINESS_TYPE_LABELS["pestanas-y-cejas"]).toBe("Pestañas y cejas");
+    expect(BUSINESS_TYPE_LABELS["spa-y-masajes"]).toBe("Spa y masajes");
+    expect(BUSINESS_TYPE_LABELS["peluqueria-canina"]).toBe("Peluquería canina");
+    // El registro desde su landing ya no los manda a «Otros».
+    expect(normalizeBusinessType("spa-y-masajes")).toBe("spa-y-masajes");
+  });
+
+  it("todos los tipos tienen perfil y «other» va el último", () => {
+    for (const tipo of BUSINESS_TYPES) {
+      expect(PERFILES_DE_SECTOR[tipo].etiqueta, tipo).toBeTruthy();
+      expect(PERFILES_DE_SECTOR[tipo].pautas.length, tipo).toBeGreaterThan(80);
+    }
+    expect(BUSINESS_TYPES.at(-1)).toBe("other");
+  });
+
+  it("un spa entra por su primaryType; una ficha con beauty_salon y spa sigue siendo estética", () => {
+    expect(
+      detectBusinessTypeFromPlace({
+        primaryType: "spa",
+        types: ["spa", "beauty_salon", "establishment"],
+      })
+    ).toBe("spa-y-masajes");
+    expect(detectBusinessTypeFromPlaceTypes(["massage", "establishment"])).toBe(
+      "spa-y-masajes"
+    );
+  });
+
+  it("una peluquería canina se detecta por pet_care", () => {
+    expect(
+      detectBusinessTypeFromPlace({
+        primaryType: "pet_care",
+        types: ["pet_care", "point_of_interest"],
+      })
+    ).toBe("peluqueria-canina");
+  });
+
+  it("un dentista ya no sale fisioterapia (sin la palabra «health»)", () => {
+    expect(
+      detectBusinessTypeFromPlace({
+        primaryType: "dentist",
+        types: ["dentist", "health", "point_of_interest"],
+      })
+    ).toBe("other");
   });
 });

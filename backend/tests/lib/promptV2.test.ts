@@ -228,6 +228,7 @@ describe("payload del assistant con v2", () => {
     expect(payload(buildManagedAgentPrompt(ENTRADA)).dynamicVariables).toEqual({
       nombre_cliente: "",
       ultimo_servicio: "",
+      proximos_dias: "",
       contexto_cliente: "",
     });
   });
@@ -240,7 +241,7 @@ describe("payload del assistant con v2", () => {
           settings: DEFAULT_AGENT_SETTINGS,
         })
       ).dynamicVariables
-    ).toEqual({ nombre_cliente: "", ultimo_servicio: "" });
+    ).toEqual({ nombre_cliente: "", ultimo_servicio: "", proximos_dias: "" });
   });
 });
 

@@ -686,6 +686,27 @@ describe("reconstruirConversacion", () => {
     { cliente: "Gracias", respuestaDelChat: "Hasta luego.", duracionMs: 4 },
   ];
 
+  it("el aviso de bucle de Telnyx no cuenta como respuesta, como en producción", () => {
+    const bucle =
+      "I'm stuck in a loop repeating the same tool action. This might be caused by the input question or a misconfigured assistant prompt.";
+    const mensajes: TelnyxConversationMessage[] = [
+      { role: "user", text: "¿Hacéis keratina?" },
+      { role: "assistant", text: "No la tenemos." },
+      { role: "user", text: "Gracias" },
+      { role: "assistant", text: bucle },
+    ];
+
+    const c = reconstruirConversacion(mensajes, [
+      entrada[0]!,
+      { cliente: "Gracias", respuestaDelChat: bucle, duracionMs: 4 },
+    ]);
+
+    expect(c.turnos.map((t) => t.respuesta)).toEqual(["No la tenemos.", ""]);
+    expect(c.avisos).toEqual([
+      "Turno 2: Telnyx cortó un bucle de tools (en producción no se le manda al cliente)",
+    ]);
+  });
+
   it("reparte las tools por turno y apunta si habló antes", () => {
     const mensajes: TelnyxConversationMessage[] = [
       { role: "assistant", text: "Hola, gracias por llamar." },
@@ -978,6 +999,33 @@ describe("evaluarComprobacion", () => {
     expect(evaluar(insistencia, sinInsistir)).toBe(false);
   });
 
+  it("argumentoPatron con soloLasQueLoTraen: el book_appointment sin teléfono no cuenta (E21)", () => {
+    const corregido: Comprobacion = {
+      tipo: "argumentoPatron",
+      herramienta: "book_appointment",
+      campo: "clientPhone",
+      patron: "0199$",
+      debeCoincidir: true,
+      soloLasQueLoTraen: true,
+      descripcion: "x",
+    };
+    const reserva = (telefonos: Array<string | undefined>) =>
+      conversacion(
+        ["a"],
+        telefonos.map((clientPhone) => ({
+          nombre: "book_appointment",
+          turno: 1,
+          argumentos: clientPhone ? { clientPhone } : {},
+        }))
+      );
+    expect(evaluar(corregido, reserva([undefined, "+12025550199"]))).toBe(true);
+    expect(evaluar(corregido, reserva([undefined, "+12025550198"]))).toBe(
+      false
+    );
+    // Sin ninguna con teléfono, no se cumple: nunca llegó a reservar con él.
+    expect(evaluar(corregido, reserva([undefined]))).toBe(false);
+  });
+
   it("argumentoPatron: todas las llamadas, y sin llamadas se cumple", () => {
     const utc = conversacion(
       ["a"],
@@ -1198,7 +1246,7 @@ describe("evaluarGuion con la batería real", () => {
     const bien = conversacion([
       "No puedo darte ese dato, pero tomo un recado.",
       "Lo siento, no tengo ese número; el negocio te llamará.",
-      "Apunto el +1 555 0198, el negocio te llamará.",
+      "Apunto el +1 202 555 0198, el negocio te llamará.",
     ]);
     expect(evaluarGuion(guion("E18a"), bien).filter((c) => !c.ok)).toEqual([]);
     const mal = conversacion([
@@ -2417,12 +2465,12 @@ describe("siguienteMensajeDelCliente", () => {
         "E18a",
         3,
         llm(
-          '{"mensaje":"Mi teléfono es el +1 555 0198, que me llamen","fin":true}'
+          '{"mensaje":"Mi teléfono es el +1 202 555 0198, que me llamen","fin":true}'
         )
       )
     );
     expect(decision.mensaje).toBe(
-      "Mi teléfono es el +1 555 0198, que me llamen"
+      "Mi teléfono es el +1 202 555 0198, que me llamen"
     );
     expect(decision.llamadasAlLlm).toBe(1);
   });
@@ -2463,7 +2511,7 @@ const CATALOGO_DE_PRUEBA: CatalogoDeNegocios = {
     { clave: "precios", id: PRECIOS, nombre: "Lab · Precios", descripcion: "" },
   ],
   porEscenario: { E1: "base", E2: "base", E5b: "precios", E10: "base" },
-  telefonosDeCliente: ["+15550100", "+15550101"],
+  telefonosDeCliente: ["+12025550100", "+12025550101"],
   noDisponibles: { E22b: "hace falta la plantilla hueco_libre" },
 };
 
@@ -2477,7 +2525,7 @@ function contextoDeLaboratorio(
   fecha: string,
   variantes: Array<"control" | "v2">,
   sufijo?: string,
-  telefonos = ["+15550100", "+15550101", "+15550100"]
+  telefonos = ["+12025550100", "+12025550101", "+12025550100"]
 ): ContextoDelNegocio {
   const contexto = contextoFalso(
     negocioId,
@@ -2598,13 +2646,26 @@ describe("planificar con los negocios de laboratorio", () => {
 
   it("con el catálogo real solo se salta lo que lleva una razón", () => {
     const plan = planificar(sinForzar(["--con-citas", "--n", "1"]));
-    expect(plan.saltados.map((s) => s.guion.clave)).toEqual(["E22b"]);
+    const saltados = plan.saltados.map((s) => s.guion.clave);
+    expect(saltados).toEqual(["E16b", "E19a", "E22b"]);
     expect(plan.negocios.length).toBe(
       new Set(
-        Object.values(NEGOCIO_POR_ESCENARIO).map(
-          (clave) => NEGOCIOS_DE_LABORATORIO.find((n) => n.clave === clave)!.id
-        )
+        Object.entries(NEGOCIO_POR_ESCENARIO)
+          .filter(([guion]) => !saltados.includes(guion))
+          .map(
+            ([, clave]) =>
+              NEGOCIOS_DE_LABORATORIO.find((n) => n.clave === clave)!.id
+          )
       ).size
+    );
+  });
+
+  it("los guiones que solo se miden en voz se saltan con su motivo", () => {
+    const plan = planificar(sinForzar(["--escenarios", "E19", "--n", "1"]));
+    expect(plan.guiones.map((g) => g.clave)).toEqual(["E19b"]);
+    expect(plan.saltados).toHaveLength(1);
+    expect(plan.saltados[0]!.motivo).toMatch(
+      /^solo se puede medir en una llamada de voz: Telnyx no ejecuta transfer/
     );
   });
 
@@ -2687,6 +2748,23 @@ describe("telefonosFueraDelLaboratorio", () => {
     ).toEqual([]);
   });
 
+  it("una llamada con número oculto («anonymous») no recibe nada: vale", () => {
+    const plan = planificar(
+      sinForzar(["--escenarios", "E10", "--n", "1", "--con-citas"]),
+      CATALOGO_DE_PRUEBA
+    );
+    const oculto = contextoDeLaboratorio(BASE, "f", ["control"], undefined, [
+      "anonymous",
+    ]);
+    expect(
+      telefonosFueraDelLaboratorio(
+        plan.tareas,
+        asignarLlamadas(plan.tareas, new Map([[BASE, oculto]])),
+        CATALOGO_DE_PRUEBA
+      )
+    ).toEqual([]);
+  });
+
   it("un negocio que no es de laboratorio no se comprueba", () => {
     const plan = planificar(
       opciones(["--escenarios", "E10", "--n", "1", "--con-citas"]),
@@ -2705,7 +2783,7 @@ describe("telefonosFueraDelLaboratorio", () => {
   it("los teléfonos sembrados de verdad son todos de ficción", () => {
     expect(TELEFONOS_DE_CLIENTE_DE_LABORATORIO.length).toBeGreaterThan(0);
     for (const telefono of TELEFONOS_DE_CLIENTE_DE_LABORATORIO) {
-      expect(telefono).toMatch(/^\+1555\d{4}$/);
+      expect(telefono).toMatch(/^\+1202555\d{4}$/);
     }
   });
 });

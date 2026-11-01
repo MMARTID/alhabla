@@ -20,6 +20,9 @@ const SELECTABLE_TYPES: BusinessType[] = [
   "peluqueria",
   "barberia",
   "salon-de-unas",
+  "pestanas-y-cejas",
+  "spa-y-masajes",
+  "peluqueria-canina",
   "other",
 ];
 

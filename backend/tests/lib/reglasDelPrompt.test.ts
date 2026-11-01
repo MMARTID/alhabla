@@ -18,6 +18,8 @@ import {
   mencionaLaIA,
 } from "../../src/lib/idiomas/catalogo.js";
 import { resolverIdiomas } from "../../src/lib/idiomas/resolver.js";
+import { proximosDias } from "../../src/lib/proximosDias.js";
+import { precioEnLaInformacion } from "../../src/lib/precioEnLaInformacion.js";
 import {
   cuandoParaDecir,
   normalizeVoiceToolDateTime,
@@ -606,6 +608,14 @@ const REGLAS: readonly Regla[] = [
         texto: "que sea la suma exacta de esos precios",
       },
       { en: "respuestaDeTool", tool: "get_catalog", campo: "precios" },
+      {
+        en: "guardaDelBackend",
+        simbolo: "precioEnLaInformacion",
+        fichero: "src/lib/precioEnLaInformacion.ts",
+        comprueba: () =>
+          precioEnLaInformacion("Tinte", "Tintes desde 30 €.") ===
+          "Tintes desde 30 €",
+      },
     ],
   },
   {
@@ -1276,6 +1286,30 @@ const REGLAS: readonly Regla[] = [
               new Date("2026-10-10T10:00:00.000Z")
             ) ?? ""
           ).includes("jueves"),
+      },
+    ],
+  },
+  {
+    id: "dia-por-su-nombre",
+    descripcion:
+      "A «el jueves» no pregunta qué fecha es ni la calcula: toma el próximo jueves de la lista de próximos días y lo comprueba.",
+    origen:
+      "Laboratorio del 30-10 (E4): a «dijous» contestó «¿el dos o el nueve?», dos lunes, sin consultar nada.",
+    lugares: [
+      {
+        en: "prompt",
+        seccion: "Uso de herramientas",
+        texto: "no preguntes qué fecha es ni la calcules",
+      },
+      {
+        en: "guardaDelBackend",
+        simbolo: "proximosDias",
+        fichero: "src/lib/proximosDias.ts",
+        comprueba: () =>
+          proximosDias(
+            new Date("2026-10-30T16:00:00Z"),
+            "Europe/Madrid"
+          ).includes("jueves 5"),
       },
     ],
   },
@@ -2092,8 +2126,9 @@ const LIMITES_DEL_PROMPT: Record<
   // F2 (PLAN-PROMPT-DINAMICO.md): el prompt compacto, por debajo de 12.000
   // en cualquier combinación de ajustes. Medidas del 31-10: base 9.316,
   // catalán de principal 9.405, un solo idioma 8.700, «cargada» 9.257 y con
-  // todo activo unos 10.700.
-  v2: { techo: 12_000, techoConTodoActivo: 12_000 },
+  // todo activo unos 10.700. El 01-11, «{{proximos_dias}}» de la #395 lo
+  // dejó en 12.017 con todo activo en fisioterapia: techo de 12.100.
+  v2: { techo: 12_000, techoConTodoActivo: 12_100 },
 };
 
 describe.each(VERSIONES_DEL_PROMPT)("tamaño del prompt (%s)", (version) => {

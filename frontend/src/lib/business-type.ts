@@ -8,6 +8,9 @@ export const BUSINESS_TYPES: BusinessType[] = [
   "salon-de-unas",
   "barberia",
   "fisioterapia",
+  "pestanas-y-cejas",
+  "spa-y-masajes",
+  "peluqueria-canina",
   "other",
 ];
 
@@ -17,6 +20,9 @@ export const BUSINESS_TYPE_LABELS: Record<BusinessType, string> = {
   "salon-de-unas": "Salón de uñas",
   barberia: "Barbería",
   fisioterapia: "Fisioterapia",
+  "pestanas-y-cejas": "Pestañas y cejas",
+  "spa-y-masajes": "Spa y masajes",
+  "peluqueria-canina": "Peluquería canina",
   other: "Otros",
 };
 
@@ -26,14 +32,22 @@ export const NICHE_SLUG_TO_BUSINESS_TYPE: Record<string, BusinessType> = {
   "salon-de-unas": "salon-de-unas",
   barberia: "barberia",
   fisioterapia: "fisioterapia",
+  "pestanas-y-cejas": "pestanas-y-cejas",
+  "spa-y-masajes": "spa-y-masajes",
+  "peluqueria-canina": "peluqueria-canina",
 };
 
+// El mismo orden y las mismas palabras que el backend
+// (backend/src/lib/sectores/perfiles.ts): se mira de arriba abajo.
 export const BUSINESS_TYPE_PLACE_KEYWORDS: Record<BusinessType, string[]> = {
   barberia: ["barber_shop", "barber"],
   "salon-de-unas": ["nail_salon", "nail"],
+  "peluqueria-canina": ["pet_groom", "pet_care"],
   peluqueria: ["hair_care", "hair_salon"],
-  "centro-de-estetica": ["beauty_salon", "spa"],
-  fisioterapia: ["physiotherapist", "health"],
+  "centro-de-estetica": ["beauty_salon"],
+  "spa-y-masajes": ["massage", "spa"],
+  fisioterapia: ["physiotherapist"],
+  "pestanas-y-cejas": [],
   other: [],
 };
 
@@ -184,6 +198,63 @@ export const BUSINESS_TYPE_ONBOARDING_TEXTS: Record<
       subheading: "Tu recepcionista consultará huecos y reservará sesiones directamente en tu agenda. Elige el calendario que usas a diario.",
       cta: "Conectar calendario",
       sinCalendario: "Si lo dejas para después, tu recepcionista atiende y toma nota de lo que te piden, pero no reserva sesiones. Puedes conectar tu calendario o activar la agenda de Alhabla cuando quieras en Agente › Calendario.",
+    },
+  },
+  "pestanas-y-cejas": {
+    services: {
+      heading: "¿Qué servicios ofrece tu estudio?",
+      subheading: "Marca las extensiones, liftings y tratamientos de cejas que sí ofreces, para que tu recepcionista pueda reservarlos por teléfono. Elige al menos 4 para continuar.",
+      cta: "Continuar con {count} servicio{s}",
+    },
+    team: {
+      heading: "¿Cuántas personas atienden en tu estudio?",
+      subheading: "Configuraremos un profesional por cada persona que coja citas. Podrás renombrarlos después en Agente.",
+      cta: "Guardar equipo y continuar",
+      employeeLabel: "Técnicas de pestañas",
+    },
+    calendar: {
+      heading: "Conecta el calendario de tu estudio",
+      subheading: "Tu recepcionista consultará disponibilidad y reservará citas directamente en tu agenda. Elige el calendario que usas a diario.",
+      cta: "Conectar calendario",
+      sinCalendario: "Si lo dejas para después, tu recepcionista atiende y toma nota de lo que te piden, pero no reserva citas. Puedes conectar tu calendario o activar la agenda de Alhabla cuando quieras en Agente › Calendario.",
+    },
+  },
+  "spa-y-masajes": {
+    services: {
+      heading: "¿Qué servicios ofrece tu centro?",
+      subheading: "Marca los masajes, circuitos y tratamientos que sí ofreces, para que tu recepcionista pueda reservarlos por teléfono. Elige al menos 4 para continuar.",
+      cta: "Continuar con {count} servicio{s}",
+    },
+    team: {
+      heading: "¿Cuántas personas atienden en tu centro?",
+      subheading: "Configuraremos un profesional por cada persona que coja citas. Podrás renombrarlos después en Agente.",
+      cta: "Guardar equipo y continuar",
+      employeeLabel: "Masajistas / terapeutas",
+    },
+    calendar: {
+      heading: "Conecta el calendario de tu centro",
+      subheading: "Tu recepcionista consultará disponibilidad y reservará tratamientos directamente en tu agenda. Elige el calendario que usas a diario.",
+      cta: "Conectar calendario",
+      sinCalendario: "Si lo dejas para después, tu recepcionista atiende y toma nota de lo que te piden, pero no reserva tratamientos. Puedes conectar tu calendario o activar la agenda de Alhabla cuando quieras en Agente › Calendario.",
+    },
+  },
+  "peluqueria-canina": {
+    services: {
+      heading: "¿Qué servicios ofrece tu peluquería canina?",
+      subheading: "Marca los baños, cortes y cuidados que sí ofreces, para que tu recepcionista pueda reservarlos por teléfono. Elige al menos 4 para continuar.",
+      cta: "Continuar con {count} servicio{s}",
+    },
+    team: {
+      heading: "¿Cuántas personas atienden en tu peluquería canina?",
+      subheading: "Configuraremos un profesional por cada persona que coja citas. Podrás renombrarlos después en Agente.",
+      cta: "Guardar equipo y continuar",
+      employeeLabel: "Peluqueros caninos",
+    },
+    calendar: {
+      heading: "Conecta el calendario de tu peluquería canina",
+      subheading: "Tu recepcionista consultará disponibilidad y reservará citas directamente en tu agenda. Elige el calendario que usas a diario.",
+      cta: "Conectar calendario",
+      sinCalendario: "Si lo dejas para después, tu recepcionista atiende y toma nota de lo que te piden, pero no reserva citas. Puedes conectar tu calendario o activar la agenda de Alhabla cuando quieras en Agente › Calendario.",
     },
   },
   other: {
