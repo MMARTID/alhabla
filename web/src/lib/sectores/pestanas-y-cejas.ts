@@ -8,9 +8,9 @@ import type { SectorLanding } from "@/lib/sectores/tipos";
  * lib/gestor-guiones.ts) Nerea falta y su cita pasa a Alba, la especialista
  * libre. Los móviles empiezan por 79, un rango sin atribuir.
  *
- * En el alta, los estudios de pestañas entran como negocio «Otros»
- * (backend/src/lib/businessType.ts) con servicios genéricos: aquí no se
- * promete plantilla de servicios propia. El recordatorio de 24 h solo va en
+ * En el alta, los estudios de pestañas tienen su tipo de negocio, «Pestañas
+ * y cejas» (backend/src/lib/sectores/perfiles.ts), con sus pautas y una
+ * plantilla de servicios propia (frontend/src/lib/service-templates.ts). El recordatorio de 24 h solo va en
  * Pro y Scale (lib/planFeatures.ts). Los móviles empiezan por 79, un rango
  * sin atribuir.
  */

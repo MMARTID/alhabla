@@ -8,6 +8,9 @@ export const BUSINESS_TYPES: BusinessType[] = [
   "salon-de-unas",
   "barberia",
   "fisioterapia",
+  "pestanas-y-cejas",
+  "spa-y-masajes",
+  "peluqueria-canina",
   "other",
 ];
 
@@ -17,6 +20,9 @@ export const BUSINESS_TYPE_LABELS: Record<BusinessType, string> = {
   "salon-de-unas": "Salón de uñas",
   barberia: "Barbería",
   fisioterapia: "Fisioterapia",
+  "pestanas-y-cejas": "Pestañas y cejas",
+  "spa-y-masajes": "Spa y masajes",
+  "peluqueria-canina": "Peluquería canina",
   other: "Otros",
 };
 
@@ -26,14 +32,22 @@ export const NICHE_SLUG_TO_BUSINESS_TYPE: Record<string, BusinessType> = {
   "salon-de-unas": "salon-de-unas",
   barberia: "barberia",
   fisioterapia: "fisioterapia",
+  "pestanas-y-cejas": "pestanas-y-cejas",
+  "spa-y-masajes": "spa-y-masajes",
+  "peluqueria-canina": "peluqueria-canina",
 };
 
+// El mismo orden y las mismas palabras que el backend
+// (backend/src/lib/sectores/perfiles.ts): se mira de arriba abajo.
 export const BUSINESS_TYPE_PLACE_KEYWORDS: Record<BusinessType, string[]> = {
   barberia: ["barber_shop", "barber"],
   "salon-de-unas": ["nail_salon", "nail"],
+  "peluqueria-canina": ["pet_groom", "pet_care"],
   peluqueria: ["hair_care", "hair_salon"],
-  "centro-de-estetica": ["beauty_salon", "spa"],
-  fisioterapia: ["physiotherapist", "health"],
+  "centro-de-estetica": ["beauty_salon"],
+  "spa-y-masajes": ["massage", "spa"],
+  fisioterapia: ["physiotherapist"],
+  "pestanas-y-cejas": [],
   other: [],
 };
 

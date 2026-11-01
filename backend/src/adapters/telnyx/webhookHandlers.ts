@@ -385,6 +385,8 @@ export async function handleCallInitiated(
         // La zona (lib/idiomas/zona.ts): saludar en la cooficial.
         address: true,
         businessDetails: true,
+        // {{proximos_dias}} en la zona del negocio.
+        timezone: true,
         phone: true,
         telnyxPhoneNumber: true,
         ownerWhatsappNumber: true,

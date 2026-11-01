@@ -174,6 +174,9 @@ export type BusinessType =
   | "salon-de-unas"
   | "barberia"
   | "fisioterapia"
+  | "pestanas-y-cejas"
+  | "spa-y-masajes"
+  | "peluqueria-canina"
   | "other";
 
 /** Tipos de línea de clientes (docs/historico/PLAN-TELEFONIA-UX.md § 3): fijo

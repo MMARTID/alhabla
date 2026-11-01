@@ -18,6 +18,7 @@ import { todosLosGuiones } from "../../scripts/laboratorioDePrompt.escenarios.js
 import {
   AYUDA,
   ErrorDeUso,
+  NUMERO_OCULTO,
   aplicarPlan,
   borrarSiembra,
   diaDeLaSemanaDe,
@@ -171,25 +172,25 @@ describe("laboratorioDePrompt.negocios (contrato)", () => {
 // ---------------------------------------------------------------------------
 
 describe("teléfonos de ficción", () => {
-  it("son +15550100 … +15550199, E.164 válidos y distintos", () => {
+  it("son +12025550100 … +12025550199, E.164 válidos y distintos", () => {
     expect(TELEFONOS_DE_CLIENTE_DE_LABORATORIO).toHaveLength(
       CANTIDAD_DE_TELEFONOS_DE_FICCION
     );
     expect(new Set(TELEFONOS_DE_CLIENTE_DE_LABORATORIO).size).toBe(100);
-    expect(TELEFONOS_DE_CLIENTE_DE_LABORATORIO[0]).toBe("+15550100");
-    expect(TELEFONOS_DE_CLIENTE_DE_LABORATORIO[99]).toBe("+15550199");
+    expect(TELEFONOS_DE_CLIENTE_DE_LABORATORIO[0]).toBe("+12025550100");
+    expect(TELEFONOS_DE_CLIENTE_DE_LABORATORIO[99]).toBe("+12025550199");
     for (const telefono of TELEFONOS_DE_CLIENTE_DE_LABORATORIO) {
       expect(isValidE164Phone(telefono)).toBe(true);
-      expect(telefono).toMatch(/^\+155501\d\d$/);
+      expect(telefono).toMatch(/^\+120255501\d\d$/);
       // Ninguno es una línea española: nada los trata como un móvil real.
       expect(esLineaDeClientesEspanola(telefono)).toBe(false);
     }
   });
 
   it("telefonoDeFiccion da la vuelta y esTelefonoDeFiccion rechaza lo demás", () => {
-    expect(telefonoDeFiccion(100)).toBe("+15550100");
-    expect(telefonoDeFiccion(-1)).toBe("+15550199");
-    expect(esTelefonoDeFiccion("+15550123")).toBe(true);
+    expect(telefonoDeFiccion(100)).toBe("+12025550100");
+    expect(telefonoDeFiccion(-1)).toBe("+12025550199");
+    expect(esTelefonoDeFiccion("+12025550123")).toBe(true);
     expect(esTelefonoDeFiccion("+34612345678")).toBe(false);
     expect(esTelefonoDeFiccion(null)).toBe(false);
   });
@@ -208,6 +209,7 @@ describe("teléfonos de ficción", () => {
       for (const llamada of p.llamadas) {
         expect(
           llamada.fromNumber === null ||
+            llamada.fromNumber === NUMERO_OCULTO ||
             esTelefonoDeFiccion(llamada.fromNumber),
           `${p.clave} ${llamada.callId}`
         ).toBe(true);
@@ -455,10 +457,12 @@ describe("planificarSiembra: lo que cubre cada negocio", () => {
     }
   });
 
-  it("número oculto: las llamadas no traen teléfono", () => {
+  it("número oculto: las llamadas llegan como «anonymous», igual que de Telnyx", () => {
     const p = plan("peluqueria-telefono-oculto");
     const voz = p.llamadas.filter((l) => l.voiceProvider === "telnyx");
-    expect(voz.every((l) => l.fromNumber === null)).toBe(true);
+    // Con null, book_appointment no pedía el teléfono (E21, 30-10).
+    expect(voz.every((l) => l.fromNumber === NUMERO_OCULTO)).toBe(true);
+    expect(p.clientesQueAceptaron).toEqual([]);
     // Sin teléfono, check_availability no puede mirar al cliente: la llamada
     // ya trae el permiso para que no pregunte por la grabación.
     expect(voz.every((l) => l.grabacionPermitida === true)).toBe(true);
@@ -1045,7 +1049,7 @@ describe("borrarSiembra y ponerBajas", () => {
     const bajas = JSON.stringify(
       de("whatsappOptOut.deleteMany")[0]!.argumentos
     );
-    expect(bajas).toContain("+15550100");
+    expect(bajas).toContain("+12025550100");
     expect(bajas).toContain(
       Object.values(TELEFONOS_DE_TRANSFERENCIA_DE_LABORATORIO)[0]!.movilDelDueno
     );
@@ -1120,7 +1124,7 @@ describe("borrarSiembra y ponerBajas", () => {
         },
         {
           id: "nuestra",
-          phoneNumber: "+15550100",
+          phoneNumber: "+12025550100",
           audience: "client",
           revokedAt: new Date("2026-10-01T00:00:00Z"),
           inboundMessageId: MARCA_DE_LAS_BAJAS_DE_LABORATORIO,
@@ -1135,7 +1139,7 @@ describe("borrarSiembra y ponerBajas", () => {
     ).data.map((b) => b.phoneNumber);
     expect(creadas).toHaveLength(100);
     expect(creadas).not.toContain("+34600000001");
-    expect(creadas).not.toContain("+15550100");
+    expect(creadas).not.toContain("+12025550100");
     const reactivadas = de("whatsappOptOut.updateMany")[0]!.argumentos as {
       where: { id: { in: string[] } };
       data: { revokedAt: null };

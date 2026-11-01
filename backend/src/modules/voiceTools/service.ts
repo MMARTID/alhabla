@@ -105,6 +105,7 @@ import {
 import { buildCalendarIdempotencyKey } from "../../lib/calendarIdempotency.js";
 import { appUrl } from "../../lib/urls.js";
 import { guardarIntentoDeReservaFallido } from "../../lib/intentoDeReserva.js";
+import { precioEnLaInformacion } from "../../lib/precioEnLaInformacion.js";
 import { describirAusencia } from "../bookings/ausencias.js";
 
 /** Lo que cada tool devuelve al orquestador: `result` va tal cual al LLM. */
@@ -343,6 +344,10 @@ type BusinessVoiceConfig = FilaDeConexionDeCalendario & {
   // lleva el precio. Puede faltar en entradas de caché anteriores: sin él,
   // el de por defecto. PATCH /business/me invalida la caché al cambiarlo.
   agentSettings?: unknown;
+  // La información del negocio: get_catalog saca de aquí lo que dice del
+  // precio de un servicio que no lo tiene (precioEnLaInformacion). Puede
+  // faltar en entradas de caché anteriores.
+  businessDetails?: string | null;
 };
 
 /** Lo que oye el cliente cuando el pago del negocio corta las reservas. */
@@ -383,6 +388,7 @@ async function loadBusinessConfig(
       callsSuspendedAt: true,
       paymentFailureSuspensionAt: true,
       agentSettings: true,
+      businessDetails: true,
     },
   });
 }
@@ -1108,7 +1114,9 @@ function abiertoAhora(business: BusinessVoiceConfig): boolean | null {
 }
 
 /** «[id] Corte (30 min, 18 €)»: con «Nunca», sin el precio, que así no
- * llega a la llamada. */
+ * llega a la llamada. Sin precio, lo que diga de él la información del
+ * negocio: «[id] Tinte (60 min, sin precio; la información del negocio
+ * dice: «Tintes desde 30 €»)». */
 function lineaDelServicio(
   service: {
     id: string;
@@ -1116,13 +1124,19 @@ function lineaDelServicio(
     durationMinutes: number;
     priceCents: number | null;
   },
-  darPrecios: ModoDeDarPrecios
+  darPrecios: ModoDeDarPrecios,
+  informacion: string | null | undefined
 ): string {
-  const precio =
-    darPrecios === "nunca"
-      ? ""
-      : `, ${precioParaDecir(service.priceCents) ?? "sin precio"}`;
-  return `[${service.id}] ${service.name} (${service.durationMinutes} min${precio})`;
+  const precio = (): string => {
+    const delCatalogo = precioParaDecir(service.priceCents);
+    if (delCatalogo) return delCatalogo;
+    const deLaInformacion = precioEnLaInformacion(service.name, informacion);
+    return deLaInformacion
+      ? `sin precio; la información del negocio dice: «${deLaInformacion}»`
+      : "sin precio";
+  };
+  const conPrecio = darPrecios === "nunca" ? "" : `, ${precio()}`;
+  return `[${service.id}] ${service.name} (${service.durationMinutes} min${conPrecio})`;
 }
 
 async function executeGetCatalog(
@@ -1180,7 +1194,9 @@ async function executeGetCatalog(
       result: {
         services: services.length
           ? services
-              .map((service) => lineaDelServicio(service, darPrecios))
+              .map((service) =>
+                lineaDelServicio(service, darPrecios, business.businessDetails)
+              )
               .join("\n")
           : "No hay servicios configurados.",
         precios: reglaDePrecios(

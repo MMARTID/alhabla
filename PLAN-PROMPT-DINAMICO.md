@@ -232,6 +232,8 @@ Quitar de las descripciones lo que ya dice el prompt o la respuesta:
 
 ### F4. Perfil de sector como datos
 
+> **Hecho (01-11, sobre el prompt v1; F2 quedó aparcada en la PR #394).** Los perfiles son un objeto tipado en `backend/src/lib/sectores/perfiles.ts`, no JSON con Zod: sin herencia ni carga en tiempo de ejecución, el compilador ya exige un perfil completo por tipo. El prompt de los seis sectores de antes sale idéntico (instantáneas sin cambios) y los tres nuevos tienen sus pautas, sus ejemplos del catálogo, plantilla de servicios y textos del alta. Fuera de este paquete: las pautas a `get_catalog` y la lista de sectores del Gestor (solo usa la etiqueta).
+
 Caracteres del prompt al acabar: **8386**
 
 Se crean lib/sectores/perfiles/*.json (Zod y herencia por `base`) con los 5 nichos actuales, «other» y los 3 que la web ya vende (pestañas y cejas, spa y masajes, peluquería canina).

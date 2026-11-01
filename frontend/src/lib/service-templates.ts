@@ -224,6 +224,90 @@ export const SERVICE_TEMPLATE_CATEGORIES: Record<
       ],
     },
   ],
+  "pestanas-y-cejas": [
+    {
+      category: "Extensiones",
+      services: [
+        { name: "Extensiones pelo a pelo", durationMinutes: 120 },
+        { name: "Extensiones de volumen", durationMinutes: 150 },
+        { name: "Relleno de extensiones", durationMinutes: 75 },
+        { name: "Retirada de extensiones", durationMinutes: 30 },
+      ],
+    },
+    {
+      category: "Pestañas",
+      services: [
+        { name: "Lifting de pestañas", durationMinutes: 60 },
+        { name: "Lifting y tinte de pestañas", durationMinutes: 75 },
+        { name: "Tinte de pestañas", durationMinutes: 20 },
+      ],
+    },
+    {
+      category: "Cejas",
+      services: [
+        { name: "Diseño de cejas", durationMinutes: 30 },
+        { name: "Laminado de cejas", durationMinutes: 45 },
+        { name: "Tinte de cejas", durationMinutes: 20 },
+        { name: "Depilación de cejas con hilo", durationMinutes: 15 },
+      ],
+    },
+  ],
+  "spa-y-masajes": [
+    {
+      category: "Masajes",
+      services: [
+        { name: "Masaje relajante", durationMinutes: 60 },
+        { name: "Masaje descontracturante", durationMinutes: 60 },
+        { name: "Masaje con piedras calientes", durationMinutes: 75 },
+        { name: "Masaje de espalda", durationMinutes: 30 },
+        { name: "Reflexología podal", durationMinutes: 45 },
+      ],
+    },
+    {
+      category: "Circuito y rituales",
+      services: [
+        { name: "Circuito de spa", durationMinutes: 90 },
+        { name: "Circuito de spa con masaje", durationMinutes: 120 },
+        { name: "Ritual corporal", durationMinutes: 90 },
+      ],
+    },
+    {
+      category: "Tratamientos",
+      services: [
+        { name: "Exfoliación corporal", durationMinutes: 45 },
+        { name: "Envoltura corporal", durationMinutes: 60 },
+        { name: "Tratamiento facial", durationMinutes: 60 },
+      ],
+    },
+  ],
+  "peluqueria-canina": [
+    {
+      category: "Baño",
+      services: [
+        { name: "Baño perro pequeño", durationMinutes: 45 },
+        { name: "Baño perro mediano", durationMinutes: 60 },
+        { name: "Baño perro grande", durationMinutes: 90 },
+      ],
+    },
+    {
+      category: "Corte",
+      services: [
+        { name: "Baño y corte perro pequeño", durationMinutes: 90 },
+        { name: "Baño y corte perro mediano", durationMinutes: 120 },
+        { name: "Baño y corte perro grande", durationMinutes: 150 },
+        { name: "Stripping", durationMinutes: 120 },
+        { name: "Deslanado", durationMinutes: 90 },
+      ],
+    },
+    {
+      category: "Cuidados",
+      services: [
+        { name: "Corte de uñas", durationMinutes: 15 },
+        { name: "Limpieza de oídos", durationMinutes: 15 },
+        { name: "Baño de gato", durationMinutes: 60 },
+      ],
+    },
+  ],
   other: [
     {
       category: "General",

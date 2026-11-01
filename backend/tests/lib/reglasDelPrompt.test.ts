@@ -16,6 +16,8 @@ import {
   mencionaLaIA,
 } from "../../src/lib/idiomas/catalogo.js";
 import { resolverIdiomas } from "../../src/lib/idiomas/resolver.js";
+import { proximosDias } from "../../src/lib/proximosDias.js";
+import { precioEnLaInformacion } from "../../src/lib/precioEnLaInformacion.js";
 import {
   cuandoParaDecir,
   normalizeVoiceToolDateTime,
@@ -565,6 +567,14 @@ const REGLAS: readonly Regla[] = [
         texto: "que sea la suma exacta de esos precios",
       },
       { en: "respuestaDeTool", tool: "get_catalog", campo: "precios" },
+      {
+        en: "guardaDelBackend",
+        simbolo: "precioEnLaInformacion",
+        fichero: "src/lib/precioEnLaInformacion.ts",
+        comprueba: () =>
+          precioEnLaInformacion("Tinte", "Tintes desde 30 €.") ===
+          "Tintes desde 30 €",
+      },
     ],
   },
   {
@@ -1221,6 +1231,30 @@ const REGLAS: readonly Regla[] = [
               new Date("2026-10-10T10:00:00.000Z")
             ) ?? ""
           ).includes("jueves"),
+      },
+    ],
+  },
+  {
+    id: "dia-por-su-nombre",
+    descripcion:
+      "A «el jueves» no pregunta qué fecha es ni la calcula: toma el próximo jueves de la lista de próximos días y lo comprueba.",
+    origen:
+      "Laboratorio del 30-10 (E4): a «dijous» contestó «¿el dos o el nueve?», dos lunes, sin consultar nada.",
+    lugares: [
+      {
+        en: "prompt",
+        seccion: "Uso de herramientas",
+        texto: "no preguntes qué fecha es ni la calcules",
+      },
+      {
+        en: "guardaDelBackend",
+        simbolo: "proximosDias",
+        fichero: "src/lib/proximosDias.ts",
+        comprueba: () =>
+          proximosDias(
+            new Date("2026-10-30T16:00:00Z"),
+            "Europe/Madrid"
+          ).includes("jueves 5"),
       },
     ],
   },
