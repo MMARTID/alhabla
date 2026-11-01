@@ -1,7 +1,9 @@
 import fs from "node:fs";
 import path from "node:path";
 import matter from "gray-matter";
+import { ENLACES_DE_SIGUE_LEYENDO, GUIAS_POR_SECTOR, SIGUE_LEYENDO } from "@/lib/blog-enlaces";
 import { absoluteUrl } from "@/lib/seo";
+import type { SectorSlug } from "@/lib/sectores/tipos";
 
 /**
  * Artículos del blog (docs/historico/PLAN-APP-DOMINIO.md § 4, fase 1): ficheros
@@ -209,19 +211,32 @@ export async function leerArticuloDePrevisualizacion(
   return articuloDesdeMdx(slug, Buffer.from(archivo.content.replace(/\n/g, ""), "base64").toString("utf8"));
 }
 
+/** Los artículos de `slugs` que existen en `todos`, en el orden de `slugs`. */
+function enElOrdenDe(slugs: readonly string[], todos: ArticuloMeta[]): ArticuloMeta[] {
+  return slugs
+    .map((slug) => todos.find((a) => a.slug === slug))
+    .filter((a): a is ArticuloMeta => a !== undefined);
+}
+
 /**
- * Otros artículos para «Sigue leyendo»: primero los del mismo sector, luego
- * el resto por fecha. Nunca el propio artículo.
+ * Otros artículos para «Sigue leyendo»: primero los que se han escrito a mano
+ * para ese artículo (lib/blog-enlaces.ts), y para rellenar, los del mismo
+ * sector y luego el resto por fecha. Nunca el propio artículo. Antes iban
+ * solo el sector y la fecha, y los 18 artículos enlazaban a los mismos tres:
+ * los otros 15 apenas recibían enlaces y Google no los rastreaba.
  */
 export function articulosRelacionados(
   actual: Pick<ArticuloMeta, "slug" | "sector">,
   todos: ArticuloMeta[],
-  maximo = 3
+  maximo = ENLACES_DE_SIGUE_LEYENDO
 ): ArticuloMeta[] {
   const otros = todos.filter((a) => a.slug !== actual.slug);
-  const mismoSector = otros.filter((a) => actual.sector && a.sector === actual.sector);
-  const resto = otros.filter((a) => !mismoSector.includes(a));
-  return [...mismoSector, ...resto].slice(0, maximo);
+  const aMano = enElOrdenDe(SIGUE_LEYENDO[actual.slug] ?? [], otros);
+  const mismoSector = otros.filter(
+    (a) => actual.sector && a.sector === actual.sector && !aMano.includes(a)
+  );
+  const resto = otros.filter((a) => !aMano.includes(a) && !mismoSector.includes(a));
+  return [...aMano, ...mismoSector, ...resto].slice(0, maximo);
 }
 
 /**
@@ -239,22 +254,24 @@ export const ARTICULOS_PARA_TODOS = [
 ] as const;
 
 /**
- * Artículos para el bloque «Guías» de la landing de un sector (2026-10-22):
- * primero los de ese sector, del más reciente al más antiguo, y luego los
- * generales de ARTICULOS_PARA_TODOS. Hasta entonces las landings no
- * enlazaban ningún artículo, y Google solo llegaba a la mitad de ellos por
- * el sitemap.
+ * Artículos para el bloque «Guías» de la landing de un sector: primero las
+ * tres escritas a mano para ese oficio (GUIAS_POR_SECTOR, lib/blog-enlaces.ts),
+ * luego las del sector por la ficha del artículo, del más reciente al más
+ * antiguo, y por último los generales de ARTICULOS_PARA_TODOS. Las landings
+ * dejaron de enlazar artículos el 29-10 al acortarse (la primera vez, el
+ * 22-10, ya había sido porque Google solo llegaba a la mitad por el sitemap).
  */
 export function articulosParaSector(
   sector: string,
   todos: ArticuloMeta[],
   maximo = 3
 ): ArticuloMeta[] {
-  const delSector = todos.filter((a) => a.sector === sector);
-  const generales = ARTICULOS_PARA_TODOS.map((slug) =>
-    todos.find((a) => a.slug === slug)
-  ).filter((a): a is ArticuloMeta => a !== undefined && !delSector.includes(a));
-  return [...delSector, ...generales].slice(0, maximo);
+  const aMano = enElOrdenDe(GUIAS_POR_SECTOR[sector as SectorSlug] ?? [], todos);
+  const delSector = todos.filter((a) => a.sector === sector && !aMano.includes(a));
+  const generales = enElOrdenDe(ARTICULOS_PARA_TODOS, todos).filter(
+    (a) => !aMano.includes(a) && !delSector.includes(a)
+  );
+  return [...aMano, ...delSector, ...generales].slice(0, maximo);
 }
 
 export function fechaLarga(fecha: string): string {

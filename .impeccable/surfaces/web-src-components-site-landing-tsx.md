@@ -47,6 +47,10 @@ de la lista del 29-10). Sin tirada nueva: la fijó el fundador el 29-10 por la t
 palabras «me gustaría utilizar la animación 3D que tengo en la general» y «quiero que haya texto y
 3d compensados». Ritmo: texto → escena → texto y pieza → escena → tabla → precio → preguntas →
 cierre. Seed de la v1 de esa mañana, la que esta forma sustituye: 4cc50b3b.
+Añadido el 1-11-2026 (enlazado interno, Search Console): entre «Más preguntas» y el cierre, una
+tira de tres guías del blog (`GuiasDelSector`): solo títulos y minutos de lectura, sin fotos ni
+tarjetas, para no volver al muro de texto. Las tres salen de `GUIAS_POR_SECTOR`
+(lib/blog-enlaces.ts).
 
 FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance
 
