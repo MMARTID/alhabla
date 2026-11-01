@@ -394,6 +394,13 @@ the content: each project keeps what it needs.
 - `blog.ts` — MDX articles in `web/content/blog`, read at build time. Next to it: `keystatic/`
   (editor blocks), `preview/` (draft preview redirects) and `og/plantilla.tsx` (the Open Graph
   image template every `opengraph-image.tsx` uses).
+- `blog-enlaces.ts` — hand-written internal links (2026-11-01): `SIGUE_LEYENDO` (four related
+  articles per article, minimum three incoming links each, checked by
+  `tests/lib/blog-enlaces.test.ts`) and `GUIAS_POR_SECTOR` (the three guides at the foot of each
+  of the eight sector landings, `components/sector/guias-del-sector.tsx`). Why: Search Console had
+  15 of 18 articles never crawled while the 3 indexed ones got 16–20 internal links. A new article
+  works without an entry (`articulosRelacionados` falls back to sector + date) but is only linked
+  by its neighbours once added here.
 - `plans.ts` (identical copy), `business-type.ts` (labels and Places detection, no onboarding
   texts), `billing-navigation.ts` (`isPlanId` only), `types.ts` (plan and Places types).
 

@@ -109,8 +109,8 @@ export const PAGINAS: readonly PaginaIndexable[] = [
       nombre,
       resumen,
       seccion: "sectores",
-      // 30-10: la calculadora compacta antes del precio.
-      actualizado: "2026-10-30",
+      // 1-11: tres guías del blog al pie (components/sector/guias-del-sector.tsx).
+      actualizado: "2026-11-01",
     })
   ),
   {

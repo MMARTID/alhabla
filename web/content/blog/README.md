@@ -86,6 +86,18 @@ también se pueden escribir a mano:
 `destino` de la Cta: `planes`, `demo`, `como_funciona` o el slug de un sector (`barberia`…).
 Una sola Cta por artículo, hacia el final; los datos siempre con fuente.
 
+## Que Google llegue a cada artículo: enlaces internos
+
+Publicar no basta: el 1-11-2026 Search Console tenía 15 de 18 artículos sin rastrear, porque los
+otros tres recibían 16–20 enlaces internos y estos entre 1 y 5. Un artículo nuevo ya sale solo en
+`/blog`, en el sitemap y en «Sigue leyendo» (rellena con su sector y los más recientes), pero para
+que lo enlacen sus vecinos y su landing hay que añadirlo **a mano** en `web/src/lib/blog-enlaces.ts`:
+
+- `SIGUE_LEYENDO`: una entrada con cuatro artículos afines, y añadirlo en las de otros tantos que
+  lo merezcan (cada artículo de la lista debe recibir al menos tres enlaces de otros: lo vigila
+  `tests/lib/blog-enlaces.test.ts`).
+- `GUIAS_POR_SECTOR`: si es de un oficio, entra en las tres guías de la landing de ese sector.
+
 ## Vista previa desde el editor
 
 El botón **Preview** del editor abre el artículo tal como está guardado en su rama, en el

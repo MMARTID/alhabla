@@ -6,6 +6,7 @@ import { CalculadoraCompacta } from "@/components/herramientas/calculadora-compa
 import { LandingHero } from "@/components/landing-hero";
 import { LlamadaScroll } from "@/components/llamada-scroll";
 import { Reveal } from "@/components/scroll-reveal";
+import { GuiasDelSector } from "@/components/sector/guias-del-sector";
 import { OficioDelSector } from "@/components/sector/oficio-del-sector";
 import { PreciosDelSector } from "@/components/sector/precios-del-sector";
 import { Pregunta } from "@/components/sector/pregunta";
@@ -148,6 +149,8 @@ export function SiteLanding({ sector }: { sector: SectorLanding }) {
           </div>
         </div>
       </section>
+
+      <GuiasDelSector sector={sector} />
 
       <section className="bg-oscuro text-white">
         <div className="mx-auto flex max-w-6xl flex-col items-start gap-8 px-4 py-16 sm:px-6 sm:py-20 lg:flex-row lg:items-center lg:justify-between lg:px-8">
