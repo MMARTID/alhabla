@@ -9,6 +9,9 @@ export type BusinessType =
   | "salon-de-unas"
   | "barberia"
   | "fisioterapia"
+  | "pestanas-y-cejas"
+  | "spa-y-masajes"
+  | "peluqueria-canina"
   | "other";
 
 export type PlanId = "inicio" | "pro" | "scale";

@@ -1,4 +1,5 @@
 import type { BusinessType } from "./businessType.js";
+import { PERFILES_DE_SECTOR } from "./sectores/perfiles.js";
 import type { TransferenciaAlDueno } from "./transferenciaAlDueno.js";
 import type { AgentSettings, VersionDelPrompt } from "./managedAgentPrompt.js";
 
@@ -73,27 +74,6 @@ const GOAL_INSTRUCTIONS: Record<AgentSettings["primaryGoal"], string> = {
 const ESCALATION_INSTRUCTIONS: Record<AgentSettings["escalation"], string> = {
   take_message: "Si no puedes resolver algo con información verificada, toma un recado claro con nombre, teléfono y motivo.",
   request_callback: "Si no puedes resolver algo con información verificada, solicita nombre y teléfono para que el equipo devuelva la llamada.",
-};
-
-/**
- * Instrucciones específicas por tipo de negocio: qué preguntar además de los
- * datos básicos de la reserva. Añadir un nicho nuevo es una línea aquí, no
- * una rama de código nueva. La de fisioterapia pide el motivo en términos
- * generales a propósito: no solicita datos de salud estructurados.
- */
-const NICHE_INSTRUCTIONS: Record<BusinessType, string> = {
-  peluqueria:
-    "Si la petición es ambigua (por ejemplo, \"quiero cambiar de look\"), pregunta primero si busca corte, color o peinado. Si ya sabe lo que quiere, no le interrogues de nuevo. Para trabajos técnicos o dudas sobre el resultado, no prometas un resultado: ofrece una valoración o que el equipo le oriente.",
-  barberia:
-    "Aclara solo lo necesario entre corte, barba o ambos. Si pide un estilo sin concretar, pregunta una sola preferencia útil (por ejemplo, si quiere mantener largo o un degradado); no recomiendes ni prometas un resultado técnico que el barbero deba valorar en persona.",
-  fisioterapia:
-    "Pregunta el motivo de la consulta en términos generales (primera visita, seguimiento, rehabilitación o descarga), sin solicitar historial clínico ni detalles médicos innecesarios. No diagnostiques, no pautes ejercicios ni afirmes qué lesión tiene. Si describe una urgencia clara, indícale que contacte con emergencias o un profesional sanitario sin demorar esa atención.",
-  "salon-de-unas":
-    "Aclara solo si es manicura o pedicura, el acabado principal y, cuando aplique, si es una aplicación nueva, mantenimiento o retirada. Si el servicio está claro, pasa a la cita sin repasar todos los acabados ni decoraciones posibles.",
-  "centro-de-estetica":
-    "Aclara el tratamiento que busca y pregunta si es la primera vez únicamente cuando sea relevante para una valoración previa. No asegures resultados estéticos ni aconsejes sobre contraindicaciones: si la duda requiere valoración profesional, toma el recado o ofrece que el centro contacte con la persona.",
-  other:
-    "Aclara con una pregunta breve qué necesita antes de hablar de una cita. Si no existe un servicio verificable que encaje, no lo inventes: toma un recado o propone que el equipo le contacte.",
 };
 
 function formatMinutesForHumans(minutes: number): string {
@@ -218,7 +198,11 @@ function seccionGrabacion(): Parrafos {
   ];
 }
 
-function seccionCatalogo(): Parrafos {
+function seccionCatalogo({ businessType }: ContextoDelPrompt): Parrafos {
+  // Los ejemplos, del perfil del sector (lib/sectores/perfiles.ts): los de
+  // los sectores de antes son los de siempre, con los que se midió.
+  const { preguntas, sinonimos } =
+    PERFILES_DE_SECTOR[businessType ?? "other"].catalogo;
   return [
     // Llamadas de prueba del 2026-10-05 y medición del 07-10 (chat de
     // assistants de Telnyx, mismo modelo y tools): ante «do you do
@@ -234,8 +218,8 @@ function seccionCatalogo(): Parrafos {
     // con flux y ~3,4 s con Soniox. «Sin volver a llamarla» porque con la
     // primera redacción la repetía en cada pregunta (hasta 3 por llamada).
     TITULO_DEL_BLOQUE_DEL_CATALOGO,
-    "Qué servicios hace este negocio, quién trabaja en él y cuándo abre solo lo sabes por get_catalog, no por lo que suele hacer un negocio como este. La primera vez que pregunten por eso, también si es de sí o no («¿hacéis mechas?», «do you do beard trims?») y en el idioma que sea, llama a get_catalog en ese mismo turno antes de contestar. Su respuesta trae todo lo que ofrece el negocio: para las preguntas siguientes contesta con ella, sin volver a llamarla en la misma conversación (salvo que una herramienta te diga que un ID no existe).",
-    "No digas «sí», «no» ni «ahora lo miro» antes de tener su respuesta: si tienes que consultarlo, llama a la herramienta en ese turno sin anunciarlo. Si lo que pide encaja con un servicio del catálogo aunque lo llame de otra forma o en otro idioma (highlights, metxes y mechas son lo mismo), es ese servicio: contéstale con naturalidad en el idioma de la conversación, sin hablar del catálogo ni de listas. Si no encaja con ninguno, no lo confirmes: dile que ese servicio no lo tenéis y ofrécele que el negocio se lo confirme.",
+    `Qué servicios hace este negocio, quién trabaja en él y cuándo abre solo lo sabes por get_catalog, no por lo que suele hacer un negocio como este. La primera vez que pregunten por eso, también si es de sí o no (${preguntas}) y en el idioma que sea, llama a get_catalog en ese mismo turno antes de contestar. Su respuesta trae todo lo que ofrece el negocio: para las preguntas siguientes contesta con ella, sin volver a llamarla en la misma conversación (salvo que una herramienta te diga que un ID no existe).`,
+    `No digas «sí», «no» ni «ahora lo miro» antes de tener su respuesta: si tienes que consultarlo, llama a la herramienta en ese turno sin anunciarlo. Si lo que pide encaja con un servicio del catálogo aunque lo llame de otra forma o en otro idioma (${sinonimos} son lo mismo), es ese servicio: contéstale con naturalidad en el idioma de la conversación, sin hablar del catálogo ni de listas. Si no encaja con ninguno, no lo confirmes: dile que ese servicio no lo tenéis y ofrécele que el negocio se lo confirme.`,
   ];
 }
 
@@ -282,7 +266,7 @@ function seccionPrecios({ settings }: ContextoDelPrompt): Parrafos {
 function seccionLimites({ settings, businessType }: ContextoDelPrompt): Parrafos {
   return [
     "## Límites",
-    businessType ? NICHE_INSTRUCTIONS[businessType] : null,
+    businessType ? PERFILES_DE_SECTOR[businessType].pautas : null,
     ESCALATION_INSTRUCTIONS[settings.escalation],
     "No inventes precios, servicios, disponibilidad, profesionales ni políticas. Si falta información verificada, dilo y escala.",
   ];

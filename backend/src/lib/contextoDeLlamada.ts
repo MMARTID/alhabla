@@ -10,6 +10,7 @@ import {
 } from "./idiomas/catalogo.js";
 import { vozDeLaCooficial } from "./telnyxAssistantPayload.js";
 import { isBusinessType, type BusinessType } from "./businessType.js";
+import { PERFILES_DE_SECTOR } from "./sectores/perfiles.js";
 import {
   estadoDeGrabacion,
   telefonoDelCliente,
@@ -38,17 +39,6 @@ export interface ContextoDeLlamada {
    * vez, para saludarle ya en su idioma con su voz. Si no, null. */
   voz: ReturnType<typeof vozDeLaCooficial> | null;
 }
-
-/**
- * Nichos en los que el saludo no nombra el último servicio: puede ser un
- * dato de salud y el teléfono puede usarlo otra persona de la casa. Se dice
- * «lo de la última vez»; el servicio sigue llegando al prompt.
- */
-const SIN_SERVICIO_EN_EL_SALUDO: ReadonlySet<BusinessType> = new Set([
-  "fisioterapia",
-  "centro-de-estetica",
-  "other",
-]);
 
 const UNA_SEMANA_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -156,7 +146,11 @@ export async function resolverContextoDeLlamada(input: {
   // idioma del negocio, que leídos dentro de otro suenan mal. Si no, «lo de
   // la última vez».
   const servicioDelSaludo =
-    !SIN_SERVICIO_EN_EL_SALUDO.has(tipo) &&
+    // En los sectores con datoSensible el saludo no nombra el último
+    // servicio: puede ser un dato de salud y el teléfono puede usarlo otra
+    // persona de la casa. Se dice «lo de la última vez»; el servicio sigue
+    // llegando al prompt.
+    !PERFILES_DE_SECTOR[tipo].datoSensible &&
     perfil.principal === IDIOMA_OBLIGATORIO &&
     idiomaDelSaludo === IDIOMA_OBLIGATORIO &&
     nombresDeServicios.length === 1

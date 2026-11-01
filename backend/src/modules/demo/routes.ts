@@ -2,7 +2,10 @@ import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { telnyxAiAdapter } from "../../adapters/telnyx/TelnyxAiAdapter.js";
 import { PREFIJO_ASSISTANT_DE_DEMO } from "../../lib/tiposDeAsistente.js";
-import { detectBusinessTypeFromPlace } from "../../lib/businessType.js";
+import {
+  detectBusinessTypeFromPlace,
+  type BusinessType,
+} from "../../lib/businessType.js";
 import { getPlaceDetails, searchPlacesForDemo } from "../places/service.js";
 
 /** Empezar una llamada de demo cuesta minutos de Telnyx: este se queda bajo. */
@@ -33,6 +36,19 @@ const DEMO_NICHES = [
 ] as const;
 
 type DemoNiche = (typeof DEMO_NICHES)[number];
+
+/** La demo que oyen los sectores sin assistant de demo propio: la más
+ * parecida. La peluquería canina, la general. */
+const DEMO_DE_OTROS_SECTORES: Partial<Record<BusinessType, DemoNiche>> = {
+  "pestanas-y-cejas": "centro-de-estetica",
+  "spa-y-masajes": "centro-de-estetica",
+};
+
+function demoDelSector(tipo: BusinessType): DemoNiche | undefined {
+  return (DEMO_NICHES as readonly string[]).includes(tipo)
+    ? (tipo as DemoNiche)
+    : DEMO_DE_OTROS_SECTORES[tipo];
+}
 
 const WebCallBodySchema = z.object({
   niche: z.enum(DEMO_NICHES).optional(),
@@ -205,8 +221,10 @@ export const demoRoutes: FastifyPluginAsync = async (fastify) => {
         // busca su barbería desde la landing principal, oye la barbería.
         let niche = parsed.data.niche;
         if (parsed.data.placeId) {
-          const detected = detectBusinessTypeFromPlace(await getPlaceDetails(parsed.data.placeId));
-          if (detected !== "other") niche = detected;
+          const detected = demoDelSector(
+            detectBusinessTypeFromPlace(await getPlaceDetails(parsed.data.placeId))
+          );
+          if (detected) niche = detected;
         }
 
         const assistantId = getDemoAssistantId(niche);

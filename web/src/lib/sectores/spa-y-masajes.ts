@@ -8,9 +8,9 @@ import type { SectorLanding } from "@/lib/sectores/tipos";
  * lib/gestor-guiones.ts) Lucía falta y su cita pasa a Óscar, quien mejor lo
  * hace de los libres. Los móviles empiezan por 79, un rango sin atribuir.
  *
- * Solo masajes de relajación y rituales, nada terapéutico. En el backend un
- * spa se da de alta como «Otros» (sin plantilla de servicios propia), así
- * que aquí no se promete ninguna. Límites que se dicen sin rodeos: cada
+ * Solo masajes de relajación y rituales, nada terapéutico. En el alta un spa
+ * tiene su tipo de negocio, «Spa y masajes» (backend/src/lib/sectores/
+ * perfiles.ts), con sus pautas y una plantilla de servicios propia. Límites que se dicen sin rodeos: cada
  * llamada termina en una cita y cada cita es de una persona
  * (voiceTools/service.ts, `numberPeople: 1`), sin notas en la cita; la
  * capacidad es una para todo el negocio (`Business.bookingCapacity`, que en

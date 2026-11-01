@@ -123,6 +123,32 @@ const CASOS: Array<[string, Parameters<typeof buildManagedAgentPrompt>[0]]> = [
       },
     },
   ],
+  // Sectores nuevos (lib/sectores/perfiles.ts): sus pautas y sus ejemplos
+  // del catálogo; el resto del prompt, el de todos.
+  [
+    "estudio de pestañas y cejas",
+    {
+      businessName: "Estudio Lía",
+      businessType: "pestanas-y-cejas",
+      settings: DEFAULT_AGENT_SETTINGS,
+    },
+  ],
+  [
+    "spa y masajes",
+    {
+      businessName: "Spa Olivo",
+      businessType: "spa-y-masajes",
+      settings: DEFAULT_AGENT_SETTINGS,
+    },
+  ],
+  [
+    "peluquería canina",
+    {
+      businessName: "Guau Estilo",
+      businessType: "peluqueria-canina",
+      settings: DEFAULT_AGENT_SETTINGS,
+    },
+  ],
 ];
 
 describe("prompt gestionado (instantáneas)", () => {
