@@ -157,8 +157,11 @@ export class WhatsAppApiError extends Error {
 
 const SDK_TEMPLATE_PARAMETER_TYPE = "text" as const;
 
+/** Lo que va en `whatsapp_message` al enviar. */
+type ContenidoWhatsApp = Telnyx.Messages.MessageWhatsappParams.WhatsappMessage;
+
 type SdkTemplateComponent = NonNullable<
-  NonNullable<Telnyx.Messages.WhatsappMessageContent["template"]>["components"]
+  NonNullable<ContenidoWhatsApp["template"]>["components"]
 >[number];
 
 /**
@@ -210,7 +213,7 @@ export class WhatsAppAdapter {
 
   private async send(
     message: WhatsAppOutbound,
-    content: Telnyx.Messages.WhatsappMessageContent,
+    content: ContenidoWhatsApp,
     describe: string
   ): Promise<WhatsAppSendResult> {
     const config = this.requireConfig();
@@ -286,17 +289,16 @@ export class WhatsAppAdapter {
       });
     }
 
-    const template: NonNullable<
-      Telnyx.Messages.WhatsappMessageContent["template"]
-    > = message.templateId
-      ? { template_id: message.templateId }
-      : {
-          name: message.templateName,
-          language: {
-            policy: "deterministic",
-            code: message.languageCode ?? "es",
-          },
-        };
+    const template: NonNullable<ContenidoWhatsApp["template"]> =
+      message.templateId
+        ? { template_id: message.templateId }
+        : {
+            name: message.templateName,
+            language: {
+              policy: "deterministic",
+              code: message.languageCode ?? "es",
+            },
+          };
     if (components.length > 0) {
       template.components = components;
     }
@@ -339,7 +341,7 @@ export class WhatsAppAdapter {
         status: "read",
         message_id: messageId,
         typing_indicator: { type: "text" },
-      } as unknown as Telnyx.Messages.WhatsappMessageContent,
+      } as unknown as ContenidoWhatsApp,
       "leído + escribiendo"
     );
   }
@@ -359,17 +361,9 @@ export class WhatsAppAdapter {
         type: "interactive",
         interactive: {
           type: "button",
-          // La API exige `header.type: "text"` (10015 si falta); el SDK no
-          // lo tipa, de ahí la conversión.
+          // La API exige `header.type: "text"` (10015 si falta).
           ...(message.header
-            ? {
-                header: {
-                  type: "text",
-                  text: message.header,
-                } as unknown as NonNullable<
-                  Telnyx.Messages.WhatsappInteractive["header"]
-                >,
-              }
+            ? { header: { type: "text", text: message.header } }
             : {}),
           body: { text: message.body },
           ...(message.footer ? { footer: { text: message.footer } } : {}),
@@ -403,11 +397,7 @@ export class WhatsAppAdapter {
         interactive: {
           type: "cta_url",
           ...(message.header
-            ? {
-                header: { type: "text", text: message.header } as unknown as NonNullable<
-                  Telnyx.Messages.WhatsappInteractive["header"]
-                >,
-              }
+            ? { header: { type: "text", text: message.header } }
             : {}),
           body: { text: message.body },
           ...(message.footer ? { footer: { text: message.footer } } : {}),
@@ -425,36 +415,36 @@ export class WhatsAppAdapter {
   async sendContacts(
     message: WhatsAppContactsMessage
   ): Promise<WhatsAppSendResult> {
-    const contacts = message.contacts.map((contact) => ({
-      // Meta exige `name.formatted_name`; el SDK tipa `name` como string por
-      // error, así que se construye la forma de Meta y se convierte al tipo.
-      name: {
-        formatted_name: contact.formattedName,
-        first_name: contact.firstName ?? contact.formattedName,
-      },
-      ...(contact.company ? { org: { company: contact.company } } : {}),
-      phones: contact.phones.map((phone) => ({
-        phone: phone.number,
-        wa_id: phone.number.replace(/^\+/, ""),
-        type: phone.type ?? "WORK",
-      })),
-      ...(contact.emails
-        ? {
-            emails: contact.emails.map((email) => ({
-              email: email.email,
-              type: email.type ?? "WORK",
-            })),
-          }
-        : {}),
-      ...(contact.urls
-        ? {
-            urls: contact.urls.map((url) => ({
-              url: url.url,
-              type: url.type ?? "WORK",
-            })),
-          }
-        : {}),
-    })) as unknown as Telnyx.Messages.WhatsappContact[];
+    const contacts: NonNullable<ContenidoWhatsApp["contacts"]> =
+      message.contacts.map((contact) => ({
+        // Meta exige `name.formatted_name` (objeto, no string).
+        name: {
+          formatted_name: contact.formattedName,
+          first_name: contact.firstName ?? contact.formattedName,
+        },
+        ...(contact.company ? { org: { company: contact.company } } : {}),
+        phones: contact.phones.map((phone) => ({
+          phone: phone.number,
+          wa_id: phone.number.replace(/^\+/, ""),
+          type: phone.type ?? "WORK",
+        })),
+        ...(contact.emails
+          ? {
+              emails: contact.emails.map((email) => ({
+                email: email.email,
+                type: email.type ?? "WORK",
+              })),
+            }
+          : {}),
+        ...(contact.urls
+          ? {
+              urls: contact.urls.map((url) => ({
+                url: url.url,
+                type: url.type ?? "WORK",
+              })),
+            }
+          : {}),
+      }));
 
     return this.send(
       message,
@@ -572,8 +562,7 @@ export class WhatsAppAdapter {
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${await response.text()}`);
       }
-      const mimeType =
-        response.headers.get("content-type") ?? "audio/ogg";
+      const mimeType = response.headers.get("content-type") ?? "audio/ogg";
       const buffer = Buffer.from(await response.arrayBuffer());
       return { buffer, mimeType };
     } catch (error) {

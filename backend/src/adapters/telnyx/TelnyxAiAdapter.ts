@@ -48,19 +48,12 @@ type TelephonySettingsInput = Omit<
 
 /** Modelos de transcripción de respaldo, en orden (hasta 3, todos de
  * streaming y distintos del principal): si el que está en uso falla al
- * empezar o a mitad de llamada, entra el siguiente. Documentado por Telnyx
- * (ajustes de transcripción, release note del 2026-10-09) pero ausente de
- * `TranscriptionSettings` en el SDK 7.24; cada uno hereda el idioma del
- * principal salvo que lleve el suyo. `null` o `[]` los quitan. */
-export type RespaldoDeTranscripcion = {
-  model: NonNullable<TranscriptionSettings["model"]>;
-  language?: string;
-  settings?: TranscriptionSettings["settings"];
-};
+ * empezar o a mitad de llamada, entra el siguiente. Cada uno hereda el
+ * idioma del principal salvo que lleve el suyo; `null` o `[]` los quitan.
+ * Tipados en el SDK desde la 7.29, que solo admite modelos de streaming. */
+export type RespaldoDeTranscripcion = TranscriptionSettings.FallbackModel;
 
-export type TranscriptionSettingsInput = TranscriptionSettings & {
-  fallback_models?: RespaldoDeTranscripcion[] | null;
-};
+export type TranscriptionSettingsInput = TranscriptionSettings;
 
 /** `language` (ISO 639-1) es el idioma en que arranca una voz de Soniox
  * (`Soniox.tts-rt-v2.*`), que habla todos los idiomas; documentado por

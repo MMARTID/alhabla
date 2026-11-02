@@ -527,7 +527,10 @@ function transcripcionDeSoniox(
 function ajustesDeSoniox(
   pistas: readonly string[] | undefined,
   boostedKeywords: readonly string[] | undefined
-): RespaldoDeTranscripcion & { language: string } {
+): RespaldoDeTranscripcion & {
+  language: string;
+  settings: NonNullable<RespaldoDeTranscripcion["settings"]>;
+} {
   return {
     model: "soniox/stt-rt-v5",
     language: "auto",
