@@ -792,7 +792,7 @@ describe("handleCallConversationEnded", () => {
       conversationId: "conv_1",
       intento: 1,
     });
-    expect(String(warn.mock.calls[0][0])).toContain("Telnyx down");
+    expect(String(warn.mock.calls.at(-1)?.[0])).toContain("Telnyx down");
     warn.mockRestore();
   });
 
@@ -827,7 +827,7 @@ describe("handleCallConversationEnded", () => {
       conversationId: "c6fc5bb5",
       intento: 1,
     });
-    const aviso = String(warn.mock.calls[0][0]);
+    const aviso = String(warn.mock.calls.at(-1)?.[0]);
     expect(aviso).toContain("biz_infinity");
     expect(aviso).toContain("cmufcsz4b0006s601kncxcf5m");
     expect(aviso).toContain("c6fc5bb5");
@@ -856,6 +856,134 @@ describe("handleCallConversationEnded", () => {
     });
 
     expect(mockedProgramarRecuperacion).not.toHaveBeenCalled();
+  });
+
+  it("guarda la transcripción con los mensajes del webhook, sin redactar, y no descarga la copia de Telnyx", async () => {
+    mockedCallFindUnique.mockResolvedValue({
+      id: "call_db_1",
+      businessId: "biz1",
+      providerConversationId: null,
+      durationSecs: null,
+    } as any);
+    mockedCallUpdate.mockResolvedValue({} as any);
+    mockedTranscriptUpsert.mockResolvedValue({} as any);
+
+    const result = await handleCallConversationEnded({
+      data: {
+        id: "evt_3",
+        event_type: "call.conversation.ended",
+        payload: {
+          call_control_id: "call_ctrl_1",
+          conversation_id: "conv_1",
+          // Forma de CallConversationEnded.Payload.Message (SDK 7.29) con
+          // conversation_ended_full_history: tool_calls y tool_call_id.
+          messages: [
+            {
+              role: "assistant",
+              content: "Peluquería Sol, ¿en qué puedo ayudarle?",
+              timestamp: "2026-11-02T18:03:41Z",
+            },
+            {
+              role: "user",
+              content: "Soy Lucía Fernández, mi móvil es el 612 345 678.",
+              timestamp: "2026-11-02T18:03:50Z",
+            },
+            {
+              role: "assistant",
+              timestamp: "2026-11-02T18:03:52Z",
+              tool_calls: [
+                {
+                  id: "tc_1",
+                  type: "function",
+                  function: { name: "book_appointment", arguments: "{}" },
+                },
+              ],
+            },
+            {
+              role: "tool",
+              content: "Reservada",
+              tool_call_id: "tc_1",
+              timestamp: "2026-11-02T18:03:53Z",
+            },
+          ],
+        },
+      },
+    });
+
+    expect(result).toEqual({ success: true });
+    expect(mockedListConversationMessages).not.toHaveBeenCalled();
+    expect(mockedProgramarRecuperacion).not.toHaveBeenCalled();
+    expect(mockedTranscriptUpsert).toHaveBeenCalledWith({
+      where: { callId: "call_db_1" },
+      create: {
+        callId: "call_db_1",
+        fullText:
+          "assistant: Peluquería Sol, ¿en qué puedo ayudarle?\nuser: Soy Lucía Fernández, mi móvil es el 612 345 678.\nassistant: \ntool: Reservada",
+        messages: [
+          {
+            role: "assistant",
+            text: "Peluquería Sol, ¿en qué puedo ayudarle?",
+            createdAt: "2026-11-02T18:03:41Z",
+            sentAt: "2026-11-02T18:03:41Z",
+          },
+          {
+            role: "user",
+            text: "Soy Lucía Fernández, mi móvil es el 612 345 678.",
+            createdAt: "2026-11-02T18:03:50Z",
+            sentAt: "2026-11-02T18:03:50Z",
+          },
+          {
+            role: "assistant",
+            text: "",
+            createdAt: "2026-11-02T18:03:52Z",
+            sentAt: "2026-11-02T18:03:52Z",
+          },
+          {
+            role: "tool",
+            text: "Reservada",
+            createdAt: "2026-11-02T18:03:53Z",
+            sentAt: "2026-11-02T18:03:53Z",
+          },
+        ],
+      },
+      update: expect.objectContaining({
+        fullText: expect.stringContaining("Lucía Fernández"),
+      }),
+    });
+  });
+
+  it("sin mensajes en el webhook usa la copia de Telnyx y avisa de que va redactada", async () => {
+    mockedCallFindUnique.mockResolvedValue({
+      id: "call_db_1",
+      businessId: "biz1",
+      providerConversationId: null,
+      durationSecs: null,
+    } as any);
+    mockedCallUpdate.mockResolvedValue({} as any);
+    mockedListConversationMessages.mockResolvedValue([
+      { role: "user", text: "Soy <PII:name/>" },
+    ]);
+    mockedTranscriptUpsert.mockResolvedValue({} as any);
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    await handleCallConversationEnded({
+      data: {
+        id: "evt_3",
+        event_type: "call.conversation.ended",
+        payload: {
+          call_control_id: "call_ctrl_1",
+          conversation_id: "conv_1",
+          messages: [],
+        },
+      },
+    });
+
+    expect(mockedListConversationMessages).toHaveBeenCalledWith("conv_1");
+    const aviso = String(warn.mock.calls[0][0]);
+    expect(aviso).toContain("redactados");
+    expect(aviso).toContain("biz1");
+    expect(aviso).toContain("call_db_1");
+    warn.mockRestore();
   });
 });
 
