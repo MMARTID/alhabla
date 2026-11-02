@@ -2,6 +2,9 @@ import { describe, it, expect, vi } from "vitest";
 import {
   ErrorDeUso,
   MODELO_DEL_CLIENTE,
+  MODELO_DEL_ASSISTANT,
+  MODELO_DEL_CLIENTE_ALTERNATIVO,
+  conModeloDelAssistant,
   NegocioNoDisponible,
   PREFIJO_DEL_LABORATORIO,
   TOPE_DE_TURNOS_SIN_CONFIRMAR,
@@ -280,10 +283,38 @@ describe("parsearArgumentos", () => {
       listaDeEspera: "auto",
       cliente: "reactivo",
       modeloDelCliente: MODELO_DEL_CLIENTE,
+      modeloDelAssistant: MODELO_DEL_ASSISTANT,
       compararCon: null,
       etiqueta: null,
     });
     expect(o.salida).toMatch(/backend\/\.laboratorio-de-prompt$/);
+  });
+
+  it("con Kimi de recepcionista, el cliente pasa a ser otro alojado por Telnyx", () => {
+    const o = parsearArgumentos([
+      "--modelo-del-assistant",
+      "moonshotai/Kimi-K2.6",
+    ]);
+    expect(o.modeloDelAssistant).toBe("moonshotai/Kimi-K2.6");
+    expect(o.modeloDelCliente).toBe(MODELO_DEL_CLIENTE_ALTERNATIVO);
+  });
+
+  it("conModeloDelAssistant cambia el modelo de todos los payloads", () => {
+    const contexto = {
+      payloads: {
+        control: { model: MODELO_DEL_ASSISTANT, name: "a" },
+        v2: { model: MODELO_DEL_ASSISTANT, name: "b" },
+      },
+    } as unknown as ContextoDelNegocio;
+    expect(conModeloDelAssistant(contexto, MODELO_DEL_ASSISTANT)).toBe(
+      contexto
+    );
+    const otro = conModeloDelAssistant(contexto, "moonshotai/Kimi-K2.6");
+    expect(Object.values(otro.payloads).map((p) => p.model)).toEqual([
+      "moonshotai/Kimi-K2.6",
+      "moonshotai/Kimi-K2.6",
+    ]);
+    expect(otro.payloads.control.name).toBe("a");
   });
 
   it("lee todas las opciones, también con =", () => {
@@ -345,6 +376,15 @@ describe("parsearArgumentos", () => {
     [["--negocio", "b", "--raro"], /desconocida/],
     [["--cliente", "humano"], /reactivo o guion/],
     [["--modelo-cliente", "openai/gpt-5.6-luna"], /el del assistant/],
+    [
+      [
+        "--modelo-del-assistant",
+        "moonshotai/Kimi-K2.6",
+        "--modelo-cliente",
+        "moonshotai/Kimi-K2.6",
+      ],
+      /el del assistant/,
+    ],
     [["--comparar-con"], /Falta el valor/],
     [["--negocio", "b", "--n", "0"], /entre 1 y 200/],
     [["--negocio", "b", "--n", "x"], /entre 1 y 200/],
