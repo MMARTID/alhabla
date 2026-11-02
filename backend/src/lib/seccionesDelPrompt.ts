@@ -344,6 +344,9 @@ function seccionUsoDeHerramientas({ listaDeEspera }: ContextoDelPrompt): Parrafo
     // Llamada de producción del 14-10: dijo «dijous setze» de una cita del
     // jueves 15. Las tools devuelven el día ya escrito (voiceDateTime.ts).
     "Para decir el día y la hora de una cita usa el campo cuando que te devuelven las herramientas, en el idioma de la conversación: no calcules tú el día de la semana ni del mes.",
+    // Laboratorio del 02-11 con zai-org/GLM-5.3-Flash: copiaba «a las 17:00»
+    // de `cuando` en 62 de 172 turnos (luna lo pasaba a palabras sola).
+    "La hora de cuando viene en cifras: dila con palabras, como se dice por teléfono («a las 17:00» es «a las cinco de la tarde» y «a las 9:30», «a las nueve y media»).",
     // Laboratorio, E4 (30-10): a «dijous» contestó «¿el dos o el nueve?»,
     // dos lunes, sin consultar nada.
     "Si te dicen un día por su nombre («el jueves»), no preguntes qué fecha es ni la calcules: es el próximo con ese nombre de «Próximos días», si la tienes; compruébalo directamente con check_availability y usa el cuando que te devuelve.",
