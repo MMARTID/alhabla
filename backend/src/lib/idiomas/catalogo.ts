@@ -131,6 +131,9 @@ export interface IdiomaDelCatalogo {
   /** Las piezas del saludo al descolgar cuando saluda en este idioma
    * (componerSaludo y componerSaludoDeLlamada). */
   saludo: PartesDelSaludo;
+  /** Lo que dice si una tool lenta (reservar, cancelar) aún no ha
+   * respondido: la frase de espera de Telnyx (telnyxAssistantPayload.ts). */
+  fraseDeEspera: string;
   /** Pista de cada motor de transcripción de Telnyx, o null si no lo
    * entiende. flux es el rápido (fin de turno anticipado); Soniox entiende
    * todos. */
@@ -234,6 +237,7 @@ export const IDIOMAS: Record<CodigoDeIdioma, IdiomaDelCatalogo> = {
         presentacionAlCliente: "Hola, {nombre}, soy recepcionista de IA.",
       },
     },
+    fraseDeEspera: "Un momento, por favor.",
     transcripcion: { flux: "es", soniox: "es" },
     cooficial: false,
     voces: ultra("es-ES"),
@@ -260,6 +264,7 @@ export const IDIOMAS: Record<CodigoDeIdioma, IdiomaDelCatalogo> = {
           "Hi {nombre}, you're speaking with an AI receptionist.",
       },
     },
+    fraseDeEspera: "One moment, please.",
     transcripcion: { flux: "en", soniox: "en" },
     cooficial: false,
     voces: ultra("en-GB"),
@@ -288,6 +293,7 @@ export const IDIOMAS: Record<CodigoDeIdioma, IdiomaDelCatalogo> = {
           "Bonjour {nombre}, vous êtes en ligne avec une intelligence artificielle.",
       },
     },
+    fraseDeEspera: "Un instant, s'il vous plaît.",
     transcripcion: { flux: "fr", soniox: "fr" },
     cooficial: false,
     voces: ultra("fr-FR"),
@@ -313,6 +319,7 @@ export const IDIOMAS: Record<CodigoDeIdioma, IdiomaDelCatalogo> = {
           "Hola, {nombre}, t'atén una intel·ligència artificial.",
       },
     },
+    fraseDeEspera: "Un moment, si us plau.",
     transcripcion: { flux: null, soniox: "ca" },
     cooficial: true,
     // Las nativas de Azure y las de MiniMax se ofrecieron del 03 al 05-10 y
@@ -345,6 +352,7 @@ export const IDIOMAS: Record<CodigoDeIdioma, IdiomaDelCatalogo> = {
         presentacionAlCliente: "Kaixo, {nombre}. Adimen artifizial bat naiz.",
       },
     },
+    fraseDeEspera: "Une bat, mesedez.",
     transcripcion: { flux: null, soniox: "eu" },
     cooficial: true,
     voces: [MARTA, SERGIO],
@@ -370,6 +378,7 @@ export const IDIOMAS: Record<CodigoDeIdioma, IdiomaDelCatalogo> = {
           "Ola, {nombre}, atendete unha intelixencia artificial.",
       },
     },
+    fraseDeEspera: "Un momento, por favor.",
     transcripcion: { flux: null, soniox: "gl" },
     cooficial: true,
     voces: [MARTA, SERGIO],
@@ -397,6 +406,7 @@ export const IDIOMAS: Record<CodigoDeIdioma, IdiomaDelCatalogo> = {
           "Hallo {nombre}, Sie sprechen mit einer künstlichen Intelligenz.",
       },
     },
+    fraseDeEspera: "Einen Moment, bitte.",
     transcripcion: { flux: "de", soniox: "de" },
     cooficial: false,
     voces: ultra("de-DE"),
@@ -424,6 +434,7 @@ export const IDIOMAS: Record<CodigoDeIdioma, IdiomaDelCatalogo> = {
           "Buongiorno {nombre}, sta parlando con un'intelligenza artificiale.",
       },
     },
+    fraseDeEspera: "Un momento, per favore.",
     transcripcion: { flux: "it", soniox: "it" },
     cooficial: false,
     voces: ultra("it-IT"),
@@ -451,6 +462,7 @@ export const IDIOMAS: Record<CodigoDeIdioma, IdiomaDelCatalogo> = {
           "Olá {nombre}, está a falar com uma inteligência artificial.",
       },
     },
+    fraseDeEspera: "Um momento, por favor.",
     transcripcion: { flux: "pt", soniox: "pt" },
     cooficial: false,
     voces: ultra("pt-PT"),
@@ -477,6 +489,7 @@ export const IDIOMAS: Record<CodigoDeIdioma, IdiomaDelCatalogo> = {
           "Hallo {nombre}, u spreekt met een kunstmatige intelligentie.",
       },
     },
+    fraseDeEspera: "Een ogenblikje, alstublieft.",
     transcripcion: { flux: "nl", soniox: "nl" },
     cooficial: false,
     voces: ultra("nl-NL"),
@@ -508,6 +521,7 @@ export const IDIOMAS: Record<CodigoDeIdioma, IdiomaDelCatalogo> = {
           "Здравствуйте, {nombre}! С вами говорит искусственный интеллект.",
       },
     },
+    fraseDeEspera: "Одну минуту, пожалуйста.",
     transcripcion: { flux: "ru", soniox: "ru" },
     cooficial: false,
     voces: null,
