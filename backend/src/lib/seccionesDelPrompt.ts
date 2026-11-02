@@ -495,13 +495,37 @@ const SECCIONES_POR_VERSION: Record<VersionDelPrompt, readonly Seccion[]> = {
   v1: SECCIONES_DEL_PROMPT,
 };
 
-/** Las secciones unidas: los párrafos vacíos fuera y una línea en blanco
- * entre los demás. */
-export function componerPrompt(contexto: ContextoDelPrompt): string {
+/** Cómo se escribe el prompt. `json` (el de producción desde el 2026-11-02)
+ * es el mismo texto como un objeto con una clave por sección y la lista de
+ * sus párrafos; `texto` es el Markdown de siempre («## Título» y párrafos),
+ * que queda para el laboratorio. Medido con zai-org/GLM-5.3-Flash en 198
+ * conversaciones (laboratorioDePrompt.ts): texto 79/99, json 81/99. */
+export type FormatoDelPrompt = "json" | "texto";
+
+/** Las secciones unidas: los párrafos vacíos fuera; en texto, una línea en
+ * blanco entre los demás. */
+export function componerPrompt(
+  contexto: ContextoDelPrompt,
+  formato: FormatoDelPrompt = "json"
+): string {
   const secciones =
     SECCIONES_POR_VERSION[contexto.settings.versionDelPrompt] ??
     SECCIONES_DEL_PROMPT;
-  return secciones.flatMap((seccion) => seccion(contexto))
-    .filter(Boolean)
-    .join("\n\n");
+  const parrafos = secciones.map((seccion) =>
+    seccion(contexto).filter((parrafo): parrafo is string => Boolean(parrafo))
+  );
+  if (formato === "texto") return parrafos.flat().join("\n\n");
+  const objeto: Record<string, string[]> = {};
+  for (const [primero, ...resto] of parrafos.filter((p) => p.length > 0)) {
+    // El título es la primera línea («## Idioma» trae su primera frase en
+    // el mismo párrafo, detrás de un salto de línea).
+    const titulo = /^##[ \t]+([^\n]+)(?:\n([\s\S]*))?$/.exec(primero!);
+    if (titulo) {
+      const delTitulo = titulo[2]?.trim() ? [titulo[2].trim()] : [];
+      (objeto[titulo[1]!.trim()] ??= []).push(...delTitulo, ...resto);
+    } else {
+      (objeto["Instrucciones"] ??= []).push(primero!, ...resto);
+    }
+  }
+  return JSON.stringify(objeto, null, 2);
 }

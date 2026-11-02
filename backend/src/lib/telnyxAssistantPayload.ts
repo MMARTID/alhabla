@@ -533,9 +533,14 @@ export function adaptManagedPromptForTelnyx(
   // {{telnyx_current_time_<zona>}} sin resolver y el agente sin saber qué
   // día es (fecha inventada para «mañana»).
   const zona = resolveManagedPromptTimezone(timezone);
+  // En el prompt en JSON (FormatoDelPrompt) el nombre cae dentro de una
+  // cadena: unas comillas en «Peluquería "La Rosa"» lo romperían.
+  const nombre = instructions.trimStart().startsWith("{")
+    ? JSON.stringify(businessName).slice(1, -1)
+    : businessName;
   return instructions
     .split("{{nombre_negocio}}")
-    .join(businessName)
+    .join(nombre)
     .split("{{user_number}}")
     .join("{{telnyx_end_user_target}}")
     .replace(RETELL_CURRENT_TIME_PATTERN, `{{telnyx_current_time_${zona}}}`)
@@ -817,16 +822,22 @@ export function buildTelnyxAssistantPayload(
     // (LLM+STT+TTS) factura una TARIFA PLANA de $0.05 por minuto
     // (redondeado a bloques de 60s) sin importar el modelo — mismo coste
     // exacto con Kimi-K2.6 y con gpt-5.6-luna en llamadas de duración
-    // comparable. El modelo NO afecta al coste; se mantiene gpt-5.6-luna
-    // por preferencia del usuario, no por ahorro. La única palanca real de
+    // comparable. El modelo NO afecta al coste. La única palanca real de
     // coste es la duración de la llamada.
-    model: "openai/gpt-5.6-luna",
-    // gpt-5.6-luna NO lo aloja Telnyx: `GET /v2/ai/models` lo da con
-    // `owned_by: "openai"`, así que la conversación sale a OpenAI (fuera del
-    // EEE; docs/auditorias/2026-10-16-pipelines-ue-y-datos.md). Kimi-K2.6,
-    // el fallback, sí es de Telnyx (`owned_by: "Telnyx"`): no exige una
-    // Integration Secret propia, y es el modelo ya validado con llamadas
-    // reales antes de este cambio.
+    //
+    // Desde el 2026-11-02, zai-org/GLM-5.3-Flash (decisión del usuario). Lo
+    // aloja Telnyx (antes gpt-5.6-luna, de OpenAI y fuera del EEE;
+    // docs/auditorias/2026-10-16-pipelines-ue-y-datos.md) y es el único
+    // modelo de assistants que Telnyx sirve en la región EU con
+    // `privacy_settings.in_transit_data_locality` (Kimi-K2.6 no está en EU:
+    // 422/10027 medido el 02-11). En el laboratorio de prompt
+    // (laboratorioDePrompt.ts) acierta como luna (~80 %) y contesta unas
+    // tres veces más rápido (~1,2 s por turno frente a ~3,9 s).
+    model: "zai-org/GLM-5.3-Flash",
+    // Kimi-K2.6 también es de Telnyx (`owned_by: "Telnyx"`), no exige una
+    // Integration Secret y es el modelo validado con llamadas reales antes
+    // de luna. No se sirve en EU: si algún día se activa
+    // `in_transit_data_locality`, el respaldo tendrá que ser otro.
     fallbackConfig: { model: "moonshotai/Kimi-K2.6" },
     // voice_speed retirado (encontrado 2026-09-14): la propia documentación
     // del SDK dice "only applicable for Telnyx Natural voices" — la cuenta

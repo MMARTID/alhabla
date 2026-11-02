@@ -38,7 +38,6 @@ import {
   pareceDespedida,
   planificar,
   marcadorParcial,
-  promptEnJson,
   reconstruirConversacion,
   repartirLlamadas,
   restableceElNegocio,
@@ -156,7 +155,7 @@ function contextoFalso(
       name: nombreDelAssistant(fecha, variante, sufijo),
       instructions: "Eres la recepcionista.",
       greeting: "Hola, gracias por llamar.",
-      model: "openai/gpt-5.6-luna",
+      model: "zai-org/GLM-5.3-Flash",
       tools: [{ type: "webhook", webhook: { name: "get_catalog" } }] as never,
     };
   }
@@ -377,7 +376,7 @@ describe("parsearArgumentos", () => {
   it.each([
     [["--negocio", "b", "--raro"], /desconocida/],
     [["--cliente", "humano"], /reactivo o guion/],
-    [["--modelo-cliente", "openai/gpt-5.6-luna"], /el del assistant/],
+    [["--modelo-cliente", "zai-org/GLM-5.3-Flash"], /el del assistant/],
     [
       [
         "--modelo-del-assistant",
@@ -2339,7 +2338,7 @@ describe("siguienteMensajeDelCliente", () => {
       mensajes: Array<{ role: string; content: string }>;
     };
     expect(peticion.modelo).toBe(MODELO_DEL_CLIENTE);
-    expect(peticion.modelo).not.toBe("openai/gpt-5.6-luna");
+    expect(peticion.modelo).not.toBe(MODELO_DEL_ASSISTANT);
     const sistema = peticion.mensajes[0]!.content;
     expect(sistema).toContain(guion("E12a").objetivo);
     expect(sistema).toContain("Servicio que quieres: un corte de pelo");
@@ -3990,34 +3989,6 @@ describe("resultadoSinAssistant", () => {
       llamadaUsada: "lab-x-0001",
       ok: false,
       error: "400 10015",
-    });
-  });
-});
-
-describe("promptEnJson", () => {
-  it("convierte cada «## Título» en una clave con sus párrafos, sin cambiar una palabra", () => {
-    const prompt =
-      "## Rol\n\nEres la recepcionista de IA de {{nombre_negocio}}.\n\nResponde en una o dos frases.\n\n## Cierre\n\nAnte una despedida normal, di una sola frase breve.";
-
-    const json = JSON.parse(promptEnJson(prompt));
-
-    expect(json).toEqual({
-      Rol: [
-        "Eres la recepcionista de IA de {{nombre_negocio}}.",
-        "Responde en una o dos frases.",
-      ],
-      Cierre: ["Ante una despedida normal, di una sola frase breve."],
-    });
-  });
-
-  it("guarda lo de antes del primer título en «Instrucciones» y los párrafos de varias líneas enteros", () => {
-    const json = JSON.parse(
-      promptEnJson("Hola.\n\n## Información del negocio\n\nAbrimos a las 9.\nCerramos a las 20.")
-    );
-
-    expect(json).toEqual({
-      Instrucciones: ["Hola."],
-      "Información del negocio": ["Abrimos a las 9.\nCerramos a las 20."],
     });
   });
 });

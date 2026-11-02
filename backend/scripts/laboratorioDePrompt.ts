@@ -119,12 +119,12 @@ export const PREFIJO_DEL_LABORATORIO = "alhabla-lab-prompt-";
 /** Por encima de estos turnos hace falta `--si`. */
 export const TOPE_DE_TURNOS_SIN_CONFIRMAR = 300;
 
-/** El juez es un modelo alojado por Telnyx y distinto del del assistant
- * (`openai/gpt-5.6-luna` no se sirve por la inferencia pública). */
+/** El juez es un modelo alojado por Telnyx y distinto del del assistant. */
 export const MODELO_DEL_JUEZ = "moonshotai/Kimi-K2.6";
-/** El de producción (telnyxAssistantPayload.ts). Con `--modelo-del-assistant`
- * se prueba otro: p. ej. Kimi-K2.6, que aloja Telnyx en vez de OpenAI. */
-export const MODELO_DEL_ASSISTANT = "openai/gpt-5.6-luna";
+/** El de producción (telnyxAssistantPayload.ts) desde el 2026-11-02. Con
+ * `--modelo-del-assistant` se prueba otro: p. ej. `openai/gpt-5.6-luna`, el
+ * de antes, o Kimi-K2.6. */
+export const MODELO_DEL_ASSISTANT = "zai-org/GLM-5.3-Flash";
 
 /** El cliente reactivo también es un modelo barato alojado por Telnyx y
  * distinto del del assistant: por defecto, el mismo cliente que el juez. */
@@ -181,35 +181,15 @@ export function marcadorParcial(
   return partes.join(" · ") || "sin resultados";
 }
 
-/** Cómo se llama cada variante y qué `versionDelPrompt` lleva. `json` es
- * el mismo prompt v1, palabra por palabra, escrito como JSON
- * (`promptEnJson`): mide solo el formato. */
+/** Cómo se llama cada variante, qué `versionDelPrompt` lleva y en qué
+ * formato va el prompt (FormatoDelPrompt). `control` es el de producción,
+ * en JSON desde el 2026-11-02; `texto` es el mismo prompt en el Markdown de
+ * antes, para volver a medir el formato. */
 export const VARIANTES = {
-  control: { version: "v1", formato: "texto" },
-  v2: { version: "v2", formato: "texto" },
-  json: { version: "v1", formato: "json" },
+  control: { version: "v1", formato: "json" },
+  v2: { version: "v2", formato: "json" },
+  texto: { version: "v1", formato: "texto" },
 } as const;
-
-/** El prompt en Markdown («## Título» y párrafos separados por una línea en
- * blanco) como un objeto JSON: una clave por sección y la lista de sus
- * párrafos, en el mismo orden. Lo de antes del primer título va en
- * «Instrucciones». No cambia ni una palabra. */
-export function promptEnJson(prompt: string): string {
-  const secciones: Record<string, string[]> = {};
-  let actual = "Instrucciones";
-  for (const parrafo of prompt.split(/\n{2,}/)) {
-    const texto = parrafo.trim();
-    if (!texto) continue;
-    const titulo = /^##\s+(.+)$/.exec(texto);
-    if (titulo && !texto.includes("\n")) {
-      actual = titulo[1]!.trim();
-      secciones[actual] ??= [];
-      continue;
-    }
-    (secciones[actual] ??= []).push(texto);
-  }
-  return JSON.stringify(secciones, null, 2);
-}
 export type NombreDeVariante = keyof typeof VARIANTES;
 
 // ---------------------------------------------------------------------------
@@ -3856,14 +3836,14 @@ async function cargarContextoReal(input: {
       ocultarNumeroDelNegocio: negocio.hideOwnerNumberFromClients,
       transferenciaAlDueno: transferencia,
       idiomas: idiomas.idiomas,
+      formato,
     });
     const construido = payloadLib.buildTelnyxAssistantPayload({
       businessId: negocio.id,
       agentId: "laboratorio",
       businessName: negocio.name,
       timezone: negocio.timezone,
-      instructions:
-        formato === "json" ? promptEnJson(instrucciones) : instrucciones,
+      instructions: instrucciones,
       greeting: idiomasLib.saludoDelNegocio(idiomas, negocio.name),
       idiomas,
       voice: VOZ_DEL_LABORATORIO,
