@@ -1351,9 +1351,10 @@ hablando por el que elige `identificarRemitente`.
   (`lib/gestorSync.ts › sincronizarGestor`: compara instrucciones, modelo y la firma de las
   tools — nombre, url, cabeceras, descripción, parámetros — y no el JSON entero, que trae
   valores por defecto de Telnyx); el deploy fuerza el reconciliador cuando cambian
-  `gestorPayload.ts` o `gestorSync.ts`. Modelo `openai/gpt-5.6-luna` (el mismo que las
-  recepcionistas); **sin `fallback_config`**: el `zai-org/GLM-5.3-Flash` del plan no está
-  disponible para assistants (10027).
+  `gestorPayload.ts` o `gestorSync.ts`. Modelo `openai/gpt-5.6-luna` (las recepcionistas
+  pasaron a `zai-org/GLM-5.3-Flash` el 2026-11-02, ver «Modelo y formato del prompt de la
+  recepcionista»); **sin `fallback_config`**: cuando se escribió, GLM-5.3-Flash daba 10027
+  para assistants; el 02-11 ya se crean con él.
 - **El negocio es dato, no prompt** (`lib/gestorPayload.ts`): prompt único y estable; la
   conversación de Telnyx la crea Alhabla con `metadata { business_id, role: "owner", channel,
   owner_phone }` y `system_prompt` con nombre, sector y zona; Telnyx templa los metadata en las
@@ -3080,7 +3081,9 @@ operativos o de auditoría creados por sus flujos específicos.
 
 ### Managed Agent Prompt (`backend/src/lib/managedAgentPrompt.ts`)
 
-`buildManagedAgentPrompt()` resolves the context and calls `componerPrompt` (`backend/src/lib/seccionesDelPrompt.ts`): the prompt is the ordered list `SECCIONES_DEL_PROMPT` — one function per «## …» section (from `seccionRol` to `seccionIdioma`), each returning paragraphs; empty ones are dropped and the rest are joined with a blank line. Each axis is still a lookup table with no branching logic — this is the pattern to follow when adding a new axis, not a template string. The list of sections per prompt version is `SECCIONES_POR_VERSION`, chosen by `agentSettings.versionDelPrompt` (only `v1` today). The axes:
+`buildManagedAgentPrompt()` resolves the context and calls `componerPrompt` (`backend/src/lib/seccionesDelPrompt.ts`): the prompt is the ordered list `SECCIONES_DEL_PROMPT` — one function per «## …» section (from `seccionRol` to `seccionIdioma`), each returning paragraphs; empty ones are dropped. Each axis is still a lookup table with no branching logic — this is the pattern to follow when adding a new axis, not a template string. The list of sections per prompt version is `SECCIONES_POR_VERSION`, chosen by `agentSettings.versionDelPrompt` (only `v1` today). The axes:
+
+**Modelo y formato del prompt de la recepcionista (2026-11-02).** El modelo es `zai-org/GLM-5.3-Flash` (`telnyxAssistantPayload.ts`; antes `openai/gpt-5.6-luna`), con `moonshotai/Kimi-K2.6` de respaldo. Lo aloja Telnyx y es el único modelo de assistants que sirve en la región EU con `privacy_settings.in_transit_data_locality` (Kimi-K2.6 no está en EU). El prompt va **en JSON**: `componerPrompt(contexto, "json")`, el formato por defecto, escribe un objeto con una clave por sección («Rol», «Conversación»…) y la lista de sus párrafos, el mismo texto palabra por palabra que el Markdown (`"texto"`: «## Título» y párrafos separados por una línea en blanco), que queda para el laboratorio (variante `texto`) y para los tests de reglas, que lo leen en Markdown; `tests/lib/managedAgentPrompt.test.ts` comprueba que los dos llevan los mismos párrafos. Medido en `scripts/laboratorioDePrompt.ts` con GLM-5.3-Flash (198 conversaciones): texto 79/99, JSON 81/99; luna con texto, 53/66. Un prompt editado a mano (`promptManuallyEdited`) sigue en texto y su bloque «## Pasar la llamada» se añade en Markdown. `adaptManagedPromptForTelnyx` escapa el nombre del negocio cuando el prompt es JSON. El Gestor no cambia: luna y Markdown.
 
 - **Tone:** `warm` / `professional` / `direct`
 - **Primary goal:** `bookings` / `customer_service` / `lead_capture`

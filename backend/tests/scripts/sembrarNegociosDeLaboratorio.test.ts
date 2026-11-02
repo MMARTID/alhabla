@@ -509,14 +509,18 @@ describe("planificarSiembra: lo que cubre cada negocio", () => {
     );
     expect(p.negocio.telnyxPhoneNumber).toBeTruthy();
     expect(p.negocio.ownerWhatsappNumber).not.toBe(p.negocio.telnyxPhoneNumber);
-    expect(p.agente.systemPrompt).toContain(TITULO_DEL_BLOQUE_DE_TRANSFERENCIA);
+    expect(JSON.parse(p.agente.systemPrompt)).toHaveProperty(
+      TITULO_DEL_BLOQUE_DE_TRANSFERENCIA.replace(/^##\s+/, "")
+    );
     expect(p.agente.systemPrompt).toContain("pide de forma clara");
   });
 
   it("transferencia «siempre»: ningún día abre, así que a cualquier hora está fuera de horario", () => {
     const p = plan("transferencia-siempre");
     expect(ajustesDe("transferencia-siempre").pasarLlamadas).toBe("siempre");
-    expect(p.agente.systemPrompt).toContain(TITULO_DEL_BLOQUE_DE_TRANSFERENCIA);
+    expect(JSON.parse(p.agente.systemPrompt)).toHaveProperty(
+      TITULO_DEL_BLOQUE_DE_TRANSFERENCIA.replace(/^##\s+/, "")
+    );
     expect(p.agente.systemPrompt).toContain(
       "Solo dentro del horario de apertura"
     );

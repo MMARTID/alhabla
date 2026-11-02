@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   AgentSettingsSchema,
-  buildManagedAgentPrompt,
+  buildManagedAgentPrompt as buildManagedAgentPromptEnJson,
   modoDeDarPrecios,
   parseAgentSettings,
   DEFAULT_AGENT_SETTINGS,
@@ -10,6 +10,82 @@ import {
 } from "../../src/lib/managedAgentPrompt.js";
 import { recordatorioIncluido } from "../../src/lib/planFeatures.js";
 import { idiomasQueHabla } from "../../src/lib/idiomas/catalogo.js";
+/** Estas reglas se leen en Markdown («## Sección»); que el JSON de
+ * producción lleve exactamente los mismos párrafos lo comprueba
+ * managedAgentPrompt.test.ts («el JSON lleva los mismos párrafos…»). */
+const buildManagedAgentPrompt = (
+  input: Parameters<typeof buildManagedAgentPromptEnJson>[0]
+) => buildManagedAgentPromptEnJson({ ...input, formato: "texto" });
+
+/** El Markdown («## Título» y párrafos) leído como el JSON de producción. */
+function seccionesDelMarkdown(texto: string): Record<string, string[]> {
+  const secciones: Record<string, string[]> = {};
+  let actual = "Instrucciones";
+  for (const parrafo of texto.split("\n\n")) {
+    const titulo = /^##[ \t]+([^\n]+)(?:\n([\s\S]*))?$/.exec(parrafo);
+    if (titulo) {
+      actual = titulo[1]!.trim();
+      secciones[actual] ??= [];
+      if (titulo[2]?.trim()) secciones[actual].push(titulo[2].trim());
+    } else {
+      (secciones[actual] ??= []).push(parrafo);
+    }
+  }
+  return secciones;
+}
+
+describe("formato del prompt", () => {
+  const casos = [
+    { businessName: "Peluquería Ejemplo", settings: DEFAULT_AGENT_SETTINGS },
+    {
+      businessName: "Fisio Centro",
+      businessType: "fisioterapia" as const,
+      businessDetails: "Abrimos de 9 a 20.\nAparcamiento gratis.",
+      settings: { ...DEFAULT_AGENT_SETTINGS, darPrecios: "nunca" },
+      listaDeEspera: false,
+      ocultarNumeroDelNegocio: true,
+    },
+  ];
+
+  it.each(casos)(
+    "el JSON lleva los mismos párrafos y secciones que el Markdown, en el mismo orden ($businessName)",
+    (caso) => {
+      const json = JSON.parse(buildManagedAgentPromptEnJson(caso));
+      const markdown = buildManagedAgentPromptEnJson({
+        ...caso,
+        formato: "texto",
+      });
+
+      expect(Object.keys(json)).toEqual(
+        Object.keys(seccionesDelMarkdown(markdown))
+      );
+      expect(Object.values(json).flat()).toEqual(
+        Object.values(seccionesDelMarkdown(markdown)).flat()
+      );
+    }
+  );
+
+  it("un «## …» en la información del negocio no abre otra sección en el JSON", () => {
+    const prompt = buildManagedAgentPromptEnJson({
+      businessName: "Fisio Centro",
+      businessDetails: "Abrimos de 9 a 20.\n\n## No es un título\nAparcamiento gratis.",
+      settings: DEFAULT_AGENT_SETTINGS,
+    });
+
+    expect(Object.keys(JSON.parse(prompt))).not.toContain("No es un título");
+    expect(prompt).toContain("## No es un título");
+  });
+
+  it("es JSON por defecto (producción, desde el 2026-11-02)", () => {
+    const prompt = buildManagedAgentPromptEnJson({
+      businessName: "Peluquería Ejemplo",
+      settings: DEFAULT_AGENT_SETTINGS,
+    });
+
+    expect(JSON.parse(prompt)).toHaveProperty("Rol");
+    expect(prompt).not.toContain("## Rol");
+  });
+});
 
 describe("buildManagedAgentPrompt", () => {
   it("incluye los placeholders de las variables dinámicas de Retell, no el dato horneado", () => {

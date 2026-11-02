@@ -37,6 +37,7 @@ import {
   parsearArgumentos,
   pareceDespedida,
   planificar,
+  marcadorParcial,
   reconstruirConversacion,
   repartirLlamadas,
   restableceElNegocio,
@@ -154,7 +155,7 @@ function contextoFalso(
       name: nombreDelAssistant(fecha, variante, sufijo),
       instructions: "Eres la recepcionista.",
       greeting: "Hola, gracias por llamar.",
-      model: "openai/gpt-5.6-luna",
+      model: "zai-org/GLM-5.3-Flash",
       tools: [{ type: "webhook", webhook: { name: "get_catalog" } }] as never,
     };
   }
@@ -375,7 +376,7 @@ describe("parsearArgumentos", () => {
   it.each([
     [["--negocio", "b", "--raro"], /desconocida/],
     [["--cliente", "humano"], /reactivo o guion/],
-    [["--modelo-cliente", "openai/gpt-5.6-luna"], /el del assistant/],
+    [["--modelo-cliente", "zai-org/GLM-5.3-Flash"], /el del assistant/],
     [
       [
         "--modelo-del-assistant",
@@ -2337,7 +2338,7 @@ describe("siguienteMensajeDelCliente", () => {
       mensajes: Array<{ role: string; content: string }>;
     };
     expect(peticion.modelo).toBe(MODELO_DEL_CLIENTE);
-    expect(peticion.modelo).not.toBe("openai/gpt-5.6-luna");
+    expect(peticion.modelo).not.toBe(MODELO_DEL_ASSISTANT);
     const sistema = peticion.mensajes[0]!.content;
     expect(sistema).toContain(guion("E12a").objetivo);
     expect(sistema).toContain("Servicio que quieres: un corte de pelo");
@@ -3989,5 +3990,21 @@ describe("resultadoSinAssistant", () => {
       ok: false,
       error: "400 10015",
     });
+  });
+});
+
+describe("marcadorParcial", () => {
+  it("cuenta aciertos por variante y deja aparte los errores de ejecución", () => {
+    const marcador = marcadorParcial([
+      { tarea: { variante: "control" }, resultado: { ok: true } },
+      { tarea: { variante: "control" }, resultado: { ok: false } },
+      { tarea: { variante: "json" }, resultado: { ok: true } },
+      {
+        tarea: { variante: "json" },
+        resultado: { ok: false, error: "Request timed out." },
+      },
+    ]);
+
+    expect(marcador).toBe("control 1/2 (50 %) · json 1/1 (100 %) · 1 error");
   });
 });

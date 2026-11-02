@@ -395,7 +395,7 @@ exports[`payloads de asistentes (instantáneas) > assistant de la recepcionista,
       "wait_seconds": 0.1,
     },
   },
-  "model": "openai/gpt-5.6-luna",
+  "model": "zai-org/GLM-5.3-Flash",
   "name": "alhabla-neg_1-ag_1",
   "postConversationSettings": {
     "enabled": true,
@@ -871,7 +871,7 @@ exports[`payloads de asistentes (instantáneas) > assistant de la recepcionista,
       "wait_seconds": 0.1,
     },
   },
-  "model": "openai/gpt-5.6-luna",
+  "model": "zai-org/GLM-5.3-Flash",
   "name": "alhabla-neg_2-ag_2",
   "postConversationSettings": {
     "enabled": true,
@@ -1255,7 +1255,7 @@ Si te escriben en catalán, gallego, euskera o inglés, responde en ese idioma; 
 exports[`payloads de asistentes (instantáneas) > el JSON enviado es idéntico byte a byte (hash) 1`] = `
 {
   "gestor": "e98c3bfa972a5bd367381ff26a58c6d2b9ee626c5ac52e24ac7c18fe833f1d96",
-  "recepcionista": "bcdf0963b7ebfc647df91a1088b5378d2f22accf42f8de761aff5502d696a477",
+  "recepcionista": "0550ac20c0a977c9c9355f3842075e513b7bd6dfa7710aeef9aa8e61e784ebd3",
 }
 `;
 
