@@ -151,11 +151,65 @@ export const DESTINO_INERTE_DE_TRANSFERENCIA =
 
 const CLAVE_LISTA_DE_ESPERA = "hueco_libre";
 
-/** Cómo se llama cada variante y qué `versionDelPrompt` lleva. */
+/** Cómo va cada variante con las conversaciones ya terminadas, para seguir
+ * una tanda larga sin esperar al informe: «control 7/9 (78 %) · json 8/9
+ * (89 %) · 2 errores». Los errores de ejecución (p. ej. el cliente simulado
+ * que no contesta) no cuentan como fallo de la recepcionista. */
+export function marcadorParcial(
+  resultados: ReadonlyArray<{
+    tarea: { variante: string };
+    resultado: { ok: boolean; error?: string };
+  }>
+): string {
+  const porVariante = new Map<string, { aciertos: number; validas: number }>();
+  let errores = 0;
+  for (const { tarea, resultado } of resultados) {
+    if (resultado.error) {
+      errores++;
+      continue;
+    }
+    const celda = porVariante.get(tarea.variante) ?? { aciertos: 0, validas: 0 };
+    celda.validas++;
+    if (resultado.ok) celda.aciertos++;
+    porVariante.set(tarea.variante, celda);
+  }
+  const partes = [...porVariante].map(
+    ([variante, { aciertos, validas }]) =>
+      `${variante} ${aciertos}/${validas} (${Math.round((100 * aciertos) / validas)} %)`
+  );
+  if (errores) partes.push(`${errores} ${errores === 1 ? "error" : "errores"}`);
+  return partes.join(" · ") || "sin resultados";
+}
+
+/** Cómo se llama cada variante y qué `versionDelPrompt` lleva. `json` es
+ * el mismo prompt v1, palabra por palabra, escrito como JSON
+ * (`promptEnJson`): mide solo el formato. */
 export const VARIANTES = {
-  control: { version: "v1" },
-  v2: { version: "v2" },
+  control: { version: "v1", formato: "texto" },
+  v2: { version: "v2", formato: "texto" },
+  json: { version: "v1", formato: "json" },
 } as const;
+
+/** El prompt en Markdown («## Título» y párrafos separados por una línea en
+ * blanco) como un objeto JSON: una clave por sección y la lista de sus
+ * párrafos, en el mismo orden. Lo de antes del primer título va en
+ * «Instrucciones». No cambia ni una palabra. */
+export function promptEnJson(prompt: string): string {
+  const secciones: Record<string, string[]> = {};
+  let actual = "Instrucciones";
+  for (const parrafo of prompt.split(/\n{2,}/)) {
+    const texto = parrafo.trim();
+    if (!texto) continue;
+    const titulo = /^##\s+(.+)$/.exec(texto);
+    if (titulo && !texto.includes("\n")) {
+      actual = titulo[1]!.trim();
+      secciones[actual] ??= [];
+      continue;
+    }
+    (secciones[actual] ??= []).push(texto);
+  }
+  return JSON.stringify(secciones, null, 2);
+}
 export type NombreDeVariante = keyof typeof VARIANTES;
 
 // ---------------------------------------------------------------------------
@@ -356,7 +410,7 @@ export function parsearArgumentos(argv: string[]): Opciones {
     dryRun: sueltas.has("dry-run"),
     si: sueltas.has("si"),
     juez,
-    paralelo: numero("paralelo", 3, 1, 10),
+    paralelo: numero("paralelo", 3, 1, 20),
     conCitas: sueltas.has("con-citas"),
     listaDeEspera: listaDeEspera as Opciones["listaDeEspera"],
     cliente: cliente as ModoDeCliente,
@@ -391,7 +445,7 @@ export const AYUDA = `Laboratorio de prompt (PLAN-PROMPT-DINAMICO.md, F0)
   --variantes control,v2    control = prompt v1; v2 solo cuando exista (F2)
   --salida <dir>            informe (por defecto backend/.laboratorio-de-prompt/)
   --juez [modelo]           juez LLM para lo textual (por defecto ${MODELO_DEL_JUEZ})
-  --paralelo <3>            conversaciones a la vez
+  --paralelo <3>            conversaciones a la vez (hasta 20)
   --con-citas               corre también los guiones que reservan o anulan
                             citas en dev (y mandan WhatsApp); exige --si
   --lista-de-espera si|no|auto
@@ -3370,7 +3424,7 @@ export async function ejecutarLaboratorio(
         hechas++;
         if (hechas % 10 === 0 || hechas === ejecutables.length) {
           deps.log(
-            `[Laboratorio] ${hechas}/${ejecutables.length} conversaciones`
+            `[Laboratorio] ${hechas}/${ejecutables.length} conversaciones · ${marcadorParcial(resultados)}`
           );
         }
       },
@@ -3779,7 +3833,7 @@ async function cargarContextoReal(input: {
 
   const payloads = {} as ContextoDelNegocio["payloads"];
   for (const variante of input.variantes) {
-    const { version } = VARIANTES[variante];
+    const { version, formato } = VARIANTES[variante];
     if (version !== "v1" && !v2Disponible) {
       throw new ErrorDeUso(
         `La variante ${variante} (versionDelPrompt «${version}») todavía no existe en este código: llega con F2`
@@ -3808,7 +3862,8 @@ async function cargarContextoReal(input: {
       agentId: "laboratorio",
       businessName: negocio.name,
       timezone: negocio.timezone,
-      instructions: instrucciones,
+      instructions:
+        formato === "json" ? promptEnJson(instrucciones) : instrucciones,
       greeting: idiomasLib.saludoDelNegocio(idiomas, negocio.name),
       idiomas,
       voice: VOZ_DEL_LABORATORIO,

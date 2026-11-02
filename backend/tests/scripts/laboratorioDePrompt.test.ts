@@ -37,6 +37,8 @@ import {
   parsearArgumentos,
   pareceDespedida,
   planificar,
+  marcadorParcial,
+  promptEnJson,
   reconstruirConversacion,
   repartirLlamadas,
   restableceElNegocio,
@@ -3989,5 +3991,49 @@ describe("resultadoSinAssistant", () => {
       ok: false,
       error: "400 10015",
     });
+  });
+});
+
+describe("promptEnJson", () => {
+  it("convierte cada «## Título» en una clave con sus párrafos, sin cambiar una palabra", () => {
+    const prompt =
+      "## Rol\n\nEres la recepcionista de IA de {{nombre_negocio}}.\n\nResponde en una o dos frases.\n\n## Cierre\n\nAnte una despedida normal, di una sola frase breve.";
+
+    const json = JSON.parse(promptEnJson(prompt));
+
+    expect(json).toEqual({
+      Rol: [
+        "Eres la recepcionista de IA de {{nombre_negocio}}.",
+        "Responde en una o dos frases.",
+      ],
+      Cierre: ["Ante una despedida normal, di una sola frase breve."],
+    });
+  });
+
+  it("guarda lo de antes del primer título en «Instrucciones» y los párrafos de varias líneas enteros", () => {
+    const json = JSON.parse(
+      promptEnJson("Hola.\n\n## Información del negocio\n\nAbrimos a las 9.\nCerramos a las 20.")
+    );
+
+    expect(json).toEqual({
+      Instrucciones: ["Hola."],
+      "Información del negocio": ["Abrimos a las 9.\nCerramos a las 20."],
+    });
+  });
+});
+
+describe("marcadorParcial", () => {
+  it("cuenta aciertos por variante y deja aparte los errores de ejecución", () => {
+    const marcador = marcadorParcial([
+      { tarea: { variante: "control" }, resultado: { ok: true } },
+      { tarea: { variante: "control" }, resultado: { ok: false } },
+      { tarea: { variante: "json" }, resultado: { ok: true } },
+      {
+        tarea: { variante: "json" },
+        resultado: { ok: false, error: "Request timed out." },
+      },
+    ]);
+
+    expect(marcador).toBe("control 1/2 (50 %) · json 1/1 (100 %) · 1 error");
   });
 });
