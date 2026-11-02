@@ -798,7 +798,8 @@ export class TelnyxAiAdapter {
   // Chat (fase 2 del plan de WhatsApp): conversaciones creadas por Alhabla
   // y turnos por `ai.assistants.chat`. Hallazgos de la fase 0.4 y del
   // 2026-09-20 en dev: la respuesta de `conversations.create` viene envuelta
-  // en `data` aunque el tipo del SDK diga `Conversation`; las claves de los
+  // en `data` aunque el tipo del SDK diga `Conversation` (vuelto a comprobar
+  // con el SDK 7.29 el 2026-11-02, por HTTP y por el SDK); las claves de los
   // `metadata` resuelven como variables dinámicas en las cabeceras de las
   // tools (por eso `call_control_id` en los metadata hace que las tools de
   // voz funcionen en chat sin tocarlas); `system_prompt` se acepta en el
@@ -814,6 +815,8 @@ export class TelnyxAiAdapter {
       name: input.name,
       metadata: input.metadata,
     })) as unknown as { data?: { id?: string }; id?: string };
+    // `data.id` es lo que llega de verdad: con el tipo del SDK, `response.id`
+    // sería undefined. `id` en la raíz por si Telnyx algún día lo arregla.
     const id = response?.data?.id ?? response?.id;
     if (!id) {
       throw new Error("Telnyx no devolvió el id de la conversación creada");
