@@ -1,5 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import Telnyx from "telnyx";
 import { TelnyxAdapter } from "../../../src/adapters/telnyx/TelnyxAdapter.js";
+
+function errorDeTelnyx(status: number) {
+  return Telnyx.APIError.generate(
+    status,
+    { errors: [{ code: "10005", title: `error ${status}` }] },
+    undefined,
+    new Headers()
+  );
+}
 
 const mockAvailablePhoneNumbersList = vi.fn();
 const mockNumberOrdersCreate = vi.fn();
@@ -230,9 +240,7 @@ describe("TelnyxAdapter", () => {
     });
 
     it("devuelve null solo cuando Telnyx dice que el número no existe (404)", async () => {
-      mockPhoneNumbersRetrieve.mockRejectedValue(
-        Object.assign(new Error("Not found"), { status: 404 })
-      );
+      mockPhoneNumbersRetrieve.mockRejectedValue(errorDeTelnyx(404));
 
       const result = await adapter.getNumber("pn_999");
 
@@ -242,13 +250,10 @@ describe("TelnyxAdapter", () => {
     it("propaga el error si Telnyx no responde, en vez de hacerlo pasar por 'no existe'", async () => {
       // Devolver null ante un 5xx hacía indistinguible "no está" de "no he
       // podido mirarlo", y quien llama podía recrear un recurso que ya existe.
-      mockPhoneNumbersRetrieve.mockRejectedValue(
-        Object.assign(new Error("Service unavailable"), { status: 503 })
-      );
+      const caida = errorDeTelnyx(503);
+      mockPhoneNumbersRetrieve.mockRejectedValue(caida);
 
-      await expect(adapter.getNumber("pn_999")).rejects.toThrow(
-        "Service unavailable"
-      );
+      await expect(adapter.getNumber("pn_999")).rejects.toBe(caida);
     });
   });
 

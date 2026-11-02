@@ -2,7 +2,7 @@
 const appUrl = (process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3001").replace(/\/$/, "");
 
 // Rutas que antes del reparto vivían en alhabla.ai y ahora son de la app
-// (docs/historico/PLAN-APP-DOMINIO.md § 4, fase 3). Un 301 con la misma ruta y
+// (docs/historico/PLAN-APP-DOMINIO.md § 4, fase 3). Un 308 con la misma ruta y
 // query salva
 // marcadores, emails ya enviados y los botones URL de las plantillas de Meta
 // (`alhabla.ai/ajustes/{{1}}`), que llevan el dominio horneado.
@@ -74,7 +74,7 @@ const nextConfig = {
       // Las 30 páginas sector × ciudad se fusionaron en la de su sector el
       // 2026-10-20 (sin búsquedas por ciudad; Google indexó 2 de 30); sus
       // cifras salieron de la web con la plantilla de sector del 2026-10-29.
-      // El 301 conserva lo que Google ya indexó.
+      // El 308 conserva lo que Google ya indexó.
       {
         source:
           "/:nicho(peluqueria|barberia|centro-de-estetica|salon-de-unas|fisioterapia)/:ciudad(madrid|barcelona|valencia|sevilla|zaragoza|malaga)",

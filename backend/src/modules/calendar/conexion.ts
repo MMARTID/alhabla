@@ -120,7 +120,7 @@ const CredencialesSchema = z.discriminatedUnion("provider", [
  *
  * Transitorio: acepta también credenciales en claro (filas anteriores al
  * cifrado, o escritas por la revisión anterior durante el despliegue) y lo
- * avisa; scripts/cifrar-credenciales-calendario.ts las recifra todas. */
+ * avisa; backend/scripts/cifrarCredencialesCalendario.ts las recifra todas. */
 function parsearCredenciales(
   provider: CalendarProviderId,
   json: unknown
@@ -139,7 +139,7 @@ function parsearCredenciales(
     }
   } else {
     console.warn(
-      `[Calendar] Credenciales de ${provider} guardadas SIN cifrar en calendar_connections; ejecuta scripts/cifrar-credenciales-calendario.ts`
+      `[Calendar] Credenciales de ${provider} guardadas SIN cifrar en calendar_connections; ejecuta backend/scripts/cifrarCredencialesCalendario.ts`
     );
   }
   const resultado = CredencialesSchema.safeParse(enClaro);

@@ -1,3 +1,4 @@
+import Telnyx from "telnyx";
 import { getTelnyxClient } from "../../lib/telnyx.js";
 import {
   enviosSimulados,
@@ -142,8 +143,8 @@ export class TelnyxAdapter {
   ): Promise<{ id: string; phoneNumber: string; status: string } | null> {
     const client = getTelnyxClient();
     try {
-      const response = await client.phoneNumbers.retrieve(phoneNumberId);
-      const data = (response as any).data ?? response;
+      const { data } = await client.phoneNumbers.retrieve(phoneNumberId);
+      if (!data) return null;
       return {
         id: data.id,
         phoneNumber: data.phone_number,
@@ -153,7 +154,7 @@ export class TelnyxAdapter {
       // Solo un 404 significa "no existe". Devolver null ante un 5xx o un
       // corte de red hacía indistinguible "no está" de "no he podido
       // mirarlo", y quien llama podía decidir crear el recurso otra vez.
-      if ((error as { status?: number })?.status === 404) {
+      if (error instanceof Telnyx.NotFoundError) {
         return null;
       }
       throw error;
@@ -249,11 +250,13 @@ export class TelnyxAdapter {
     });
   }
 
-  private toOrderResult(data: any): NumberOrderResult {
+  private toOrderResult(
+    data: Telnyx.NumberOrderCreateResponse["data"]
+  ): NumberOrderResult {
     const number = data?.phone_numbers?.[0];
     return {
-      orderId: data?.id,
-      status: (data?.status ?? "pending") as TelnyxOrderStatus,
+      orderId: data?.id ?? "",
+      status: data?.status ?? "pending",
       phoneNumber: number?.phone_number ?? "",
       phoneNumberId: number?.id ?? undefined,
       requirementsMet: data?.requirements_met ?? undefined,
