@@ -152,6 +152,8 @@ const CONTESTAR_CON_CONTEXTO = {
   dynamicVariables: CONTEXTO.variables,
   grabar: false,
   voiceSettings: null,
+  // Uno por llamada: contestarLlamada.ts lo repite en cada reintento.
+  commandId: expect.any(String),
 };
 const mockedEnqueueUsageReportJob = vi.mocked(enqueueUsageReportJob);
 const mockedComprobacionReciente = vi.mocked(comprobacionDeDesvioReciente);
@@ -348,6 +350,7 @@ describe("handleCallInitiated", () => {
         dynamicVariables: conocido.variables,
         grabar: true,
         voiceSettings: null,
+        commandId: expect.any(String),
       }
     );
   });
@@ -407,7 +410,11 @@ describe("handleCallInitiated", () => {
     expect(mockedAnswerCallWithAssistant).toHaveBeenLastCalledWith(
       "call_ctrl_1",
       "assistant_1",
-      { dynamicVariables: CONTEXTO.variables, grabar: true }
+      {
+        dynamicVariables: CONTEXTO.variables,
+        grabar: true,
+        commandId: expect.any(String),
+      }
     );
     expect(errorLog).toHaveBeenCalledWith(
       expect.stringMatching(/rechazó contestar con la voz Soniox\.tts-rt-v2\.Marta \(negocio biz1\).*422/)
@@ -517,7 +524,7 @@ describe("handleCallInitiated", () => {
     expect(mockedAnswerCallWithAssistant).toHaveBeenCalledWith(
       "call_ctrl_1",
       "assistant_1",
-      {}
+      { commandId: expect.any(String) }
     );
     expect(errorLog).toHaveBeenCalledWith(
       expect.stringMatching(/no se pudo saber quién llama \(negocio biz1\).*BD caída/)

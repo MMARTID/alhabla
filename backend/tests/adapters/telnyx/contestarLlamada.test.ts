@@ -64,11 +64,10 @@ describe("contestarConReintentos", () => {
     await contestarConReintentos({ ...CONTEXTO, esperar });
 
     expect(mockedAnswer).toHaveBeenCalledTimes(1);
-    expect(mockedAnswer).toHaveBeenCalledWith(
-      "call_ctrl_1",
-      "assistant_1",
-      CONTEXTO.opciones
-    );
+    expect(mockedAnswer).toHaveBeenCalledWith("call_ctrl_1", "assistant_1", {
+      ...CONTEXTO.opciones,
+      commandId: expect.any(String),
+    });
     expect(esperar).not.toHaveBeenCalled();
   });
 
@@ -83,7 +82,7 @@ describe("contestarConReintentos", () => {
     expect(mockedAnswer).toHaveBeenLastCalledWith(
       "call_ctrl_1",
       "assistant_1",
-      CONTEXTO.opciones
+      { ...CONTEXTO.opciones, commandId: expect.any(String) }
     );
     expect(esperar).toHaveBeenCalledWith(ESPERAS_ENTRE_REINTENTOS_MS[0]);
   });
@@ -102,8 +101,43 @@ describe("contestarConReintentos", () => {
     expect(mockedAnswer).toHaveBeenLastCalledWith(
       "call_ctrl_1",
       "assistant_1",
-      CONTEXTO.opciones
+      { ...CONTEXTO.opciones, commandId: expect.any(String) }
     );
+  });
+
+  it("repite con el mismo command_id: Telnyx ignora el repetido si el primero llegó", async () => {
+    mockedAnswer
+      .mockRejectedValueOnce(new Telnyx.APIConnectionTimeoutError())
+      .mockRejectedValueOnce(errorDeTelnyx(503))
+      .mockResolvedValueOnce(undefined);
+
+    await contestarConReintentos({ ...CONTEXTO, esperar });
+
+    const ids = mockedAnswer.mock.calls.map(
+      ([, , opciones]) => opciones?.commandId
+    );
+    expect(ids).toHaveLength(3);
+    expect(ids[0]).toEqual(expect.any(String));
+    expect(new Set(ids).size).toBe(1);
+  });
+
+  it("contestar sin la voz es otro comando: lleva otro command_id", async () => {
+    const sinVoz = {
+      opciones: { grabar: false },
+      voz: "Soniox.tts-rt-v2.Marta",
+    };
+    mockedAnswer
+      .mockRejectedValueOnce(errorDeTelnyx(422))
+      .mockResolvedValueOnce(undefined);
+
+    await contestarConReintentos({ ...CONTEXTO, sinVoz, esperar });
+
+    const [primero, segundo] = mockedAnswer.mock.calls.map(
+      ([, , opciones]) => opciones?.commandId
+    );
+    expect(primero).toEqual(expect.any(String));
+    expect(segundo).toEqual(expect.any(String));
+    expect(segundo).not.toBe(primero);
   });
 
   it("agotados los reintentos lanza NoSePudoContestar con los intentos hechos", async () => {
@@ -149,7 +183,7 @@ describe("contestarConReintentos", () => {
     expect(mockedAnswer).toHaveBeenLastCalledWith(
       "call_ctrl_1",
       "assistant_1",
-      sinVoz.opciones
+      { ...sinVoz.opciones, commandId: expect.any(String) }
     );
     expect(console.error).toHaveBeenCalledWith(
       expect.stringMatching(
