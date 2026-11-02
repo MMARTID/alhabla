@@ -134,7 +134,7 @@ each file.
 - **Next.js 16** with App Router (`frontend/src/app/`, `web/src/app/`). `params`, `searchParams` and `cookies()` are Promises (await them in server components, `use()` in client pages); lint runs with the ESLint CLI (`eslint.config.mjs`), not `next lint`.
 - App on port 3001, public site on port 3002 (dev and `next start`).
 - **Proxy (both projects, dev only):** `/api/backend/:path*` → `http://localhost:3000/:path*` (`frontend/next.config.mjs`, `web/next.config.mjs`). Never rely on it in code — see `DemoVoiceCall` below.
-- **Redirects (app):** marketing paths (`/landing`, niche pages, `/planes`, `/blog`, `/legal/*`, `/register`) go 301 to the public site; `/register/business/*` → `/bienvenida/*`; `/gestor` → `/asistente`. The public site in turn 301s every app route to `app.alhabla.ai`.
+- **Redirects (app):** marketing paths (`/landing`, niche pages, `/planes`, `/blog`, `/legal/*`, `/register`) go 308 to the public site; `/register/business/*` → `/bienvenida/*`; `/gestor` → `/asistente`. The public site in turn 308s every app route to `app.alhabla.ai`.
 
 ### Pages
 
@@ -165,7 +165,7 @@ each file.
 | Route | Purpose |
 |-------|---------|
 | `/` | Generic conversion landing |
-| `/peluqueria`, `/barberia`, `/fisioterapia`, `/centro-de-estetica`, `/salon-de-unas`, `/pestanas-y-cejas`, `/spa-y-masajes`, `/peluqueria-canina` | The eight sector landings (`SiteLanding`; the old `/<niche>/<city>` pages 301 here since 2026-10-20) |
+| `/peluqueria`, `/barberia`, `/fisioterapia`, `/centro-de-estetica`, `/salon-de-unas`, `/pestanas-y-cejas`, `/spa-y-masajes`, `/peluqueria-canina` | The eight sector landings (`SiteLanding`; the old `/<niche>/<city>` pages 308 here since 2026-10-20) |
 | `/recepcionista-ia-en-catalan`, `/recepcionista-ia-en-euskera`, `/recepcionista-ia-en-gallego` | Co-official language attention (by postal code), one page per language |
 | `/agenda-por-whatsapp` | The Gestor: the owner manages the agenda over WhatsApp (not `/gestor`, which redirects to the app) |
 | `/planes` | Pricing page (`TarjetasDePlanes`) |
@@ -259,7 +259,7 @@ each page's image explicitly from its `openGraph`/`twitter` metadata.
   that changes per sector is in `web/src/lib/sectores/` (see Frontend Lib). Removed on
   2026-10-29: third-party sector data and press quotes, the per-city figures
   (`SectorCiudadesIdiomas`, `lib/sector-ciudades.ts`; the 30 `/<niche>/[ciudad]` pages had been
-  merged into the sector page on 2026-10-20, 301 in `next.config.mjs`), `TeamRoutingSection`,
+  merged into the sector page on 2026-10-20, 308 in `next.config.mjs`), `TeamRoutingSection`,
   `WhatsAppBenefitsTable`, the 1,300-word guide, the articles block, the landing calculator
   (`RevenueLossCalculator`) and, in the evening, the flat call transcript
   (`TranscripcionLlamada`, `DesplieguePorLineas`).
@@ -599,10 +599,8 @@ Para probar cambios de estos scripts antes de fusionarlos: un worktree de la ram
     y se usa la secuencia de la baja de cuenta (`releaseNumber`, o `deleteAssistant` y su app TeXML).
     Un fantasma puede ser de un PR abierto (p. ej. #325 y `demo-brain-to-train`): mira antes los PR.
   - **Números de una cuenta** (desde el 30-10). Cada cuenta tiene un solo número de voz.
-    «Pedir número nuevo» va por la ruta de la app, como el dueño (`backend/mcp/inventario.ts` pide
-    `POST /business/me/phone/provision`, pero la ruta real del backend es
-    `POST /phone/business/me/phone/provision`, ver la fila `phone` de la tabla de módulos: pendiente
-    de comprobar si el botón da 404): misma compra que en el alta, 402 sin suscripción activa o en prueba, 1 $ + 1 $/mes, y
+    «Pedir número nuevo» va por la ruta de la app (`POST /phone/business/me/phone/provision`, como el
+    dueño): misma compra que en el alta, 402 sin suscripción activa o en prueba, 1 $ + 1 $/mes, y
     siempre con el id de la cuenta escrito. «Asignar número» da a la cuenta un número fantasma (el
     cruce de arriba, con las dos BD) por `POST /internal/panel/asignar-numero`
     (`asignarNumeroExistente` en `modules/phone/service.ts`: mismo cerrojo que la compra, comprueba
@@ -1016,7 +1014,7 @@ handler**: todo pasa por
   fuera, la plantilla `alerta_operativa_negocio` (`negocio_nombre`, `texto`) con el sufijo del
   botón URL `https://alhabla.ai/ajustes/{{1}}` = `facturacion | calendario | telefono`. La
   plantilla lleva el dominio `alhabla.ai` horneado: desde la separación de webs (21-09)
-  `web/next.config.mjs` reenvía `/ajustes/*` con un 301 a `app.alhabla.ai`, y allí
+  `web/next.config.mjs` reenvía `/ajustes/*` con un 308 a `app.alhabla.ai`, y allí
   `frontend/next.config.mjs` redirige `/ajustes/calendario` a `/agente` (donde vive el
   calendario); `/ajustes/telefono` es una pantalla propia (Ajustes › Teléfono). Idempotente por recurso (`pago:<invoiceId>`,
   `minutos:<periodId>`, `prueba:<subscriptionId>`, `calendario:<biz>:<proveedor>:<día>`,
@@ -1596,7 +1594,7 @@ hablando por el que elige `identificarRemitente`.
   del gestor» del escritorio, qué propuso y qué pasó con cada propuesta en los últimos 30 días.
 - `PATCH /business/me` acepta `ownerChatEnabled` y `clientChatEnabled` (booleanos).
 - Panel: página `/asistente` («Tu asistente», badge Beta; nació como `/gestor` «Tu Gestor», que
-  redirige con un 301 desde el 22-09 en `frontend/next.config.mjs`), entrada «Gestor» en la barra
+  redirige con un 308 desde el 22-09 en `frontend/next.config.mjs`), entrada «Gestor» en la barra
   lateral del escritorio (`escritorio/navegacion.ts`, vista `escritorio/gestor/gestor-escritorio.tsx`)
   y, en móvil, en la pestaña Cuenta (`movil/cuenta-movil.tsx`: la barra inferior tiene cinco huecos
   justos) con `components/gestor-chat.tsx` (historial, burbujas, propuesta con sus dos botones, ejemplos
@@ -3527,7 +3525,7 @@ After confirming the business type, the user is taken to `/bienvenida/services`,
 
 The next step is `/bienvenida/team`, where the user sets the number of employees (1–20) and booking capacity (1–50). The app updates `Business.bookingCapacity` and creates placeholder professionals (`Profesional 1…N`) with `POST /booking-settings/professionals`, skipping names that already exist so a retry doesn't duplicate them; no service links are sent (no row = «lo hace»).
 
-The final setup step is `/bienvenida/calendar`, which offers Google, Outlook, Apple (inline form with `AppleCalendarConnect`, the same as in `/agente`) and, since 2026-10-28 (PR #364), «Usar la agenda de Alhabla» (`PATCH /business/me/agenda/modo`, see "Modo de agenda"). Before Google/Microsoft OAuth the frontend stores `registration_next_step` in `localStorage` (with a timestamp; it expires after 24 h, `lib/registration-next-step.ts`) so `/settings` can bounce the user back into the registration flow after the provider callback. The flow always ends at `/checkout?plan=` (if a plan is pending) or `/planes?from=register` (to select one; the app redirects `/planes` 301 to the public site).
+The final setup step is `/bienvenida/calendar`, which offers Google, Outlook, Apple (inline form with `AppleCalendarConnect`, the same as in `/agente`) and, since 2026-10-28 (PR #364), «Usar la agenda de Alhabla» (`PATCH /business/me/agenda/modo`, see "Modo de agenda"). Before Google/Microsoft OAuth the frontend stores `registration_next_step` in `localStorage` (with a timestamp; it expires after 24 h, `lib/registration-next-step.ts`) so `/settings` can bounce the user back into the registration flow after the provider callback. The flow always ends at `/checkout?plan=` (if a plan is pending) or `/planes?from=register` (to select one; the app redirects `/planes` 308 to the public site).
 
 Onboarding texts for headings, subheadings and CTAs are dynamically selected per business type via `BUSINESS_TYPE_ONBOARDING_TEXTS` in `frontend/src/lib/business-type.ts`.
 
@@ -3869,7 +3867,7 @@ The landing lives in `web/`; the backend (demo) and the app (redirect) need a sm
    closest one in `DEMO_DE_OTROS_SECTORES` (today pestañas y cejas and spa y masajes → centro de
    estética; anything not listed, like peluquería canina, gets the generic one).
 6. **App:** add `/<niche>` to the marketing paths in `frontend/next.config.mjs`, so the old app
-   URL goes 301 to the public site instead of a 404.
+   URL goes 308 to the public site instead of a 404.
 
 A landing niche is not automatically a business type: until it is added, an account registered
 from it arrives as `other`. Making it one is separate work across the three projects: its slug in
@@ -4417,7 +4415,7 @@ Notification channels, not in code.
 | **Cloud Tasks · cola que no baja** | `cloudtasks.googleapis.com/queue/depth`, any queue, 5-min mean **> 200 for 15 min** | Queues drain in seconds at current traffic; a queue that grows is a task failing in a loop. Same incident peaked at ~9,000. |
 | **alhabla-api · /health caído** | Uptime check `alhabla-api-health-tJzyQ7cVqx8` (HTTPS `api.alhabla.ai/health` every minute from 6 regions, must contain `"status":"ok"`) failing from **more than one region for 60 s** | One region failing is usually the checker; two is us. |
 | **alhabla-api · cerrojos de citas con errores** | Log match (added 2026-10-12, PR A vigilance): stderr `[Cerrojo]` or `[Compat Redis]` (matches nothing since 2026-10-19), or `[Purga] No se pudo purgar`, from `alhabla-api`; at most one email per 30 min, auto-close after 30 min | Every `[Cerrojo]` line is an error: a booking, change or cancellation that did not happen (the lock fails closed, never double-books). Kept after the 72 h of PR A vigilance. |
-| **alhabla-api · llamadas de voz con fallos** | Log match (added 2026-10-17): `textPayload` with `[Telnyx] No se pudo contestar`, `[Telnyx] Error procesando inicio de`, `[Telnyx] No se pudo procesar el evento`, `[Telnyx] Error procesando call.`, `sin assistant Telnyx operativo` or `[Salud] ` from `alhabla-api`; at most one email per 30 min, auto-close after 30 min | A voice failure was invisible until then: `/webhooks/telnyx` answers **404, not 5xx**, when `handleCallInitiated` fails, so the 5xx policy never sees it. `[Salud]` comes from `avisarDeLlamadasSinResultado` (`jobs/cleanupZombieCalls.ts`, every 15 min): Telnyx calls that ended 10–25 min ago with cost ≠ 0 and no `outcome` (the conversation insights never arrived), each reported once. A business whose service is cut for non-payment also logs it (`[Telnyx] Negocio … sin assistant Telnyx operativo o con el servicio cortado por el pago …`, `adapters/telnyx/webhookHandlers.ts`): legitimate after a missed payment. **Pending:** that log line changed on 2026-10-20 (commit `5df21f5`; until then it read `… operativo o suspendido`), and the policy's filter in Monitoring still matches the old text `sin assistant Telnyx operativo o suspendido`, so that branch of the alert has not fired since; the filter must be updated to `textPayload:"sin assistant Telnyx operativo"` (Monitoring › Alerting, policy `12857991338509678084`; checked 2026-11-02, not changed). |
+| **alhabla-api · llamadas de voz con fallos** | Log match (added 2026-10-17): `textPayload` with `[Telnyx] No se pudo contestar`, `[Telnyx] Error procesando inicio de`, `[Telnyx] No se pudo procesar el evento`, `[Telnyx] Error procesando call.`, `sin assistant Telnyx operativo` or `[Salud] ` from `alhabla-api`; at most one email per 30 min, auto-close after 30 min | A voice failure was invisible until then: `/webhooks/telnyx` answers **404, not 5xx**, when `handleCallInitiated` fails, so the 5xx policy never sees it. `[Salud]` comes from `avisarDeLlamadasSinResultado` (`jobs/cleanupZombieCalls.ts`, every 15 min): Telnyx calls that ended 10–25 min ago with cost ≠ 0 and no `outcome` (the conversation insights never arrived), each reported once. A business whose service is cut for non-payment also logs it (`[Telnyx] Negocio … sin assistant Telnyx operativo o con el servicio cortado por el pago …`, `adapters/telnyx/webhookHandlers.ts`): legitimate after a missed payment. The log line changed on 2026-10-20 (commit `5df21f5`; until then it read `… operativo o suspendido`) and the filter kept the old text until 2026-11-02, so that branch of the alert did not fire in between; it now matches the stable prefix `textPayload:"sin assistant Telnyx operativo"`. |
 | **alhabla-api · WhatsApp rechazado por Meta** | Log match (added 2026-10-17, PR 5): `textPayload:"[WhatsApp] Meta rechazó"`; at most one email per hour, auto-close after 1 h | A deferred `statuses[].failed` on a message to a client (`aplicarEfectosDeEntrega`): a confirmation, reminder or notice that never arrived. 1 in 175 sends up to 2026-10-17. |
 | **alhabla-api · límite de peticiones solo en local** | Log match (added 2026-10-11, PR A): `textPayload:"no se abre otra hasta"` from `alhabla-api`; at most one email per hour, auto-close after 30 min | Fires when an instance has 2 limiter connections discarded by a timeout in 15 min and stops opening new ones: up to 15 min counting the rate limit locally with Postgres healthy, which `/health` does not see (§ Corte de Redis a Postgres, «Conexión desechada y tope»). |
 

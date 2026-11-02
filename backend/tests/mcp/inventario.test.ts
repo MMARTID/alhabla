@@ -653,7 +653,7 @@ describe("números para una cuenta", () => {
     expect(r.mensaje).toBe("Comprado +34930000010");
     expect(llamador).toHaveBeenCalledWith("dev", {
       metodo: "POST",
-      ruta: "/business/me/phone/provision",
+      ruta: "/phone/business/me/phone/provision",
       cuerpo: {},
       businessId: "cuentadev000001",
     });
