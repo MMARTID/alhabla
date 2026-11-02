@@ -34,7 +34,7 @@ const nextConfig = {
       // llegue a la
       // app con una ruta de marketing va allí. El registro de cuenta también;
       // el asistente del negocio de después ya es /bienvenida, aquí.
-      ...["/landing", "/peluqueria", "/barberia", "/centro-de-estetica", "/salon-de-unas", "/fisioterapia", "/planes", "/blog"].map(
+      ...["/landing", "/peluqueria", "/barberia", "/centro-de-estetica", "/salon-de-unas", "/fisioterapia", "/pestanas-y-cejas", "/spa-y-masajes", "/peluqueria-canina", "/planes", "/blog"].map(
         (source) => ({ source, destination: `${webUrl}${source === "/landing" ? "/" : source}`, permanent: true }),
       ),
       { source: "/legal/:path*", destination: `${webUrl}/legal/:path*`, permanent: true },

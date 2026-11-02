@@ -118,7 +118,7 @@ each file.
 - **Next.js 16** with App Router (`frontend/src/app/`, `web/src/app/`). `params`, `searchParams` and `cookies()` are Promises (await them in server components, `use()` in client pages); lint runs with the ESLint CLI (`eslint.config.mjs`), not `next lint`.
 - App on port 3001, public site on port 3002 (dev and `next start`).
 - **Proxy (both projects, dev only):** `/api/backend/:path*` → `http://localhost:3000/:path*` (`frontend/next.config.mjs`, `web/next.config.mjs`). Never rely on it in code — see `DemoVoiceCall` below.
-- **Redirects (app):** marketing paths (`/landing`, niche pages, `/planes`, `/blog`, `/legal/*`, `/register`) go 301 to the public site; `/register/business/*` → `/bienvenida/*`; `/gestor` → `/asistente`. The public site in turn 301s every app route to `app.alhabla.ai`.
+- **Redirects (app):** marketing paths (`/landing`, niche pages, `/planes`, `/blog`, `/legal/*`, `/register`) go 308 to the public site; `/register/business/*` → `/bienvenida/*`; `/gestor` → `/asistente`. The public site in turn 308s every app route to `app.alhabla.ai`.
 
 ### Pages
 
@@ -542,7 +542,7 @@ Para probar cambios de estos scripts antes de fusionarlos: un worktree de la ram
     y se usa la secuencia de la baja de cuenta (`releaseNumber`, o `deleteAssistant` y su app TeXML).
     Un fantasma puede ser de un PR abierto (p. ej. #325 y `demo-brain-to-train`): mira antes los PR.
   - **Números de una cuenta** (desde el 30-10). Cada cuenta tiene un solo número de voz.
-    «Pedir número nuevo» va por la ruta de la app (`POST /business/me/phone/provision`, como el
+    «Pedir número nuevo» va por la ruta de la app (`POST /phone/business/me/phone/provision`, como el
     dueño): misma compra que en el alta, 402 sin suscripción activa o en prueba, 1 $ + 1 $/mes, y
     siempre con el id de la cuenta escrito. «Asignar número» da a la cuenta un número fantasma (el
     cruce de arriba, con las dos BD) por `POST /internal/panel/asignar-numero`
