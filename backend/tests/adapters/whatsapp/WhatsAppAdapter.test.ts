@@ -262,7 +262,11 @@ describe("WhatsAppAdapter", () => {
 
     expect(fetchMock).toHaveBeenCalledWith(
       "https://api.telnyx.com/v2/whatsapp/media/%2B34930454394/media-abc123",
-      { headers: { Authorization: "Bearer KEY" } }
+      {
+        headers: { Authorization: "Bearer KEY" },
+        // Con plazo propio: el fetch directo no hereda el del SDK.
+        signal: expect.any(AbortSignal),
+      }
     );
     expect(mimeType).toBe("audio/ogg");
     expect(buffer.toString()).toBe("contenido-audio");
@@ -298,6 +302,15 @@ describe("WhatsAppAdapter", () => {
     const [params] = mockedTranscribe.mock.calls.at(-1)!;
     expect(params.model).toBe("openai/whisper-large-v3-turbo");
     expect(params.language).toBeUndefined();
+  });
+
+  it("transcribe con 30 s de plazo, no los 10 s del cliente", async () => {
+    mockedTranscribe.mockResolvedValue({ text: "hola" });
+
+    await adapter.transcribirAudio(Buffer.from("x"), "audio/ogg");
+
+    const [, opciones] = mockedTranscribe.mock.calls.at(-1)!;
+    expect(opciones).toEqual({ timeout: 30_000 });
   });
 
   // Regresión real de producción (2026-10-02): Telnyx valida el formato por

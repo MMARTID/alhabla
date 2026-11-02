@@ -587,6 +587,9 @@ export class TelnyxAiAdapter {
       /** La voz de esta llamada en vez de la del assistant (la cooficial de
        * la zona para quien habla en ella). */
       voiceSettings?: VoiceSettingsInput | null;
+      /** Telnyx ignora un segundo comando con el mismo `command_id` en la
+       * misma llamada: el que repite tras un timeout no contesta dos veces. */
+      commandId?: string;
     } = {}
   ): Promise<void> {
     const client = getTelnyxClient();
@@ -604,6 +607,7 @@ export class TelnyxAiAdapter {
             : {}),
         },
         client_state: options.clientState,
+        ...(options.commandId ? { command_id: options.commandId } : {}),
         ...(options.grabar
           ? {
               record: "record-from-answer",
@@ -1163,14 +1167,12 @@ export class TelnyxAiAdapter {
   // Firma de webhooks — Ed25519 con ventana de timestamp.
   //
   // Delega en `TelnyxWebhook` (telnyx/lib/webhooks.js), la clase Ed25519
-  // oficial del SDK — no en `client.webhooks.unwrap()` (el `webhooks` del
-  // cliente principal), que usa la librería `standardwebhooks` (cabeceras
-  // `webhook-id`/`webhook-timestamp`/`webhook-signature`, HMAC): un esquema
-  // completamente distinto que NO corresponde a los webhooks de Call
-  // Control/AI Assistants (`telnyx-signature-ed25519`/`telnyx-timestamp`).
-  // Confirmado leyendo el código fuente de ambos módulos el 2026-09-11 —
-  // el SDK de Telnyx bundlea las dos implementaciones para categorías de
-  // webhook distintas y es fácil confundirlas.
+  // oficial del SDK: cabeceras `telnyx-signature-ed25519`/`telnyx-timestamp`,
+  // firma sobre `timestamp|cuerpo` y 5 minutos de margen. En la 7.29,
+  // `client.webhooks.unwrap()` usa esta misma clase (comprobado en el código
+  // del SDK el 2026-11-02; el 2026-09-11 usaba `standardwebhooks`, HMAC, otro
+  // esquema). Aquí se llama a la clase directamente porque solo hace falta
+  // la verificación, no el evento parseado.
   // ---------------------------------------------------------------------
 
   /**

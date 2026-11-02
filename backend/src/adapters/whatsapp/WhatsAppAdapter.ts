@@ -11,6 +11,14 @@ import {
  * los negocios que hablan catalán con sus clientes. */
 const TELNYX_TRANSCRIPTION_MODEL = "openai/whisper-large-v3-turbo";
 
+/** La descarga va por fetch directo, sin el timeout del cliente del SDK:
+ * sin plazo propio podía dejar colgado el webhook de WhatsApp. */
+const TIEMPO_PARA_DESCARGAR_AUDIO_MS = 10_000;
+
+/** Una nota de voz larga pasa de los 10 s del cliente (un «Request timed
+ * out» en producción el 2026-10-12): 30 s, como un turno del chat. */
+const TIEMPO_PARA_TRANSCRIBIR_MS = 30_000;
+
 /**
  * Telnyx valida el formato del audio por la EXTENSIÓN del nombre de
  * archivo, no por el `Content-Type` del multipart (comprobado a mano
@@ -543,7 +551,7 @@ export class WhatsAppAdapter {
   /**
    * Descarga un audio entrante (nota de voz) por su `media_id` de Meta. El
    * SDK no modela este recurso (verificado: no hay `whatsapp.media.*` en
-   * telnyx@7.21), así que va por fetch directo — mismo patrón que
+   * telnyx@7.29), así que va por fetch directo — mismo patrón que
    * microsoftGraph.ts/zohoMail.ts para lo que el SDK no cubre. Ruta
    * verificada a mano el 2026-10-02 contra la API real (`GET
    * /v2/whatsapp/media/{phone_number}/{id}`, sin el bug de doble /v2 que
@@ -557,7 +565,10 @@ export class WhatsAppAdapter {
     try {
       const response = await fetch(
         `https://api.telnyx.com/v2/whatsapp/media/${encodeURIComponent(toNumber)}/${encodeURIComponent(mediaId)}`,
-        { headers: { Authorization: `Bearer ${config.apiKey}` } }
+        {
+          headers: { Authorization: `Bearer ${config.apiKey}` },
+          signal: AbortSignal.timeout(TIEMPO_PARA_DESCARGAR_AUDIO_MS),
+        }
       );
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${await response.text()}`);
@@ -586,10 +597,10 @@ export class WhatsAppAdapter {
         `audio.${extensionFromMimeType(mimeType)}`,
         { type: mimeType }
       );
-      const response = await getTelnyxClient().ai.audio.transcribe({
-        model: TELNYX_TRANSCRIPTION_MODEL,
-        file,
-      });
+      const response = await getTelnyxClient().ai.audio.transcribe(
+        { model: TELNYX_TRANSCRIPTION_MODEL, file },
+        { timeout: TIEMPO_PARA_TRANSCRIBIR_MS }
+      );
       return response.text?.trim() ?? "";
     } catch (error) {
       throw toWhatsAppApiError(error, "al transcribir un audio de WhatsApp");
