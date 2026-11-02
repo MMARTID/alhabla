@@ -1,5 +1,18 @@
 import Image from "next/image";
-import { Aviso, ChatWhatsApp, Checklist, Cta, Dato, Faq, Pasos } from "@/components/blog/bloques";
+import {
+  Apartado,
+  Aviso,
+  ChatWhatsApp,
+  Checklist,
+  Cta,
+  Cuenta,
+  Dato,
+  Faq,
+  Indice,
+  Pasos,
+  Plantilla,
+  Tabla,
+} from "@/components/blog/bloques";
 
 /**
  * Imagen dentro de un artículo. En MDX se escribe `<Imagen src="…" alt="…"
@@ -55,6 +68,12 @@ export const componentesDeArticulo = {
   Faq,
   ChatWhatsApp,
   Checklist,
+  Tabla,
+  Cuenta,
+  Plantilla,
+  Indice,
+  // Los `##` con ancla, para que el bloque Indice salte a cada apartado.
+  h2: Apartado,
   // `![alt](src)` de Markdown llega como <img>; sin `alt` no se pinta la
   // imagen (el README lo exige) para que ningún artículo salga sin texto
   // alternativo.

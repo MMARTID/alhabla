@@ -81,9 +81,26 @@ también se pueden escribir a mano:
 <Faq preguntas={[{ pregunta: "¿…?", respuesta: "…" }]} />
 
 <Cta titulo="¿Y si nadie volviera a quedarse sin respuesta?" texto="Opcional" destino="planes" boton="Opcional" />
+
+<Indice apartados={[{ texto: "Título exacto del primer ##" }, { texto: "Título exacto del segundo ##" }]} />
+
+<Tabla titulo="Opcional" columnas={["Operador", "Para quitarlo"]} filas={[{ celdas: ["Orange", "`##002#` o desde Mi Orange"] }]} nota="Fuente y fecha" />
+
+<Cuenta titulo="Opcional" lineas={[{ concepto: "Sueldo bruto", importe: "17.500 €", detalle: "Opcional" }]} totalConcepto="Coste al año" total="23.126 €" nota="Opcional" />
+
+<Plantilla titulo="Mensaje de ausencia" cuando="Opcional" texto={"Primera línea\nSegunda línea"} />
 ```
 
-`destino` de la Cta: `planes`, `demo`, `como_funciona` o el slug de un sector (`barberia`…).
+- **Indice**: «En este artículo», con los títulos de los `##` escritos igual que en el texto; cada
+  uno salta a su apartado (los `##` reciben el ancla solos).
+- **Tabla**: el MDX del blog no pinta tablas de Markdown; usa este bloque. La primera columna va en
+  negrita y lo que va entre comillas invertidas (`` `##002#` ``) sale en monoespaciado. En el móvil se
+  desliza dentro de su marco.
+- **Cuenta**: una cuenta paso a paso con el total destacado, para enseñar de dónde sale una cifra.
+- **Plantilla**: un mensaje listo para copiar, con botón «Copiar»; `\n` es un salto de línea.
+
+`destino` de la Cta: `planes`, `demo`, `como_funciona`, `desvio-de-llamadas`, `agenda-por-whatsapp` o el
+slug de un sector (`barberia`…).
 Una sola Cta por artículo, hacia el final; los datos siempre con fuente.
 
 ## Que Google llegue a cada artículo: enlaces internos

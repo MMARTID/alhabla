@@ -1,0 +1,125 @@
+---
+titulo: "Cómo quitar el contestador del móvil, operador por operador"
+resumen: "Los pasos oficiales para quitar el buzón de voz en Movistar, Vodafone, Orange, Yoigo y diez operadores más, y qué poner en su lugar si el móvil es de tu negocio."
+fecha: "2026-11-02"
+autor: "Miguel Martín Delgado"
+sector: ""
+imagen: "https://images.unsplash.com/photo-1761373564177-8505a38c91f2?auto=format&fit=crop&w=1600&h=1000&q=80"
+imagenAlt: "Clienta sentada en el sillón de una peluquería mirando el móvil, reflejada en un espejo"
+idioma: "es"
+borrador: false
+---
+
+Para quitar el contestador del móvil, en la mayoría de operadores basta con marcar **`##002#`** y pulsar la tecla de llamada. Pero no en todos: Movistar se quita llamando gratis al **22500**, Vodafone con **`#147#`**, y Yoigo y MásMóvil publican **`#002#`** con una sola almohadilla. O2 directamente no tiene buzón de voz.
+
+Abajo tienes el método de cada operador, sacado de su página de ayuda oficial, cómo volver a ponerlo y qué conviene hacer si ese móvil es el teléfono de tu negocio. Porque quitar el contestador no hace que cojas más llamadas: solo cambia lo que oye quien te llama.
+
+<Indice apartados={[{ texto: "El código de cada operador, de un vistazo" }, { texto: "Por qué el contestador es en realidad un desvío" }, { texto: "Operador por operador" }, { texto: "iPhone y Android: lo que el móvil puede y no puede quitar" }, { texto: "Si el móvil es de tu negocio, piensa antes qué oirá el cliente" }, { texto: "Preguntas frecuentes" }]} />
+
+## El código de cada operador, de un vistazo
+
+<Tabla titulo="Quitar, volver a poner y escuchar el contestador" columnas={["Operador", "Para quitarlo", "Para volver a ponerlo", "Para escuchar los mensajes"]} filas={[{ celdas: ["Movistar", "Llamar gratis al 22500 o desde el área privada. Con MultiSIM, al 1004", "Igual: 22500 o área privada", "22123"] }, { celdas: ["Vodafone", "`#147#` o en Mi Vodafone › Ajustes de línea › Opciones de llamada › Contestador", "`*147#`", "22177"] }, { celdas: ["Orange", "`##002#` o en Mi Orange › Productos › Llamadas nacionales", "`**62*242#` (y `**61*242#`, `**67*242#`)", "242"] }, { celdas: ["Yoigo", "`#002#`", "`**61*633#`, `**62*633#`, `**67*633#`", "633"] }, { celdas: ["MásMóvil", "`#002#`", "`**61*242#`, `**62*242#`, `**67*242#`", "242"] }, { celdas: ["O2", "No tiene buzón de voz", "—", "—"] }, { celdas: ["Digi", "`##002#` o en Mi DIGI › Servicios", "Desde Mi DIGI o llamando al 1200", "1210"] }, { celdas: ["Lowi", "`##002#` o desde el área privada", "Mi Lowi › Mi SIM › Buzón de voz", "2211"] }, { celdas: ["Pepephone", "Mi Pepephone › Ajustes de la línea: elige «que no ocurra nada»", "La misma pantalla, eligiendo «buzón»", "22177"] }, { celdas: ["Simyo", "Llamar gratis al 1644 o desde el área personal", "Igual: 1644 o área personal", "1213"] }, { celdas: ["Jazztel", "`##002#` o en la app › Ajustes de línea › Buzón de voz", "`**61*1222#`, `**62*1222#`, `**67*1222#`", "1222"] }, { celdas: ["Euskaltel", "`##61#`, `##62#`, `##67#` y `##21#`", "`**61*2242#`, `**62*2242#`, `**67*2242#`", "2242"] }, { celdas: ["R", "`##002#`, o uno a uno con `##61#`, `##62#` y `##67#`", "`**61*22277#`, `**62*22277#`, `**67*22277#`", "22277"] }, { celdas: ["Telecable", "`##002#`, o uno a uno con `##61#`, `##62#` y `##67#`", "`**61*2242#`, `**62*2242#`, `**67*2242#`", "2242"] }]} nota="Datos de la ayuda oficial de cada operador, consultada el 2 de noviembre de 2026. Los códigos se marcan como un número y se pulsa la tecla de llamada. Los enlaces a cada fuente están en el apartado de cada operador." />
+
+<Aviso tipo="importante" titulo="Ojo con ##002#">`##002#` borra **todos** los desvíos de la línea, no solo el del contestador: también el que tengas hacia otro número, por ejemplo hacia tu recepcionista o hacia el móvil de un compañero. Si ya desvías las llamadas a algún sitio, quita el contestador con el método propio de tu operador, no con `##002#`.</Aviso>
+
+## Por qué el contestador es en realidad un desvío
+
+El contestador no vive en tu móvil: es un buzón en la red del operador. Lo que hace tu línea es **desviar las llamadas a ese buzón** en tres situaciones. Orange lo explica así en su ayuda: «Activar o desactivar el buzón de voz en realidad supone hacer un desvío de tu línea». Por eso, al quitarlo, muchos móviles enseñan el mensaje «todos los desvíos desactivados».
+
+Esos tres desvíos son estándar (los fija la norma 3GPP TS 22.030 que siguen todos los operadores GSM) y por eso los códigos se parecen tanto de una compañía a otra:
+
+<Tabla columnas={["Código", "Qué hace"]} filas={[{ celdas: ["`**61*número#`", "Desvía si no contestas"] }, { celdas: ["`**62*número#`", "Desvía si el móvil está apagado o sin cobertura"] }, { celdas: ["`**67*número#`", "Desvía si estás comunicando"] }, { celdas: ["`##61#`, `##62#`, `##67#`", "Borran cada uno de esos desvíos"] }, { celdas: ["`##004#`", "Borra los tres desvíos condicionales a la vez"] }, { celdas: ["`##002#`", "Borra todos los desvíos, también el que desvía siempre (`**21*`)"] }]} nota="Fuente: ETSI TS 122 030 V19.0.0 (3GPP TS 22.030), anexo B. Yoigo y MásMóvil publican #002# con una sola almohadilla: en la norma, # desactiva y ## borra." />
+
+Esto tiene una consecuencia útil: igual que puedes mandar las llamadas que no coges al buzón, puedes mandarlas **a otro número**. Lo vemos al final.
+
+## Operador por operador
+
+### Movistar
+
+Se quita **llamando gratis al 22500** o desde tu área privada, y se vuelve a poner igual. Si tienes MultiSIM, llama al 1004. Para escuchar los mensajes, el 22123, gratis desde tu móvil. Movistar lo publica como un servicio de 0 € al mes y alta gratis. Si usas el buzón visual del iPhone, se da de alta o de baja aparte, llamando gratis al 22570. [Ayuda de Movistar](https://www.movistar.es/mas-servicios/servicios-de-movil) · [Desvío de llamadas en Movistar](/desvio-de-llamadas/movistar)
+
+### Vodafone
+
+Marca **`#147#`** y la tecla de llamada, o entra en Mi Vodafone › Ajustes de línea › Opciones de llamada › Contestador (también lo hace su asistente TOBi). Para volver a activarlo, `*147#`. Los mensajes se escuchan en el 22177, o desde otro teléfono en el 607 122 177 con tu contraseña. Según Vodafone, el contestador no tiene coste de activación ni cuota. [Ayuda de Vodafone](https://ayudacliente.vodafone.es/particulares/es/moviles/configuracion-del-movil/como-gestionar-tu-contestador-movil/) · [Desvío de llamadas en Vodafone](/desvio-de-llamadas/vodafone)
+
+### Orange
+
+Marca **`##002#`** y la tecla de llamada, o hazlo en Mi Orange › Productos › Llamadas nacionales. Orange dice que se desactiva gratis y que los mensajes guardados se conservan 30 días. Para volver a ponerlo: `**62*242#` (apagado o sin cobertura), `**67*242#` (comunicando) y `**61*242**segundos#` para que salte si no contestas en 5 a 30 segundos. El buzón se escucha en el 242, o desde otro móvil en el 656 242 242. [Ayuda de Orange](https://ayuda.orange.es/particulares/movil/mi-movil/configurar/772-como-activo-o-desactivo-el-buzon-de-voz-de-mi-movil) · [Desvío de llamadas en Orange](/desvio-de-llamadas/orange)
+
+### Yoigo
+
+Su ayuda indica marcar **`#002#`** (con una almohadilla). Al hacerlo, Yoigo te propone activar el **aviso de llamadas perdidas** (`*61*556#`, `*62*556#` y `*67*556#`), un SMS que te dice quién llamó. Para volver al buzón primero hay que borrar los desvíos (`#21#`) y luego marcar `**61*633#`, `**62*633#` y `**67*633#`. El buzón se escucha en el 633, gratis desde la línea en España. [Ayuda de Yoigo](https://www.yoigo.com/ayuda/guia-rapida-de-uso-del-contestador-de-mi-movil) · [Desvío de llamadas en Yoigo](/desvio-de-llamadas/yoigo)
+
+### MásMóvil
+
+Marca **`#002#`** y la tecla de llamada. Para volver a activarlo, `**61*242#`, `**62*242#` y `**67*242#`. El buzón (242) es gratuito salvo fuera de la UE, y MásMóvil indica que los mensajes ya guardados no se borran al quitarlo. [Ayuda de MásMóvil](https://www.masmovil.es/ayuda-clientes/buzon-de-voz) · [Desvío de llamadas en MásMóvil](/desvio-de-llamadas/masmovil)
+
+### O2
+
+No hay nada que quitar: O2 dice en su ayuda que en su red no está disponible el buzón de voz. Lo que sí trae es el **aviso de llamadas perdidas**, que se quita llamando gratis al 22200. [Ayuda de O2](https://o2online.es/ayuda/buzon-de-voz/) · [Desvío de llamadas en O2](/desvio-de-llamadas/o2)
+
+### Digi
+
+Desde la app o la web Mi DIGI › Servicios › Servicios de tu línea, o marcando **`##002#`**. Se vuelve a poner desde Mi DIGI o llamando al 1200, y se escucha en el 1210. [Ayuda de Digi](https://www.digimobil.es/servicios-adicionales) · [Desvío de llamadas en Digi](/desvio-de-llamadas/digi)
+
+### Lowi
+
+Marca **`##002#`** y la tecla de llamada, o desactívalo desde el área privada. Para volver a ponerlo: Mi Lowi › configuración › Mis líneas › Mi SIM › Buzón de voz. Se escucha en el 2211, o desde otra línea en el +34 603 000 177. [Ayuda de Lowi](https://www.lowi.es/asistencia/buzon-voz/) · [Desvío de llamadas en Lowi](/desvio-de-llamadas/lowi)
+
+### Pepephone
+
+Pepephone no publica un código: se hace en **Mi Pepephone › Ajustes de la línea**. Para cada caso («si no atiendo», «comunicando» y «sin cobertura») eliges qué pasa: SMS de aviso, buzón, otro número o que no ocurra nada. Para escuchar los mensajes, el 22177, o desde otro teléfono el 633 177 177. [Ayuda de Pepephone](https://www.pepephone.com/ayuda/como-activar-y-desactivar-desvio-de-llamadas) · [Desvío de llamadas en Pepephone](/desvio-de-llamadas/pepephone)
+
+### Simyo
+
+Desde tu área personal, marcando o desmarcando la opción, o **llamando gratis al 1644**. El buzón se escucha en el 1213, gratis, pero solo desde tu línea: Simyo no permite escucharlo desde otro número ni desde el extranjero. [Ayuda de Simyo](https://www.simyo.es/preguntas-frecuentes/mi-linea.html) · [Desvío de llamadas en Simyo](/desvio-de-llamadas/simyo)
+
+### Jazztel
+
+Marca **`##002#`** y la tecla de llamada, o entra en el área de clientes o la app › Productos › Ajustes de línea › Buzón de voz. Jazztel dice que se desactiva gratis. Para volver a ponerlo, `**61*1222#`, `**62*1222#` y `**67*1222#` (o `**21*1222#` para que vayan todas al buzón). Se escucha en el 1222. [Ayuda de Jazztel](https://ayuda.jazztel.com/movil/servicios/1742-como-activar-o-desactivar-el-buzon-de-voz) · [Desvío de llamadas en Jazztel](/desvio-de-llamadas/jazztel)
+
+### Euskaltel
+
+Su ayuda lo quita condición por condición: **`##61#`** (no contestas), **`##62#`** (apagado o sin cobertura), **`##67#`** (comunicando) y `##21#`. Para volver a ponerlo, `**61*2242#`, `**62*2242#` y `**67*2242#`. Se escucha en el 2242, o desde otro teléfono en el 688 688 243. Es gratuito salvo en itinerancia. [Ayuda de Euskaltel](https://www.euskaltel.com/ayuda-clientes/contestador-movil-euskaltel) · [Desvío de llamadas en Euskaltel](/desvio-de-llamadas/euskaltel)
+
+### R
+
+Igual que Euskaltel, uno a uno con `##61#`, `##62#` y `##67#`, o todos a la vez con **`##002#`**. Se vuelve a poner con `**61*22277#`, `**62*22277#` y `**67*22277#`, y se escucha en el 22277 (desde otro teléfono, 900 825 277). Es un servicio gratuito incluido. [Ayuda de R](https://www.mundo-r.com/es/ayuda-clientes/contestador-movil-r) · [Desvío de llamadas en R](/desvio-de-llamadas/r-galicia)
+
+### Telecable
+
+Con `##61#`, `##62#` y `##67#`, o con **`##002#`** para quitar todos los desvíos. Para volver a ponerlo, `**61*2242#`, `**62*2242#` y `**67*2242#`, y se escucha en el 2242 (desde otro teléfono, 688 688 243). Servicio gratuito incluido. [Ayuda de Telecable](https://www.telecable.es/ayuda-clientes/activar-desactivar-contestador-movil) · [Desvío de llamadas en Telecable](/desvio-de-llamadas/telecable)
+
+## iPhone y Android: lo que el móvil puede y no puede quitar
+
+El buzón del operador **no se quita desde los ajustes del móvil**, ni en iPhone ni en Android: se quita con el código o la app de tu operador. Lo que sí tiene el móvil son funciones propias que a veces se confunden con el contestador:
+
+- **iPhone, Buzón de voz en vivo.** Es del propio iPhone: transcribe en pantalla el mensaje mientras te lo dejan. Si te sigue saltando algo parecido a un contestador después de quitar el del operador, mira en Ajustes › Apps › Teléfono › Buzón de voz en vivo. Apple recuerda además que, con el iPhone apagado o sin cobertura, la llamada va al buzón de tu operador si lo tienes activo ([ayuda de Apple](https://support.apple.com/es-es/guide/iphone/iph3c99490e/ios)).
+- **iPhone, buzón visual.** Es la pantalla que lista los mensajes. En Movistar se da de alta o de baja aparte, en el 22570.
+- **Android, app Teléfono de Google.** En Ajustes › Buzón de voz eliges quién gestiona el buzón, pero para quitarlo remite a tu operador.
+
+Si después de quitarlo te sigue saltando, casi siempre es porque queda uno de los tres desvíos (por ejemplo, el de «apagado o sin cobertura»). Marca `##004#` para borrar los tres condicionales, o consulta cómo están con `*#61#`, `*#62#` y `*#67#`.
+
+## Si el móvil es de tu negocio, piensa antes qué oirá el cliente
+
+Quitar el contestador tiene sentido si nadie lo escucha nunca, si te cuesta dinero escucharlo fuera de España o si prefieres que te avisen por SMS. Pero si ese móvil es el teléfono de tu peluquería o tu clínica, ten claro qué pasa después: **el teléfono sonará hasta que el cliente cuelgue**. Nadie le dice que le llamarás, ni le da otra forma de pedir cita. Y quien no consigue hablar contigo suele llamar al siguiente de la lista.
+
+Tienes tres opciones mejores que un timbre que no contesta nadie:
+
+1. **Dejar el contestador, pero con un buen mensaje.** Corto, con tu horario y diciendo cómo pedir cita por WhatsApp. Tienes ejemplos para copiar en [mensajes de contestador](/herramientas/mensajes-de-contestador).
+2. **Cambiarlo por el aviso de llamadas perdidas.** Muchos operadores lo ofrecen (Yoigo te lo propone al quitar el buzón; O2 lo trae de serie). Te llega un SMS con quién llamó, pero el cliente no oye nada.
+3. **Desviar las llamadas que no coges a una recepcionista de IA.** En vez de mandar el desvío al buzón, lo mandas a un número que contesta, explica tus servicios y deja la cita apuntada en tu agenda.
+
+La tercera es justo lo que hace Alhabla, y se monta con los mismos códigos que has visto arriba:
+
+<Pasos pasos={[{ titulo: "Quita el desvío al buzón con el método de tu operador", texto: "El de la tabla. Si ya tienes otro desvío puesto, evita ##002#, que lo borraría." }, { titulo: "Pon el desvío «si no contesto» hacia tu número de Alhabla", texto: "Con **61*número# o desde la app de tu operador. Tienes el paso a paso de cada compañía en desvío de llamadas." }, { titulo: "Pruébalo llamándote desde otro teléfono", texto: "Deja sonar sin coger: en unos segundos contesta la recepcionista con el nombre de tu negocio." }]} />
+
+<ChatWhatsApp titulo="Lo que oye el cliente" mensajes={[{ autor: "cliente", texto: "(Llama a la peluquería a las 18:40. Nadie puede coger: estáis con clientas.)" }, { autor: "alhabla", texto: "Hola, has llamado a Peluquería Lucía, soy su recepcionista de IA. ¿En qué te ayudo?" }, { autor: "cliente", texto: "Quería corte y color para el jueves por la tarde." }, { autor: "alhabla", texto: "El jueves tengo hueco a las 17:00 con Marta, unas dos horas. ¿Te lo reservo? Te mando la confirmación por WhatsApp." }]} />
+
+Los minutos de desvío los cobra o no tu operador según tu tarifa: lo que publica cada uno está en [desvío de llamadas si no contesta](/blog/desvio-de-llamadas-si-no-contesta). Y si quieres hacerte una idea de cuánto cuestan las llamadas que se quedan sin coger, prueba la [calculadora de llamadas perdidas](/herramientas/calculadora-de-llamadas-perdidas).
+
+## Preguntas frecuentes
+
+<Faq preguntas={[{ pregunta: "¿Quitar el contestador cuesta dinero?", respuesta: "En los operadores que lo publican (Movistar, Orange, Jazztel, MásMóvil, Yoigo, Euskaltel, R, Telecable y Simyo) desactivarlo es gratis, y los números para hacerlo, como el 22500 de Movistar o el 1644 de Simyo, también. Vodafone, Digi, Lowi y Pepephone no publican que tenga coste." }, { pregunta: "¿Se borran los mensajes que tenía guardados?", respuesta: "Depende del operador. Yoigo y MásMóvil dicen que se conservan; Orange los guarda 30 días. Si te importan, escúchalos antes de quitarlo." }, { pregunta: "¿Qué hace exactamente ##002#?", respuesta: "Borra todos los desvíos de la línea: los tres que mandan las llamadas al buzón y cualquier otro que tengas, por ejemplo hacia otro móvil o hacia tu recepcionista. Por eso, si desvías a algún sitio, es mejor quitar el buzón con el método de tu operador." }, { pregunta: "Lo he quitado y me sigue saltando, ¿por qué?", respuesta: "Suele quedar uno de los desvíos condicionales (apagado o sin cobertura, o comunicando). Marca ##004# para borrar los tres, o revisa tu app. En iPhone, comprueba también el Buzón de voz en vivo, que es del propio teléfono." }, { pregunta: "¿Puedo quitarlo solo cuando no contesto y dejarlo con el móvil apagado?", respuesta: "Sí, porque son tres desvíos distintos. Con ##61# quitas solo el de «no contesto» y dejas los demás. Euskaltel, R y Telecable lo explican así en su ayuda; en el resto de operadores con códigos GSM funciona igual." }, { pregunta: "¿Y si el teléfono de mi negocio es un fijo?", respuesta: "El buzón de un fijo se gestiona distinto en cada operador. Para mandar las llamadas que no coges a otro número desde un fijo, mira la guía de tu compañía en desvío de llamadas." }]} />
+
+<Cta titulo="Que ninguna llamada acabe en un buzón que nadie escucha" texto="Desvía las que no coges a tu recepcionista de IA: contesta con tu número de siempre y te deja la cita en la agenda. 7 días de prueba, sin permanencia." destino="planes" />
