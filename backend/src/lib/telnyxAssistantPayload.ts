@@ -34,6 +34,10 @@ export interface TelnyxWebhookToolInput {
   required?: string[];
   headers?: Array<{ name: string; value: string }>;
   timeoutMs?: number;
+  /** Lo que dice Telnyx mientras espera la respuesta (filler messages):
+   * frases fijas, no del modelo. Solo suenan en voz; en el chat no salen
+   * (comprobado en dev el 2026-11-02). */
+  mensajesDeEspera?: Array<{ content: string; timingMs: number }>;
 }
 
 /**
@@ -60,7 +64,50 @@ export function toTelnyxWebhookTool(
         required: input.required,
       },
       headers: input.headers,
+      ...(input.mensajesDeEspera
+        ? {
+            messages: input.mensajesDeEspera.map((mensaje) => ({
+              type: "request_response_delayed" as const,
+              content: mensaje.content,
+              timing_ms: mensaje.timingMs,
+            })),
+          }
+        : {}),
     },
+  };
+}
+
+/**
+ * Las tools que tardan lo bastante como para que se note el silencio: en
+ * producción, del 19-10 al 02-11, book_appointment tardó 2,0 s de mediana
+ * (3,2 s el máximo) y cancel_appointment 1,1 s; el resto, menos de 0,5 s.
+ * Si a los 1,5 s no han respondido, la recepcionista dice la frase de
+ * espera del idioma principal (no la de cada llamada: las variables de
+ * llamada en estas frases están sin comprobar, y si no se sustituyeran se
+ * leerían las llaves en voz alta).
+ */
+const TOOLS_CON_FRASE_DE_ESPERA = new Set([
+  "book_appointment",
+  "cancel_appointment",
+]);
+const ESPERA_ANTES_DE_LA_FRASE_MS = 1500;
+
+function conFraseDeEspera(
+  tool: TelnyxWebhookToolInput,
+  isoDelPrincipal: string
+): TelnyxWebhookToolInput {
+  if (!TOOLS_CON_FRASE_DE_ESPERA.has(tool.name)) return tool;
+  const idioma =
+    Object.values(IDIOMAS).find((i) => i.iso === isoDelPrincipal) ??
+    IDIOMAS["es-ES"];
+  return {
+    ...tool,
+    mensajesDeEspera: [
+      {
+        content: idioma.fraseDeEspera,
+        timingMs: ESPERA_ANTES_DE_LA_FRASE_MS,
+      },
+    ],
   };
 }
 
@@ -730,7 +777,9 @@ export function buildTelnyxAssistantPayload(
 ): CreateTelnyxAssistantInput {
   const tools: Array<TelnyxWebhookTool | HangupTool | TelnyxTransferTool> = (
     input.tools ?? []
-  ).map(toTelnyxWebhookTool);
+  ).map((tool) =>
+    toTelnyxWebhookTool(conFraseDeEspera(tool, input.idiomas.isoDeLaVoz))
+  );
 
   if (input.transferenciaAlDueno) {
     tools.push(
@@ -897,8 +946,13 @@ export function buildTelnyxAssistantPayload(
     // 2026-10-02: la espera, la de flux; sin puntuación, 0.5 s (medido con
     // llamadas reales el 2026-10-03, ver transcripcionDeSoniox); con
     // puntuación y con número, los defaults de Telnyx.
+    //
+    // El saludo no se puede cortar: lleva el aviso de IA (Reglamento europeo
+    // de IA, art. 50) y, si toca, el de grabación, y tienen que oírse
+    // enteros. Telnyx pone este caso de ejemplo en su guía de interrupciones.
     interruptionSettings: soniox
       ? {
+          disable_greeting_interruption: true,
           start_speaking_plan: {
             wait_seconds: 0.1,
             transcription_endpointing_plan: {
@@ -909,6 +963,7 @@ export function buildTelnyxAssistantPayload(
           },
         }
       : {
+          disable_greeting_interruption: true,
           start_speaking_plan: { wait_seconds: 0.1 },
           interrupt_prediction_threshold: 0.4,
         },

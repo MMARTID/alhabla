@@ -4,6 +4,7 @@ exports[`payloads de asistentes (instantáneas) > assistant de la recepcionista 
 {
   "greeting": "Perruqueria Anna, t'atén una intel·ligència artificial. En què et puc ajudar?",
   "interruptionSettings": {
+    "disable_greeting_interruption": true,
     "start_speaking_plan": {
       "transcription_endpointing_plan": {
         "on_no_punctuation_seconds": 0.5,
@@ -54,6 +55,7 @@ exports[`payloads de asistentes (instantáneas) > assistant de la recepcionista 
 {
   "greeting": "Perruqueria Anna, te atiende su recepcionista de IA. ¿En qué te ayudo?",
   "interruptionSettings": {
+    "disable_greeting_interruption": true,
     "interrupt_prediction_threshold": 0.4,
     "start_speaking_plan": {
       "wait_seconds": 0.1,
@@ -107,6 +109,7 @@ exports[`payloads de asistentes (instantáneas) > assistant de la recepcionista 
 {
   "greeting": "Kaixo, Perruqueria Anna. Adimen artifizial bat naiz. Zertan lagun zaitzaket?",
   "interruptionSettings": {
+    "disable_greeting_interruption": true,
     "start_speaking_plan": {
       "transcription_endpointing_plan": {
         "on_no_punctuation_seconds": 0.5,
@@ -157,6 +160,7 @@ exports[`payloads de asistentes (instantáneas) > assistant de la recepcionista 
 {
   "greeting": "Perruqueria Anna, atendete unha intelixencia artificial. En que te axudo?",
   "interruptionSettings": {
+    "disable_greeting_interruption": true,
     "start_speaking_plan": {
       "transcription_endpointing_plan": {
         "on_no_punctuation_seconds": 0.5,
@@ -207,6 +211,7 @@ exports[`payloads de asistentes (instantáneas) > assistant de la recepcionista 
 {
   "greeting": "Perruqueria Anna, Sie sprechen mit einer künstlichen Intelligenz. Wie kann ich Ihnen helfen?",
   "interruptionSettings": {
+    "disable_greeting_interruption": true,
     "interrupt_prediction_threshold": 0.4,
     "start_speaking_plan": {
       "wait_seconds": 0.1,
@@ -323,6 +328,7 @@ Desde ahora habla en catalán con naturalidad; no repitas el saludo ni el aviso 
   },
   "greeting": "Peluquería Ana, te atiende su recepcionista de IA. ¿En qué te ayudo?",
   "interruptionSettings": {
+    "disable_greeting_interruption": true,
     "start_speaking_plan": {
       "transcription_endpointing_plan": {
         "on_no_punctuation_seconds": 0.5,
@@ -383,6 +389,7 @@ exports[`payloads de asistentes (instantáneas) > assistant de la recepcionista,
   "insightGroupId": undefined,
   "instructions": "Hola Peluquería Ana, llama {{telnyx_end_user_target}} a las {{telnyx_current_time_Europe/Madrid}} (Europe/Madrid).",
   "interruptionSettings": {
+    "disable_greeting_interruption": true,
     "interrupt_prediction_threshold": 0.4,
     "start_speaking_plan": {
       "wait_seconds": 0.1,
@@ -526,6 +533,13 @@ exports[`payloads de asistentes (instantáneas) > assistant de la recepcionista,
             "value": "{{call_control_id}}",
           },
         ],
+        "messages": [
+          {
+            "content": "Un momento, por favor.",
+            "timing_ms": 1500,
+            "type": "request_response_delayed",
+          },
+        ],
         "method": "POST",
         "name": "book_appointment",
         "url": "https://api.alhabla.test/webhooks/telnyx/tools/book_appointment",
@@ -573,6 +587,13 @@ exports[`payloads de asistentes (instantáneas) > assistant de la recepcionista,
           {
             "name": "X-Alhabla-Call-Control-Id",
             "value": "{{call_control_id}}",
+          },
+        ],
+        "messages": [
+          {
+            "content": "Un momento, por favor.",
+            "timing_ms": 1500,
+            "type": "request_response_delayed",
           },
         ],
         "method": "POST",
@@ -844,6 +865,7 @@ exports[`payloads de asistentes (instantáneas) > assistant de la recepcionista,
   "insightGroupId": undefined,
   "instructions": "Prompt manual.",
   "interruptionSettings": {
+    "disable_greeting_interruption": true,
     "interrupt_prediction_threshold": 0.4,
     "start_speaking_plan": {
       "wait_seconds": 0.1,
@@ -1233,7 +1255,7 @@ Si te escriben en catalán, gallego, euskera o inglés, responde en ese idioma; 
 exports[`payloads de asistentes (instantáneas) > el JSON enviado es idéntico byte a byte (hash) 1`] = `
 {
   "gestor": "e98c3bfa972a5bd367381ff26a58c6d2b9ee626c5ac52e24ac7c18fe833f1d96",
-  "recepcionista": "a5776f5c2278589ef5e57740e60b456969e762724b3055869c3dd34cb19a7ab8",
+  "recepcionista": "bcdf0963b7ebfc647df91a1088b5378d2f22accf42f8de761aff5502d696a477",
 }
 `;
 

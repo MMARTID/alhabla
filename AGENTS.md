@@ -2394,6 +2394,13 @@ Telnyx assistant itself (MCP `ver_assistant_telnyx`), not only the DB.
   someone) to check that specific professional instead of "anyone free". `get_catalog` returns
   each service with its duration and, unless «Dar precios» is `nunca`, its price («18 €», «sin
   precio»), plus a `precios` rule (see § Agent Configuration › Agent Settings).
+- **Saludo protegido y frase de espera (2026-11-02).** `interruption_settings.disable_greeting_interruption`
+  está a `true` en las dos ramas (flux y Soniox): el saludo lleva el aviso de IA (RIA art. 50) y el de
+  grabación, y no se puede cortar. `book_appointment` y `cancel_appointment` llevan una frase de espera de
+  Telnyx (`webhook.messages`, `request_response_delayed` a 1,5 s; `conFraseDeEspera` en
+  `lib/telnyxAssistantPayload.ts`) en el idioma principal (`fraseDeEspera` en `lib/idiomas/catalogo.ts`):
+  en producción tardaban 2,0 s y 1,1 s de mediana. Es fija y no por llamada porque no está comprobado que
+  Telnyx sustituya `{{variables}}` en estas frases. En el chat de WhatsApp no salen (comprobado en dev).
 - **Classification.** The three custom insights (`call_outcome`, `escalation_reason`,
   `tool_failure_detected`; ids in `TELNYX_INSIGHT_*_ID`, created by
   `scripts/createTelnyxCallInsights.ts`) arrive as `call.conversation_insights.generated` and
