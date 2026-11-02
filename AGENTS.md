@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-Alhabla is a multi-tenant SaaS platform that provides AI-powered voice receptionists for small businesses in Spain (hair salons, barbershops, physiotherapy clinics, beauty centers, etc.). Each business gets a voice receptionist orchestrated by **Telnyx AI Assistants**, the only voice orchestrator (see § Voice Orchestrator). The agents handle incoming phone calls, answer questions, check business hours, check availability, and book appointments directly into the business's Google, Outlook or Apple/iCloud (CalDAV) calendar. Since September 2026 the platform also talks over WhatsApp (Telnyx as Meta BSP) with business owners (alerts and the Gestor assistant) and with their clients.
+Alhabla is a multi-tenant SaaS platform that provides AI-powered voice receptionists for small businesses in Spain (hair salons, barbershops, physiotherapy clinics, beauty centers, etc.). Each business gets a voice receptionist orchestrated by **Telnyx AI Assistants**, the only voice orchestrator (see § Voice Orchestrator). The agents handle incoming phone calls, answer questions, check business hours, check availability, and book appointments directly into the business's Google, Outlook or Apple/iCloud (CalDAV) calendar or, since October 2026, into Alhabla's own agenda (agenda mode in `lib/modoDeAgenda.ts`, with an iCal feed the owner can subscribe to). Since September 2026 the platform also talks over WhatsApp (Telnyx as Meta BSP) with business owners (alerts and the Gestor assistant) and with their clients. There is also an internal dashboard, Alhabla Growth (`growth/`, `growth.alhabla.ai`), with its own auth and no business tenant (§ Alhabla Growth).
 
 The codebase is fully in Spanish — UI copy, comments, variable names, and business logic are written in Spanish. Keep everything in Spanish when modifying code or adding user-facing text.
 
@@ -12,7 +12,7 @@ The codebase is fully in Spanish — UI copy, comments, variable names, and busi
 |-------|------------|
 | **Backend runtime** | Node.js 22 (`.nvmrc`), TypeScript 5.9, ESM (`"type": "module"`) |
 | **HTTP framework** | Fastify 5 |
-| **Frontend** | Two Next.js 16 (App Router, Turbopack) projects, React 19, Tailwind CSS v3: `frontend/` (the app, `app.alhabla.ai`, :3001) and `web/` (public site + MDX blog, `alhabla.ai`, :3002) |
+| **Frontend** | Three Next.js 16 (App Router, Turbopack) projects, React 19, Tailwind CSS v3: `frontend/` (the app, `app.alhabla.ai`, :3001), `web/` (public site + MDX blog, `alhabla.ai`, :3002) and `growth/` (internal Alhabla Growth dashboard, `growth.alhabla.ai`, :3003) |
 | **Database** | PostgreSQL 15 + Prisma ORM |
 | **Cache** | Postgres (`claves_temporales`, `contadores`, `cerrojos`) since PR B (2026-10); no Redis since 2026-10-19 (§ Corte de Redis a Postgres) |
 | **Background jobs** | Cloud Tasks / Cloud Scheduler (HTTP callbacks to `alhabla-api`, no BullMQ) |
@@ -21,9 +21,9 @@ The codebase is fully in Spanish — UI copy, comments, variable names, and busi
 | **Telephony / WhatsApp** | Telnyx (Spanish numbers, call control, WhatsApp Business Platform) |
 | **Billing** | Stripe (Checkout Sessions, Customer Portal, webhooks) |
 | **Calendar** | Google Calendar API, Microsoft Graph (Outlook), CalDAV vía `tsdav` + `ical.js` (Apple/iCloud) |
-| **Auth** | JWT (custom) + Google OAuth 2.0 |
+| **Auth** | JWT (custom) + Google OAuth 2.0 + Facebook Login; Growth: Google ID token (`plugins/growthAuth.ts`) |
 | **Containerization** | Docker + Docker Compose |
-| **Testing** | Vitest (backend, `frontend/` and `web/`; Testing Library + jsdom in the two webs). Integration tests against the real Postgres of docker-compose (`alhabla_test`), no containers of their own |
+| **Testing** | Vitest (backend, `frontend/`, `web/` and `growth/`; Testing Library + jsdom in the three webs). Integration tests against the real Postgres of docker-compose (`alhabla_test`), no containers of their own |
 
 ## Monorepo Layout
 
@@ -32,7 +32,7 @@ The codebase is fully in Spanish — UI copy, comments, variable names, and busi
 ├── backend/                 # Backend source (ESM TypeScript)
 │   ├── src/
 │   │   ├── server.ts           # Fastify entry point
-│   │   ├── plugins/            # Fastify plugins (auth, internalAuth); CORS and rate-limit are registered in server.ts
+│   │   ├── plugins/            # Fastify plugins (auth, internalAuth, firmaTelnyx, growthAuth); CORS and rate-limit are registered in server.ts
 │   │   ├── modules/            # Domain route modules (one folder per domain)
 │   │   ├── adapters/           # External API adapters (telnyx, whatsapp, calendar)
 │   │   ├── lib/                # Shared utilities (Prisma, temporary store, Stripe, Cloud Tasks, storage)
@@ -41,16 +41,20 @@ The codebase is fully in Spanish — UI copy, comments, variable names, and busi
 │   ├── prisma/              # Prisma schema + migrations
 │   ├── dist/                # Compiled backend output (tsc, not versioned)
 │   ├── scripts/             # One-off/manual scripts (Telnyx assistants, prompts, demo, simulations)
+│   ├── mcp/                 # Dev MCP (alhabla-dev), dev panel (:3005) and the Growth MCP
 │   ├── tests/                # Vitest test suite
 │   └── Dockerfile            # Multi-stage build
 ├── frontend/               # Next.js 16 application
 │   ├── src/app/            # App Router pages
 │   ├── src/components/     # React components
-│   ├── src/lib/            # API client, types, helpers, SEO, ROI
+│   ├── src/lib/            # API client, types, helpers, SEO
 │   └── src/hooks/          # Custom React hooks
 ├── web/                    # Next.js 16 public site (alhabla.ai): landing, niches, plans, legal, register, blog
 │   └── content/blog/       # MDX articles
-├── docs/                   # Niche research and closed plans (docs/historico/)
+├── growth/                 # Next.js 16 internal Alhabla Growth dashboard (growth.alhabla.ai, :3003); growth/agentes/ = agent rules
+├── scripts/                # backend-sim.sh, comprobar-copias-compartidas.sh, dev/ (fixed dev environment)
+├── infra/cloudflare/       # LaLiga failover Worker (failover-laliga/, deployed by hand)
+├── docs/                   # Niche research, analytics events, audits, Growth docs and closed plans (docs/historico/)
 └── docker-compose.yml      # Postgres + backend + cloudflared (dev profile)
 ```
 
@@ -60,21 +64,22 @@ Most modules are a folder containing a `routes.ts` file (and optionally `service
 
 | Module | Prefix | Auth | Purpose |
 |--------|--------|------|---------|
-| `auth` | `/auth` | Mixed | JWT login, Google OAuth callback, registration, authenticated account summary/password change/deletion. Since 2026-09-24 the JWT carries `tv` (`User.tokenVersion`) and `plugins/auth.ts` checks it against the DB (30 s in-process cache), so changing or resetting the password invalidates every token issued before it instead of letting it live out its 7 days — that check fails **closed**. `/register` applies the same password policy as changing and resetting it (8+, a letter and a digit — before, a one-character password got in) and hashes with bcrypt cost 12, not 10. All of `/auth/*` also sits behind an in-memory backstop limiter (`lib/limitadorEnMemoria.ts`, 40/min per IP): the global limiter counts in Postgres, but when Postgres fails or is slow each instance decides with its own local count (blind to the other instances) and `skipOnError: true` lets requests through if the store ever errors, and failing open there means unthrottled credential stuffing. |
+| `auth` | `/auth` | Mixed | JWT login, Google and Facebook OAuth callbacks, registration (also returns a one-time `pase`, redeemed at `/auth/pase/canjear`), authenticated account summary/password change/deletion. Since 2026-09-24 the JWT carries `tv` (`User.tokenVersion`) and `plugins/auth.ts` checks it against the DB (30 s in-process cache), so changing or resetting the password invalidates every token issued before it instead of letting it live out its 7 days — that check fails **closed**. `/register` applies the same password policy as changing and resetting it (8+, a letter and a digit — before, a one-character password got in) and hashes with bcrypt cost 12, not 10. All of `/auth/*` also sits behind an in-memory backstop limiter (`lib/limitadorEnMemoria.ts`, 40/min per IP): the global limiter counts in Postgres, but when Postgres fails or is slow each instance decides with its own local count (blind to the other instances) and `skipOnError: true` lets requests through if the store ever errors, and failing open there means unthrottled credential stuffing. |
 | `businesses` | *(none)* | Yes | Business CRUD, `me` endpoints, agent prompt rebuild on update, and the dashboard reads: `GET /business/me/stats` (all-time totals plus a rolling 7-day `week` window with the previous 7 days for comparison and an estimated revenue in cents), `GET /business/me/agenda?days&limit` (upcoming `Booking` rows with client phone, professional and resolved service names; an optional `desde` instant — at most 60 days back — moves the window start, which the mobile week view uses to show the days already gone) `GET /business/me/pending-bookings` (unresolved `pending_booking` leads — appointments the caller asked for that never reached the calendar) and, since 2026-10-02, `POST /business/me/pending-bookings/:id/resolver` («Ya la he confirmado» in the mobile panel: same close as «La apunté yo» on WhatsApp, `data.resolvedBy: "owner_panel"`, idempotent). Desktop redesign (phase 1): the agenda takes `limit` up to 200 (the week grid loads at once) and `profesionalId`, and each booking also carries `clientName`, `createdAt`, `createdVia` and `origen` (`{ canal, startedAt, durationSecs }` of the conversation that booked it; `null` when the owner added it with the Gestor). **The Gestor's synthetic calls** (`callId` prefixed `whatsapp:gestor:`, `lib/citasDelDueno.ts`) are excluded from stats, the call list, analytics and the weekly summary: they hang owner-added bookings off a `Call` because `Booking.callId` is required, but they are not conversations nor receptionist bookings |
 | `agents` | *(none)* | Yes | Agent CRUD. `POST` goes through `createBusinessAgent` (the `Agent` row and its Telnyx assistant); `PATCH /agents/:id` calls `syncAgentToTelnyx` only when `systemPrompt` changes (a hand-edited prompt reaches the assistant as is) — name, greeting and voice of the assistant come from the business settings, not from the `Agent` row |
 | `calls` | *(none)* | Yes | Call logs, transcripts, outcomes (paginated). Since 2026-10-02 the list takes `filtro` (`todas`, `con_cita` or `por_devolver`), always returns `conteos { todas, conCita, porDevolver }` and gives each call a `recado` (its `message` lead: name, phone, reason, `atendidoAt`; pending while any is unresolved) instead of raw leads; `PATCH /business/me/calls/:id/recado { atendido }` closes or reopens it from the panel — the same close as the «Atendido» button of the WhatsApp notice. Desktop filters (`listado.ts`): `filtro` also takes `sin_cita`, combinable with `canal` (`voz`/`whatsapp`), `sentimiento`, `desde`/`hasta` (on `ultimaActividadAt`), `q` (digits match phone numbers; text matches summary, requested service, booking client name and booked service names) and `orden` (`reciente`, `antigua`, `mas_larga`, `mas_corta`); `conteos` ignore those filters. `resumen=hoy` adds `hoy { llamadas, conCita, duracionMediaSecs }` from the business's midnight. **Since 2026-10-13 the list orders, filters and counts «hoy» by `Call.ultimaActividadAt`**, not `createdAt`/`startedAt`: a voice call's start, and for a WhatsApp chat the client's last message (`chatCliente.ts` › `anotarActividadDelChat`, before answering, best-effort with a loud log). A chat keeps its `Call` row for 30 days, so a client who moved a booking by WhatsApp on 13-10 showed up under 09-10, the day of their first message, and the owner could not find it; the app shows that same date on every list row (`momentoDeActividad` in `frontend/src/lib/llamadas.ts`). `updatedAt` would not do: the text purge also bumps it. `GET /business/me/calls/export.csv` exports the same filters (`;`, UTF-8 BOM, decimal comma, formula-safe cells, at most 5000 rows with `X-Filas-Omitidas`) |
 | `recordings` | *(none)* | Yes | Recording metadata, review notes |
-| `calendar` | `/calendar` | Yes* | Google/Outlook OAuth, Apple/CalDAV sign-in with credentials, list events, book appointments. **CalDAV is user-supplied URL territory**: since 2026-09-24 every request the adapter makes goes through `fetchSoloPublico` (`lib/destinoPublico.ts`) — https only, DNS resolved and rejected if any address is private/loopback/link-local/CGNAT, redirects followed by hand so a 302 cannot bounce into the VPC, and `calendarId` on `POST /calendar/select` must be one of the discovered calendars. This is not theoretical: `alhabla-api` has egress into the VPC (Direct VPC egress since 2026-10-10; a Serverless VPC Access connector with `private-ranges-only` egress before), so private ranges really are reachable from the container. |
+| `calendar` | `/calendar` | Yes* | Google/Outlook OAuth, Apple/CalDAV sign-in with credentials, list events, book appointments. **CalDAV is user-supplied URL territory**: since 2026-09-24 every request the adapter makes goes through `fetchSoloPublico` (`lib/destinoPublico.ts`) — https only, DNS resolved and rejected if any address is private/loopback/link-local/CGNAT, redirects followed by hand so a 302 cannot bounce into the VPC, and `calendarId` on `POST /calendar/select` must be one of the discovered calendars. When this was added it was not theoretical: `alhabla-api` had egress into the VPC (a Serverless VPC Access connector with `private-ranges-only` egress, then Direct VPC egress from 2026-10-10 until it was removed on 2026-10-19 together with Memorystore, § Corte de Redis a Postgres), so private ranges really were reachable from the container. The guard stays: any future VPC egress would make them reachable again. |
 | `bookings` | `/booking-settings` | Yes | CRUD de servicios y profesionales, asignaciones y capacidad de reserva; las retiradas son lógicas. Desde el 2026-10-02 (`citasDelPanel.ts`, sin prefijo) la agenda del panel mueve, cancela y avisa: `POST /business/me/bookings/:id/mover { fechaHora, profesionalId?, soloComprobar? }` (la misma `moverReserva` que `mover_cita` del Gestor: hueco real bajo el candado, evento nuevo antes de borrar el viejo), `POST .../cancelar` (`cancelarReserva` con `cancelledBy: "owner_panel"`, sin aviso #4 al dueño) y `POST .../avisar { tipo: cambio\|cancelacion }` (`avisar_cliente`); mover y cancelar devuelven `avisoAlCliente` si se le puede escribir por WhatsApp |
 | `billing` | `/billing` | Yes* | Stripe checkout, portal, subscription summary, webhooks. Since 2026-10-16: current prices 59/139/269 € + IVA (Stripe prices with `tax_behavior: "exclusive"`) and a founder price (39/99/199 € + IVA, `STRIPE_PRICE_*_FOUNDER`) for the first 15 businesses on any plan; prices of earlier tables stay recognised through `STRIPE_PRICES_ANTERIORES_*` (comma-separated) but an earlier founder price no longer counts for the cupo, so founders are migrated to the new founder price when the table changes; `getBillingSummary` returns `precioDeFundador` so the app shows what the business really pays — `estadoDelCupoDeFundador()` counts them and decides the checkout price; public `GET /billing/fundadores` (no auth, `{ total, restantes, disponible }`, cached 60 s) lets the web show the discount only while seats remain. Extra minutes: one Stripe meter (`alhabla_call_minutes`, sum, `stripe_customer_id`) and per-plan graduated metered prices whose free tier MUST equal `includedMinutes` in `catalog.ts` (200/600/1500 since 2026-10-16) — `processUsageReport` sends every consumed minute and Stripe's first tier is what makes them free |
-| `phone` | `/phone` | Yes | Telnyx phone number status, manual provisioning retry |
+| `phone` | `/phone` | Yes | Telnyx phone number status (`GET /phone/business/me/phone`) and manual provisioning retry (`POST /phone/business/me/phone/provision`): the routes are declared as `/business/me/phone…` and registered under the `/phone` prefix, so the prefix shows up twice in the real path (`frontend/src/lib/api.ts`) |
 | `places` | *(none)* | Yes | Google Places autocomplete & details |
 | `onboarding` | *(none)* | Yes | Onboarding state: progress, dismiss, complete, confirm call forwarding |
 | `busqueda` | *(none)* | Yes | Since 2026-10-02: `GET /business/me/buscar?q=` for the panel's ⌘K search — up to 6 bookings (upcoming first, then the last 60 days) and 6 conversations matching client name, phone digits, service name or summary; Gestor rows excluded |
 | `demo` | `/demo` | No | Public landing voice demo, **on Telnyx since 2026-09-22**. `POST /demo/web-call` accepts `{ niche?, placeId? }` and returns `{ assistantId, niche, maxDurationSeconds }`: the browser then places an unauthenticated WebRTC call to that assistant (`anonymous_login`), so no token or credential ever reaches the bundle. With a `placeId` the backend re-reads the Google Places card and the **detected** niche wins over the landing's — searching your barbershop from the main landing gets you the barbershop demo. Each niche points at an **isolated** demo assistant (`TELNYX_DEMO_<NICHO>_ASSISTANT_ID`), falling back to the generic one. Since 2026-09-24 those are clones of the demo accounts' assistants (`scripts/crearAssistantsDemoAislados.ts`) with **no tools at all** and their own `time_limit_secs` in Telnyx: `anonymous_login` means the assistant id necessarily reaches the browser, so anyone can dial it directly, bypassing this route's rate limit and the browser's cap — pointing that at the real accounts' assistants let an abuser write real bookings into their agendas. The demo accounts' own assistants now have `supports_unauthenticated_web_calls: false`. The route still reasserts that flag once per assistant per process, but only after checking the name starts with `alhabla-demo-`, so a misconfigured env var can never open a real business's assistant. `resolveDemoMaxDurationSeconds()` validates `TELNYX_DEMO_MAX_DURATION_SECONDS` (finite and positive, or 60s) — it is a browser-side cap, Telnyx keeps the account's own `time_limit_secs` |
 | `contacto` | — | No | Formulario «Hablar con nosotros» de la web (`/contacto`, desde 2026-10-16). `POST /contacto` acepta `{ nombre, email, telefono?, negocio, sedes: "1" \| "2-4" \| "5+" \| "franquicia", mensaje?, sitioWeb? }` (Zod, mensajes en español por campo) y encola un correo a `hola@alhabla.ai` desde `support@` (`solicitudDeContactoEmail`; en dev sale en línea y, sin `ZOHO_DEV_ALLOWED_RECIPIENTS`, se queda en el aviso «CORREO NO ENVIADO»). No guarda nada en la BD. 5 envíos cada 10 min por IP. `sitioWeb` es una trampa para bots: relleno, responde `200` y no manda nada. Ni el asunto ni los logs llevan datos personales (solo las sedes) |
-
+| `agenda` | *(none)* | Mixed | iCal feed of the Alhabla agenda (`lib/feedIcal.ts`): public `GET /agenda/:token.ics` (the secret token in the URL is the only credential) and `GET`/`POST`/`DELETE /business/me/agenda/feed` to show, create or renew, and revoke it |
+| `growth` | `/growth` | Own (`plugins/growthAuth.ts`) | Alhabla Growth API: `/growth/admin/*` (founder, Google ID token in `GROWTH_ADMIN_EMAILS`) and `/growth/agente/*` (the scheduled agent, its own token). Not business-scoped. See § Alhabla Growth |
 | `whatsapp` | *(none)* | Mixed | WhatsApp channel (Telnyx as Meta BSP): owner sign-up and preferences (`/business/me/whatsapp`), inbound messages/status/template events routed from `/webhooks/telnyx`, owner and client chats, waiting list, reminders. |
 | `gestor` | *(no routes.ts)* | Mixed | The owner's assistant ("Gestor", shown as «Tu asistente»): tools at `/webhooks/telnyx/gestor/:toolName` (Ed25519) and the panel thread at `/business/me/gestor` (`panel.ts`). It proposes; only the owner's button executes. |
 | `voiceTools` | *(no routes.ts)* | Webhook signature | Tool execution (`executeVoiceTool`) behind `/webhooks/telnyx/tools/:toolName`, for calls and for the client chat on WhatsApp (`canalDeLaTool`). |
@@ -86,11 +91,11 @@ Most modules are a folder containing a `routes.ts` file (and optionally `service
 ### Key Libraries (`backend/src/lib/`)
 
 - `prisma.ts` — Prisma Client singleton with `globalThis` hot-reload guard. Since PR A also `conUnaConexion(url, parametros)` (the same URL with `connection_limit=1` plus the given parameters, leaving the rest — `host=/cloudsql/…`, escaped passwords — untouched) and `crearClienteDeUnaConexion(parametros)` (a separate `PrismaClient` with one connection of its own, outside the app pool: the rate limiter's; see § Pool and § Corte de Redis a Postgres).
-- `almacenTemporal.ts` — the temporary store in Postgres that replaced Redis (PR B, 2026-10): `claves_temporales` (key → JSON value with `expiraEn` and an optional `businessId` FK `ON DELETE CASCADE`) with `guardarClave`/`guardarClaveSiNoExiste` (SET NX)/`leerClave`/`consumirClave` (GETDEL)/`borrarClave`, and per-field writes on a JSON object (`guardarCampos`, `fijarCampo`, `fijarCampoSiNoExiste` = HSETNX, `leerCampos`); `contadores` (`incrementarContador`/`leerContador`, fixed window); and `purgarCaducados`. An expired key does not exist for any read. `lib/redis.ts` (the general ioredis client) was deleted in PR B; the only Redis client left is `redisDeCompatibilidad.ts` (locks, see § Corte de Redis a Postgres). Locks and the rate-limit counter moved to Postgres in PR A (`cerrojos.ts`, `limitesDePeticiones.ts`).
+- `almacenTemporal.ts` — the temporary store in Postgres that replaced Redis (PR B, 2026-10): `claves_temporales` (key → JSON value with `expiraEn` and an optional `businessId` FK `ON DELETE CASCADE`) with `guardarClave`/`guardarClaveSiNoExiste` (SET NX)/`leerClave`/`consumirClave` (GETDEL)/`borrarClave`, and per-field writes on a JSON object (`guardarCampos`, `fijarCampo`, `fijarCampoSiNoExiste` = HSETNX, `leerCampos`); `contadores` (`incrementarContador`/`leerContador`, fixed window); and `purgarCaducados`. An expired key does not exist for any read. `incrementarContadores` bumps several counters in one statement. `lib/redis.ts` (the general ioredis client) was deleted in PR B and `redisDeCompatibilidad.ts` (the lock mirror) on 2026-10-19: there is no Redis client left (see § Corte de Redis a Postgres). Locks and the rate-limit counter moved to Postgres in PR A (`cerrojos.ts`, `limitesDePeticiones.ts`).
 - `cloudTasks.ts` — Cloud Tasks job dispatch (`enqueueRecordingJob`, `enqueueRetryBookingJob`, `enqueueUsageReportJob`, `enqueueEmailJob`, `enqueueSmsJob`, `enqueueRecordarRecadoJob`, `enqueueWhatsappJob`); inline synchronous fallback outside production. See Background Jobs below.
 - `storage.ts` — R2/S3 client for file uploads (recordings).
 - `stripe.ts` — Stripe SDK client singleton.
-- `telnyx.ts` — Telnyx SDK singleton (single Bearer API key). Active provider for phone number provisioning.
+- `telnyx.ts` — Telnyx SDK clients with one API key: `getTelnyxClient()` (`maxRetries: 0` on purpose — the SDK would otherwise retry a number purchase that already went through — and a 10 s timeout) and `getTelnyxWhatsappClient()` for the `client.whatsapp.*` resources (baseURL without `/v2`, to work around an SDK bug). Telnyx is the only provider for voice, numbers, SMS and WhatsApp.
 - `microsoftGraph.ts` — Microsoft Graph OAuth + Calendar API helpers.
 - `agentBootstrap.ts` — Default `Agent` row config (`DEFAULT_AGENT_CONFIG`), per-niche template and display name, safe assistant naming, and `createBusinessAgent` (the `Agent` row plus its Telnyx assistant via `crearAssistantDelNegocio`, `telnyxAgentSync.ts`).
 - `businessSchedule.ts` — Business hours validation logic with Zod schemas.
@@ -98,14 +103,25 @@ Most modules are a folder containing a `routes.ts` file (and optionally `service
 - `logUtils.ts` — Shared logging helpers (`errorMessage`, `callLabel`).
 - `managedAgentPrompt.ts` — Dynamic system prompt builder from business settings (tone, goal, style, escalation).
 - `serverUrl.ts` — `getPublicWebhookBaseUrl()`: the public base URL used to register webhooks, always straight from `BASE_URL`.
+- `urls.ts` — `appUrl()`, `webUrl()`, `growthUrl()` and the CORS allow-list `origenesPermitidos()` (`APP_URL`, `WEB_URL`, `FRONTEND_URL`, `GROWTH_URL`, `EXTRA_ALLOWED_ORIGIN`).
+- `cerrojos.ts`, `limitesDePeticiones.ts`, `limitadorEnMemoria.ts` — Locks and the global rate-limit counter in Postgres, and the per-instance in-memory backstop limiter of `/auth/*` (§ Corte de Redis a Postgres).
+- `telnyxAgentSync.ts` / `telnyxAssistantPayload.ts` — Create and sync each business's Telnyx assistant (`crearAssistantDelNegocio`, `syncAgentToTelnyx`) and build its payload and voice tools (`buildTelnyxVoiceTools`).
+- `zohoMail.ts` / `emailTemplates.ts` — Sending through Zoho Mail and the email templates.
+- `planFeatures.ts` — What each plan includes (gating).
+- `cifradoDeCredenciales.ts` — AES-256-GCM encryption at rest of calendar credentials (`CALENDAR_CREDENTIALS_KEY`).
+- `destinoPublico.ts` — `fetchSoloPublico`: https only, public addresses only (CalDAV).
+- `enviosSimulados.ts` — `ENVIOS_SIMULADOS=1` (never in production): WhatsApp, SMS and emails are logged as `ENVÍO SIMULADO` instead of sent.
+- `modoDeAgenda.ts` / `feedIcal.ts` — Calendar vs Alhabla agenda mode, and the iCal feed.
+- `proxyDeConfianza.ts` — `TRUST_PROXY_HOPS` (0–5): how many proxy hops to trust for the client IP.
 
 ### Configuration (`backend/src/config/`)
 
-- `voiceAgent.ts` — Generic voice/LLM/STT catalog constants: voice providers (8), LLM providers (4) + models, STT providers (7) + models.
+- `voiceAgent.ts` — Provider lists used to validate `PATCH /agents/:id`: voice providers (8), LLM providers (4) and STT providers (7). There is no model catalog any more: the voice, model and transcription the assistant really uses come from the Telnyx payload (`lib/telnyxAssistantPayload.ts`).
 
 ## Frontend Architecture
 
-Since 2026-09-21 (`docs/historico/PLAN-APP-DOMINIO.md`) there are **two** Next.js projects:
+Since 2026-09-21 (`docs/historico/PLAN-APP-DOMINIO.md`) there are **two** customer-facing Next.js
+projects (plus the internal `growth/` dashboard, § Alhabla Growth):
 `frontend/` is the authenticated app (`app.alhabla.ai`) and `web/` is the public site
 (`alhabla.ai`: landing, niche pages, plans, legal, registration and blog). Marketing components
 (`MainLanding`, `SiteLanding`, `LandingHero`, `TarjetasDePlanes`, `DemoVoiceCall`, `PaginaGuia`,
@@ -127,7 +143,7 @@ each file.
 | Route | Purpose |
 |-------|---------|
 | `/` | Dashboard (protected) — calls, stats, onboarding checklist, upcoming bookings |
-| `/login`, `/auth/entrar?pase=`, `/auth/google/callback` | Sign-in; `/auth/entrar` redeems the one-time pass from the public site's registration |
+| `/login`, `/auth/entrar?pase=`, `/auth/google/callback`, `/auth/facebook/callback` | Sign-in; `/auth/entrar` redeems the one-time pass from the public site's registration |
 | `/recuperar-contrasena`, `/restablecer-contrasena?token=` | Password recovery — request the emailed link, then set a new password (signs the user in on success) |
 | `/bienvenida`, `/bienvenida/niche`, `/bienvenida/services`, `/bienvenida/team`, `/bienvenida/calendar` | Business setup wizard after registration |
 | `/elegir-plan` | Arrival from «Elegir plan» on the public site: checkout with a session, registration without |
@@ -136,6 +152,7 @@ each file.
 | `/agenda` | Today's bookings and pending ones |
 | `/llamadas`, `/llamadas/analitica` | Call log and analytics |
 | `/agente` | Full agent setup (schedule, services, professionals, calendar, knowledge and behavior) |
+| `/agente/[ajuste]` | One agent setting per screen on mobile; redirects to `/agente?ajuste=` on desktop |
 | `/asistente` | The owner's assistant (Gestor) thread, same as on WhatsApp |
 | `/ajustes`, `/ajustes/negocio`, `/ajustes/seguridad` | Account settings (identity, business contact data, password, session and account deletion) |
 | `/ajustes/telefono`, `/ajustes/numero-principal` | Customer line, «Comprobar desvío», «Alhabla como número principal» (§ Telefonía) |
@@ -148,22 +165,30 @@ each file.
 | Route | Purpose |
 |-------|---------|
 | `/` | Generic conversion landing |
-| `/barberia`, `/peluqueria`, `/fisioterapia`, `/centro-de-estetica`, `/salon-de-unas` | Niche SEO landings (the old `/<niche>/<city>` pages 301 here since 2026-10-20) |
-| `/recepcionista-ia-en-catalan` | Catalan / Basque / Galician attention (cooficial language by postal code) |
+| `/peluqueria`, `/barberia`, `/fisioterapia`, `/centro-de-estetica`, `/salon-de-unas`, `/pestanas-y-cejas`, `/spa-y-masajes`, `/peluqueria-canina` | The eight sector landings (`SiteLanding`; the old `/<niche>/<city>` pages 301 here since 2026-10-20) |
+| `/recepcionista-ia-en-catalan`, `/recepcionista-ia-en-euskera`, `/recepcionista-ia-en-gallego` | Co-official language attention (by postal code), one page per language |
 | `/agenda-por-whatsapp` | The Gestor: the owner manages the agenda over WhatsApp (not `/gestor`, which redirects to the app) |
-| `/planes` | Pricing page with ROI-aware headline |
+| `/planes` | Pricing page (`TarjetasDePlanes`) |
 | `/register` | Account creation (email or Google); jumps to the app with a one-time pass |
 | `/blog`, `/blog/[slug]`, `/blog/rss.xml` | MDX blog (`web/content/blog`) |
 | `/keystatic`, `/vista-previa/[slug]` | Blog editor (Keystatic) and draft preview |
 | `/legal/privacidad` | Privacy policy — covers the voice demo, recorded calls and calendar scopes |
 | `/legal/aviso-legal` | Legal notice — service terms, trial, withdrawal |
+| `/comparativa`, `/comparativa/alhabla-vs-*` | Comparisons (Retell AI, Vapi, Bland AI, ElevenLabs, Synthflow) |
+| `/desvio-de-llamadas`, `/desvio-de-llamadas/<operador>` | Call-forwarding guides per carrier (14) and `iphone-y-android` |
+| `/herramientas`, `/herramientas/*` | Free tools: lost-calls calculator, phone script, voicemail messages, reminder templates, cancellation policy |
+| `/integraciones`, `/integraciones/*` | Google Calendar, Outlook, iCloud, WhatsApp |
+| `/guias/ley-y-recepcionista-de-ia`, `/glosario`, `/novedades`, `/prensa`, `/sobre-alhabla` | Legal guide, glossary, monthly changelog, press kit, about |
+| `/contacto` | «Hablar con nosotros» form (`POST /contacto`) |
+| `/llms.txt`, `/preview` | Summary for AI crawlers; Keystatic's preview redirect (`?branch=&to=`, internal destinations only) |
 
 Both legal pages (now in `web/`) identify the owner with real data (filled in `048270b` and
 `97038ed`); no `LegalTodo` marker is left. If a legal page ever needs data that only a human can
 supply, mark it with `LegalTodo` instead of inventing it.
 
-Every indexable page of the public site has its own `opengraph-image.tsx` (home, the five niches,
-`/planes`, `/blog`, each article and both legal pages; the city pages reuse their niche's), and all
+Every indexable page of the public site has its own `opengraph-image.tsx` (home, the eight sectors,
+the language pages, `/planes`, `/blog` and each article, the comparisons, guides, tools,
+integrations, carrier pages and both legal pages; the city pages they had are gone), and all
 of them render the shared template `imagenOg()` from `web/src/lib/og/plantilla.tsx` (`next/og`,
 Geist, the real isotipo; sector photos come from `public/heroes/`). There is no static OG asset:
 a page's texts live in its own file, the layout in the template. `web/next.config.mjs` adds those
@@ -176,7 +201,7 @@ each page's image explicitly from its `openGraph`/`twitter` metadata.
 - **BusinessProvider** context exposes `business`, `isLoadingBusiness`, `hasToken`, `isError`.
 - **Auth token** stored in `localStorage` as `alhabla_token` (legacy keys `token`, `jwt` also checked).
 - **Pending plan** stored in `localStorage` as `alhabla_pending_plan` for post-registration checkout flow.
-- **ROI context** stored in `localStorage` + `sessionStorage` with 1-hour TTL for calculator → pricing continuity.
+- **ROI context** (histórico, hasta el 2026-10-30): `roi-context.ts` kept the calculator → pricing estimate in `localStorage` + `sessionStorage` with a 1-hour TTL. It went away with the landing calculator; nothing stores a ROI estimate any more.
 
 ### Key Components
 
@@ -250,9 +275,8 @@ each page's image explicitly from its `openGraph`/`twitter` metadata.
   the old landing calculator through `roi-context.ts` were removed on 2026-10-30: nothing wrote
   that estimate any more; the lost-calls calculator lives in `components/herramientas/`.) Each card's
   button (`PlanSelectionLink`) jumps to the app's `/elegir-plan?plan=&niche=`: the web cannot see
-  the session, so the app decides between checkout and registration. Since the landing
-  calculator went away (2026-10-29) nothing calls `activateRoiContext`: the ROI copy only shows an
-  estimate saved before, and the tools calculator does not feed it.
+  the session, so the app decides between checkout and registration. There is no ROI copy left
+  (`activateRoiContext` and `roi-context.ts` are gone), and the tools calculator feeds nothing here.
 - `DemoVoiceCall` — Real voice demo over **Telnyx WebRTC** (`@telnyx/webrtc`, loaded with a dynamic
   `import()` so it stays out of the landing bundle) with live transcription from the
   `telnyx.ai.conversation` events. The browser asks the backend which assistant to call via
@@ -287,23 +311,27 @@ each page's image explicitly from its `openGraph`/`twitter` metadata.
 
 **App (`frontend/src/components/`):**
 
-- `AppShell` — Protected layout: sidebar from `lg` (Panel, Agenda, Llamadas, Agente, Asistente,
-  Ajustes, Facturación). Below `lg` it is the mobile app (since 2026-10-02): no global header,
+- `AppShell` — Protected layout: sidebar from `lg` (`components/escritorio/barra-lateral.tsx`,
+  items in `navegacion.ts`: Panel, Agenda, Llamadas, Agente, Gestor — `/asistente` —, Ajustes,
+  Facturación). Below `lg` it is the mobile app (since 2026-10-02): no global header,
   a five-tab bottom bar (Inicio, Agenda, Llamadas, Agente, Cuenta — `components/movil/`) shown
   only on those five routes; the Cuenta tab (`/ajustes` on mobile) holds the Gestor, settings,
   billing, the privacy link to the web (`webUrl()`), cookie preferences and logout. Each screen
   brings its own `CabeceraMovil`; agent settings are routes (`/agente/[ajuste]`, redirected back
-  to `/agente?section=` on desktop). Mobile vs desktop trees are chosen with `useEsMovil()`
+  to `/agente?ajuste=` on desktop; `?section=` is still read there too). Mobile vs desktop trees are chosen with `useEsMovil()`
   (`hooks/use-es-movil.ts`, `null` until hydrated). Account screens
   (`/login`, `/bienvenida/*`, `/auth/*`, `/elegir-plan`, `/dev/entrar`…) render without it
   (`esRutaSinArmazon`).
-- `PanelInicio` — Dashboard at `/`: `StatusStrip`, `CallForwardingCard`, `PendingBookings`,
-  `OnboardingChecklist`, `WeeklySummary`, `UpcomingBookings` (the next 7 days of `Booking`s, not
-  raw calendar events; refreshes every 5 min) and `RecentCalls`.
+- `PanelInicio` — Dashboard at `/`: picks `InicioMovil` (`components/movil/inicio-movil.tsx`,
+  below `lg`) or `PanelEscritorio` (`components/escritorio/panel-escritorio.tsx`, desktop
+  redesign: the day's column, upcoming `Booking`s from `/business/me/agenda`, recent calls,
+  stats, `CallForwardingCard`/`TarjetaDeDesvio` and `DatosPorCompletar`) with `useEsMovil()`.
+  (Histórico, antes del rediseño: `StatusStrip`, `PendingBookings`, `OnboardingChecklist`,
+  `WeeklySummary`, `UpcomingBookings` and `RecentCalls`; those components no longer exist.)
 - `BusinessHoursEditor` — Weekly schedule editor (up to 3 intervals per day), in `/agente`.
-- `AgentSettingsEditor` — Tone, goal, response style, escalation strategy, «Dar precios», voice
-  gender and languages, in `/agente` (today `ComportamientoMovil`, «Cómo atiende», on mobile and
-  desktop).
+- `ComportamientoMovil` («Cómo atiende», `components/movil/agente/comportamiento-movil.tsx`) —
+  Tone, goal, response style, escalation strategy, «Dar precios», voice gender and languages, in
+  `/agente` on mobile and desktop. It replaced `AgentSettingsEditor`, which no longer exists.
 - `CallForwardingCard`, `TarjetasDeLinea`, `AjustesTelefono`, `PasarLlamadas`, `WhatsappDueno` —
   Customer line, forwarding, main number and the owner's mobile (see § Telefonía).
 - `ajustes/` — `MarcoDeAjustes` (header, tabs and shared data) and one `seccion-*` per tab:
@@ -312,7 +340,7 @@ each page's image explicitly from its `openGraph`/`twitter` metadata.
   WhatsApp.
 
 **Copied into both projects**, byte for byte: `brand-mark`, `brand-icons`, `beta-pill`,
-`back-link`, `google-analytics`, `google-auth-button`, `particle-field`, `particle-mouse-layer`,
+`facebook-auth-button`, `google-analytics`, `google-auth-button`, `particle-field`, `particle-mouse-layer`,
 `range-slider`, `hooks/use-focus-trap.ts` and `lib/plans.ts`. Change one, copy the file to the
 other: anything that differs between app and site goes in via props. The list lives in
 `scripts/comprobar-copias-compartidas.sh` and CI (job «Copias compartidas app/web») fails if a
@@ -360,11 +388,18 @@ the content: each project keeps what it needs.
   content lives in `web/src/lib/niche-landings.ts`.
 - Smaller helpers: `agent-configuration.ts` (`/agente` setup steps), `plan-limit.ts`,
   `eleccion-de-plan.ts` (`/elegir-plan`), `registration-next-step.ts`, `login-next.ts`.
+- Desktop redesign and dark mode: `tema.ts` / `tema-inicial.ts` (theme: system default, choice
+  saved under `alhabla:tema`, applied by an inline script in `<head>` before React so there is no
+  flash), `fechas-negocio.ts` (dates in the business's time zone, days as `AAAA-MM-DD` keys),
+  `agenda-escritorio.ts`, `filtros-de-llamadas.ts`, `llamadas.ts` (`momentoDeActividad`),
+  `horario.ts`, `ausencias.ts`, `suscripcion.ts`, `analitica.ts`, `desvio-por-operador.ts`,
+  `datos-por-completar.ts`, `agent-settings.ts`.
 
 **Public site (`web/src/lib/`):**
 
 - `api.ts` — Axios client **without** a token interceptor (the web never has a session):
-  `registerAccount` (returns the one-time `pase`), `getGoogleAuthUrl` and the demo wrappers
+  `registerAccount` (returns the one-time `pase`), `getGoogleAuthUrl`, `getFacebookAuthUrl`,
+  `getCupoDeFundador` (`GET /billing/fundadores`), `enviarContacto` (`POST /contacto`) and the demo wrappers
   (`createDemoWebCall`, `searchDemoPlaces`, `getDemoPlaceDetails`). Same build-time guard on
   `NEXT_PUBLIC_API_BASE_URL`.
 - `app-url.ts` — `appUrl()` (`NEXT_PUBLIC_APP_URL`): every link from the web to the app.
@@ -425,7 +460,7 @@ npm run prisma:generate
 npm run prisma:migrate
 npm run prisma:studio
 
-# Lint / type-check
+# Lint / type-check (both also cover backend/mcp/)
 npm run lint
 npm run typecheck
 
@@ -434,6 +469,11 @@ npm run test          # vitest run
 npm run test:watch    # vitest
 npm run test:coverage # vitest run --coverage
 npm run test:integration  # against real Postgres (backend/.env.test; also runs in CI)
+npm run test:integration:watch
+
+# Alhabla Growth
+npm run growth:conocimiento   # Growth knowledge base (mcp/growth/conocimiento/cli.ts)
+npm run growth:token          # Growth agent token (scripts/growth/crearToken.ts)
 ```
 
 ### Frontend (app) and web
@@ -458,10 +498,24 @@ npm run lint
 npm run test
 ```
 
-> **Never run `npm run build` while `npm run dev` is running.** Both write to `frontend/.next`, and
-> the production build invalidates the dev server's CSS and route manifests — the site keeps
-> returning 200 but renders completely unstyled. Same trap if two dev servers race for port 3001.
-> Recovery: stop the dev server, `rm -rf frontend/.next`, start it again.
+`web/` also has `npm run seo:similitud` (similarity audit of the pages, also run in CI) and
+`npm run seo:indexnow` (pings IndexNow with the production sitemap, after Vercel publishes).
+
+### Growth dashboard
+
+```bash
+cd growth
+npm run dev        # :3003, against the backend (Google sign-in)
+npm run dev:demo   # :3003 with demo data, no backend nor Google (development only)
+# build / start / lint / test as in frontend/
+```
+
+> **Histórico (Next 15):** running `npm run build` while `npm run dev` was running broke the dev
+> server: both wrote to `frontend/.next`, the production build invalidated the dev server's CSS and
+> route manifests, and the site kept returning 200 but rendered completely unstyled. Since Next 16,
+> `next dev` writes to `.next/dev` (seen in `~/.alhabla-dev/{frontend,web}/.next/dev`), so they
+> should no longer collide. Two dev servers racing for port 3001 is still a trap. If a dev server
+> ever renders unstyled, the recovery is the same: stop it, `rm -rf frontend/.next`, start it again.
 
 ### Docker Compose
 
@@ -469,15 +523,16 @@ npm run test
 # Development (backend with tsx watch, cloudflared tunnel, postgres)
 docker compose --profile dev up
 
-# Production (compiled backend only)
+# Production-like (compiled backend; postgres has no profile and always starts)
 docker compose --profile prod up
 ```
 
 - Backend exposed on `localhost:3000`
 - Prisma Studio exposed on `localhost:5555`
+- Postgres is published on `:5432` in `docker-compose.yml`; the main checkout's unversioned `docker-compose.override.yml` moves it to `:5433` (5432 is taken by Homebrew's Postgres), which is what the dev MCP assumes (`backend/mcp/entorno.ts`, `ALHABLA_DEV_DB_PORT` changes it)
 - The app (`localhost:3001`) and the public site (`localhost:3002`) are not in Compose: on the owner's Mac they run from the fixed dev environment (§ Entorno de desarrollo fijo, below); session previews use `:3101`/`:3102`
 - The dev profile adds `cloudflared`, a named Cloudflare tunnel exposing `backend-dev` at `https://dev-api.alhabla.ai` (`CLOUDFLARE_TUNNEL_TOKEN`)
-- The `sim` profile adds `backend-sim` (`localhost:3010`): the same dev backend and database, but trusting a locally generated Ed25519 key (`TELNYX_PUBLIC_KEY_SIMULACION`) instead of Telnyx's. It is the target of the Telnyx webhooks signed by the dev MCP below; `backend-dev` still accepts only real Telnyx signatures. Start it with `scripts/backend-sim.sh` (stop: `scripts/backend-sim.sh parar`), which works the same from the main checkout or a worktree: it links the main `.env`, uses project `asistai` and the override, and `--no-deps` so the running Postgres/Redis are reused. It mounts `backend/` of the checkout it is launched from
+- The `sim` profile adds `backend-sim` (`localhost:3010`): the same dev backend and database, but trusting a locally generated Ed25519 key (`TELNYX_PUBLIC_KEY_SIMULACION`) instead of Telnyx's. It is the target of the Telnyx webhooks signed by the dev MCP below; `backend-dev` still accepts only real Telnyx signatures. Start it with `scripts/backend-sim.sh` (stop: `scripts/backend-sim.sh parar`), which works the same from the main checkout or a worktree: it links the main `.env`, uses project `asistai` and the override, and `--no-deps` so the running Postgres is reused. It mounts `backend/` of the checkout it is launched from
 
 ### Entorno de desarrollo fijo (`scripts/dev/`, desde 2026-10-15)
 
@@ -489,7 +544,7 @@ dos carpetas fijas, worktrees que ninguna sesión edita:
 - **`~/.alhabla-dev`, lo que se enseña:** de ella salen `backend-dev` (Compose, proyecto `asistai`, con
   el `.env` y el override del checkout principal enlazados), la app (`:3001`) y la web (`:3002`). Por
   defecto en `origin/main`; `scripts/dev/entorno.sh ver <rama|main|nº de PR>` la pone en otra rama ya
-  subida a origin.
+  subida a origin, y `entorno.sh estado` dice qué enseña, con qué herramientas y qué responde.
 - **`~/.alhabla-mcp`, las herramientas, siempre en `main`:** el MCP `alhabla-dev`, `scripts/dev/` y el
   panel. Así el arranque y el panel funcionan aunque la rama que se enseña sea anterior a ellos.
 
@@ -533,7 +588,9 @@ Para probar cambios de estos scripts antes de fusionarlos: un worktree de la ram
     `promptManuallyEdited` y llama a `syncAgentToTelnyx`). En dev, por `llamarApiDeDev`; en
     producción, a `api.alhabla.ai` con un JWT de 2 min firmado con el `JWT_SECRET` de Secret Manager,
     y solo escribiendo el id del objetivo. Una cuenta sin usuario no se puede editar (409).
-  - **Fantasmas**: la cuenta de Telnyx es UNA para dev y producción (comprobado el 30-10), así que se
+  - **Fantasmas**: la cuenta de Telnyx es UNA para dev y producción (comprobado el 30-10; la
+    separación en dos cuentas está en curso, issue #400, y cuando dev tenga la suya este cruce tendrá
+    que leer cada cuenta con su clave), así que se
     cruza la lista de la cuenta (`listAssistants`/`listNumbers`, nuevos en los adaptadores) con las
     DOS BD, los `*_ASSISTANT_ID` y números del `.env` y de Cloud Run, el WABA y las etiquetas
     `whatsapp*` de Telnyx (los WhatsApp de sector en reserva no tienen fila en ninguna BD). Un
@@ -542,8 +599,10 @@ Para probar cambios de estos scripts antes de fusionarlos: un worktree de la ram
     y se usa la secuencia de la baja de cuenta (`releaseNumber`, o `deleteAssistant` y su app TeXML).
     Un fantasma puede ser de un PR abierto (p. ej. #325 y `demo-brain-to-train`): mira antes los PR.
   - **Números de una cuenta** (desde el 30-10). Cada cuenta tiene un solo número de voz.
-    «Pedir número nuevo» va por la ruta de la app (`POST /business/me/phone/provision`, como el
-    dueño): misma compra que en el alta, 402 sin suscripción activa o en prueba, 1 $ + 1 $/mes, y
+    «Pedir número nuevo» va por la ruta de la app, como el dueño (`backend/mcp/inventario.ts` pide
+    `POST /business/me/phone/provision`, pero la ruta real del backend es
+    `POST /phone/business/me/phone/provision`, ver la fila `phone` de la tabla de módulos: pendiente
+    de comprobar si el botón da 404): misma compra que en el alta, 402 sin suscripción activa o en prueba, 1 $ + 1 $/mes, y
     siempre con el id de la cuenta escrito. «Asignar número» da a la cuenta un número fantasma (el
     cruce de arriba, con las dos BD) por `POST /internal/panel/asignar-numero`
     (`asignarNumeroExistente` en `modules/phone/service.ts`: mismo cerrojo que la compra, comprueba
@@ -563,7 +622,7 @@ Para probar cambios de estos scripts antes de fusionarlos: un worktree de la ram
   - Cada escritura, también las rechazadas, va a `~/Library/Logs/alhabla-dev/inventario.log` (el
     prompt, solo su tamaño).
 - **Vistas previas de las sesiones** (`.claude/launch.json`): `:3101` (app) y `:3102` (web), contra
-  el backend fijo; el login con Google no funciona ahí (sus URIs de redirección son las de `:3001`).
+  el backend fijo, y `growth-dev` en `:3103` (Growth en modo demostración, sin backend ni Google); el login con Google no funciona ahí (sus URIs de redirección son las de `:3001`).
   `panel-dev` levanta el panel de la rama en `:3105` (el fijo de `:3005` no se toca).
 - **MCP:** `estado_dev` y `ver_en_dev` hacen lo mismo que el panel desde una sesión, sin `git` fuera
   de su worktree.
@@ -587,6 +646,7 @@ checkout PRINCIPAL aunque se lance desde un worktree (`git rev-parse --git-commo
 | `simular_webhook_telnyx` | POST firmado Ed25519 a `/webhooks/telnyx…` de `backend-sim` (:3010). Con `businessId` crea una fila de `calls` NUEVA (`sim-mcp-<uuid>`) y pone `x-alhabla-call-control-id`; para seguir la misma conversación se pasa su `callControlId` (una cita por llamada: `bookings.callId` es único) | Solo localhost y la ruta YA RESUELTA dentro de `/webhooks/telnyx` (un `../` no sale); firma con `TELNYX_PRIVATE_KEY_SIMULACION`, que ningún otro backend acepta |
 | `simular_conversacion` | Varios pasos seguidos sobre la MISMA llamada simulada (canal `voz`) o del Gestor (canal `gestor`: `/webhooks/telnyx/gestor/<tool>` con `x-alhabla-business` y `x-alhabla-role: owner`). `{{nombre}}` en un cuerpo toma el último valor con ese nombre que devolvió un paso anterior (`{{availabilityToken}}`, `{{bookingId}}`); un `book_appointment` sin token ni `startDateTime` toma el del último `check_availability`. Devuelve cada paso, las citas y reservas pendientes que dejó la llamada y los envíos simulados (`mcp/conversacionSimulada.ts`) | Las de `simular_webhook_telnyx`; máximo 20 pasos |
 | `backend_sim` | De qué carpeta, rama y commit corre backend-sim y cuántos commits de backend va por detrás de `main`; `levantar` sin rama lo pone en el último main (las herramientas, actualizadas antes) y con rama o nº de PR en `~/.alhabla-sim` (worktree detached solo para él, sin `node_modules`: usa los de la imagen); `reiniciar` (schema nuevo), `reconstruir` (dependencias nuevas; `levantar` lo hace solo si cambia el lock) y `parar`. Al levantar aplica las migraciones de ese código a la BD de dev (`mcp/backendSim.ts`) | Solo ramas ya subidas a origin; no toca `~/.alhabla-sim` si tiene cambios a mano |
+| `ver_envios_simulados` | Los WhatsApp, SMS y correos que `backend-sim` NO envió (`ENVIOS_SIMULADOS=1`) y solo registró en su log: canal, destino y detalle, para comprobar que una tool simulada avisó a quien tocaba. Filtros `desde` (`30m` por defecto), `canal`, `destino` y `limite`; lee `docker logs` de `alhabla_backend_sim` | Solo lectura |
 | `borrar_llamadas_simuladas` | Borra las `sim-mcp-…` (de un negocio o de todas) para que no salgan en el historial del panel | Conserva y devuelve las que tienen una cita viva con evento en el calendario: borrarla dejaría el evento huérfano |
 | `describir_tabla` | Tablas de dev o prod con su modelo de Prisma y filas aproximadas; con `tabla` (nombre real o modelo: `Booking`), columnas con tipo/NULL/defecto, índices y claves foráneas (`mcp/esquema.ts`) | Las mismas que `consultar_bd_*`; en prod, consultas una tras otra (el rol de lectura admite 2 conexiones) |
 | `ver_logs_prod` | Cloud Logging de `alhabla-api` en orden: busca a la vez en `textPayload` (`console.*`) y `jsonPayload.msg`/`err.message` (Fastify), quita «incoming request»/«request completed»; `soloErrores` mira stderr y el nivel de pino (`console.error` no trae `severity`). Devuelve el filtro usado (`mcp/logsDeProd.ts`) | Solo lectura con las credenciales de gcloud del Mac; fechas validadas antes de entrar al filtro y textos escapados |
@@ -648,25 +708,29 @@ Copy `.env.example` to `.env` and fill in all required secrets. Key groups:
 | **Google Calendar OAuth** | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI` |
 | **Outlook Calendar OAuth** | `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET`, `MICROSOFT_REDIRECT_URI` |
 | **Google Login OAuth** | `GOOGLE_AUTH_CLIENT_ID`, `GOOGLE_AUTH_CLIENT_SECRET`, `GOOGLE_AUTH_REDIRECT_URI` |
+| **Facebook Login** | `FACEBOOK_LOGIN_APP_ID`, `FACEBOOK_LOGIN_APP_SECRET`, `FACEBOOK_LOGIN_REDIRECT_URI` |
+| **Growth** | `GROWTH_ADMIN_EMAILS`, `GROWTH_GOOGLE_CLIENT_ID` (backend; without them admin requests are rejected). `GROWTH_API_URL`, `GROWTH_AGENT_TOKEN`, `GROWTH_CONOCIMIENTO_TOKEN` are for the Mac's Growth tools only (MCP `alhabla-growth`), not the backend nor `docker-compose.yml` |
 | **Google Places** | `GOOGLE_PLACES_API_KEY` |
 | **R2 / S3** | `R2_ACCESS_KEY`, `R2_SECRET_KEY`, `R2_BUCKET`, `R2_REGION`, `R2_ENDPOINT` |
 | **Telnyx** | `TELNYX_API_KEY`, `TELNYX_PUBLIC_KEY` (Ed25519 webhook verification), `TELNYX_CALL_CONTROL_APP_ID` (the `connection_id` of every number), `TELNYX_SPAIN_REQUIREMENT_GROUP_ID`, `TELNYX_SPAIN_LOCALITY`, `PHONE_NUMBER_COUNTRY`, `TELNYX_ALERT_EMAIL`, `TELNYX_INSIGHT_*_ID` |
 | **SMS / WhatsApp** | `TELNYX_SMS_SENDER_ID`, `TELNYX_MESSAGING_PROFILE_ID`, `WHATSAPP_TELNYX_FROM_NUMBER`, `WHATSAPP_WABA_ID`, `WHATSAPP_TEMPLATE_*`, `TELNYX_CLIENT_CHAT_ENABLED`, `TELNYX_OWNER_CHAT_ENABLED`, `TELNYX_GESTOR_ASSISTANT_ID` |
 | **Email (Zoho)** | `ZOHO_CLIENT_ID`, `ZOHO_CLIENT_SECRET`, `ZOHO_REFRESH_TOKEN`, `ZOHO_ACCOUNT_ID`, `ZOHO_DEV_ALLOWED_RECIPIENTS` |
-| **Cloud Tasks** | `GCP_PROJECT_ID`, `GCP_REGION`, `INTERNAL_JOBS_BASE_URL`, `CLOUD_TASKS_INVOKER_SERVICE_ACCOUNT` (production only; jobs run inline elsewhere) |
+| **Cloud Tasks** | `GCP_PROJECT_ID`, `GCP_REGION`, `INTERNAL_JOBS_BASE_URL`, `CLOUD_TASKS_INVOKER_SERVICE_ACCOUNT` (production only; jobs run inline elsewhere), `PANEL_INVOKER_SERVICE_ACCOUNT` (the dev panel's `/internal/panel/*`, § Entorno de desarrollo fijo) |
 | **Recordings** | `RECORDING_RETENTION_DAYS`, `CALL_TEXT_RETENTION_DAYS` |
 | **Bootstrap** | `FIRST_USER_BOOTSTRAP_SECRET` (`POST /auth/register-first-user`) |
-| **Server** | `APP_URL` (la app, app.alhabla.ai), `WEB_URL` (la web de marketing, alhabla.ai), `FRONTEND_URL` (respaldo de las dos), `BASE_URL` (URL pública para webhooks), `GROWTH_URL` (el dashboard de Growth, def. `http://localhost:3003`), `EXTRA_ALLOWED_ORIGIN`, `PORT`, `HOST`, `NODE_ENV`, `LOG_LEVEL` — ver `lib/urls.ts` |
+| **Server** | `APP_URL` (la app, app.alhabla.ai), `WEB_URL` (la web de marketing, alhabla.ai), `FRONTEND_URL` (respaldo de las dos), `BASE_URL` (URL pública para webhooks), `GROWTH_URL` (el dashboard de Growth, def. `http://localhost:3003`), `EXTRA_ALLOWED_ORIGIN`, `PORT`, `HOST`, `NODE_ENV`, `LOG_LEVEL` — ver `lib/urls.ts`; `TRUST_PROXY_HOPS` (saltos de proxy de confianza para la IP del cliente, entero 0–5, `lib/proxyDeConfianza.ts`) |
 | **Calendario** | `CALENDAR_CREDENTIALS_KEY` (obligatoria; cifrado en reposo de `calendar_connections.credentials`) |
+| **Dev / simulación** | `ENVIOS_SIMULADOS` (se ignora en producción), `TELNYX_PUBLIC_KEY_SIMULACION` / `TELNYX_PRIVATE_KEY_SIMULACION` (backend-sim y el MCP de dev), `CLOUDFLARE_TUNNEL_TOKEN` (cloudflared) |
+| **Webs (Vercel / `next dev`)** | Not in `.env.example`; only `NEXT_PUBLIC_*` plus Keystatic. App: `NEXT_PUBLIC_API_BASE_URL`, `NEXT_PUBLIC_WEB_URL`, `NEXT_PUBLIC_SITE_URL`, `NEXT_PUBLIC_GA_MEASUREMENT_ID`, `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`, `NEXT_PUBLIC_DEV_RAMA`/`_DEV_COMMIT`/`_DEV_PANEL_URL` (set by `servir.sh` only). Web: `NEXT_PUBLIC_API_BASE_URL`, `NEXT_PUBLIC_APP_URL`, `NEXT_PUBLIC_SITE_URL`, `NEXT_PUBLIC_GA_MEASUREMENT_ID`, `KEYSTATIC_GITHUB_CLIENT_ID`, `KEYSTATIC_GITHUB_CLIENT_SECRET`, `KEYSTATIC_SECRET`. Growth: `NEXT_PUBLIC_API_BASE_URL`, `NEXT_PUBLIC_GROWTH_GOOGLE_CLIENT_ID`, `NEXT_PUBLIC_GROWTH_DEMO` |
 
 ## Authentication & Authorization
 
 The backend uses a custom JWT scheme:
 
-1. On login / Google OAuth, the server issues a JWT signed with `JWT_SECRET` (7-day expiry).
+1. On login, Google or Facebook OAuth, registration or pass redemption (`/auth/pase/canjear`), the server issues a JWT signed with `JWT_SECRET` (7-day expiry).
 2. The frontend stores the token in `localStorage` under key `alhabla_token` (legacy keys `token` and `jwt` are also checked).
 3. The token is sent as `Authorization: Bearer <token>`.
-4. The `authPlugin` (`backend/src/plugins/auth.ts`) decodes it with `jsonwebtoken` and decorates `request.user` with `{ id, businessId }`.
+4. The `authPlugin` (`backend/src/plugins/auth.ts`) decodes it with `jsonwebtoken`, checks its `tv` against `User.tokenVersion` (30 s in-process cache; fails closed) and decorates `request.user` with `{ id, businessId }`.
 5. Routes that need auth use `onRequest: fastify.authenticate` or `preValidation: [fastify.authenticate]` in their route options.
 
 All business-scoped data is filtered by `businessId` from the token. Never trust a `businessId` coming from the request body for read/write operations — always use `request.user.businessId`.
@@ -679,44 +743,60 @@ All business-scoped data is filtered by `businessId` from the token. Never trust
   `${APP_URL}/restablecer-contrasena?token=` is emailed through the `send-email` job from
   `support@`. Google-only accounts (no password) can use it too — receiving the mail proves
   ownership, same as setting a password from `/ajustes`. Rate limit: 5/min.
-- `POST /auth/reset-password` `{ token, password }` — consumes the hash with `GETDEL` (single use),
-  applies the same password rules as `/auth/change-password`, hashes with bcrypt(12), sends the
+- `POST /auth/reset-password` `{ token, password }` — consumes the hash with `consumirClave` (read
+  and delete in one statement; single use), rejects the link if the user's `tokenVersion` changed
+  since it was issued, bumps `tokenVersion` (every earlier session dies), applies the same password rules as `/auth/change-password`, hashes with bcrypt(12), sends the
   "password changed" confirmation and returns a JWT so the frontend signs the user in directly.
   Invalid/expired token → `400` "El enlace no es válido o ha caducado. Pide uno nuevo.".
 - Logic lives in `backend/src/modules/auth/passwordResetService.ts`; no Prisma model is involved.
 
 ### Google OAuth Flow (Auth)
 
-- `GET /auth/google` generates an OAuth URL with `select_account` prompt and stores `state` in the temporary store (`claves_temporales`, 10 min TTL).
-- `GET /auth/google/callback` validates and consumes `state` (read and delete in one statement), exchanges `code` for tokens, verifies ID token, creates/links user, stores JWT in a **HttpOnly session cookie**, and redirects to frontend.
+- `GET /auth/google` generates an OAuth URL with `select_account` prompt, stores `state` in the temporary store (`claves_temporales`, `auth:google:state:*`, 10 min TTL) and sets the `alhabla_google_oauth_state` cookie, which the callback requires to match (login CSRF: someone else's valid `state` is useless in your browser). `?acceptedTerms` and `?intent=register` let the same button create an account.
+- `GET /auth/google/callback` validates and consumes `state` (read and delete in one statement), exchanges `code` for tokens, verifies ID token, creates/links user, stores the JWT in the temporary store under a random session id (`auth:google:session:<id>`, 60 s, tied to the business), puts that id — not the JWT — in a **HttpOnly session cookie**, and redirects to the app's `/auth/google/callback` (`?alta=1` for a new account; `?error=` with `account_not_found`, `terms_required`, `unverified_email` or `authentication_failed`).
 - `POST /auth/google/session` reads the session cookie, retrieves the JWT from the temporary store (atomic read+delete, 60 s TTL, tied to the business), clears the cookie, and returns the token to the frontend.
+
+### Facebook Login (Auth)
+
+- Same three steps as Google: `GET /auth/facebook` (scope `email,public_profile`, state `auth:facebook:state:*` plus the `alhabla_facebook_oauth_state` cookie), `GET /auth/facebook/callback` (reads `id,email` from the Graph API; `?error=no_email` when Facebook gives no confirmed email) and `POST /auth/facebook/session` (`auth:facebook:session:*`, 60 s). The app's landing page is `/auth/facebook/callback`; `facebook-auth-button.tsx` is one of the files copied into both webs. Variables `FACEBOOK_LOGIN_*`; rate limit 10/min, like Google.
 
 ## Request Validation & Error Handling
 
 - **Validation:** Use `zod` schemas for route bodies and params. Return `400` with `error.errors` on `ZodError`.
-- **Global error handler** (`server.ts`): Normalizes all errors to `{ statusCode, error, message }`. Handles both `Error` instances and plain error objects (e.g. rate-limit errors from `@fastify/rate-limit`). Logs full error details with Pino. Returns generic "Internal server error" for 5xx to avoid leaking internals.
-- **Rate limiting:** Default 100 req/min per IP, with a counter global across Cloud Run instances (since 2026-09-17; in Redis until PR A, now in the UNLOGGED Postgres table `contadores`, `lib/limitesDePeticiones.ts`: if Postgres fails or is slow each instance decides with its local count, never a 500 — see § Corte de Redis a Postgres). The Telnyx webhook endpoints override to 300 req/min. Auth endpoints have stricter limits (`backend/src/modules/auth/routes.ts`): 10/min (`strictRateLimit`: `/login`, the three `/google*` routes and `GET /account`) and 5/min (`veryStrictRateLimit`: `/register`, `/pase/canjear`, `/forgot-password`, `/reset-password`, `/change-password`, `DELETE /account`, `/register-first-user`). **Pase de un solo uso** (docs/historico/PLAN-APP-DOMINIO.md § 3, fase 0, 2026-09-21): `POST /auth/register` devuelve además `pase` (64 hex, `auth:pase:<código>` en Redis, 60 s, best-effort) y `POST /auth/pase/canjear { pase }` lo cambia por el JWT una sola vez (`getdel`; 401 `PASE_INVALIDO` si no existe o ya se usó, 400 si el formato no es el esperado). Es el puente entre el registro en la web de marketing y la sesión en la app (`lib/urls.ts`, `modules/auth/pase.ts`). Places endpoints use 20/min; `POST /contacto`, 5 per 10 min. **`/internal/jobs/*` are exempt** (`config.rateLimit: false` on every route): Cloud Tasks/Scheduler call from a handful of Google IPs and are already OIDC-authenticated — with the limit made real, draining a queue produced 293 × 429 in three minutes, and a burst of weekly-summary emails would have exhausted Cloud Tasks retries on legitimate sends.
+- **Global error handler** (`server.ts`): An uncaught `ZodError` becomes `400 { error: error.errors }` there too, so a parse outside the route's own try/catch no longer ends as a generic 500. Everything else is normalized to `{ statusCode, error, message }`. Handles both `Error` instances and plain error objects (e.g. rate-limit errors from `@fastify/rate-limit`). Logs full error details with Pino. Returns generic "Internal server error" for 5xx to avoid leaking internals.
+- **Rate limiting:** Default 100 req/min per IP, with a counter global across Cloud Run instances (since 2026-09-17; in Redis until PR A, now in the UNLOGGED Postgres table `contadores`, `lib/limitesDePeticiones.ts`: if Postgres fails or is slow each instance decides with its local count, never a 500 — see § Corte de Redis a Postgres). The Telnyx webhook endpoints override to 300 req/min. Auth endpoints have stricter limits (`backend/src/modules/auth/routes.ts`): 10/min (`strictRateLimit`: `/login`, the three `/google*` routes, the three `/facebook*` routes and `GET /account`) and 5/min (`veryStrictRateLimit`: `/register`, `/pase/canjear`, `/forgot-password`, `/reset-password`, `/change-password`, `DELETE /account`, `/register-first-user`). **Pase de un solo uso** (docs/historico/PLAN-APP-DOMINIO.md § 3, fase 0, 2026-09-21): `POST /auth/register` devuelve además `pase` (64 hex, `auth:pase:<código>` en el almacén temporal de Postgres, `claves_temporales` — en Redis hasta el corte de octubre —, 60 s, best-effort) y `POST /auth/pase/canjear { pase }` lo cambia por el JWT una sola vez (`consumirClave`: lectura y borrado en una sola sentencia; 401 `PASE_INVALIDO` si no existe o ya se usó, 400 si el formato no es el esperado). Es el puente entre el registro en la web de marketing y la sesión en la app (`lib/urls.ts`, `modules/auth/pase.ts`). Places endpoints use 20/min; `POST /contacto`, 5 per 10 min. **`/internal/jobs/*` are exempt** (`config.rateLimit: false` on every route): Cloud Tasks/Scheduler call from a handful of Google IPs and are already OIDC-authenticated — with the limit made real, draining a queue produced 293 × 429 in three minutes, and a burst of weekly-summary emails would have exhausted Cloud Tasks retries on legitimate sends.
 
 ## Database (Prisma)
 
 The schema lives in `backend/prisma/schema.prisma`. Key models:
 
-- `Business` — tenant root; holds Stripe billing state, calendar tokens (encrypted), schedule JSON, agent settings, booking capacity, and optional booking restrictions `minAdvanceBookingMinutes` / `maxAppointmentDurationMinutes` (both nullable = no restriction; stated in the prompt and enforced by `check_availability` and `book_appointment`, see Business Schedule and Agent Configuration).
+- `Business` — tenant root; holds Stripe billing state, `calendarProvider` (pointer to the active calendar provider; the encrypted credentials live in `CalendarConnection`, one row per provider, since 2026-09-18), `modoDeAgenda` (`sin_elegir | alhabla | externo`, see `lib/modoDeAgenda.ts`) and the iCal feed token `icalToken`, schedule JSON, agent settings, booking capacity, and optional booking restrictions `minAdvanceBookingMinutes` / `maxAppointmentDurationMinutes` (both nullable = no restriction; stated in the prompt and enforced by `check_availability` and `book_appointment`, see Business Schedule and Agent Configuration).
 - `User` — belongs to a Business; supports password (bcrypt) + Google OAuth login (`googleId`).
 - `Agent` — voice agent config; `telnyxAssistantId` links it to its Telnyx assistant (with `telnyxSyncedAt`/`telnyxSyncError`/`telnyxConfigHash`). Includes voice/LLM/STT provider configs (legacy fields still written by `buildAgentPersistencePayload` and `PATCH /agents/:id` and returned by the API; the Telnyx path does not read them), integrations.
 - `Call` — a phone call (Telnyx; the WhatsApp chats keep a synthetic `Call` with `voiceProvider = "whatsapp"`). `voiceProvider` defaults to `"telnyx"` since migration `20261017180000_defaults_de_voz_telnyx` (every `create` passes it anyway). Status enum: `INITIATED`, `IN_PROGRESS`, `COMPLETED`, `FAILED`, `TIMED_OUT`. Outcome enum: `RESOLVED`, `FRUSTRATED`, `NO_ANSWER`, `ESCALATED`, `LEAD_CAPTURED` — set from the Telnyx conversation insights (`call.conversation_insights.generated`, see § Voice Orchestrator) and from the receptionist's final report (`informar_al_negocio`, `modules/whatsapp/recados.ts`, which only fills what the insights left empty). The other analysis fields: `escalationReason` (enum `CallEscalationReason`) and `toolFailureDetected` (insights and report) and `requestedService` (report only).
-- `Booking` — outcome extracted from a call; stores `professionalId`, `serviceIds` (array — since 2026-09-05 a booking can cover several services, e.g. "corte y mechas") and `durationMinutes` to track who performs the appointment and how long it lasts. `professionalId`/`serviceIds` supplied by the LLM are verified to belong to the business before being trusted (`voiceTools/service.ts`) — they are not enforced at the DB/FK level.
+- `Booking` — outcome extracted from a call; stores `professionalId`, `serviceIds` (array — since 2026-09-05 a booking can cover several services, e.g. "corte y mechas") and `durationMinutes` to track who performs the appointment and how long it lasts. `professionalId`/`serviceIds` supplied by the LLM are verified to belong to the business before being trusted (`voiceTools/service.ts`) — they are not enforced at the DB/FK level. Also `isCancelled`/`cancelledAt`/`cancelledBy`, `createdVia` (voice, `client_chat`, `owner_chat`, `whatsapp_lista_espera`…), `confirmedByClientAt`, `clientNotifiedAt` and `rescheduledToId` — see § WhatsApp below.
 - `Transcript` / `Recording` — call artifacts. Recording has `storageKey` and `storageUrl` for R2, `providerLegId` (Telnyx `call_leg_id`, to request a fresh download URL once the 10-minute webhook one expires) and `processingFailedAt`/`processingError` (declared unrecoverable; `retry-stuck-recordings` leaves it alone).
-- `Lead` — structured lead data captured during a call. `type: "pending_booking"` rows are created by `voiceTools/service.ts` when `book_appointment` fails, holding the attempted booking payload so it's never lost; `resolvedAt` is set once `jobs/retryFailedBooking.ts` confirms the booking in the background (still `null` if retries are exhausted or the failure needs a manual calendar reconnect).
+- `Lead` — structured lead data captured during a call. `type: "pending_booking"` rows are created by `voiceTools/service.ts` when `book_appointment` fails, holding the attempted booking payload so it's never lost; `resolvedAt` is set once `jobs/retryFailedBooking.ts` confirms the booking in the background (still `null` if retries are exhausted or the failure needs a manual calendar reconnect). `notifiedAt`/`notifiedVia` record the notice to the owner and `snoozedUntil` the «Recuérdamelo mañana» of a message; how a lead was resolved goes in `data.resolvedBy` (JSON, not a column — the `resolvedBy: …` mentions in § WhatsApp refer to that key).
 - `Service` / `Professional` / `ProfessionalService` — booking catalog (many-to-many between professionals and services). `Service.priceCents` is optional: a business may work without a published tariff, and the dashboard only estimates revenue for bookings whose services all have a price. `Service` and `Professional` use `deletedAt` plus `active: false` for logical deletion; their `ProfessionalService` rows are auxiliary and may be deleted physically when an assignment or resource is retired.
 - `OnboardingState` — per-business onboarding state. Tracks `dismissedAt`, `completedAt`, `forwardingConfirmedAt` and optional step metadata. The actual step completion is computed live from `Business.schedule`, `Service`, `Professional`, calendar connection state and call history (see Onboarding Flow).
 - `StripeWebhookEvent` — idempotency guard for Stripe webhooks.
+- `CalendarConnection` — one row per business and calendar provider (`google | outlook | caldav`), encrypted credentials (`lib/cifradoDeCredenciales.ts`); see § `CalendarConnection` below.
+- `VoiceWebhookEvent` — idempotency of Telnyx webhooks (`/webhooks/telnyx`, voice and WhatsApp).
+- `SentMessage` — every email/SMS/WhatsApp claimed before sending (`lib/messageIdempotency.ts`); for WhatsApp also delivery status, cost and correlation.
+- `WhatsappSender`, `WhatsappTemplate`, `InboundMessage`, `WhatsappOptOut`, `ClientConversation`, `OwnerPendingAction`, `OwnerChatFeedback` — the WhatsApp channel, see § WhatsApp below.
+- `ProfessionalAbsence` — absences of a professional (they occupy that person's slots, they do not reduce capacity).
+- `ClienteDelNegocio` — a client within a business (recording consent).
+- `BillingUsagePeriod` / `BillingUsageReport` — metered minutes.
+- `Cerrojo`, `ClaveTemporal`, `Contador` — temporary state in Postgres since 2026-10-19 (`lib/cerrojos.ts`, `lib/almacenTemporal.ts`, `lib/limitesDePeticiones.ts`); see § Corte de Redis a Postgres.
+- `Growth*` — Alhabla Growth, not tenant-scoped; see § Alhabla Growth.
 
 #### WhatsApp (Telnyx como BSP de Meta)
 
 Referencia de lo verificado contra la cuenta real el 2026-09-19 (fase 0 de
-`PLAN-CANAL-DUENO.md`). El SDK es `telnyx@7.21`; donde el SDK falla o no tipa algo se indica
-el `fetch` equivalente. **Nunca desde un route handler**: todo pasa por
+`PLAN-CANAL-DUENO.md`), hecha con `telnyx@7.21`; hoy el backend va con `telnyx@7.29`
+(`backend/package.json`) y los rodeos de abajo siguen en el código (sin re-verificar con 7.29).
+Donde el SDK falla o no tipa algo se indica el `fetch` equivalente. **Nunca desde un route
+handler**: todo pasa por
 `backend/src/adapters/whatsapp/WhatsAppAdapter.ts`.
 
 **Código (fase 1, cimientos — PR de 2026-09-20).**
@@ -724,7 +804,10 @@ el `fetch` equivalente. **Nunca desde un route handler**: todo pasa por
   `templateId`, con parámetros nombrados; nombre + idioma solo de respaldo), `sendText`,
   `sendInteractiveButtons` (1-3 botones; la cabecera lleva `type: "text"`, que el SDK no tipa
   y la API exige), `sendContacts` (vCard en formato Meta `name.formatted_name`; verificado
-  entregado), `getConversationWindow`, `listWabaPhoneNumbers`, `listTemplates`.
+  entregado), `getConversationWindow`, `listWabaPhoneNumbers`, `listTemplates`. Después
+  llegaron `sendInteractiveCtaUrl` (alertas, PR 6), `marcarLeidoYEscribiendo` (marca leído y
+  enseña «escribiendo…» desde el número que recibió el mensaje) y `descargarAudio` /
+  `transcribirAudio` (notas de voz, 2026-10-02, ver PR 2).
 - `modules/whatsapp/service.ts`: la política. `resolverRemitente(audience)` lee
   `WhatsappSender` (`client` → +34 930 454 394, `owner` → +34 930 453 218; caché 60 s; el de
   `owner` es el respaldo del de `client`, y `WHATSAPP_TELNYX_FROM_NUMBER` el de todo);
@@ -746,7 +829,7 @@ el `fetch` equivalente. **Nunca desde un route handler**: todo pasa por
   por id de evento que la voz.
 - `modules/whatsapp/router.ts`: `enrutarEntrante` — todavía **no responde a nadie**; clasifica
   y deja `handler: pendiente:…` para que los siguientes PRs (alta/STOP, botones de avisos,
-  chat Beta) rellenen cada rama.
+  chat Beta) rellenen cada rama. *(Estado del PR 1; desde el PR 2 responde, ver abajo.)*
 - `jobs/sendWhatsapp.ts` pasa por el servicio: los envíos de voz (`confirmacion_cita`,
   `recordatorio_cita`, `hora_disponible`) salen por el número de **clientes** y por
   `template_id` en cuanto la tabla tiene la plantilla; si no, por nombre + `es` como antes.
@@ -813,7 +896,13 @@ el `fetch` equivalente. **Nunca desde un route handler**: todo pasa por
   adivina), `ayuda:dueno | ayuda:sin-consentimiento (el móvil solo lo tecleó un negocio, quizá
   otro tenant: no se nombra) | ayuda:desconocido`, `texto:dueno | texto:desconocido |
   texto:dueno-en-clientes`, `bienvenida-chat:<audience>`, `ignorado:{sin-audiencia,reaction,
-  system,unsupported,audio,media,other}`, y `pendiente:*` para lo de los PRs 3/4 y la fase 2.
+  system,unsupported,media,other}`, y `pendiente:*` para lo de los PRs 3/4 y la fase 2.
+  **Notas de voz (desde el 2026-10-02):** `handleWhatsappMessages` las descarga
+  (`WhatsAppAdapter.descargarAudio`) y transcribe con Telnyx Inference (`transcribirAudio`, sin
+  proveedores externos); si sale texto, el entrante pasa a `kind: text` y se enruta como
+  cualquier texto. Si no, `pendiente:audio:sin-transcribir` con la respuesta `audioNoEntendido`
+  (una vez al día, igual para dueño y cliente; `router.ts › audioSinTranscribir`). Antes del
+  02-10 el audio caía en `ignorado:audio`.
   Sufijos: `:silenciado` (una vez al día por tipo, o techo de 20 respuestas por número y hora)
   y `:baja` (el número pidió STOP: no es error). Como mucho una respuesta por entrante, siempre
   texto desde el número al que escribió, reclamada con `reclamarEnvio`
@@ -840,7 +929,8 @@ el `fetch` equivalente. **Nunca desde un route handler**: todo pasa por
   `toNumber` sigue siendo el `ownerWhatsappNumber`; un `delivered/read` al móvil actual o
   cualquier entrante real del dueño la limpia.
 - **Barrido de filas sin enrutar**: el reintento de Telnyx llega con el mismo `data.id` y
-  `server.ts` lo descarta como duplicado sin reprocesar nada, así que una fila guardada y no
+  `/webhooks/telnyx` lo descarta como duplicado sin reprocesar nada
+  (`modules/webhooksTelnyx/routes.ts`, `claimVoiceWebhookEvent`), así que una fila guardada y no
   enrutada (proceso muerto) la recoge `handleWhatsappMessages` al inicio de cualquier evento
   posterior (`handledAt null`, >2 min y <7 d, reclamo atómico con `handler:
   "reintento:en-curso:<n>"`, 20 por pasada, como mucho 3 reintentos por fila; después `handler:
@@ -862,7 +952,9 @@ el `fetch` equivalente. **Nunca desde un route handler**: todo pasa por
   `ALTA <código>`, copiar y QR con `qrcode.react`; se refresca cada 10 s mientras esté
   pendiente), campo opcional «Tu móvil con WhatsApp» en `/bienvenida` (guarda en el
   mismo PATCH y pide la activación en silencio; tolera un backend que ignore el campo), paso
-  «Activa los avisos por WhatsApp» en `onboarding-checklist.tsx` (la barra y el «n de 6» salen
+  «Activa los avisos por WhatsApp» (definido en `lib/agent-configuration.ts` y pintado por la guía
+  de `escritorio/panel-escritorio.tsx` y `movil/inicio-movil.tsx`; antes en
+  `onboarding-checklist.tsx`, retirado en la fase 1 del escritorio — la barra y el «n de 6» salen
   del mismo recuento del frontend, no de `progress`), `lib/phone.ts` (`normalizarMovil`:
   `600 123 456` → `+34600123456`, `esFijoEspanol`, `formatearMovil`), `lib/api-errors.ts`
   (`describeApiError`, `apiErrorCode`), `getOwnerWhatsapp`/`sendOwnerWhatsappActivation` en
@@ -881,6 +973,8 @@ el `fetch` equivalente. **Nunca desde un route handler**: todo pasa por
   (cuando el reintento en segundo plano mete la cita; solo dentro de la ventana).
   `textoAgendaDelDia` (citas de hoy/mañana en la zona del negocio). Mientras las plantillas
   sigan `PENDING`, fuera de la ventana los avisos #1 y #4 no salen y el #3 va por email.
+  *(Estado de septiembre: las plantillas se aprobaron después; ver «Categoría de las
+  plantillas» y «Plantillas».)*
 - Botones de los avisos en `router.ts`: por id `aviso:<tipo>:<recurso>:<accion>` (interactivo)
   o por título + `context.id` → `SentMessage.callbackData` (botón de plantilla). El envío
   original tiene que existir y haber ido a ese móvil; el negocio del aviso tiene que seguir
@@ -901,6 +995,8 @@ el `fetch` equivalente. **Nunca desde un route handler**: todo pasa por
   Checklist de deploy: `whatsapp_senders` con `owner +34930453218` y `client +34930454394`
   (sin ellas, todo lo que llegue al número de clientes acaba en `ignorado:sin-audiencia`) y
   `whatsapp_templates` con `key = 'bienvenida_negocio'` (sin ella el estado nunca cambia).
+  Sigue valiendo para montar un entorno nuevo (p. ej. la cuenta de Telnyx de dev de #400); hoy
+  las filas de plantillas nuevas las crea solo `incorporarPlantillasNuevas()` (PR 4).
 
 **Código (fase 1, PR 6 — alertas operativas, 2026-09-20).**
 - `modules/whatsapp/alertas.ts`: las cinco alertas del plan (§ 4 fila 5): `alertarCalendarioDesconectado`
@@ -910,13 +1006,18 @@ el `fetch` equivalente. **Nunca desde un route handler**: todo pasa por
   `customer.subscription.trial_will_end`, nuevo en `billing/service.ts`), `alertarMinutos`
   (`jobs/processUsageReport.ts`, junto al email del 80 %) y `alertarPagoFallido`
   (`invoice.payment_failed`, junto al email). Nunca lanzan. Las dos de facturación no llevan
-  email de respaldo (ya sale el suyo); las otras tres sí (`operationalAlertEmail`).
+  email de respaldo (ya sale el suyo); las otras tres sí (`operationalAlertEmail`). Después
+  llegaron dos más del desvío, `alertarDesvioSinComprobar` y `alertarDesvioComprobado` (mensaje
+  del día 1, desde `jobs/recordarDesvioSinComprobar.ts`; claves `desvio:` / `desvio-ok:` abajo; el
+  email de la positiva es `forwardingCheckedEmail`).
 - `avisarAlerta` (avisosNegocio.ts, tipo `alerta`): dentro de la ventana es un interactivo
   **`cta_url`** con el botón «Ir a Ajustes» (`WhatsAppAdapter.sendInteractiveCtaUrl`,
   verificado entregado el 20-09; los botones de respuesta rápida no pueden llevar enlace);
   fuera, la plantilla `alerta_operativa_negocio` (`negocio_nombre`, `texto`) con el sufijo del
-  botón URL `https://alhabla.ai/ajustes/{{1}}` = `facturacion | calendario | telefono`. El
-  frontend (`next.config.mjs`) redirige `/ajustes/calendario` a `/agente` (donde vive el
+  botón URL `https://alhabla.ai/ajustes/{{1}}` = `facturacion | calendario | telefono`. La
+  plantilla lleva el dominio `alhabla.ai` horneado: desde la separación de webs (21-09)
+  `web/next.config.mjs` reenvía `/ajustes/*` con un 301 a `app.alhabla.ai`, y allí
+  `frontend/next.config.mjs` redirige `/ajustes/calendario` a `/agente` (donde vive el
   calendario); `/ajustes/telefono` es una pantalla propia (Ajustes › Teléfono). Idempotente por recurso (`pago:<invoiceId>`,
   `minutos:<periodId>`, `prueba:<subscriptionId>`, `calendario:<biz>:<proveedor>:<día>`,
   `telefono:<biz>:<día>`, `desvio:<biz>:<intento>` / `desvio-ok:<biz>:<intento>` para el
@@ -992,7 +1093,8 @@ el `fetch` equivalente. **Nunca desde un route handler**: todo pasa por
   cita, negocio_telefono + botón URL «Cómo llegar» con el `placeId`, índice derivado de
   `WhatsappTemplate.components`, respaldo 1), `confirmacion_cita` es_ES (5, SIN profesional),
   `recordatorio_cita_v2` (3), `recordatorio_cita`/env (6), `hueco_libre` (2),
-  `hora_disponible`/env (4). Cascada `elegirPlantillaCliente` en el momento del envío: v2
+  `hora_disponible`/env (4) — conteos de septiembre; desde el 16-10 la cascada empieza por `_v3`
+  (ver «Versiones» abajo). Cascada `elegirPlantillaCliente` en el momento del envío: v2
   aprobada (la confirmación solo con `Business.placeId`) → aprobada actual → variable
   `WHATSAPP_TEMPLATE_*_NAME` → `SIN_PLANTILLA`; antes de cada clave `refrescarPlantilla` (≤ 1
   llamada al WABA/día/clave), así una v2 aprobada entra sola en ≤ 24 h sin deploy.
@@ -1137,6 +1239,7 @@ el `fetch` equivalente. **Nunca desde un route handler**: todo pasa por
   alta (reciben `confirmacion_cita` hasta tenerlo). Antes de fusionar: leer `components` de
   `confirmacion_cita_v2` en producción y confirmar la posición del botón URL, y probar la URL
   de «Cómo llegar» con un `placeId` real (`query=place_id:` no es la forma documentada por Google).
+  *(Pendiente del 20-09; sin constancia de que se cerrara, sin verificar a 2026-11-02.)*
 
 **Código (fase 1, PR 7 — toggle «aviso por reserva», 2026-09-20).**
 - `modules/whatsapp/preferencias.ts` › `preferenciasDeAvisos(raw)` lee `Business.notificationPrefs`
@@ -1217,7 +1320,9 @@ el `fetch` equivalente. **Nunca desde un route handler**: todo pasa por
   Gestor) y la tabla `client_conversations`. Variables nuevas en `.env.example` y
   `docker-compose.yml`. Queda para PRs siguientes: la lista para elegir negocio cuando el
   cliente tiene citas en varios (hoy va al de la reserva más reciente), el panel («Tu chat con la
-  recepcionista», toggle «chat Beta» en Ajustes) y los tests de integración. El UTC de
+  recepcionista», toggle «chat Beta» en Ajustes) y los tests de integración. *(Hecho después: el
+  negocio lo elige `tenantDelCliente.ts`, ver el párrafo siguiente, y los interruptores están en
+  Ajustes › Teléfono › Tu móvil, bloque «Conversaciones», PR 5.)* El UTC de
   `{{telnyx_current_time}}` afectaba también a las llamadas de voz desde el primer día de Telnyx
   (issue #122): resuelto el 20-09 traduciendo la variable antigua `{{current_time_<zona IANA>}}` a la variante con zona
   `{{telnyx_current_time_<zona IANA>}}` (`adaptManagedPromptForTelnyx`), verificado por chat en
@@ -1242,7 +1347,8 @@ hablando por el que elige `identificarRemitente`.
   `assistant-776758e8-…`, creado el 20-09 y apuntando a `dev-api.alhabla.ai`; producción:
   `assistant-302a2a23-e77c-43ec-8fc7-db094ea0c5c3`, creado el 21-09 apuntando a
   `api.alhabla.ai`, con `TELNYX_OWNER_CHAT_ENABLED=true` en Cloud Run desde la revisión
-  `alhabla-api-00160`; `TELNYX_CLIENT_CHAT_ENABLED` sigue apagado). Se crea con
+  `alhabla-api-00160`; `TELNYX_CLIENT_CHAT_ENABLED` sigue apagado — a 21-09, sin verificar a
+  2026-11-02). Se crea con
   `scripts/manual/sincronizarGestor.mts --crear` y lo mantiene al día el reconciliador diario
   (`lib/gestorSync.ts › sincronizarGestor`: compara instrucciones, modelo y la firma de las
   tools — nombre, url, cabeceras, descripción, parámetros — y no el JSON entero, que trae
@@ -1414,10 +1520,11 @@ hablando por el que elige `identificarRemitente`.
   `programarAvisoAlCliente` (nueva: una tarea por petición, la cancelación solo sobre una
   reserva ya cancelada). Propósitos nuevos en `mensajesCliente.ts` y `jobTypes.ts`:
   `cambio` (plantilla `cambio_cita_cliente`, 4 parámetros con la hora nueva) y `cancelacion`
-  (`cancelacion_cita_cliente`, 3), ambas sin v2 ni variable de entorno; el job admite la
+  (`cancelacion_cita_cliente`, 3), ambas sin variable de entorno (desde el 16-10 con versión
+  `_v2`: cascada `VERSIONES_CAMBIO` / `VERSIONES_CANCELACION`); el job admite la
   reserva cancelada para `cancelacion` (`RESERVA_ACTIVA` si no lo está) y anota
-  `clientNotifiedAt`. Las dos plantillas siguen `PENDING` en Meta (#103): hasta que se aprueben
-  el job las descarta con `SIN_PLANTILLA`. El botón «No me va bien» del cliente (fase 1) ya
+  `clientNotifiedAt`. En septiembre las dos estaban `PENDING` en Meta; hoy están aprobadas. Si no
+  hay fila `APPROVED`, el job las descarta con `SIN_PLANTILLA`. El botón «No me va bien» del cliente (fase 1) ya
   avisa al dueño por la vía del recado (`avisarRecado`, con el móvil del cliente y «quiere que
   le llamen»).
 - **Ausencias**: tabla nueva `ProfessionalAbsence` (`professional_absences`: `businessId`,
@@ -1437,7 +1544,10 @@ hablando por el que elige `identificarRemitente`.
   `DELETE /booking-settings/absences/:id` (lógica en `modules/bookings/ausencias.ts`): la agenda de
   escritorio (vista Día) las pinta por columna con «Quitar», y Agente › Profesionales (escritorio y
   móvil) las lista por persona. No hay caché de voz que invalidar: `checkAvailability` y `get_catalog`
-  leen la tabla en cada llamada. Crear sigue siendo solo del Gestor.
+  leen la tabla en cada llamada. Crear era solo del Gestor hasta el 28-10; desde entonces el panel
+  también las crea (`POST /business/me/absences`, `modules/bookings/citasDelPanel.ts`, la misma
+  acción `marcar_ausencia` de `ACCIONES_DE_AGENDA`), igual que «Nueva cita» (`añadir_cita`,
+  `POST /business/me/bookings`) y «Bloquear horas» (`bloquear_franja`, `POST /business/me/bloqueos`).
 - **Bloqueos no son tabla**: `bloquear_franja` escribe una excepción del horario con horario
   especial (`restarTramo` quita `[desde, hasta)` de los tramos del día; si no queda nada,
   `closed`), lo que `checkBusinessHours`, `get_catalog`, el panel (`business-hours-editor`) y
@@ -1482,10 +1592,14 @@ hablando por el que elige `identificarRemitente`.
   «Listo.») y cuya propuesta, si la hay, también; «No» a la pregunta de avisar responde
   `avisoAlClienteDescartado` sin turno. Errores con `code` (`limite` 429, `ocupado` 409,
   `sin_respuesta` 502, resto 403; propuestas `no_encontrada` 404, caducada/decidida 409).
+  Después llegó `GET /business/me/gestor/cambios` (`panel.ts › cambiosDelGestor`): los «Cambios
+  del gestor» del escritorio, qué propuso y qué pasó con cada propuesta en los últimos 30 días.
 - `PATCH /business/me` acepta `ownerChatEnabled` y `clientChatEnabled` (booleanos).
-- Panel: página `/gestor` («Tu Gestor», badge Beta, entrada «Gestor» bajo Recepcionista en la
-  barra lateral y, en móvil, en la pestaña Cuenta: la barra inferior tiene cinco huecos justos) con
-  `components/gestor-chat.tsx` (historial, burbujas, propuesta con sus dos botones, ejemplos
+- Panel: página `/asistente` («Tu asistente», badge Beta; nació como `/gestor` «Tu Gestor», que
+  redirige con un 301 desde el 22-09 en `frontend/next.config.mjs`), entrada «Gestor» en la barra
+  lateral del escritorio (`escritorio/navegacion.ts`, vista `escritorio/gestor/gestor-escritorio.tsx`)
+  y, en móvil, en la pestaña Cuenta (`movil/cuenta-movil.tsx`: la barra inferior tiene cinco huecos
+  justos) con `components/gestor-chat.tsx` (historial, burbujas, propuesta con sus dos botones, ejemplos
   para empezar, Enter envía, invalida `my-business`/`booking-settings`/`agenda` tras un botón);
   Ajustes › Teléfono › Tu móvil gana el bloque «Conversaciones · Beta» con los dos interruptores
   (guardado al instante por el PATCH; se enseñan aunque no haya móvil, porque el Gestor
@@ -1548,7 +1662,12 @@ hablando por el que elige `identificarRemitente`.
 (250 destinatarios únicos/24 h para **toda** la cartera), `business_verification_status:
 pending_submission` (issue #103: hasta verificar la empresa el remitente se ve como número
 pelado, el techo es 250 y el WABA admite **2 números**). `account_review_status: APPROVED`.
-**Bug del SDK 7.21 en `client.whatsapp.*`**: el cliente normal tiene `baseURL`
+Todo eso es el estado del 19-09. **La empresa quedó verificada en Meta el 02-11-2026 (issue #103
+cerrado)**: el nombre visible, el techo de destinatarios y el número de números por WABA cambian
+con eso. Falta resincronizar `whatsapp_senders` (la copia de producción es del 19-09 y aún dice
+`TIER_250` y `PENDING_REVIEW`) y anotar aquí el tier y el tope nuevos.
+**Bug del SDK 7.21 en `client.whatsapp.*`** (histórico: el rodeo sigue en el código con
+`telnyx@7.29`, sin re-verificar si ya hace falta): el cliente normal tiene `baseURL`
 `https://api.telnyx.com/v2` y esos recursos ya llevan `/v2/` en la ruta, así que toda llamada
 (`businessAccounts.list`, `phoneNumbers.list`, `templates.list`, `retrieveConversationWindow`,
 perfil…) va a `/v2/v2/whatsapp/…` y devuelve `404 10005`. Solución en
@@ -1558,9 +1677,10 @@ correcta y va por el cliente normal). Con eso el SDK sirve para todo; `whatsappM
 .retrieve` sigue dando 404 (ese endpoint no existe). El filtro de `templates.list` es `waba_id`
 (el tipo del SDK dice `filter[waba_id]`, que devuelve cero).
 
-**Números en el WABA — uno por audiencia** (decisión del 19-09 por la noche; son los dos que
-admite el WABA hasta #103, y el `to` del mensaje entrante ya dice si escribe un dueño o un
-cliente).
+**Números en el WABA — uno por audiencia** (decisión del 19-09 por la noche; eran los dos que
+admitía el WABA antes de verificar la empresa — #103, cerrado el 02-11 —, y el `to` del mensaje
+entrante ya dice si escribe un dueño o un cliente). La tabla es el estado del 19-09: tras la
+verificación hay que revisar nombre visible y calidad al resincronizar.
 
 | Número | Estado en el WABA | Nombre visible | Uso |
 |---|---|---|---|
@@ -1585,11 +1705,13 @@ añadirlo en WhatsApp Manager **sin** verificar allí y completar por API.
 uno** porque la cuenta recarga por goteo y un pedido de cinco a la vez —10 $— fue rechazado con
 `20100 Insufficient Funds`). Se compraron como «uno por sector»; esa misma noche la decisión
 pasó a «uno por audiencia»: el de `peluqueria` es ahora el de clientes y los otros cuatro
-quedan **en reserva hasta #103** (tope de 2 números por WABA). Todos con `customer_reference alhabla-whatsapp-<sector>`, tags
-`env-prod` + `whatsapp-sector` + `sector-<tipo>`, y **desvío de voz permanente**
+quedaron **en reserva hasta #103** (tope de 2 números por WABA); con #103 cerrado (02-11) ya
+pueden añadirse al WABA si se decide, por el portal de Telnyx (ver «Cómo se da de alta»). Todos con `customer_reference alhabla-whatsapp-<sector>`, tags
+`env-prod` + `whatsapp-sector` + `sector-<tipo>` (cuenta de Telnyx única dev+prod hasta #400; los
+números de WhatsApp son de producción), y **desvío de voz permanente**
 (`PATCH /v2/phone_numbers/{id}/voice` → `call_forwarding { call_forwarding_enabled: true,
-forwarding_type: "always", forwards_to: "+34692138456" }`) para que la llamada de verificación
-de Meta (los números españoles no reciben SMS) suene en el móvil del usuario.
+forwarding_type: "always", forwards_to: <el móvil del fundador> }`) para que la llamada de
+verificación de Meta (los números españoles no reciben SMS) suene en el móvil del fundador.
 
 | Sector (`businessType`) | Número | Id en Telnyx |
 |---|---|---|
@@ -1610,7 +1732,8 @@ Menú nativo por número (*ice breakers* ≤ 4 y comandos que WhatsApp muestra a
 commands: [{ command, description }] })`. El número de plataforma ya tiene perfil («Gestionamos
 tus reservas», `PROF_SERVICES`); los *ice breakers* y comandos se probaron y **se retiraron**
 del número de producción hasta que exista el enrutador (un cliente real los vería sin que nadie
-responda). El plan los reparte por audiencia (clientes en «Alhabla Reservas», dueño y comandos
+responda). *(Histórico: el enrutador existe desde el 20-09, pero ningún código ni script los
+configura; volver a ponerlos es una decisión pendiente.)* El plan los reparte por audiencia (clientes en «Alhabla Reservas», dueño y comandos
 en «Alhabla»).
 
 **Envío.** `POST /v2/messages/whatsapp` — en el SDK es `client.messages.whatsapp(...)` (**no**
@@ -1620,7 +1743,8 @@ no puede estar asignado a ningún perfil (`40323`, reconfirmado). **Plantillas: 
 `language.code: "es_ES"` Meta devuelve `40008 Undeliverable` («recipient carrier did not accept»)
 desde cualquier número aunque la plantilla esté `APPROVED`, y la misma plantilla por `template_id`
 se entrega (verificado el 19-09 con `confirmacion_cita` `es_ES` `01a0a982-…`). Por nombre solo
-funciona con `es` (lo que usa producción hoy vía `WHATSAPP_TEMPLATE_LANGUAGE=es`).
+funciona con `es` (lo que usa el último respaldo por nombre, `WHATSAPP_TEMPLATE_LANGUAGE=es`;
+lo normal en producción es `template_id` por la fila de `WhatsappTemplate`).
 `whatsapp_message.type` ∈
 `template | text | interactive | contacts | location | reaction | image | …`;
 `biz_opaque_callback_data` vuelve en todos los estados. Texto, interactivos y `contacts` (vCard)
@@ -1637,11 +1761,13 @@ todas nuestras plantillas) el adaptador sigue con `fetch`.
 0,004 $ de Telnyx + 0,020 $ de tasa de Meta = **0,024 $**; mensaje libre dentro de la ventana
 `whatsapp_service` = **0,004 $** (sin tasa de Meta). Los mensajes del usuario no se cobran. Una
 reserva (confirmación al cliente + aviso al negocio) ≈ 0,05 $; mantener la ventana abierta con
-botones sale seis veces más barato que reabrirla con plantilla.
+botones sale seis veces más barato que reabrirla con plantilla. Las plantillas que Meta clasificó
+como MARKETING (`hueco_libre`, `hora_disponible` y, desde el 20-10, `bienvenida_negocio` y
+`cierre_del_dia`) pagan la tasa de marketing de Meta, más cara; no está medida aquí.
 
 **Plantillas** (`GET/POST /v2/whatsapp/message_templates`; `client.whatsapp.templates
-.list/create` con el cliente de `getTelnyxWhatsappClient()`). Todas de categoría `UTILITY`, idioma
-`es`, `parameter_format: "NAMED"` con `example.body_text_named_params` (la API lo acepta aunque
+.list/create` con el cliente de `getTelnyxWhatsappClient()`). Se piden como `UTILITY` (salvo
+`hora_disponible` y `hueco_libre`, MARKETING), idioma `es`, `parameter_format: "NAMED"` con `example.body_text_named_params` (la API lo acepta aunque
 el SDK no lo tipe). Reglas de Meta que rechazan la creación: **el cuerpo no puede empezar ni
 terminar con una variable** (`2388299`) y **hay un tope de variables por cantidad de texto**
 (`2388293`). Estado el 19-09: `confirmacion_cita` (dos, `es_ES` y `es`), `recordatorio_cita` y
@@ -1650,8 +1776,12 @@ las doce del plan (`bienvenida_negocio`, `nueva_reserva_negocio`, `recado_negoci
 `cita_pendiente_negocio`, `cancelacion_negocio`, `alerta_operativa_negocio`, `cierre_del_dia`,
 `confirmacion_cita_v2`, `recordatorio_cita_v2`, `cambio_cita_cliente`,
 `cancelacion_cita_cliente`, `hueco_libre`) en `PENDING`; textos definitivos en la tabla de
-plantillas de `PLAN-CANAL-DUENO.md`. Los cambios de estado llegan por webhook
-(`whatsapp.template.*`) si el WABA está suscrito (abajo).
+plantillas de `PLAN-CANAL-DUENO.md`. **Hoy están aprobadas**; Meta reclasificó a MARKETING
+`bienvenida_negocio`, `cierre_del_dia` y `hueco_libre` (20-10, ver «Categoría de las plantillas»
+arriba), y las versiones posteriores (`_v2`/`_v3`) y sus traducciones a ca, en, fr, de, it,
+pt_PT y nl viven en `scripts/manual/plantillasWhatsapp/plantillas.json` (ver «Versiones», PR 4).
+Los cambios de estado llegan por webhook (`whatsapp.template.*`) si el WABA está suscrito
+(abajo).
 
 **Webhooks entrantes (la parte que nadie documenta bien).** Los mensajes entrantes de WhatsApp
 **no** van por perfil de mensajería: los entrega el **webhook del WABA**, configurado con
@@ -1662,8 +1792,9 @@ cadena sin validar): hoy `messages`, `message_template_status_update`,
 `account_update`, `account_review_update`, apuntando a `https://api.alhabla.ai/webhooks/telnyx`.
 **Sin `messages` en la lista, los entrantes se pierden en silencio** (ni MDR ni webhook) aunque
 Meta los cuente. El evento es **`whatsapp.messages`** (no `message.received`), firmado con la
-misma Ed25519 que los de voz, y `/webhooks/telnyx` hoy lo acepta y lo descarta como "no
-procesable" (200). Payload en formato Meta:
+misma Ed25519 que los de voz. En la fase 0 `/webhooks/telnyx` lo aceptaba y lo descartaba como
+"no procesable" (200); desde el 20-09 lo procesa `handleWhatsappMessages` (ver «fase 1,
+cimientos»). Payload en formato Meta:
 
 - `payload.contacts[]`: `profile.name`, `wa_id`. `payload.metadata`: `display_phone_number` (el
   número de sector que recibe, sin `+`), `phone_number_id`.
@@ -1677,13 +1808,15 @@ procesable" (200). Payload en formato Meta:
   `sent | delivered | read`, `biz_opaque_callback_data`.
 
 Por el webhook **por mensaje** (`webhook_url` en el envío) o el del **perfil de mensajería**
-(`TELNYX_MESSAGING_PROFILE_ID`, hoy a producción) llegan además los clásicos `message.sent` →
+(`TELNYX_MESSAGING_PROFILE_ID`, hoy a producción; cuenta de Telnyx compartida dev+prod hasta el
+issue #400) llegan además los clásicos `message.sent` →
 `message.finalized` (`to[0].status: delivered`) → **`message.read`**, con el `body` del mensaje
 ecoado y `messaging_profile_id`. `cost.amount` venía `null` en las pruebas.
 
 **AI Assistants por chat y post-conversación (verificado 2026-09-19, fase 0.4-0.6).**
-`POST /v2/ai/assistants/{id}/chat` (`client.ai.assistants.chat`, Beta) ejecuta las *shared
-tools* del assistant (`tool_ids`) firmando con la Ed25519 de siempre; 1,6-3,7 s por turno con
+`POST /v2/ai/assistants/{id}/chat` (`client.ai.assistants.chat`, Beta) ejecuta las tools del
+assistant — las *shared tools* (`tool_ids`, fase 0.4) y también las inline (verificado el 20-09,
+ver «fase 2, PR 1») — firmando con la Ed25519 de siempre; 1,6-3,7 s por turno con
 `gpt-5.6-luna`. La conversación la crea Alhabla (`POST /v2/ai/conversations` con `metadata`;
 la respuesta viene envuelta en `data`) y **sus claves de `metadata` resuelven como variables
 dinámicas en las cabeceras de las tools** (`{{business_id}}`), mientras que
@@ -1704,7 +1837,10 @@ registran salientes (hay entregas reales de WhatsApp al móvil del usuario desde
 entrantes no aparecen ahí. Precio de modelos y catálogo: `GET /v2/ai/models` (ver plan). Desde
 el Mac del usuario no se llega por HTTP a los hosts de `alhabla.ai` proxied por Cloudflare
 (`dev-api.alhabla.ai`, `alhabla.ai`), aunque desde internet responden: probar con
-`web_fetch`/otro equipo, no con `curl` local.
+`web_fetch`/otro equipo, no con `curl` local. *(Es el bloqueo de IPs de Cloudflare durante los
+partidos de LaLiga. Desde el 11-10 el Worker `alhabla-failover-laliga` quita el proxy de
+`alhabla.ai`, `www` y `app` mientras dura, pero no el de `api` ni `dev-api`; ver § Cloudflare
+failover for LaLiga blocks.)*
 
 ## Stripe Billing Fields on `Business`
 
@@ -1716,17 +1852,32 @@ subscriptionStatus (enum SubscriptionStatus)
 subscriptionCurrentPeriodStart / End
 subscriptionTrialEnd
 subscriptionCancelAtPeriodEnd (boolean)
+subscriptionEventCreatedAt      # `created` of the last customer.subscription.* applied;
+                                # an older event delivered out of order is discarded
+
+paymentFailureInvoiceId         # invoice that opened the grace period (paying another
+                                # invoice does not reactivate the service)
+paymentFailureNotifiedAt
+paymentFailureSuspensionAt      # end of the grace period (servicioSuspendidoPorPago)
+callsSuspendedAt
+cancellationNoticeSentAt
+usageBillingStartsAt            # extra minutes are billed from this period on
 ```
 
 ### Phone Number Fields on `Business`
 
 `phoneNumberStatus` is the number's lifecycle-status field
-(`"pending" | "purchased" | "active" | "failed"`).
+(`"pending" | "active" | "failed"`; `"purchased"` is still in the `PhoneNumberStatus` type
+of `modules/phone/service.ts` and read by the checkout page, but no code writes it any more).
 
 ```
 phoneNumberStatus (default "pending")   # "active" as soon as the number is bought
                                          # and on the Call Control App
 
+telnyxPendingPhoneNumber       # written BEFORE ordering the number; if the process
+                                # dies between the purchase and saving the order id,
+                                # the retry adopts the number already bought
+                                # (getNumberByPhoneNumber) instead of buying another
 telnyxNumberOrderId (unique)   # persisted as soon as the order is placed,
                                 # since Telnyx orders are async; lets a retry
                                 # resume the same order instead of buying twice
@@ -1759,8 +1910,9 @@ Business (campos de agenda, desde 2026-10-28, PLAN-AGENDA-ALHABLA.md)
                             //   serializa con el Business (modules/agenda/routes.ts)
 ```
 
-Una fila por negocio y proveedor; **`Business.calendarProvider` es el único campo de calendario
-que queda en `Business`** (puntero al proveedor activo). Todo pasa por `modules/calendar/conexion.ts`.
+Una fila por negocio y proveedor; **`Business.calendarProvider` es el único campo de conexión de
+calendario que queda en `Business`** (puntero al proveedor activo; `modoDeAgenda` e `icalToken`,
+arriba, son de la agenda, no de la conexión). Todo pasa por `modules/calendar/conexion.ts`.
 
 **Credenciales cifradas en reposo (desde 2026-09-18):** `credentials` es siempre un sobre AES-256-GCM
 (`{ v: 1, alg, iv, tag, data }`, `lib/cifradoDeCredenciales.ts`) con la clave `CALENDAR_CREDENTIALS_KEY`
@@ -1816,7 +1968,7 @@ Every business is answered by Telnyx; there is no per-business voice routing.
 businessType (String, default "other")
 ```
 
-Stores the business niche selected during registration. Used to label agents and to drive per-niche agent templates in `agentBootstrap.ts`.
+Stores the business niche selected during registration. The values live in `lib/businessType.ts` (`BUSINESS_TYPES`, copied in `frontend/src/lib/business-type.ts` and `web/src/lib/business-type.ts`). Everything that varies by niche — prompt guidelines, greeting, Google Places detection, label — lives in its profile in `lib/sectores/perfiles.ts`, used by `managedAgentPrompt.ts`/`seccionesDelPrompt.ts`, `contextoDeLlamada.ts` (greeting) and `places/service.ts`; `agentBootstrap.ts` uses it to name the agent (`buildAgentDisplayName`) and to build its first prompt (`getAgentTemplateForBusinessType`).
 
 Run migrations in dev with `npm run prisma:migrate`. In production, generate the client before starting (`prisma generate`).
 
@@ -1885,8 +2037,33 @@ is now a **Cloud Scheduler** job hitting the same kind of endpoint every
   `jobs/processRecording.ts` (`processRecordingJob`), `jobs/retryFailedBooking.ts`
   (`processRetryFailedBookingJob`), `jobs/sendEmail.ts` (`processSendEmailJob`),
   `jobs/sendSms.ts` (`processSendSmsJob`), `jobs/cleanupZombieCalls.ts`
-  (`cleanupZombieCallsJob`) — called directly both by the `/internal/jobs/*`
-  route handlers and by the dev inline fallback in `cloudTasks.ts`.
+  (`cleanupZombieCallsJob`) and so on, one file per job in `backend/src/jobs/` —
+  called directly both by the `/internal/jobs/*` route handlers and by the dev
+  inline fallback in `cloudTasks.ts`.
+
+**Cloud Tasks queues** (`europe-west1`, checked with `gcloud tasks queues list` on
+2026-11-02): `process-recording` (5 attempts, 1s min backoff; also carries
+`recuperar-transcripcion`), `retry-failed-booking` (4, 30s), `send-email`, `send-sms`
+and `send-whatsapp` (4, 5s; `send-whatsapp` also carries `recordar-recado` and
+`revisar-escalada`), `report-usage` (5, 5s).
+
+**Cloud Scheduler jobs** (`europe-west1`, time zone Europe/Madrid, same OIDC config;
+checked with `gcloud scheduler jobs list` on 2026-11-02):
+
+| Job | Schedule | Retries | Endpoint |
+|---|---|---|---|
+| `cleanup-zombie-calls` | `*/15 * * * *` | 3 | `/internal/jobs/cleanup-zombie-calls` |
+| `retry-stuck-recordings` | `*/15 * * * *` | 3 | `/internal/jobs/retry-stuck-recordings` |
+| `recordar-desvio-sin-comprobar` | `15 * * * *` | 3 | `/internal/jobs/recordar-desvio-sin-comprobar` |
+| `retry-usage-reports` | `15 * * * *` | 3 | `/internal/jobs/retry-usage-reports` |
+| `suspend-overdue-calls` | `0 2 * * *` | 3 | `/internal/jobs/suspend-overdue-calls` |
+| `telnyx-reconciler` | `0 4 * * *` | default | `/internal/jobs/telnyx-reconciler` |
+| `purge-old-recordings` | `30 4 * * *` | default | `/internal/jobs/purge-old-recordings` |
+| `growth-mantenimiento` | `20 5 * * *` | 3 | `/internal/jobs/growth-mantenimiento` |
+| `send-weekly-summaries` | `0 8 * * 1` | default | `/internal/jobs/send-weekly-summaries` |
+
+`attach-usage-prices` has no Scheduler job: it is a one-off migration (adds the
+extra-minutes price to subscriptions created before it existed), invoked after a deploy.
 
 1. **`process-recording`**
    - Downloads the call recording from Telnyx and uploads it to R2.
@@ -1937,6 +2114,9 @@ is now a **Cloud Scheduler** job hitting the same kind of endpoint every
    - **Contestar con reintentos (desde el 2026-10-17).**
      `handleCallInitiated` contesta con `contestarConReintentos` (`adapters/telnyx/contestarLlamada.ts`):
      - Un 5xx, un 429 o un fallo de red se reintentan dos veces, tras 300 y 800 ms.
+     - Todos los intentos llevan el mismo `command_id` (desde el 2026-11-02, #402): si uno que
+       agotó el tiempo sí llegó, Telnyx ignora el siguiente en vez de contestar dos veces.
+       Contestar sin la voz de la cooficial es otro comando y lleva uno nuevo.
      - El `answer` tiene su propio timeout de 3 s (`TIEMPO_PARA_CONTESTAR_MS`), así que el peor caso
        ronda 10 s. El `call.initiated` entero tarda 0,3-1,5 s en producción.
      - Un 4xx no se reintenta. Si la llamada llevaba la voz de la cooficial, se contesta una vez sin
@@ -1999,7 +2179,7 @@ is now a **Cloud Scheduler** job hitting the same kind of endpoint every
    - Cloud Tasks queue `send-sms`: 4 attempts, exponential backoff 5s base (same as `send-email`).
    - **Known blocker, root cause confirmed (2026-09-12): Spanish geographic long-codes are structurally not messaging-capable, and never will be.** Telnyx returns `40323 "Messaging activation failed"` when assigning any Spanish long-code number (voice or newly purchased) to a Messaging Profile — confirmed via API, the Telnyx dashboard, Telnyx's own error documentation ("not all phone numbers are messaging-capable... you will receive a 40323 error"), and independent research (Kimi, 2026-09-12): Telnyx's country coverage for SMS-capable markets never lists Spain for geographic numbers, this matches every other provider (e.g. Twilio's equivalent `21614`), and Spanish anti-fraud regulation (Orden TDF/149/2025 art. 7.1) additionally blocks any SMS entering via international interconnection with a Spanish numeric sender — so even a hypothetically-activated number would have its messages intercepted. This is not fixable by escalating to support or waiting; stop trying to activate messaging on `business.telnyxPhoneNumber`.
    - Spanish mobile numbers (6xx/7xx) are not an alternative either: Telnyx has no self-service Spanish mobile inventory at all (`GET /available_phone_numbers`, `phone_number_type=mobile`, `country_code=ES` → `10015 "No coverage found"`), independent of the fact that no Requirement Group is required for that combination.
-   - **The only supported path is the Alphanumeric Sender ID ("ALHABLA", issue #21).** It's the standard A2P channel for Spain (every major CPaaS — Twilio, Vonage, Sinch, Infobip — pushes the same pattern) and doesn't need any number's messaging activated (`resolverRemitenteSms()` in `voiceTools/service.ts` uses it as soon as `TELNYX_SMS_SENDER_ID` is set; without it no SMS is sent). The Messaging Profile (`Alhabla — Avisos SMS a propietarios`, id in `TELNYX_MESSAGING_PROFILE_ID`) is already configured for this: `whitelisted_destinations: ["ES"]`, `smart_encoding: true`, `webhook_url` pointing at `/webhooks/telnyx` for delivery receipts (arrive as `message.*` events, currently unhandled — logged and ignored, no delivery tracking built yet). Sending with an alphanumeric sender ID requires `messaging_profile_id` on the API call (the SDK enforces this) — wired via `resolverRemitenteSms()`, which returns null unless both variables are set.
+   - **The only supported path is the Alphanumeric Sender ID ("ALHABLA"; mentioned in issue #21, which is about the call battery).** It's the standard A2P channel for Spain (every major CPaaS — Twilio, Vonage, Sinch, Infobip — pushes the same pattern) and doesn't need any number's messaging activated (`resolverRemitenteSms()` in `voiceTools/service.ts` uses it as soon as `TELNYX_SMS_SENDER_ID` is set; without it no SMS is sent). The Messaging Profile (`Alhabla — Avisos SMS a propietarios`, id in `TELNYX_MESSAGING_PROFILE_ID`) is already configured for this: `whitelisted_destinations: ["ES"]`, `smart_encoding: true`, `webhook_url` pointing at `/webhooks/telnyx` for delivery receipts (arrive as `message.sent`/`message.finalized` events and go through `handleMessageStatusEvent` in `modules/whatsapp/webhooks.ts`, the same handler as WhatsApp, which updates `sent_messages` by `providerMessageId`; but `processSendSmsJob` does not store the Telnyx message id when the send succeeds, so an SMS receipt matches no row and there is still no SMS delivery tracking). Sending with an alphanumeric sender ID requires `messaging_profile_id` on the API call (the SDK enforces this) — wired via `resolverRemitenteSms()`, which returns null unless both variables are set.
    - **Regulatory deadline, separate from Telnyx's own approval:** since 2026-09-15 (CNMC Circular 1/2026, developing Orden TDF/149/2025), every alphanumeric sender must be registered in the CNMC's Alias Registry or operators block it outright. Circular 3/2026 (2026-09-08) transitionally pre-registers aliases *requested* before 2026-09-14 15:00 — confirm with Telnyx (`alpha_sender_id@telnyx.com`) that the "ALHABLA" request was actually filed with the CNMC (not just queued internally at Telnyx) before that cutoff.
    - Client-facing SMS texts (`buildClientConfirmationSmsText`/`buildClientReminderSmsText`) include "para cambiarla o cancelarla, llama al `business.telnyxPhoneNumber`" — the alias is one-way (can't receive replies), so this reuses the existing caller-ID-based `find_my_appointment`/`cancel_appointment` voice tools as the client's management channel instead of building a separate web page.
    - `Business.phone` is the **customer line** (placeholder `TEMP-...` at registration, editable via `PATCH /business/me`; it can be the Alhabla number itself with `customerLineType = "alhabla"`) — it is no longer an SMS destination.
@@ -2046,9 +2226,10 @@ is now a **Cloud Scheduler** job hitting the same kind of endpoint every
      `processingFailedAt` puts it back in the sweep.
 
 7. **Recording purge** (`backend/src/jobs/purgeOldRecordings.ts`) — added 2026-09-17
-   - `POST /internal/jobs/purge-old-recordings`. **Needs a Cloud Scheduler job
-     to be created** (same OIDC config as `cleanup-zombie-calls`); daily is
-     enough:
+   - `POST /internal/jobs/purge-old-recordings`, run daily by the Cloud
+     Scheduler job `purge-old-recordings` (04:30 Europe/Madrid, same OIDC
+     config as `cleanup-zombie-calls`; it exists, checked on 2026-11-02).
+     Command it was created with, for reference:
      ```bash
      gcloud scheduler jobs create http purge-old-recordings \
        --location=europe-west1 --schedule="30 4 * * *" --time-zone="Europe/Madrid" \
@@ -2084,8 +2265,10 @@ is now a **Cloud Scheduler** job hitting the same kind of endpoint every
    `backend/src/jobs/recordarDesvioSinComprobar.ts`) — added 2026-09-22,
    docs/historico/PLAN-TELEFONIA-UX.md § 5, fase 5.
    - `POST /internal/jobs/recordar-desvio-sin-comprobar`, pensado para
-     ejecutarse **cada hora**. **Needs a Cloud Scheduler job to be created**
-     (same OIDC config as `cleanup-zombie-calls`):
+     ejecutarse **cada hora**: lo lanza el job de Cloud Scheduler
+     `recordar-desvio-sin-comprobar` (`15 * * * *`, 3 reintentos, misma
+     configuración OIDC que `cleanup-zombie-calls`; existe, comprobado el
+     2026-11-02). Comando con el que se creó, de referencia:
      ```bash
      gcloud scheduler jobs create http recordar-desvio-sin-comprobar \
        --location=europe-west1 --schedule="15 * * * *" --time-zone="Europe/Madrid" \
@@ -2144,8 +2327,11 @@ cancel by button, changes by phone), recados via post-conversation processing,
 pending bookings, cancellations, alerts, and two **Beta** conversations
 (client: read-only; owner: consult/add/move/cancel with a confirmation
 button). No second number, no WhatsApp number per business, no WhatsApp
-calling, no push, **no outbound calls** (user decisions). Inbound `message.*`
-events on `/webhooks/telnyx` are still ignored until phase 1 of that plan.
+calling, no push, **no outbound calls** (user decisions of September; for what
+holds today — the sector numbers and the business's own number — see
+§ WhatsApp and `PLAN-WHATSAPP-COEXISTENCIA.md`). Since phase 1 (2026-09-20) the
+`whatsapp.*` and `message.*` events on `/webhooks/telnyx` are processed
+(`modules/webhooksTelnyx/routes.ts` → `modules/whatsapp/webhooks.ts`).
 `docs/historico/PLAN-WHATSAPP-LLAMADAS.md` is kept as reference only (discarded).
 
 **WhatsApp:** everything about the WABA, numbers, templates, inbound webhooks and
@@ -2207,7 +2393,9 @@ Telnyx assistant itself (MCP `ver_assistant_telnyx`), not only the DB.
   state is in `Agent.telnyxSyncError`). Called from `PATCH /business/me`,
   `syncBookingConfiguration` (services/professionals), `guardarHorarioDelNegocio`,
   `guardarInformacionDelNegocio`, `calendarService.syncCalendarToolsToAgents`, `PATCH /agents/:id`
-  (only when `systemPrompt` changes), `provisionPhoneNumber` and the daily reconciler.
+  (only when `systemPrompt` changes), `provisionPhoneNumber`, the Stripe subscription webhook
+  when the plan changes (`billing/service.ts`: the prompt only offers the WhatsApp reminder if
+  the plan includes it) and the daily reconciler.
 - **Professional levels in the tool contract (2026-09-17).** `check_availability` translates the ranking into things the agent may say, never the internal tiers: without `professionalId` the success result carries `assignedProfessional: { id, name, isSpecialist }` (= `availableProfessionals[0]`); when the named professional is marked "no sugerir" for the requested services and someone better is free at that time, the result (success or `ALL_PROFESSIONALS_BUSY`) carries `recommendation: { professional, isSpecialist, availabilityToken, instructions }` — its own token so "vale, con Laura" books without another round-trip — and the draft of the *requested* person is flagged `recommendationOffered`. Both tools accept `professionalConfirmed: boolean`: `check_availability` with it skips the recommendation; `book_appointment` **without it on a flagged draft returns `PROFESSIONAL_CONFIRMATION_REQUIRED`** (with the recommendation) instead of booking — the safety net for manually-edited prompts, which receive new tools but not the new prompt text. Booking results now include `professionalName`. Internal fields (`specialistIds`, `recommendedProfessional`) never reach the LLM.
 - **Cambio de cita y teléfono del cliente (auditoría del 16-10,
   `docs/auditorias/2026-10-16-pipelines-ue-y-datos.md`).** Cambiar una cita ya no es
@@ -2238,6 +2426,10 @@ Telnyx assistant itself (MCP `ver_assistant_telnyx`), not only the DB.
 - **`serviceIds`/`professionalId` supplied by the LLM to `book_appointment` are verified against `businessId` before use** (`prisma.service.findFirst`/`prisma.professional.findFirst` scoped by `businessId`). An ID that doesn't belong to the business is treated as if it had never been given (falls back to auto-resolution) rather than failing the booking or silently trusting a cross-tenant ID.
 
 ### Telnyx: qué es de desarrollo y qué de producción
+
+**Decidido el 2026-11-02 (issue #400, abierta):** desarrollo pasará a una cuenta de Telnyx propia
+(`desarrollo@alhabla.ai`) y producción se queda en la cuenta original, la verificada. Hasta que se
+haga, sigue habiendo **una sola cuenta** y vale todo lo de esta sección.
 
 Dev y producción **comparten la cuenta y la API key de Telnyx**, y **Telnyx no ofrece ninguna
 forma autoservicio de separarlas** (comprobado el 2026-09-19 con los skills oficiales y contra la
@@ -2271,6 +2463,13 @@ La separación se apoya por tanto en tres cosas:
    cuenta entera. Es la alternativa barata a Managed Accounts, y hay que **ponerla a mano al
    comprar un número**: `provisionPhoneNumber` todavía no etiqueta.
 
+   Inventario del 2026-09-19 (**histórico**: ya no cuadra con las BD). A 2026-11-02, +34930453219
+   es el número de «El petit salo» en la BD de producción; en dev solo tienen número
+   +34930453236 y +34930453238; 237 y 289 no están en ningún negocio, y «Peluqueria Vide» ya no
+   existe. Las tags no se han vuelto a comprobar en Telnyx. El estado actual se mira en el
+   inventario del panel (`http://localhost:3005/inventario`, #378) y en
+   `businesses."telnyxPhoneNumber"` de las dos BD.
+
    | Número | Tag | Uso |
    |---|---|---|
    | +34930453219 / 236 / 237 / 238 / 289 | `env-dev` | Las 5 cuentas de prueba `test-*@alhabla.local` |
@@ -2278,8 +2477,11 @@ La separación se apoya por tanto en tres cosas:
    | +34930453218 | `env-prod` | Emisor de WhatsApp gestionado por Telnyx — **no borrar**, no pertenece a ningún negocio de la BD |
    | +34930454394 / 372 / 382 / 375 / 393 | `env-prod`, `whatsapp-sector`, `sector-<tipo>` | Números de WhatsApp de Alhabla (ver § WhatsApp): el …394 es el de clientes «Alhabla Reservas», los otros cuatro en reserva — **no borrar**, no pertenecen a ningún negocio; desvío de voz permanente a +34 692 138 456 |
 
-3. **Los scripts miran contra qué base de datos cruzan** (`describirEntorno()`), porque el daño
-   real no viene de compartir cuenta sino de apuntar a la BD equivocada.
+3. **Cruzar con la BD correcta**, porque el daño real no viene de compartir cuenta sino de
+   apuntar a la BD equivocada. Lo hacían los scripts de inventario de Retell con
+   `describirEntorno()`, borrados con Retell el 2026-10-17; hoy cruzan con las dos BD el
+   inventario del panel (#378) y `POST /internal/panel/asignar-numero`
+   (`asignarNumeroExistente`, ver § Entorno de desarrollo fijo).
 
 **Lo que dev y producción siguen compartiendo** (auditado el 2026-09-19 comparando por hash cada
 secreto de Secret Manager con el `.env` local, sin imprimir valores): la cuenta de **Telnyx**
@@ -2304,7 +2506,8 @@ túnel de dev era ngrok y cambiaba de hostname cada dos por tres. Con `dev-api.a
 eso dejó de hacer falta: los 5 números volvieron al app de dev y las 5 copias se borraron de la
 Cloud SQL de producción (`DELETE FROM businesses`, cascada; 55 llamadas y 17 citas de prueba con
 ellas), junto con sus 5 assistants de Telnyx. Producción
-queda con tres negocios reales. **Si se vuelve a ejecutar ese script, hay que revertir lo mismo
+quedó entonces con tres negocios reales (dato del 19-09; a 2026-11-02 en producción solo hay
+cuentas de prueba). **Si se vuelve a ejecutar ese script, hay que revertir lo mismo
 otra vez**; lo que no hay que hacer es dejar las copias vivas apropiándose de los números.
 
 ### Tipos de asistente y cómo añadir uno nuevo
@@ -2349,6 +2552,8 @@ El mapa de todos los asistentes vive en `backend/src/lib/tiposDeAsistente.ts`
 
 `provisionPhoneNumber` (`backend/src/modules/phone/service.ts`) buys a Telnyx number on the Call Control App (`connection_id = TELNYX_CALL_CONTROL_APP_ID`, always; without it the provisioning fails) and, once the order succeeds, writes `telnyxPhoneNumber`, `telnyxPhoneNumberId` (the real PhoneNumber resource id, resolved by the number itself), `telnyxPhoneNumberPurchasedAt` and `phoneNumberStatus: "active"` in one update — bought and on the Call Control App, it already takes calls. Then it invalidates the voice cache and calls `syncAgentToTelnyx` (the transfer to the owner goes out *from* that number). A failure leaves `phoneNumberStatus: "failed"` and sends the owner alert #5 (`alertarNumeroNoActivo`); it never fails the Stripe webhook response. `getPhoneNumberStatus` returns `phoneNumber`, `sid`, `purchasedAt` and `status`.
 
+Before ordering, it writes the chosen number to `telnyxPendingPhoneNumber`: if the process dies between the purchase and saving `telnyxNumberOrderId`, the next attempt finds that number already in the account (`getNumberByPhoneNumber`) and adopts it instead of buying another. A number that is already in the Telnyx account can also be given to a business with `asignarNumeroExistente` (`POST /internal/panel/asignar-numero`, from the dev panel; see § Entorno de desarrollo fijo).
+
 Only Spain (`PHONE_NUMBER_COUNTRY=ES`) is supported today — searches only `local`-type numbers and requires `TELNYX_SPAIN_REQUIREMENT_GROUP_ID`, a single platform-level regulatory Requirement Group reused across every business. Telnyx doesn't expose a per-number address-requirement flag in search results — regulatory requirements are resolved entirely by the Requirement Group at order time, so there's no address-based filtering step.
 
 **Telnyx number orders are asynchronous** (`status: "pending" | "success" | "failure"`). `provisionPhoneNumber` persists `telnyxNumberOrderId` as soon as the order is created, then polls `getNumberOrder` for a bounded window (5 attempts, 2s apart). If still `"pending"` after that, it returns `status: "pending"` rather than an error — a retry (via the frontend's "Reintentar asignación de número" button, or the `checkout-session/:id/reconcile` fallback) resumes the same order (`telnyxAdapter.getNumberOrder(business.telnyxNumberOrderId)`) instead of placing a duplicate purchase.
@@ -2388,14 +2593,20 @@ aceptadas por `PATCH /business/me` (`modules/businesses/routes.ts`):
 - `Business.forwardingReminderSentAt` (fase 5): marca del mensaje único del día 1 (en
   cualquiera de sus dos variantes), § Background Jobs 8.
 
-Tipos de línea y códigos: **los MMI son los mismos en todos los operadores españoles**
-(`*21*`, `*61*`, `*62*`, `*67*` + número + `#`; con `**` en móviles; se quitan con `#21#`,
-`##21#`…), así que no se pregunta el operador. Solo cambia la explicación por tipo:
+Tipos de línea y códigos: la base son los MMI del estándar GSM (`*21*`, `*61*`, `*62*`, `*67*`
++ número + `#`; con `**` en móviles; se quitan con `#21#`, `##21#`…). Al principio se dieron por
+iguales en todas las compañías y no se preguntaba el operador; **desde el 2026-10-20** (`a20646b`)
+la tarjeta de desvío y Ajustes › Teléfono tienen un selector de compañía opcional (`SelectorDeOperador`, 16 compañías en
+`OPERADORES`) y enseña los códigos tal como los publica la ayuda oficial de cada una, porque no
+todas los publican igual (Vodafone va sin `#` final, Orange tiene dos juegos según la cobertura y
+Jazztel no pone asterisco entre el código y el número). Las listas viven en
+`frontend/src/lib/desvio-por-operador.ts` (`CODIGOS_FIJO`, `CODIGOS_MOVIL`,
+`CODIGO_ANULAR_DESVIOS_MOVIL`, `guiaDeDesvio(tipo, operador)`), y la web tiene la guía por compañía
+con sus fuentes en `web/src/app/desvio-de-llamadas/`. Por tipo de línea cambia la explicación:
 fijo → `*61*`/`*21*` sin `**`, marcados desde el propio aparato tras el tono, con la nota del
 contestador («si tu fijo tiene contestador, desactívalo o se quedará él las llamadas», en
 Movistar `#10#`); móvil → los cuatro códigos con `**61*` recomendado y la nota «este desvío
-sustituye al buzón de voz»; `alhabla` → no hay tarjeta de desvío. Las listas viven en
-`CODIGOS_FIJO`/`CODIGOS_MOVIL` de `frontend/src/components/call-forwarding-card.tsx`.
+sustituye al buzón de voz»; `alhabla` → no hay tarjeta de desvío.
 
 Pantallas: el alta pregunta «¿A qué número te llaman tus clientes?» con cuatro tarjetas
 (`frontend/src/components/tarjetas-de-linea.tsx`, usadas en `app/bienvenida/page.tsx`) y
@@ -2499,7 +2710,7 @@ nuevas: el ajuste vive en `Business.agentSettings.pasarLlamadas`.
   { from, to }`, aparte de `tools` para que también entre cuando `calendar/service.ts`
   pasa sus tools de webhook).
 - **Tool nativa `transfer`** (`buildTelnyxTransferTool` en `lib/telnyxAssistantPayload.ts`,
-  formato de `AssistantTool.Transfer` del SDK telnyx 7.21): `from` = número de Alhabla,
+  formato de `AssistantTool.Transfer` del SDK de telnyx, desde la 7.21; hoy `^7.29`): `from` = número de Alhabla,
   `targets: [{ name: "Responsable del negocio", to: <móvil> }]`,
   `warm_transfer_instructions` (el assistant compone un mensaje que el dueño oye antes de
   unir las llamadas: «soy la recepcionista de X, te paso a un cliente que…») y
@@ -2522,7 +2733,8 @@ nuevas: el ajuste vive en `Business.agentSettings.pasarLlamadas`.
   Telnyx mezcla `telephony_settings` en cada update y omitirlo dejaría el destino de un
   dueño que pasó a «nunca»; solo `null` lo borra (comprobado el 18-10). El SDK no admite
   `null` en el tipo: lo cubre `TelephonySettingsInput` en `TelnyxAiAdapter.ts`.
-- **Reglas del prompt** (`buildTransferInstruction`, `lib/managedAgentPrompt.ts`):
+- **Reglas del prompt** (`buildTransferInstruction`, `lib/seccionesDelPrompt.ts`, reexportada
+  por `lib/managedAgentPrompt.ts`):
   `si_lo_pide` → solo si el cliente pide hablar con una persona; quejas/urgencias/pagos →
   recado primero, transferencia si insiste. `siempre` → también quejas, urgencias, pagos y
   lo que no sea reservar/consultar, **solo en horario de apertura**; fuera, recado. En
@@ -2530,7 +2742,9 @@ nuevas: el ajuste vive en `Business.agentSettings.pasarLlamadas`.
   puede atenderle, ¿prefiere que le llamen o dejar recado?» (recado = `informar_al_negocio`
   de siempre). Que la llamada siga con la recepcionista tras un fallo lo dice la
   documentación de Telnyx (transfer de Call Control y «Voicemail Detection on Transfer»);
-  **queda por confirmar en vivo** (§ 6 del plan: probar con INFINITY antes de exponerlo).
+  **queda por confirmar en vivo** (§ 6 de `docs/historico/PLAN-TELEFONIA-UX.md`: probar con un
+  negocio de producción antes de exponerlo; el plan nombraba INFINITY, que ya no existe; ver
+  «Pendiente en producción»).
 - **Resincronización**: además de `agentSettings`, `PATCH /business/me` resincroniza prompt
   y assistant cuando cambian `customerLineType`, `phone`, `ownerWhatsappNumber` u
   `ownerPhoneIsCustomerLine` (`cambiaLaTransferencia`), porque los cuatro deciden si la
@@ -2582,23 +2796,27 @@ nuevas: el ajuste vive en `Business.agentSettings.pasarLlamadas`.
 
 Lo que el plan dejó fuera del código (rescatado al archivarlo en `docs/historico/`):
 
-- **Prueba real de la fase 4** con INFINITY (INFINITY Hair Salon, cuenta de producción; antes
-  necesita número de Alhabla activo y un móvil del dueño español): pasar a «Alhabla como
-  número principal» desde Ajustes › Teléfono, llamar al número de Alhabla, pedir hablar con el
+- **Prueba real de la fase 4** (sigue pendiente a 2026-11-02) con un negocio de producción con
+  número de Alhabla activo y un móvil del dueño español. El plan la pedía con INFINITY (INFINITY
+  Hair Salon), que ya no existe en ninguna BD; hoy encaja «El petit salo», que ya tiene Alhabla
+  como número principal pero con «Cuándo pasarme llamadas» en «nunca» (sin tool `transfer`).
+  Pasar ese ajuste a «si lo pide» desde Ajustes › Teléfono, llamar al número de Alhabla, pedir hablar con el
   dueño y comprobar que el móvil suena; que si no lo coge vuelve la recepcionista («¿te llamo
   yo o te dejo recado?»); que no queda `Call` fantasma de la pata de transferencia y que
   `voice_webhook_events` no registra errores. Después, el modo «nunca» debe quitar la tool
   `transfer` del assistant.
-- **Crear el job de Cloud Scheduler `recordar-desvio-sin-comprobar`** (cada hora) con el
-  comando de § Background Jobs 8. Hasta entonces el mensaje del día 1 sobre el desvío no sale
-  en producción.
+- ~~Crear el job de Cloud Scheduler `recordar-desvio-sin-comprobar`~~ **Hecho:** el job existe
+  (`15 * * * *`, 3 reintentos; comprobado con `gcloud scheduler jobs list` el 2026-11-02), así
+  que el mensaje del día 1 sobre el desvío ya sale en producción (§ Background Jobs 8).
 
 ## Stripe Billing
 
 - Uses **Stripe Checkout Sessions** (embedded UI mode) for subscription sign-ups.
-- Plans are defined in `backend/src/modules/billing/catalog.ts`:
+- Plans (id, included minutes, extra-minute price and env var names) are defined in
+  `backend/src/modules/billing/catalog.ts`; the monthly amounts live in the Stripe prices those
+  variables point to (table of 2026-10-16):
   - `inicio` — 59 € + IVA, 200 min included, 0.30€/min + IVA extra.
-  - `pro` — 139 € + IVA, 600 min included, 0.25€/min + IVA extra (featured).
+  - `pro` — 139 € + IVA, 600 min included, 0.25€/min + IVA extra (featured on the public site).
   - `scale` — 269 € + IVA, 1500 min included, 0.20€/min + IVA extra.
 - Each plan maps to `STRIPE_PRICE_*` (current), `STRIPE_PRICE_*_FOUNDER` (current founder price),
   `STRIPE_PRICES_ANTERIORES_*` (comma-separated prices of earlier tables, still recognised) and
@@ -2611,12 +2829,14 @@ Lo que el plan dejó fuera del código (rescatado al archivarlo en `docs/histori
   13,71 €). La suscripción lo hereda (renovaciones y minutos extra) y con un NIF-IVA de otro país
   de la UE se aplica la inversión del sujeto pasivo. Coste: 0,5 % por cobro con IVA (Stripe Tax Basic).
   Las suscripciones anteriores siguen sin IVA hasta activarles `automatic_tax` a mano.
-- New subscriptions get a 7-day trial (`CHECKOUT_TRIAL_DAYS = 7`).
+- The first subscription of a business gets a 7-day trial (`CHECKOUT_TRIAL_DAYS = 7`); a business or
+  Stripe customer that already had one gets none (`diasDePruebaDelCheckout`, which omits
+  `trial_period_days`).
 - `createCheckoutSession` rejects if the business already has an active subscription or trial.
 - Stripe webhooks are processed in `billing/service.ts` (`handleStripeEvent`). Events are deduplicated via `StripeWebhookEvent` table.
 - After a successful checkout, the frontend calls `POST /billing/checkout-session/:sessionId/reconcile` to sync the subscription state to the `Business` record.
 - `getBillingSummary` calculates consumed minutes in the current period via `call.aggregate({ _sum: { durationSecs } })` on non-`IN_PROGRESS` calls.
-- **Automatic phone provisioning:** On Stripe webhook `checkout.session.completed`, the backend persists the Stripe IDs and triggers `provisionPhoneNumber(businessId)` asynchronously. This purchases a Telnyx number on the Call Control App and leaves it `active` (see Phone provisioning above). Failures do not fail the Stripe webhook response. (That webhook does not run the full subscription reconcile — the complete state sync happens via `POST /billing/checkout-session/:sessionId/reconcile` or the `customer.subscription.created` webhook.)
+- **Automatic phone provisioning:** On Stripe webhook `checkout.session.completed`, the backend persists the Stripe IDs and awaits `provisionPhoneNumber(businessId)` (not fire-and-forget: on Cloud Run the task could lose its CPU right after the webhook response — finding #11 of the September audit). This purchases a Telnyx number on the Call Control App and leaves it `active` (see Phone provisioning above). Failures are logged (`[Billing] Phone provisioning failed…`) and do not fail the Stripe webhook response. (That webhook does not run the full subscription reconcile — the complete state sync happens via `POST /billing/checkout-session/:sessionId/reconcile` or the `customer.subscription.created` webhook.)
 
 ## Calendar Integration
 
@@ -2651,7 +2871,8 @@ no conocen columnas de `Business`: reciben una `CalendarConnection` opaca.
 backend/src/adapters/calendar/
 ├── CalendarProvider.ts   # SOLO tipos y constantes (PROVEEDORES_DE_CALENDARIO, DESCRIPTORES_DE_PROVEEDOR,
 │                         #   CalendarConnection, ConexionActiva, NuevoEventoDeCalendario, interfaz CalendarProvider).
-│                         #   Prohibido importar googleapis, microsoftGraph, prisma o redis: lo importan voiceTools y el job.
+│                         #   Prohibido importar googleapis, microsoftGraph, prisma o el almacén temporal
+│                         #   (lib/almacenTemporal; antes redis): lo importan voiceTools y el job.
 ├── errors.ts             # CalendarBusinessError (+ `provider` opcional), codigoDeReconexion, esCalendarBusinessError
 │                         #   (duck-typed por `name`), proveedorDesdeErrorDeReconexion (null si desconocido: nunca cae a google)
 ├── eventoDeCalendario.ts # buildEventContent, recordatorios, hashDeIdempotencia — común a todos los proveedores
@@ -2763,7 +2984,7 @@ El alta de Apple es la tarjeta «Conecta el calendario de Apple» de `/agente`
 `POST /calendar/auth/caldav/connect` → selector de calendario → `POST /calendar/select`.
 - **Añadir otro proveedor**: (1) id en `PROVEEDORES_DE_CALENDARIO` + tipo de credenciales en `CalendarCredentials`
   + descriptor en `DESCRIPTORES_DE_PROVEEDOR`; el código `<ID>_CALENDAR_RECONNECT_REQUIRED` aparece solo por el
-  template literal; (2) clase en `adapters/calendar/<id>/`, que nunca importa prisma/redis; (3) una línea en
+  template literal; (2) clase en `adapters/calendar/<id>/`, que nunca importa prisma ni el almacén temporal; (3) una línea en
   `registry.ts`; (4) en `conexion.ts`, su forma en `CredencialesSchema` (Zod); (5) si no es OAuth, reutilizar
   `conectarConCredenciales` desde una ruta de alta. `CalendarService`, voiceTools, el job y el resto de rutas no
   se tocan. Doctoralia queda fuera del roadmap por decisión de producto (2026-09-18).
@@ -2772,13 +2993,17 @@ El alta de Apple es la tarjeta «Conecta el calendario de Apple» de `/agente`
 
 ### Models
 
-- `Service` — `name`, `durationMinutes` (5–480), `active`, `deletedAt`.
+- `Service` — `name`, `durationMinutes` (5–480), `priceCents` (optional, in cents; read by
+  `get_catalog` and «Dar precios»), `active`, `deletedAt`.
 - `Professional` — `name`, `active`, `deletedAt`.
 - `ProfessionalService` — many-to-many link with, since 2026-09-17,
   `level: ESPECIALISTA | NO_SUGERIR`. **No row = "lo hace" (normal)**, the default for
   any active professional. Rows that predate the column were the old "especialidad"
   checkbox and keep that meaning via the column default. See § Availability for what
   each level does at booking time and § CRUD for the `serviceLevels` API contract.
+- `ProfessionalAbsence` — `professionalId`, `startsAt`/`endsAt` (half-open interval), `reason`,
+  `createdVia` (`owner_chat` | `panel`). It makes its professional busy without using a slot of the
+  business; closing the whole business goes in `schedule.exceptions` instead.
 
 ### CRUD de configuración (`/booking-settings`)
 
@@ -2798,6 +3023,8 @@ persistencia y sincronización vive en `service.ts`, y los contratos Zod en
   lo hace) y `serviceIds` (= solo especialistas, para clientes antiguos). Cada
   guardado dispara `syncBookingConfiguration` (caché + resync de agentes), aunque
   `availability.ts` lee los niveles de la BD en cada tool call y no depende de esa caché.
+- `GET /absences?desde&hasta` y `DELETE /absences/:id` — ausencias de profesionales (lógica en
+  `ausencias.ts`); se crean con `POST /business/me/absences` (ver § Modo de agenda).
 
 `DELETE` nunca destruye un `Service` o `Professional`: marca `deletedAt` y
 `active: false`, retira solo las filas auxiliares de `ProfessionalService`,
@@ -2809,7 +3036,7 @@ operativos o de auditoría creados por sus flujos específicos.
 ### Business Schedule (`backend/src/lib/businessSchedule.ts`)
 
 - Zod schema: `BusinessScheduleSchema` with `version: 1`, 7 days (`monday`–`sunday`), each day has `enabled` + up to 3 non-overlapping intervals (`HH:mm` format), plus **`exceptions`** (added 2026-09-17).
-- **`exceptions`**: up to 120 entries `{ date: "YYYY-MM-DD", closed, intervals, label? }` for a single date — a public holiday, a bridge day, holidays, or a one-off special timetable. The exception **overrides the weekly pattern** for that date: `closed: true` shuts a day that would otherwise be open, `closed: false` replaces its intervals. Optional in the schema (`.default([])`) so schedules stored before it still parse. Edited from `/ajustes` (`BusinessHoursEditor`, "Festivos y días cerrados"); the next 12 upcoming ones are appended to the schedule string injected into the agent prompt, so the agent can say *why* there is no slot.
+- **`exceptions`**: up to 120 entries `{ date: "YYYY-MM-DD", closed, intervals, label? }` for a single date — a public holiday, a bridge day, holidays, or a one-off special timetable. The exception **overrides the weekly pattern** for that date: `closed: true` shuts a day that would otherwise be open, `closed: false` replaces its intervals. Optional in the schema (`.default([])`) so schedules stored before it still parse. Edited from `/agente` (`BusinessHoursEditor`, "Festivos y días cerrados"; on mobile `/agente/horario`); the next 12 upcoming ones are appended to the schedule text that `get_catalog` returns (`formatScheduleForPrompt` — the schedule has not been in the prompt itself since 2026-09-04), so the agent can say *why* there is no slot.
   - This was a real hole: 25 December is a Thursday in 2026, so the agent confirmed appointments for a closed business. The usual workaround (blocking the day in Google Calendar) did not help either — Google marks all-day events as *free* (`transparency: "transparent"`) by default and `getBusyIntervals` filtered them out. It now treats any all-day event (`start.date` present) as busy regardless of transparency.
 - Default: L–V 09:00–18:00, S–D closed, no exceptions.
 - `checkBusinessHours(schedule, timezone, startDateTime, durationMinutes)` converts to local time, applies the date exception if there is one, and validates against intervals.
@@ -2826,6 +3053,7 @@ operativos o de auditoría creados por sus flujos específicos.
    - **Client named someone:** candidates = that person only, whatever their tier — asking for someone by name is always honoured. If their tier is `no_sugerir`, the result also carries `recommendedProfessional` (best free member of the automatic pool at that same time, with `isSpecialist`), computed even when the requested person is busy.
    - **Order among candidates** (`ordenarParaAsignar`): tier first (especialista before normal), then fewest bookings that local day (counted from the already-loaded bookings, in the business timezone — "quien tenga el día más despejado"), then sign-up order. `availableProfessionals[0]` is who gets the appointment; `specialistIds` lists which of them are specialists in everything requested.
 3. Finds overlapping bookings in the time slot, using each booking's stored `durationMinutes` for overlap calculation.
+   - **Also counted as occupancy:** the busy intervals of the external calendar (`externalBusyIntervals`, with `calendarAvailabilityKnown` and `calendarOrigin`; they only reduce capacity, never make a specific professional busy), professional absences (`ProfessionalAbsence`: they make *their* professional busy without using a slot) and orphan events of cancelled bookings are reconciled so they don't block the slot forever. The booking being moved (`excluir`) is not counted. With `buscarTambienAntes` (voice receptionist) the alternative slot is the closest one before or after the requested time, not only the next one.
 4. If `bookingsInSlot >= bookingCapacity` → `CAPACITY_REACHED`.
 5. Identifies busy professionals by `professionalId` from overlapping bookings and returns the free ones with `id` and `name`. If none → `ALL_PROFESSIONALS_BUSY`.
 6. Otherwise → `available: true` with `availableProfessionals` (array of `{ id, name }`, in assignment order), optional `specialistIds`, optional `recommendedProfessional`, and capacity counts. `findNextAvailableSlot` applies the same tier/load ordering per candidate day and, without `professionalId`, also excludes `no_sugerir`.
@@ -2834,7 +3062,7 @@ operativos o de auditoría creados por sus flujos específicos.
 
 ### Managed Agent Prompt (`backend/src/lib/managedAgentPrompt.ts`)
 
-`buildManagedAgentPrompt()` assembles the prompt as a list of independent text fragments (one lookup table per axis, no branching logic) joined with blank lines — this is the pattern to follow when adding a new axis, not a template string:
+`buildManagedAgentPrompt()` resolves the context and calls `componerPrompt` (`backend/src/lib/seccionesDelPrompt.ts`): the prompt is the ordered list `SECCIONES_DEL_PROMPT` — one function per «## …» section (from `seccionRol` to `seccionIdioma`), each returning paragraphs; empty ones are dropped and the rest are joined with a blank line. Each axis is still a lookup table with no branching logic — this is the pattern to follow when adding a new axis, not a template string. The list of sections per prompt version is `SECCIONES_POR_VERSION`, chosen by `agentSettings.versionDelPrompt` (only `v1` today). The axes:
 
 - **Tone:** `warm` / `professional` / `direct`
 - **Primary goal:** `bookings` / `customer_service` / `lead_capture`
@@ -2842,10 +3070,10 @@ operativos o de auditoría creados por sus flujos específicos.
 - **Escalation:** `take_message` / `request_callback`
 - **Dar precios** (`darPrecios`, since 2026-10-20): `siempre` / `si_preguntan` / `nunca` → the
   «## Precios» block right after «## Lo que ofrece el negocio» (see Agent Settings below)
-- **Niche instructions** (`NICHE_INSTRUCTIONS`, keyed by `BusinessType`) — one sentence per vertical about what to additionally ask when booking (e.g. peluquería asks the service type, fisioterapia asks the reason for the visit **in general terms only, no structured health data** — see below). Adding a vertical is one line here, not a code branch.
+- **Sector profile** (`PERFILES_DE_SECTOR` in `backend/src/lib/sectores/perfiles.ts`, keyed by `BusinessType`; replaced `NICHE_INSTRUCTIONS`, same texts letter by letter for the original sectors) — `pautas`: what to additionally ask when booking and what not to promise, in «## Límites» (e.g. peluquería asks the service type, fisioterapia asks the reason for the visit **in general terms only, no structured health data** — see below); `catalogo`: the examples of «## Lo que ofrece el negocio»; plus the Places keywords and `datoSensible`. Adding a vertical is its slug in `BUSINESS_TYPES` plus a profile there, not a code branch.
 
 The prompt includes:
-- Business identity and verified info block (`INFORMACION_VERIFICADA_DEL_NEGOCIO`, free text from `Business.businessDetails`)
+- Business identity and the «## Información del negocio» section near the end (`seccionInformacionDelNegocio`, free text from `Business.businessDetails`, which the owner can also extend from the Gestor with `actualizar_informacion`)
 - Booking restrictions, in Spanish, only if set (`minAdvanceBookingMinutes`/`maxAppointmentDurationMinutes` — see Business Type / Booking & Availability)
 - Instructions to NEVER invent data: `get_catalog` for services, professionals and hours; `check_availability` for a concrete slot (it validates opening hours, booking restrictions, capacity and the calendar, and returns the `availabilityToken`); `book_appointment` only after explicit confirmation and with that token (a required parameter). The legacy `check_business_hours` tool no longer exists (removed 2026-09-29)
 - **Bloque «## Lo que ofrece el negocio»** (`TITULO_DEL_BLOQUE_DEL_CATALOGO`, desde el 2026-10-07): lo que hace el negocio solo se sabe por `get_catalog`, también ante preguntas de sí o no («¿hacéis mechas?», «do you do beard trims?») y en cualquier idioma. La tool se llama en ese mismo turno, antes de decir «sí», «no» o «lo miro», y una sola vez por conversación. Un servicio pedido con otro nombre o en otro idioma es el del catálogo, y uno que no está no se confirma. La descripción de la tool dice lo mismo (`buildTelnyxVoiceTools`). Viene de las llamadas de prueba del 05-10: con la regla anterior, metida en «## Conversación» detrás de «no enumeres opciones», la recepcionista contestaba «yes, we do highlights» en un negocio sin servicios. Por chat consultaban 27 de 72 preguntas de sí o no; con el bloque, todas las medidas (288 por chat y 13 llamadas reales). Cuesta una vuelta más del LLM en esa primera respuesta: ~2 s de mediana con flux y ~3,4 s con Soniox, frente a ~0,8 s sin consultar.
@@ -2859,13 +3087,21 @@ Since 2026-09-04 the prompt text itself no longer contains the business's servic
 
 ### Agent Settings (`AgentSettingsSchema`)
 
-Stored in `Business.agentSettings` (JSON). Parsed with Zod; falls back to `DEFAULT_AGENT_SETTINGS` on invalid data.
+Stored in `Business.agentSettings` (JSON). Parsed with Zod by `parseAgentSettings`, field by
+field: an invalid value falls back to its own default from `DEFAULT_AGENT_SETTINGS` without
+resetting the rest. Fields (`CAMPOS_DE_AJUSTES` in `managedAgentPrompt.ts`): `version: 1`, `tone`,
+`primaryGoal`, `responseStyle`, `escalation`, `voiceGender`, `languages`, `voiceLanguage`, `voz?`,
+`pasarLlamadas?` (see «Cuándo pasarme llamadas» in § Telefonía), `darPrecios` and
+`versionDelPrompt` (internal switch, `.default("v1")`: picks the prompt's list of sections
+— `SECCIONES_POR_VERSION` — so a new prompt can be turned on business by business; the owner
+never sees it and `PATCH /business/me` keeps the stored value).
 
 Includes `voiceGender: "femenina" | "masculina"` (added 2026-09, `.default("femenina")` in the
 Zod schema — required so businesses with `agentSettings` saved before this field existed keep
 parsing successfully instead of losing their tone/goal/style/escalation customization to the
-full `DEFAULT_AGENT_SETTINGS` fallback). Edited in `/agente` via `AgentSettingsEditor`, same
-generic `fields` array pattern as tone/goal/style/escalation — no registration step, matches the
+full `DEFAULT_AGENT_SETTINGS` fallback). Edited in «Cómo atiende» (`comportamiento-movil.tsx`,
+the same on mobile — `/agente/comportamiento` — and desktop `/agente`; the old
+`AgentSettingsEditor` no longer exists), together with tone/goal/style/escalation — no registration step, matches the
 "configure once, tune later" pattern already used for the rest of `AgentSettings`.
 The assistant's voice comes from `lib/idiomas/` (`resolverIdiomas`, below): the chosen voice
 (`AgentSettings.voz`) if it is one of the main language's, otherwise the first of its gender
@@ -2925,7 +3161,8 @@ neerlandés y, desde el 14-10, ruso) y, si es catalán, euskera o gallego, tambi
 El ruso no tiene voces propias, así que no puede ser principal; su saludo sirve para saludar en ruso
 a quien ya llamó hablándolo. No hay casillas de
 idiomas: `languages` se guarda derivado del principal para que todo lo que lo lee siga igual. El
-panel dice «Habla en 7 idiomas: … Saluda en español y sigue en el idioma de quien llama.»
+panel dice «Habla en 8 idiomas: … Saluda en español y sigue en el idioma de quien llama.» (9 con
+una cooficial; eran 7 antes del ruso, 14-10).
 
 **Una sola fuente: `backend/src/lib/idiomas/`** (módulo puro, sin E/S). Ningún otro módulo guarda
 listas de idiomas ni decide por su cuenta:
@@ -3062,7 +3299,9 @@ listas de idiomas ni decide por su cuenta:
   catálogo en caché aún les pone ese `requiere`— y `voz_idioma` donde hay `elegir_voz` —la app
   anterior al 05-10 desbloqueaba con ella la voz—: Vercel publica la app antes de que Cloud Run
   sirva el backend, y una pestaña con la app anterior lanzaba al pintar sin ellos o bloqueaba lo
-  que ya se puede elegir. Se quitan en la PR siguiente (el fixture del frontend no los lleva). En
+  que ya se puede elegir. Iban a quitarse en la PR siguiente (el fixture del frontend no los
+  lleva); **pendiente: a 2026-11-02 siguen en el código** (`catalogoConCamposDelPanelAnterior`,
+  `featuresParaLaApp` y su nota en `planFeatures.ts`). En
   sentido contrario, la app tolera un catálogo sin `idiomas`/`entradilla`/`requiere`/
   `requiereParaElegirVoz` (guarda el obligatorio y el principal, enseña la entradilla de la vista
   previa y no bloquea la voz, que ese backend tampoco mira) y uno con `requiere` de
@@ -3114,7 +3353,8 @@ olvida al guardar.
     carácter (ver «Coste por voz») y no mejoraban la espera. El inventario de producción del
     05-10 confirmó que ningún negocio las había elegido; sus muestras de `frontend/public/voces`
     (y `blanca.mp3`/`marcos.mp3`, ahora por uuid) se borran en una PR posterior, cuando el backend
-    ya desplegado deje de pedirlas.
+    ya desplegado deje de pedirlas. **Pendiente: a 2026-11-02 siguen ahí** (`es/blanca.mp3`,
+    `es/marcos.mp3` y en `ca/` alba, clara, enric, joana, ramon, serena y tomas).
   - Transcripción con Soniox: `language_hints` (la del principal y la del español), `context`,
     endpoint a 500 ms (el mínimo), `wait_seconds: 0.1` y 0.5 s sin puntuación (medido, ver
     abajo). Contesta entre 1,4 y 2 s en vez de ~0,9 s, también a quien habla castellano, y el
@@ -3130,10 +3370,13 @@ olvida al guardar.
   da 400) y distintos; heredan el idioma salvo que lleven el suyo; `null` o `[]` los quitan.
   Validadas las combinaciones reales (flux con los ocho idiomas y `multi`, Soniox con es+ca y
   es+eu). No se pudo forzar un fallo de verdad: una `api_key_ref` falsa en Soniox no lo rompe
-  (Telnyx usa su propia clave). El SDK 7.24 no declara el campo:
-  `TranscriptionSettingsInput` en `TelnyxAiAdapter.ts`.
+  (Telnyx usa su propia clave). El SDK 7.24 no declaraba el campo; desde la 7.29 está tipado
+  (`RespaldoDeTranscripcion` = `TranscriptionSettings.FallbackModel` y
+  `TranscriptionSettingsInput` = `TranscriptionSettings` en `TelnyxAiAdapter.ts`).
   - **En estudio (no depende de esta PR):** cambiar de voz a mitad de llamada (español → catalán
     con Marta) con `conversation_flow`, para que un principal español atienda también catalán.
+    *Histórico:* se hizo el 14-10 para la cooficial de la zona (`flujoDeLaCooficial`, ver «La
+    cooficial de la zona» arriba).
 - **El dueño elige la voz escuchándola** en «Cómo atiende»: en Pro y Scale, las recomendadas a
   la vista y el resto del género al desplegar; en Inicio, la de por defecto de cada género. Las
   muestras las genera `scripts/muestrasDeVoces.ts`.
@@ -3176,7 +3419,8 @@ herramienta):**
   principal español, lo vigilan; elegir la voz de por defecto produce el mismo payload que no elegir.
 - **La API de voces** lista las nativas de alemán, italiano y neerlandés sin región («de», «it»,
   «nl»), solo envía `deprecated` cuando vale `true` y el SDK 7.24 no tipa `label`, `accent` ni
-  `deprecated` (`TelnyxAiAdapter.listVoices` los devuelve con un cast documentado).
+  `deprecated` (`TelnyxAiAdapter.listVoices` los devuelve con un cast documentado; medido con la
+  7.24 y el cast sigue con la 7.29).
 - **Hash del 05-10:** la simplificación cambia el payload de todos los negocios (transcripción
   `multi` con principal Ultra, la lista del prompt y el refuerzo de la regla de idioma): al
   desplegar se resincronizan todos los assistants. Es deliberado; la instantánea se revisó caso a
@@ -3200,7 +3444,8 @@ herramienta):**
   transcripción y pistas de Soniox) y los cambios de voz e idioma (de catalán a español y al
   revés, con el payload completo), y lo borra todo. Tiene 8 casos: el de MiniMax se queda para
   vigilar que el adaptador borre su `language_boost`, y desde el 05-10 principal español (habla
-  siete: Blanca, flux en `multi`), principal catalán (habla ocho: Marta, `language: "ca"`, Soniox
+  siete —ocho desde el ruso, 14-10—: Blanca, flux en `multi`), principal catalán (habla ocho —hoy
+  nueve—: Marta, `language: "ca"`, Soniox
   con las pistas del catalán y el español), principal alemán (Alina, flux en `multi`) y español con una voz que no es
   la de por defecto, que comprueban antes lo que da el resolver.
 - `medirLatenciaDeTurnos.ts`: espera entre el cliente y la recepcionista (p50/p95 y solapes) a
@@ -3247,7 +3492,7 @@ del mismo día la lectura hace lo mismo (`normalizarIdiomas`) por si queda algun
 ### Agent Defaults (`backend/src/lib/agentBootstrap.ts`)
 
 `DEFAULT_AGENT_CONFIG` is what a new `Agent` row starts with (`buildAgentPersistencePayload`):
-name «Asistente virtual», `firstMessage` "Hola, soy la recepcionista virtual. ¿En qué te ayudo?"
+name «Asistente virtual» (placeholder: `createBusinessAgent` names the row with `buildAgentDisplayName`), `firstMessage` "Hola, soy la recepcionista de IA. ¿En qué te ayudo?"
 (replaced at creation by the greeting of `componerSaludo` with the business name),
 `firstMessageMode: "assistant-speaks-first"`, language `es` and the voice/LLM/STT fields of the
 row. The Telnyx assistant does not take its voice or greeting from these fields: they come from
@@ -3257,73 +3502,81 @@ silence) and the rest of the payload from `buildTelnyxAssistantPayload`
 
 ### Business Type (`Business.businessType`)
 
-The `businessType` field stores the business niche selected during registration. Supported values: `peluqueria`, `centro-de-estetica`, `salon-de-unas`, `barberia`, `fisioterapia`, `other`. It is persisted in `Business.businessType` and used by `agentBootstrap.ts` to:
+The `businessType` field stores the business niche selected during registration. Supported values (`BUSINESS_TYPES` in `backend/src/lib/businessType.ts`): `peluqueria`, `centro-de-estetica`, `salon-de-unas`, `barberia`, `fisioterapia`, `pestanas-y-cejas`, `spa-y-masajes`, `peluqueria-canina`, `other`. What changes per type (label, prompt guidance, catalog examples, Places keywords, `datoSensible`) lives in its profile in `backend/src/lib/sectores/perfiles.ts` (`PERFILES_DE_SECTOR`); the app and the web keep a copy of the list (`frontend/src/lib/business-type.ts`, `web/src/lib/business-type.ts`). It is persisted in `Business.businessType` and used by `agentBootstrap.ts` to:
 
 - Build a readable agent display name (`buildAgentDisplayName`) that includes the niche label, making agents easy to tell apart.
-- Resolve the agent template (`getAgentTemplateForBusinessType`), which builds an initial prompt already including the niche instruction (`NICHE_INSTRUCTIONS`, see Managed Agent Prompt). TTS/LLM/STT settings are still shared across all niches — only prompt content differs today.
+- Resolve the agent template (`getAgentTemplateForBusinessType`), which builds an initial prompt already including the sector's `pautas` (`PERFILES_DE_SECTOR`, see Managed Agent Prompt). Voice and models (TTS/LLM/STT) are the same for every sector — what differs is the profile.
 - Rename the agent row (`syncAgentNameWithBusinessType`, cosmetic only) and resync the assistant's prompt (`syncAgentToTelnyx`, from `PATCH /business/me`) when the business type changes, since it changes the niche instruction.
 
-Niche landings pass `?niche=<slug>` to `/planes` and on to `/register`, so the type can be pre-selected. If the user comes from the generic flow, the type is inferred from the `types` array returned by Google Places API (`backend/src/modules/places/service.ts`) using the keywords defined in `BUSINESS_TYPE_PLACE_KEYWORDS` (both in `backend/src/lib/businessType.ts` and `frontend/src/lib/business-type.ts`). Each niche has exactly 2 keywords; if any place type contains at least one of them, that niche is assigned. The mapping is ordered from most specific to most generic:
+Sector landings (in `web/`) pass `?niche=<slug>` to `/planes` and on to `/register` (both on the public site), which sends it as `businessType` at sign-up, so the type can be pre-selected. If the user comes from the generic flow, the type is detected from the Google Places result by `detectBusinessTypeFromPlace` (`backend/src/lib/businessType.ts`, called from `backend/src/modules/places/service.ts`): Google's `primaryType` first (the only reliable signal: `types` has no guaranteed order, and a hair salon that also does nails used to land in «Salón de uñas») and, only if it is missing, the `types` array. Each profile's keywords (`palabrasDePlaces`) are checked in the order of `ORDEN_DE_DETECCION_EN_PLACES`, most specific first; the first sector with a keyword contained in a type wins. The app and the web keep a copy in `BUSINESS_TYPE_PLACE_KEYWORDS`. The mapping, in that order:
 
 | Niche | Keywords |
 |-------|----------|
 | `barberia` | `barber_shop`, `barber` |
 | `salon-de-unas` | `nail_salon`, `nail` |
+| `peluqueria-canina` | `pet_groom`, `pet_care` |
 | `peluqueria` | `hair_care`, `hair_salon` |
-| `centro-de-estetica` | `beauty_salon`, `spa` |
-| `fisioterapia` | `physiotherapist`, `health` |
+| `centro-de-estetica` | `beauty_salon` (without `spa`: a spa comes in through its `primaryType`) |
+| `spa-y-masajes` | `massage`, `spa` |
+| `fisioterapia` | `physiotherapist` (without `health`, which matched any health business: a dentist came out as physio) |
+| `pestanas-y-cejas`, `other` | none (chosen by hand) |
 
 The inferred type is shown for confirmation on `/bienvenida/niche` after the Places API step; if no type can be inferred, the user selects it manually from the list.
 
 After confirming the business type, the user is taken to `/bienvenida/services`, which offers a template of common services for the selected niche (defined in `frontend/src/lib/service-templates.ts`). Services are rendered as selectable pills showing name and duration. Selected services are created via `POST /booking-settings/services`; the user can also skip this step and configure services later in `/agente`.
 
-The next step is `/bienvenida/team`, where the user sets the number of employees (1–20) and booking capacity (1–50). The backend creates placeholder professionals (`Profesional 1…N`) and updates `Business.bookingCapacity`.
+The next step is `/bienvenida/team`, where the user sets the number of employees (1–20) and booking capacity (1–50). The app updates `Business.bookingCapacity` and creates placeholder professionals (`Profesional 1…N`) with `POST /booking-settings/professionals`, skipping names that already exist so a retry doesn't duplicate them; no service links are sent (no row = «lo hace»).
 
-The final setup step is `/bienvenida/calendar`, where the user connects Google or Outlook Calendar (Apple/CalDAV is only offered later, from `/agente`). The frontend stores `registration_next_step` in `localStorage` before starting OAuth so `/settings` can bounce the user back into the registration flow after the provider callback. The flow always ends at `/checkout?plan=` (if a plan is pending) or `/planes?from=register` (to select one).
+The final setup step is `/bienvenida/calendar`, which offers Google, Outlook, Apple (inline form with `AppleCalendarConnect`, the same as in `/agente`) and, since 2026-10-28 (PR #364), «Usar la agenda de Alhabla» (`PATCH /business/me/agenda/modo`, see "Modo de agenda"). Before Google/Microsoft OAuth the frontend stores `registration_next_step` in `localStorage` (with a timestamp; it expires after 24 h, `lib/registration-next-step.ts`) so `/settings` can bounce the user back into the registration flow after the provider callback. The flow always ends at `/checkout?plan=` (if a plan is pending) or `/planes?from=register` (to select one; the app redirects `/planes` 301 to the public site).
 
 Onboarding texts for headings, subheadings and CTAs are dynamically selected per business type via `BUSINESS_TYPE_ONBOARDING_TEXTS` in `frontend/src/lib/business-type.ts`.
 
-Google Places autocomplete is filtered by the country selected during registration and stored in `localStorage` under `alhabla_registration_country`. The `/bienvenida` page shows the country as a summary with an optional "Cambiar" link; the selector only appears when no country is saved or when the user explicitly chooses to change it. The country is sent as the `country` query param and passed to `includedRegionCodes` in `backend/src/modules/places/service.ts`.
+Google Places search on `/bienvenida` is biased to the browser's location: it asks for geolocation and sends `lat`/`lng`, which become a 50 km `locationBias` in `backend/src/modules/places/service.ts`. Only if geolocation is unavailable, denied or too slow does the page show a country selector; the country is sent as the `country` query param and passed to `includedRegionCodes`. (The old country saved in `localStorage` as `alhabla_registration_country` no longer exists.)
 
 ## Onboarding Flow
 
-The onboarding checklist lives on the dashboard (`/`). It guides the business through five setup steps:
+The onboarding checklist lives on the dashboard (`/`). It guides the business through six setup steps
+(`AGENT_CONFIGURATION_STEPS` in `frontend/src/lib/agent-configuration.ts`):
 
 1. **Schedule** — valid `BusinessSchedule` configured.
 2. **Services** — at least one active `Service` created.
 3. **Professionals** — at least one active `Professional` created.
-4. **Calendar** — a calendar connected with the active provider (Google, Outlook or Apple/CalDAV): `marcadaComoConectada`, i.e. only the `connected` flag, without looking at the credentials (historical semantics of this step).
-5. **Forwarding** — the business's own line is forwarded to its Alhabla number.
+4. **Calendar** — a calendar connected with the active provider (Google, Outlook or Apple/CalDAV): `marcadaComoConectada`, i.e. only the `connected` flag, without looking at the credentials (historical semantics of this step); or the business books in the Alhabla agenda (`modoDeAgenda = alhabla`, `reservaEnAlhabla`), which needs no calendar — otherwise the checklist never finished.
+5. **WhatsApp** — the owner's WhatsApp is `activo`, or they opted out (`baja`: a decision, not a pending task). It counts towards progress since the panel PR of 2026-09-20 (`CONTAR_WHATSAPP_EN_PROGRESO = true`).
+6. **Forwarding** — the business's own line is forwarded to its Alhabla number.
 
 **The forwarding step is the only one we cannot verify directly**: it is activated on the
 business's own handset with a GSM MMI code and no API reports it. It is therefore treated as done
-when either the business has received **at least one call** (real proof) or the user pressed "Ya lo
-he activado" (`OnboardingState.forwardingConfirmedAt`). Its `status` also gates the UI:
+when the business has received **at least one call** (real proof), the user pressed "Ya lo
+he activado" (`OnboardingState.forwardingConfirmedAt`), or the business uses its Alhabla number as
+its main line (`customerLineType = "alhabla"`: there is no line to forward). The `forwarding` object
+also carries `checkedAt` (last «Comprobar desvío» that really came through) and `customerLine` (null
+while it is still the registration placeholder). Its `status` also gates the UI:
 
 | `forwarding.status` | When | UI |
 |---|---|---|
 | `waiting_number` | `phoneNumberStatus` is not `active`, or no number yet | Step shown but not actionable ("Disponible en cuanto tu número esté activo"). Telnyx takes a few minutes to approve a Spanish number, and the checklist copy redirects that wait to the other steps. |
 | `ready` | Number active, no calls yet, not confirmed | Step is the highlighted action; `CallForwardingCard` on the dashboard shows the MMI codes with the real number substituted. |
-| `done` | First call received, or user confirmed | Step complete; the card disappears. |
+| `done` | First call received, user confirmed, or Alhabla number as main line | Step complete; the card disappears. |
 
 ### Backend (`backend/src/modules/onboarding/routes.ts`)
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/business/me/onboarding` | Computes step completion live from business data and returns progress, dismissed/completed timestamps, `isActive` and the `forwarding` object above. |
+| `GET` | `/business/me/onboarding` | Computes step completion live from business data and returns progress, dismissed/completed timestamps, `isActive`, `whatsapp` (`{ status, ownerWhatsappNumber }`) and the `forwarding` object above. |
 | `POST` | `/business/me/onboarding/dismiss` | Persists `dismissedAt`. |
 | `POST` | `/business/me/onboarding/complete` | Persists `completedAt`. |
 | `POST` | `/business/me/onboarding/confirm-forwarding` | Persists `forwardingConfirmedAt` — the user's word, not a verification. |
 | `POST` | `/business/me/onboarding/forwarding/check` | «Comprobar desvío»: origina una llamada real desde el número de Alhabla a la línea de clientes (202 con `{ id, linea, startedAt, resultado, resueltaAt }`). Ver § Telefonía. |
 | `GET` | `/business/me/onboarding/forwarding/check/:id` | Estado de esa comprobación (polling del panel); 404 si no es del negocio del token o ya caducó. |
 
-### Frontend (`frontend/src/app/ajustes/page.tsx`)
+### Frontend (`frontend/src/components/movil/inicio-movil.tsx` › `GuiaDeConfiguracion`)
 
-- Fetches onboarding state via TanStack Query (`["onboarding-state"]`).
-- Shows the `SetupGuide` whenever `onboardingQuery.data?.isActive === true`, regardless of the `?from` query param. Any authenticated user that has not completed or dismissed onboarding sees the guide.
-- Calls `dismissOnboarding()` when the user closes the guide.
-- Auto-completes onboarding via `completeOnboarding()` when computed progress reaches 100%.
-- Real-time invalidation: `invalidateAll()` also invalidates `["onboarding-state"]` so the guide progress updates immediately after creating services/professionals or updating capacity. `scheduleMutation` calls `invalidateAll()` after saving the business schedule so the schedule step is marked as done right away.
+- Fetches onboarding state via TanStack Query (`["onboarding-state"]`, `getOnboardingState`); the same query feeds `operational-status.tsx`, the Teléfono settings (`ajustes-telefono.tsx`) and `/checkout/resultado`.
+- `GuiaDeConfiguracion` is shown on the home panel — mobile (`inicio-movil.tsx`) and desktop (`escritorio/panel-escritorio.tsx`) — whenever `isActive === true`. Any authenticated user that has not completed or dismissed onboarding sees the guide. Folded, it is one row with the next step; open, the pending and the done steps, each linking to `/agente?section=…` (desktop) or `/agente/<ajuste>` (mobile).
+- Calls `dismissOnboarding()` when the user hides the guide.
+- Nothing in the app calls `/complete` today: `isActive` turns false by itself when progress reaches 100%. (Historical: the old `SetupGuide` auto-completed it with `completeOnboarding()`; the route stays.)
+- Real-time invalidation: every mutation that can complete a step (services, professionals, schedule, phone, WhatsApp, main number) invalidates `["onboarding-state"]` so the guide progress updates right away.
 
 ## Frontend Design System
 
@@ -3336,33 +3589,41 @@ The frontend follows a **conservative, professional SaaS aesthetic** tailored to
 
 ### Color Palette
 
-Defined in `frontend/src/app/globals.css`. The site was redesigned in agosto 2026
-(commit `eeab7f4`) from the old green palette to a black/white/purple system — the
-values below are the current ones; any green token found in older docs is stale.
+The site was redesigned in agosto 2026 (commit `eeab7f4`) from the old green palette to a
+black/white/purple system. **Since October 2026 the app has a dark mode** (the system's by
+default, with a selector in Cuenta; `lib/tema.ts` and the script in `app/layout.tsx` set
+`data-tema` on `<html>` before painting). Every colour is a token defined as RGB channels in
+`frontend/src/app/globals.css` — light value in `:root`, dark value in `:root[data-tema="oscuro"]` —
+with a Tailwind class of the same name (`tailwind.config.ts`, `darkMode: ["selector",
+'[data-tema="oscuro"]']`), so each class works in both themes without `dark:` and accepts opacity
+(`bg-superficie/95`).
 
-| Token | Hex | Usage |
-|-------|-----|-------|
-| `--background` | `#ffffff` | Body background (flat white, no gradients) |
-| `--foreground` | `#0a0a0a` | Main text color |
-| `--surface` | `#ffffff` | Card/panel backgrounds |
-| `--surface-soft` | `#fafafa` | Second-level surfaces, hovers, sticky bars |
-| `--border` | `#e5e5e5` | Default hairline borders |
-| `--muted` | `#52525b` | Secondary text, descriptions (7.5:1 on white — AA) |
-| `--accent` | `#0a0a0a` | Primary buttons, headings, emphasis |
-| `--accent-strong` | `#262626` | Hover states on primary elements |
-| `--accent-soft` | `#a78bfa` | Light purple accents |
-| `--purple` | `#8b5cf6` | Brand accent: focus rings, links, selected states |
-| `--purple-strong` | `#7c3aed` | Purple hover |
-| `--purple-wash` | `#f3eeff` | Badge/icon tile backgrounds |
-| `--purple-ink` | `#6d28d9` | Text on purple-wash surfaces |
-| `--purple-ring` | `#ddd6fe` | Subtle purple rings |
-| `--success` | `#2c7334` | Success states, connected indicators |
-| `--warning` | `#9f7a15` | Warning states |
-| `--error` | `#c53030` | Error states, validation failures |
+| Token (class) | Light | Dark | Usage |
+|---------------|-------|------|-------|
+| `lienzo` / `superficie` / `elevada` | `#ffffff` | `#0b0b0e` / `#141418` / `#1c1c21` | Page background, panels, what floats |
+| `relleno` / `relleno-fuerte` | `#fafafa` / `#f4f4f5` | `#19191e` / `#24242a` | Soft fills, hovers, sticky bars, skeletons |
+| `linea` / `linea-suave` / `linea-fuerte` | `#e5e5e5` / `#f0f0f0` / `#d4d4d8` | `#2e2e36` / `#222228` / `#3f3f48` | Borders |
+| `tinta` (+ `tinta-hover`, `sobre-tinta`) | `#0a0a0a` | `#f4f4f5` | Main text and primary button; inverts in dark, and so does the text on it (`sobre-tinta`) |
+| `apagado` / `tenue` | `#52525b` / `#a1a1aa` | `#a1a1aa` / `#696973` | Secondary text (`.text-muted`; `apagado` is 7.5:1 on white — AA) |
+| `morado` / `morado-hondo` | `#8b5cf6` / `#7c3aed` | same | Brand accent: icons, focus rings, links, selected states; hover |
+| `morado-tinta` / `morado-claro` | `#6d28d9` / `#a78bfa` | `#c4b5fd` / `#c4b5fd` | Text on `lavado`; light purple accents |
+| `lavado` / `lavado-borde` | `#f3eeff` / `#ddd6fe` | `#231b38` / `#3d3163` | Badge and icon-tile backgrounds; subtle purple rings |
+| `exito` / `aviso` / `error` (+ `-fondo`, `-borde`) | `#2c7334` / `#806012` / `#c53030` | `#6ecf7a` / `#e3bd57` / `#f47067` | States (`aviso-icono` `#9f7a15` for the icon) |
+| `urgente` (+ `-fondo`) | `#b42318` | `#f97066` | What asks for action (a booking that fell through): sober red only on the icon, white card |
+| `peligro` | `#c53030` | `#c83a3a` | Delete buttons (white text in both themes) |
+| `oscuro` | `#0a0a0a` | `#1e1e24` | Dark surfaces in both themes (next appointment, transcript) |
 
-Consume tokens through CSS variables or Tailwind utilities — do not hardcode
-near-duplicate hex values. The old green palette (`#eef2eb`, `#1e2b22`, `#b8d96e`…)
-is gone from `frontend/src`; the values above win on conflict.
+There are also intermediate steps (`tinta-2`, `tinta-3`, `apagado-2`, `lavado-2`, `lavado-3`,
+`aviso-fondo-2`, `error-fondo-2`, `error-hondo`, `peligro-hondo`); the full list is `TOKENS` in
+`tailwind.config.ts`. `--background`, `--foreground` and `--muted` remain as aliases for a few old
+classes.
+
+**No hex in classes** (`bg-[#f3eeff]`): use the token (`bg-lavado`), or it won't change in dark
+mode. The old green palette (`#eef2eb`, `#1e2b22`, `#b8d96e`…) is gone from `frontend/src`. The
+public site (`web/`) defines the same tokens, light only (dark only on `/register`, which follows
+the system), so the components shared between the two use the same classes; its `globals.css`
+still carries the old hex variables (`--surface`, `--accent`, `--purple*`…) as leftovers.
+`DESIGN.md` wins on conflict.
 
 ### Accessibility Baseline
 
@@ -3373,7 +3634,8 @@ non-optional for a service sold online in the EU. Concretely:
   this palette look fine and fail.
 - Every interactive control is at least 44px tall. Inline links inside prose are exempt.
 - Body text never drops below 14px. 12px is for badges and column headers only.
-- Focus is always visible (`focus-visible` ring in `#8b5cf6` — see `.field`).
+- Focus is always visible (`ring-morado` — see `.field` and the `.btn-*` classes). Check contrast in
+  both themes: dark mode has its own values.
 - Modals need `role="dialog"`, `aria-modal`, a focus trap and body scroll lock.
 - Anything driven by audio needs a non-audio equivalent.
 
@@ -3381,12 +3643,14 @@ non-optional for a service sold online in the EU. Concretely:
 
 | Class | Purpose | Key properties |
 |-------|---------|----------------|
-| `.panel` | Card/container | `rounded-3xl`, `bg-white`, border `#e5e5e5`, `shadow-none` |
-| `.field` | Text inputs | `rounded-[10px]`, `h-11`, border `#e5e5e5`, focus `border/ring #8b5cf6` |
-| `.btn-primary` | Primary action | `rounded-[10px]`, `h-12`, `bg-[#0a0a0a]`, white text, hover lift |
-| `.btn-secondary` | Secondary action | `rounded-[10px]`, `h-12`, white bg, `border-[#0a0a0a]` |
-| `.btn-purple` | Brand accent action | `rounded-[10px]`, `h-12`, `bg-[#8b5cf6]`, hover `#7c3aed` |
-| `.badge-soft` | Status badges | `rounded-full`, `bg-[#f3eeff]`, text `#6d28d9`, ring `#ddd6fe` |
+| `.panel` | Card/container | `rounded-3xl`, `bg-superficie`, `border-linea`, `shadow-none` |
+| `.field` | Text inputs | `rounded-[10px]`, `h-11`, `bg-superficie`, `border-linea`, focus `border-morado` + `ring-morado/30`, `aria-invalid` in `error` |
+| `.btn-primary` | Primary action | `rounded-[10px]`, `h-12`, `bg-tinta`, `text-sobre-tinta` (inverts in dark), hover `bg-tinta-hover` + lift |
+| `.btn-secondary` | Secondary action | `rounded-[10px]`, `h-12`, `bg-superficie`, `border-tinta`, `text-tinta`, hover `bg-relleno` |
+| `.btn-purple` | Brand accent action | `rounded-[10px]`, `h-12`, `bg-morado`, white text, hover `bg-morado-hondo` |
+| `.badge-soft` | Status badges | `rounded-full`, `bg-lavado`, `text-morado-tinta`, ring `lavado-borde` |
+
+The three buttons share the focus ring (`focus-visible:ring-morado` with offset).
 
 ### Styling Rules
 
@@ -3395,10 +3659,12 @@ non-optional for a service sold online in the EU. Concretely:
   2026-09-17, commit `e6d3b52`), and `rounded-full` only for badges, nav pills, segmented
   controls, progress bars and genuinely circular icon buttons. No 8px radius (`rounded-lg`) —
   see `DESIGN.md` § Shapes.
-- **Shadows:** minimal — `.panel` is `shadow-none` with a hairline border; the ambient
-  purple-tinted glow (`0 8px 24px rgba(0,0,0,0.06)` + purple halo, see `globals.css`) is
-  reserved for specific highlighted elements. Don't add heavy drop shadows.
-- **Typography:** Reserve `font-semibold` for H1/H2/H3, card titles, CTAs and key figures. Use
+- **Shadows:** minimal — `.panel` is `shadow-none` with a hairline border. A shadow only on
+  elements that really float (circular back button, modals, sticky configuration bars), always
+  pure black (`rgba(0,0,0,0.08)`–`0.12`, offset 8–12 px, blur 20–32 px), never coloured — see
+  `DESIGN.md` § Elevation & Depth. Don't add heavy drop shadows.
+- **Typography:** Reserve `font-semibold` or heavier for headings, card titles, CTAs and key
+  figures (headlines go up to `font-extrabold`/`font-black`, see `DESIGN.md` § Typography). Use
   `font-normal` for body text and descriptions.
 - **Tracking:** `-0.02em` on headings (floor `-0.04em`), max `0.12em` on uppercase labels. Anything
   from `0.15em` up reads as texture, not words.
@@ -3406,13 +3672,13 @@ non-optional for a service sold online in the EU. Concretely:
   "Sin letra pequeña"). The heading carries its own weight. A badge is fine when it adds
   information the heading doesn't — "Google Calendar" names the integration — but not when it just
   announces the section.
-- **Backgrounds:** flat white (`#ffffff`) — the old green radial-gradient body is gone.
-  Second-level surfaces use `#fafafa` (hovers, sticky bars).
-- **Icons:** Lucide React icons in a `rounded-xl` tile with `bg-[#f3eeff]` and `text-[#8b5cf6]`
+- **Backgrounds:** flat `bg-lienzo` (white in light mode) — the old green radial-gradient body
+  is gone. Second-level surfaces use `bg-relleno` (hovers, sticky bars).
+- **Icons:** Lucide React icons in a `rounded-xl` tile with `bg-lavado` and `text-morado`
   (purple system, not the old green).
-- **Black is the primary surface color:** primary buttons and headings are near-black
-  (`#0a0a0a`); purple (`#8b5cf6`) is the single brand accent. Don't introduce additional
-  accent colors.
+- **Black is the primary surface color:** primary buttons and headings are `tinta` (near-black
+  in light mode, inverted in dark); `morado` is the single brand accent. Don't introduce
+  additional accent colors.
 
 ### Component-Specific Notes
 
@@ -3420,9 +3686,9 @@ non-optional for a service sold online in the EU. Concretely:
   pass their niche accent.
 - **Checkout:** container has `min-h-[480px]` to prevent empty-state collapse.
 - **`AppShell` bars:** below `lg`, a sticky header and a fixed bottom bar (padded with
-  `env(safe-area-inset-bottom)`), both `bg-white/95` with `backdrop-blur` and a `#e5e5e5`
-  hairline; from `lg` up both give way to a sticky white sidebar with `border-r`.
-- **`MobileNav`:** closes on Escape and on outside pointerdown, restores focus to the toggle, and
+  `env(safe-area-inset-bottom)`), both `bg-superficie/95` with `backdrop-blur` and a
+  `border-linea` hairline; from `lg` up both give way to a sticky sidebar with `border-r`.
+- **`MobileNav` (`web/`, the public site's menu):** closes on Escape and on outside pointerdown, restores focus to the toggle, and
   locks body scroll while open.
 - **Skip link:** `SiteLanding`'s "Saltar al contenido" targets `#contenido` (the wrapper around
   `LandingHero`), not `#main-content` — the `<main>` contains the link, so it skipped nothing.
@@ -3438,13 +3704,18 @@ any user-facing copy:
   comparisons do (`Fuentes`, with the date they were checked). The sector landings carry no
   third-party figures or press quotes since 2026-10-29; if a quote comes back, it is a business
   owner interviewed in the press **about the problem**, never presented as a testimonial.
-- Do not promise capabilities that do not ship. As of 2026-09 there **is** a real voice picker —
-  `AgentSettingsEditor` in `/agente` lets the business choose `femenina`/`masculina`
-  (`AgentSettings.voiceGender`, see Agent Configuration below) — but it is exactly two options,
-  not "choose your voice" or a voice library; copy must not overclaim beyond that. Onboarding is
+- Do not promise capabilities that do not ship. There **is** a real voice picker in «Cómo
+  atiende» (see Agent Configuration above, «Idiomas de atención y voz»): Pro and Scale choose,
+  by listening, among all the voices of the main language (29 in Spanish); Inicio chooses female
+  or male (`voiceGender`) and gets that gender's default voice. Copy may say «elige la voz» for
+  Pro/Scale, but must not promise voice cloning, a custom voice or voices outside the catalog.
+  (Historical: in 2026-09 it was exactly two options, `femenina`/`masculina`.) Onboarding is
   self-service, so copy must not promise a human configuring things with the customer.
-- No AI jargon in the UI: "recepcionista virtual", "agente de voz". Never "LLM", "prompt",
-  "orquestador", "webhook", "API", "leads" or "archivo de contexto".
+- No AI jargon in the UI. Say «recepcionista» or «recepcionista de IA» (always «de IA» in
+  headings) and «tu asistente». Never «recepcionista virtual», «recepcionista de voz», «agente de
+  voz», «el Gestor» (code only), "LLM", "modelo", "prompt", "orquestador", "webhook", "API",
+  "leads", "archivo de contexto" or the name of any provider (Telnyx…). `PRODUCT.md`
+  § Terminología wins on conflict.
 - Error copy is Spanish, actionable and never blames the user. Backend 5xx are generic on purpose;
   the UI must translate them into something human.
 - A structured-data claim is a public claim. The "Soporte para Kit Digital" JSON-LD node was
@@ -3457,18 +3728,19 @@ any user-facing copy:
 - **Formatter:** Prettier — `semi: true`, `trailingComma: "es5"`, `singleQuote: false`, `printWidth: 80`, `tabWidth: 2`.
 - **Linter:** ESLint (backend: `@typescript-eslint/recommended`; frontend: `next/core-web-vitals`).
 - **Imports:** Use `.js` extensions in TypeScript import paths (required for ESM). Example: `import { prisma } from "../../lib/prisma.js";`.
-- **Path aliases:** Backend uses `"@/*"` → `"./*"` (relative to `backend/src/`). Frontend uses `"@/*"` → `"./src/*"`.
+- **Path aliases:** Backend uses `"@/*"` → `"./src/*"` (i.e. `backend/src/`). Frontend uses `"@/*"` → `"./src/*"`.
 - **Types:** Prefer explicit types on Fastify route generics (`Body`, `Params`, `Querystring`). Use `z.infer<typeof Schema>` for request shapes.
 - **Null handling:** Prefer `??` for defaults. Be defensive with external API responses.
-- **Logging:** Use `fastify.log` inside routes, `console.log`/`console.error` in startup code and workers. Prefix logs with the module name in brackets, e.g. `[Agent]`, `[Calendar]`, `[Job]`.
+- **Logging:** Use `fastify.log` inside routes, `console.log`/`console.error` in startup code and in the jobs (`src/jobs/`; there are no BullMQ workers since 2026-09-03). Prefix logs with the module name in brackets, e.g. `[Agent]`, `[Calendar]`, `[Job]`.
 
 ## Testing
 
-The project uses **Vitest** for backend testing.
+The project uses **Vitest** in the backend, the app (`frontend/tests/`), the public site
+(`web/tests/`) and Growth (`npm run test` in each package). This section describes the backend.
 
 - **Config:** `backend/vitest.config.ts` — Node environment, includes `backend/tests/**/*.{test,spec}.ts` (excludes `backend/tests/integration/**`), setup file `backend/tests/setup.ts` (loads `backend/.env.test`).
 - **Coverage:** V8 provider, reports text/html/lcov. Excludes `node_modules/`, `dist/`, `frontend/`, `backend/tests/`.
-- **Mocking:** `backend/tests/helpers/prismaMock.ts` provides a `createPrismaMock()` factory. There is no HTTP-mocking library (MSW was removed in `9d3656e`): mock the adapter or module with `vi.mock`.
+- **Mocking:** there is no shared Prisma mock (the old `createPrismaMock()` helper was removed in `9d3656e`): each test mocks `src/lib/prisma.js` with `vi.mock` and its own object. Shared helpers: `backend/tests/helpers/almacenEnMemoria.ts` (in-memory `almacenTemporal`) and `backend/tests/helpers/conexionDeCalendario.ts` (calendar fixtures). There is no HTTP-mocking library (MSW was removed in `9d3656e`): mock the adapter or module with `vi.mock`.
 
 ### Integration tests (`backend/tests/integration/`)
 
@@ -3482,6 +3754,9 @@ Separate suite (`npm run test:integration`, config `backend/vitest.integration.c
 
 ### Test Files
 
+A selection (there are ~255 backend test files): each test lives next to what it covers, under
+`backend/tests/<adapters|lib|modules|jobs|plugins|mcp|scripts>/`.
+
 | File | Coverage |
 |------|----------|
 | `backend/tests/lib/availability.test.ts` | Availability logic (hours, professionals, capacity, overlaps, busy professional detection) |
@@ -3491,7 +3766,7 @@ Separate suite (`npm run test:integration`, config `backend/vitest.integration.c
 | `backend/tests/modules/billing/service.test.ts` | Stripe event handling, billing summary, checkout session, reconciliation |
 | `backend/tests/modules/phone/service.test.ts` | Phone provisioning idempotency, async order polling/resume, partial failure handling, status retrieval |
 | `backend/tests/modules/calendar/service.test.ts` | Google/Outlook/CalDAV booking, upcoming events, cancel, sync tools to agents, invalid_grant detection, timeout/rate-limit classification, `listarCalendarios`/`seleccionarCalendario`/`conectarConCredenciales` |
-| `backend/tests/modules/calendar/conexion.test.ts` | Resolver de conexión sobre filas de `calendar_connections` (proveedor activo, defaults, credenciales corruptas, caché antigua sin filas), los cuatro predicados de "conectado", `marcarCalendarioDesconectado` (modos panel/revocar, fallo de BD → log de error con identificadores, fallo de Redis), `guardarConexionDeCalendario` (nested upsert exacto por cada caller), `actualizarCalendarioDeConexion`, rotación de credenciales por id y por valor, `serializarBusiness`/`camposDeCalendarioParaElPanel`. Fixtures compartidas en `tests/helpers/conexionDeCalendario.ts` |
+| `backend/tests/modules/calendar/conexion.test.ts` | Resolver de conexión sobre filas de `calendar_connections` (proveedor activo, defaults, credenciales corruptas, caché antigua sin filas), los cuatro predicados de "conectado", `marcarCalendarioDesconectado` (modos panel/revocar, fallo de BD → log de error con identificadores, fallo del almacén temporal), `guardarConexionDeCalendario` (nested upsert exacto por cada caller), `actualizarCalendarioDeConexion`, rotación de credenciales por id y por valor, `serializarBusiness`/`camposDeCalendarioParaElPanel`. Fixtures compartidas en `tests/helpers/conexionDeCalendario.ts` |
 | `backend/tests/adapters/calendar/caldav/ics.test.ts`, `CaldavCalendarProvider.test.ts` | iCalendar ↔ dominio (UID determinista, escapado, alarmas, día completo, TRANSPARENT, cancelado, RRULE, TZID+VTIMEZONE) y adaptador con tsdav mockeado (Basic auth, If-None-Match/412, 404 al borrar, mapeo de errores, `fetchVigilado`) |
 | `backend/tests/lib/cifradoDeCredenciales.test.ts` | Sobre AES-256-GCM: ida y vuelta, IV aleatorio, manipulación y clave distinta fallan, clave ausente/corta falla explícitamente |
 | `backend/tests/modules/businesses/me.test.ts` | Contrato de `GET /business/me` con el panel: campos de calendario históricos calculados desde las filas, nunca `calendarConnections` ni credenciales |
@@ -3515,7 +3790,7 @@ Separate suite (`npm run test:integration`, config `backend/vitest.integration.c
 
 - **`DELETE /recordings/:id`** es un borrado lógico: establece `deletedAt` y la oculta de las lecturas del negocio, sin borrar el objeto de R2/S3 ni la fila histórica. La purga física de audio debe quedar en una política de retención explícita, no en una acción de UI.
 - **`PATCH /business/me`** rebuilds the managed agent prompt and synchronizes it to the Telnyx assistants via `syncAgentToTelnyx` (see § Voice Orchestrator, «Sync»).
-- **Onboarding flow:** `backend/src/modules/onboarding/routes.ts` exposes `GET /business/me/onboarding`, `POST /business/me/onboarding/dismiss` and `POST /business/me/onboarding/complete`. The `/agente` page consumes these endpoints to show/persist the setup guide state. Step completion is computed live from business data; only `dismissedAt`/`completedAt` are persisted.
+- **Onboarding flow:** `backend/src/modules/onboarding/routes.ts` exposes the six routes of § Onboarding Flow (state, `dismiss`, `complete`, `confirm-forwarding` and «Comprobar desvío»). The home panel (`GuiaDeConfiguracion`, mobile and desktop) consumes them to show/persist the setup guide state. Step completion is computed live from business data; only `dismissedAt`, `completedAt`, `forwardingConfirmedAt` and `forwardingCheckedAt` are persisted.
 
 ## Common Tasks
 
@@ -3566,10 +3841,10 @@ The landing lives in `web/`; the backend (demo) and the app (redirect) need a sm
    existing one; every field in `tipos.ts` says its limit), its slug in `SectorSlug` and its entry
    in `SECTORES` (`index.ts`), plus its accent in `NICHE_ACCENTS` (`web/src/lib/niche-accents.ts`;
    `deep` must pass AA as text on `soft`). The absence chat is built with `ausenciaDe`
-   (`lib/gestor-guiones.ts`), so it matches what the assistant really does. Only if it gets its own
-   voice demo and scripts does it also go into `NicheSlug` (`lib/niche-landings.ts`), and
-   `npx tsc --noEmit` then flags the `Record<NicheSlug, …>` that need an entry
-   (`GUIONES_SECTOR` in `relato-guiones.ts`, `GUIONES_GESTOR` in `gestor-guiones.ts`).
+   (`lib/gestor-guiones.ts`), so it matches what the assistant really does. Every sector needs its
+   scripts in `GUIONES_SECTOR` (`relato-guiones.ts`) and `GUIONES_GESTOR` (`gestor-guiones.ts`):
+   both are `Record<SectorSlug, …>`, so `npx tsc --noEmit` flags them. Only if it gets its own
+   voice demo does it also go into `NicheSlug` and `nicheLandings` (`lib/niche-landings.ts`).
 2. **Pages:** copy an existing sector folder — `web/src/app/<sector>/page.tsx` (`SiteLanding` +
    `datosEstructuradosDeSector`, metadata from `metadatosDeSector`) and `opengraph-image.tsx`
    (`imagenOg`) — and add the sector photo `web/public/heroes/<sector>.jpg` if its OG image uses
@@ -3590,13 +3865,19 @@ The landing lives in `web/`; the backend (demo) and the app (redirect) need a sm
    answers 400 until it is there — and map it in `DEMO_ASSISTANT_ENV_BY_NICHE` to a
    `TELNYX_DEMO_<NICHO>_ASSISTANT_ID` for its isolated demo assistant (see the `demo` module
    above; new variables follow § Add a new environment variable). While that variable is empty,
-   the demo falls back to the generic assistant.
+   the demo falls back to the generic assistant. Without its own demo, map the sector to the
+   closest one in `DEMO_DE_OTROS_SECTORES` (today pestañas y cejas and spa y masajes → centro de
+   estética; anything not listed, like peluquería canina, gets the generic one).
 6. **App:** add `/<niche>` to the marketing paths in `frontend/next.config.mjs`, so the old app
    URL goes 301 to the public site instead of a 404.
 
-A landing niche is not a business type: an account registered from it arrives as `other`. Making
-it one (registration, Places detection, agent instructions, service templates) is separate work
-across the three projects — see § Business Type (`Business.businessType`).
+A landing niche is not automatically a business type: until it is added, an account registered
+from it arrives as `other`. Making it one is separate work across the three projects: its slug in
+`BUSINESS_TYPES` and a profile in `backend/src/lib/sectores/perfiles.ts` (prompt guidance, Places
+detection, label), the copies in `frontend/src/lib/business-type.ts` and
+`web/src/lib/business-type.ts`, and its service template (`frontend/src/lib/service-templates.ts`)
+— see § Business Type (`Business.businessType`). The eight current landing sectors are all
+business types.
 
 ## Alhabla Growth (desde 2026-10-30)
 
@@ -3608,8 +3889,8 @@ mantenimiento, el MCP `alhabla-growth` (`backend/mcp/growth/`) y el dashboard
 (`growth/`, `growth.alhabla.ai`). **El backend de Growth no llama a ningún LLM**:
 el razonamiento es de la suscripción de Claude Code, sin consumo de API. Los
 agentes (orquestador, seis subagentes, reglas, comando `/growth-run` y un hook) viven
-en `growth/agentes/` y `.claude/` desde la Fase 2b (ver «Agentes» más abajo); aún no
-existe la Scheduled Task (Fase 3).
+en `growth/agentes/` y `.claude/` desde la Fase 2b (ver «Agentes» más abajo); a
+2026-11-01 aún no existe la Scheduled Task (Fase 3; `PLAN-GROWTH.md`).
 
 **Excepción al aislamiento multi-tenant.** Las tablas `growth_*` y las rutas
 `/growth/*` no son de ningún negocio: no cuelgan de `Business` y no usan
@@ -3772,14 +4053,17 @@ Siembra competidores (los 7 de `comparativas.ts` más HeyDiga y fonio, **confirm
 05:20 Europe/Madrid; ver § Background Jobs): caduca las `aprobada` con `expiraEn`
 vencido (por `sistema`, descarta sus borradores abiertos y deja la decisión
 `caducar`) y aplica la retención de 180 días (borra la fila si ni ella ni sus borradores tienen decisiones, enlaces ni gestión; si no, vacía `extracto` y pone `quienEdita` a
-null). **Needs a Cloud Scheduler job to be created** por una persona:
+null). El job de Cloud Scheduler `growth-mantenimiento` **ya existe** (05:20
+Europe/Madrid, activo; comprobado el 2026-11-02 con `gcloud scheduler jobs list`). Si hubiera
+que recrearlo, lo crea una persona:
 
 ```bash
 gcloud scheduler jobs create http growth-mantenimiento --project=project-84381467-a606-4b71-a6e --location=europe-west1 --schedule="20 5 * * *" --time-zone="Europe/Madrid" --uri="https://api.alhabla.ai/internal/jobs/growth-mantenimiento" --http-method=POST --oidc-service-account-email="<cuenta de cleanup-zombie-calls>" --oidc-token-audience="https://api.alhabla.ai" --max-retry-attempts=3
 ```
 
-Antes, `estado_prod` debe mostrar la migración `20261030120000_alhabla_growth` y
-la ruta ya desplegadas. Está en `JOBS_QUE_NO` de `lanzar_job_prod`.
+Se creó tras comprobar con `estado_prod` que la migración
+`20261030120000_alhabla_growth` y la ruta estaban desplegadas (si se recrea, lo mismo). Está en
+`JOBS_QUE_NO` de `lanzar_job_prod`.
 
 **MCP `alhabla-growth`** (`backend/mcp/growth/`, `.mcp.json`, lanzado por
 `backend/mcp/arrancar.sh growth/servidorGrowth`; `alhabla-dev` sigue siendo otro
@@ -3804,7 +4088,8 @@ ni aprueba o gestiona; el texto de páginas ajenas va bajo `terceros`;
 Mac: `GROWTH_API_URL` (solo `https://api.alhabla.ai` o `localhost`) y el token en
 el llavero (`security add-generic-password -s alhabla-growth -a api.alhabla.ai -U
 -w`, sin el valor en la línea de órdenes) o `GROWTH_AGENT_TOKEN` para pruebas;
-`diagnostico_mcp` comprueba la pieza «Alhabla Growth» (opcional hasta la Fase 2).
+`diagnostico_mcp` comprueba la pieza «Alhabla Growth» (opcional: sin token configurado
+sale ok «sin configurar»; con token inválido, sin alcance o con la API caída, falla).
 
 **Agentes** (Fase 2b; `growth/agentes/README.md` explica cómo preparar y lanzar un run
 manual). Todo versionado en el repo y sin ejecutar nunca desde el backend:
@@ -3832,8 +4117,9 @@ El token del run (`leer`, `escribir`) no puede sincronizar el conocimiento (alca
 de Claude Max, sin medir.
 
 **Dashboard** (`growth/`, Next 16, vistas `/bandeja`, `/oportunidad/[id]`, `/borradores`,
-`/historial`, `/conocimiento`, `/ejecuciones`, `/ajustes` y, desde la Fase 2a,
-`/competencia` y `/competencia/[id]`; dev `:3003`, vista previa de sesión `:3103` en
+`/historial`, `/conocimiento`, `/ejecuciones`, `/ajustes`, desde la Fase 2a
+`/competencia` y `/competencia/[id]` y, desde el 31-10, `/competencia/comparador` y `/tareas`
+(con la Ficha de Alhabla); dev `:3003`, vista previa de sesión `:3103` en
 modo demostración vía `.claude/launch.json › growth-dev`; no se sirve en el
 entorno fijo). Variables: `NEXT_PUBLIC_API_BASE_URL` y
 `NEXT_PUBLIC_GROWTH_GOOGLE_CLIENT_ID` (obligatorias en producción: el build
@@ -3849,13 +4135,14 @@ contra `estados.ts` (si cambias `estados.ts`, copia la tabla a
 `growth/src/lib/demo/estados-demo.ts`). Todo texto de terceros se pinta como
 texto y todo `href` pasa por `urlSegura`. No entra en
 `scripts/comprobar-copias-compartidas.sh` (no copiar `brand-mark` ni
-`google-auth-button`). Pasos manuales fuera del repo: proyecto de Vercel
-`alhabla-growth` (root `growth`; las dos variables `NEXT_PUBLIC_*` también en
-Preview), CNAME `growth` en Cloudflare solo DNS (nube gris), origen
+`google-auth-button`). Configuración fuera del repo (**hecha**; comprobado el 2026-11-02:
+`growth.alhabla.ai` responde, Cloud Run tiene las tres `GROWTH_*` y `GET /growth/admin/yo`
+da 401, no 503): proyecto de Vercel `alhabla-growth` (root `growth`; las dos variables
+`NEXT_PUBLIC_*` también en Preview), CNAME `growth` en Cloudflare solo DNS (nube gris), origen
 `https://growth.alhabla.ai` (y `http://localhost:3003`) autorizado en el cliente
-OAuth de Google, y `GROWTH_GOOGLE_CLIENT_ID`, `GROWTH_ADMIN_EMAILS` y
-`GROWTH_URL=https://growth.alhabla.ai` en Cloud Run (sin `GROWTH_URL` el CORS solo
-admite `localhost:3003`).
+OAuth de Google (este no se puede comprobar desde el repo), y `GROWTH_GOOGLE_CLIENT_ID`,
+`GROWTH_ADMIN_EMAILS` y `GROWTH_URL=https://growth.alhabla.ai` en Cloud Run (sin `GROWTH_URL`
+el CORS solo admite `localhost:3003`).
 
 ## Lista de ramas por componente
 
@@ -3869,7 +4156,7 @@ partir vacía de `main` como marcador.
 |------|-----------|-------|-------|
 | `step-followups-landing` | Sección "Cómo funciona" de la landing: desde el 2026-10-02, `LlamadaScroll` + `EnTuNegocioScroll` en todas las landings (`HowItWorksScrollytelling` ya no existe) | [#12](https://github.com/MMARTID/alhabla/issues/12) | Pulir y/o rediseñar el recorrido de 3 pasos. |
 | `demo-modal-landing` | Modal/experiencia de "Escuchar una llamada" del hero (`DemoVoiceCall`) | — | Pulir y/o rediseñar la demo de llamada de voz que se abre desde la landing. Sin Issue todavía. |
-| `telnyx-whatsapp-calls` | Llamadas de voz por WhatsApp vía Telnyx — distinto de la mensajería de texto ya existente (`WhatsAppAdapter`, `jobs/sendWhatsapp.ts`, plantillas de confirmación/recordatorio) | — | **Descartado** el 2026-09-19 (ver `PLAN-CANAL-DUENO.md` v3). `docs/historico/PLAN-WHATSAPP-LLAMADAS.md` queda en `main` solo como referencia. Rama sin trabajo; borrar cuando se confirme. |
+| `telnyx-whatsapp-calls` | Llamadas de voz por WhatsApp vía Telnyx — distinto de la mensajería de texto ya existente (`WhatsAppAdapter`, `jobs/sendWhatsapp.ts`, plantillas de confirmación/recordatorio) | — | **Descartado** el 2026-09-19 (ver `PLAN-CANAL-DUENO.md` v3). `docs/historico/PLAN-WHATSAPP-LLAMADAS.md` queda en `main` solo como referencia. La rama lleva 2 commits de documentación que no están en `main` (`ad71182`, `3c35b16`: el plan y los endpoints de verificación, recogidos en el plan histórico); `docs/telnyx-whatsapp-calls-tracking` es su marcador vacío. Borrar las dos cuando se confirme y quitar entonces esta fila. |
 
 Al abrir el Issue correspondiente, añade su número en la columna "Issue". Al
 fusionar o descartar una rama, quita su fila de esta tabla.
@@ -3902,7 +4189,7 @@ landings de sector compartían el 55–58 % del texto de `<main>`. Desde el 2026
   tu agente frente a recepcionista hecha; no se pelea el precio por minuto. Datos publicados por
   cada una, con fuente y fecha (`lib/comparativas.ts`, art. 10 de la Ley 3/1991); lo que no
   publican se escribe «No consta en su web». Nunca se nombra al proveedor de voz de Alhabla. Las
-  viejas contra HeyDiga, fonio y personas redirigen con 301 en `next.config.mjs`),
+  viejas contra HeyDiga, fonio y personas redirigen con 308 (`permanent: true`) en `next.config.mjs`),
   `/herramientas/*`, `/guias/ley-y-recepcionista-de-ia`, `/recepcionista-ia-en-{catalan,euskera,gallego}`,
   `/glosario` (una página con anclas y `DefinedTermSet`, no una por término), `/sobre-alhabla`,
   `/prensa`, `/novedades` (añadir cada mes), `/agenda-por-whatsapp` (tu asistente) y las ocho landings
@@ -3923,10 +4210,16 @@ landings de sector compartían el 55–58 % del texto de `<main>`. Desde el 2026
 
 ### Automated CI/CD (GitHub Actions) — added 2026-09-04
 
-- **`.github/workflows/ci.yml`** — on every PR and every push to `main`: backend
-  (`typecheck`/`lint`/`test`), **backend integration** and frontend (`lint`/`test`/`build`, which
-  also type-checks — there is no `typecheck` script in `frontend/package.json`) run as three
-  parallel jobs. Test-only, never deploys.
+- **`.github/workflows/ci.yml`** — on every PR and every push to `main`, in parallel: backend
+  (`typecheck`/`lint`/`test` plus `npm run growth:conocimiento -- --comprobar`), **backend
+  integration**, frontend (`lint`/`test`/`build`, which also type-checks — there is no
+  `typecheck` script in `frontend/package.json`), web (`lint`/`test`/`build` plus
+  `seo:similitud`), growth (`lint`/`test`/`build` plus the check that the demo sentinel is not in
+  the build), the shared-copies check (`scripts/comprobar-copias-compartidas.sh`, job «Copias
+  compartidas app/web») and the LaLiga Worker; `diff` runs on pull requests only. Required checks
+  on `main` (branch protection, checked 2026-11-02): «Backend — typecheck, lint, test», «Backend —
+  tests de integración», «Frontend — lint, test, build» and «Web — lint, test, build».
+  Test-only, never deploys.
   - The **integration** job (added 2026-09-19) runs `npm run test:integration` against real
     a Postgres service container, after `npx prisma migrate deploy` creates the schema.
     That suite existed for a while but **nothing ran it** — only the unit tests were gated, so the
@@ -3955,7 +4248,10 @@ landings de sector compartían el 55–58 % del texto de `<main>`. Desde el 2026
 - **`.github/workflows/deploy-backend.yml`** — on push to `main` only: a `test` job (same backend
   checks, kept as an independent pre-deploy gate on purpose, not just a dependency on `ci.yml`)
   must pass before the `deploy` job runs `gcloud builds submit --config cloudbuild.yaml
-  --substitutions=_TAG=<commit sha>` then `gcloud run deploy alhabla-api --image=...:<sha>`, then
+  --substitutions=_TAG=<commit sha>` then `gcloud run deploy alhabla-api --image=...:<sha>` and
+  `gcloud run services update-traffic alhabla-api --to-latest` (after an automatic rollback the
+  service stays pinned to the old revision, and the next deploy would otherwise create a revision
+  with no traffic while `/health` answered from the old one and the workflow went green), then
   curls `/health` to confirm (three attempts, for cold starts).
   Two steps were added on 2026-09-19:
   - **Automatic rollback.** The job records the serving revision *before* deploying and, if
@@ -3966,7 +4262,8 @@ landings de sector compartían el 55–58 % del texto de `<main>`. Desde el 2026
     creating a revision, the second newest is two deploys old and rolling back to it would undo
     more than the bad deploy.
   - **Propagating agent behaviour.** If the push touches anything that feeds the assistants'
-    payload — `lib/managedAgentPrompt.ts`, `lib/telnyxAssistantPayload.ts`, `lib/telnyxAgentSync.ts`,
+    payload — `lib/managedAgentPrompt.ts`, `lib/seccionesDelPrompt.ts` (since the dynamic prompt,
+    PR #380), `lib/telnyxAssistantPayload.ts`, `lib/telnyxAgentSync.ts`,
     `lib/telnyxEligibility.ts`, `lib/transferenciaAlDueno.ts`, `lib/idiomas/*.ts` or the Gestor's
     `lib/gestorPayload.ts`/`lib/gestorSync.ts` (`lib/idiomas/` and the rest were added on
     2026-10-07, after a change only in `idiomas/resolver.ts`, PR #262, came out as "nada que
@@ -3991,18 +4288,20 @@ landings de sector compartían el 55–58 % del texto de `<main>`. Desde el 2026
   branch policy stays, so only protected branches deploy). It had required approval from MMARTID
   since ~2026-09-15, and with `cancel-in-progress: false` a run left in `waiting` held the queue
   for every later push — on 2026-09-19 one sat for 1h46m and blocked the two behind it. The gate
-  is now the `test` job plus the automatic rollback below, which catch more than a human clicking
+  is now the `test` job plus the automatic rollback above, which catch more than a human clicking
   approve on a diff they already reviewed in the PR. **Removing the reviewers fails any run that
   was already waiting** (that is how the deploy for PR #88 ended, at 2h08m); the next merge
   redeploys the same code, so nothing is lost, but it is worth knowing before touching this
   setting again.
-  **Neither web is deployed by this workflow** — Vercel's own Git integration handles both
-  projects: `alhabla-frontend` (Root Directory `frontend`, domain `app.alhabla.ai`) and
-  `alhabla-web` (Root Directory `web`, domains `alhabla.ai` + `www` → 308 to `alhabla.ai`),
-  split on 2026-09-21 (`docs/historico/PLAN-APP-DOMINIO.md`). DNS lives in Cloudflare (proxied CNAMEs to the
+  **None of the three webs is deployed by this workflow** — Vercel's own Git integration handles
+  every project: `alhabla-frontend` (Root Directory `frontend`, domain `app.alhabla.ai`),
+  `alhabla-web` (Root Directory `web`, domains `alhabla.ai` + `www` → 308 to `alhabla.ai`) and,
+  since 2026-10-30, `alhabla-growth` (Root Directory `growth`, `growth.alhabla.ai`, DNS-only;
+  § Alhabla Growth). The first two were split on 2026-09-21 (`docs/historico/PLAN-APP-DOMINIO.md`). DNS lives in Cloudflare (proxied CNAMEs to the
   project's `*.vercel-dns-017.com` target; see «Cloudflare failover for LaLiga blocks» below for
-  who turns that proxy off and on). `alhabla.ai` answers every app route with a 301 to
-  `app.alhabla.ai` (`web/next.config.mjs`), which is what keeps the Meta template URL buttons
+  who turns that proxy off and on). `alhabla.ai` answers every app route with a permanent
+  redirect to `app.alhabla.ai` (308: `permanent: true` in `web/next.config.mjs`; checked with
+  `curl -I` on 2026-11-02), which is what keeps the Meta template URL buttons
   (`alhabla.ai/ajustes/{{1}}`) and old emails working. Backend URLs: `APP_URL`
   (`https://app.alhabla.ai`), `WEB_URL` (`https://alhabla.ai`), `FRONTEND_URL` kept equal to
   `APP_URL` as a fallback. Vercel env: the app has `NEXT_PUBLIC_WEB_URL`; the web has
@@ -4025,8 +4324,9 @@ landings de sector compartían el 55–58 % del texto de `<main>`. Desde el 2026
     preview (registering, creating a business, saving a schedule) wrote to the **production
     database**, which is part of how production accumulated accounts nobody meant to create.
     There are now two entries: `production` → `https://api.alhabla.ai`, `preview` →
-    `https://dev-api.alhabla.ai`. A preview therefore needs the Cloudflare tunnel up
-    (`docker compose --profile dev up`) to work; the build still succeeds without it, the calls
+    `https://dev-api.alhabla.ai`. A preview therefore needs the Cloudflare tunnel of the
+    fixed dev environment up (`~/.alhabla-dev`, `scripts/dev/entorno.sh estado`; § Entorno de
+    desarrollo fijo) to work; the build still succeeds without it, the calls
     just fail. The accidental mitigation that was already there:
     `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` is production-only, so checkout in a preview breaks
     rather than charging anyone.
@@ -4050,12 +4350,12 @@ landings de sector compartían el 55–58 % del texto de `<main>`. Desde el 2026
 
 - The `backend/Dockerfile` has 5 stages: `base`, `deps`, `builder`, `runtime`, `development`.
 - Production image runs `node dist/server.js` (compiled output).
-- Development image runs `npx tsx watch backend/src/server.ts` over a volume-mounted source tree.
+- The `development` stage's default command is `npx tsx watch src/server.ts` (the build context is `./backend`); `backend-dev` in Compose overrides it with `sh -c "npx prisma generate && npm run dev"` over the volume-mounted `./backend`.
 - Health check endpoint at `GET /health` probes Postgres on every request — it alone decides `200`/`503` (and the deploy's automatic rollback). Redis was a critical dependency until 2026-10-19 (the locks' compatibility client; § Corte de Redis a Postgres). Telnyx (`balance.retrieve`), when `TELNYX_API_KEY` is set, is informational only (`lib/salud.ts`, `comprobarSalud`) and is asked **at most once a minute per instance** (`conMemoria`, since 2026-10-11, issue #281): a success is kept 60 s and a failure 15 s, and concurrent requests share one probe. Before that every uptime-check probe (every 60 s from 6 regions, ~8,600 a day) opened fresh TLS connections to the voice providers — ~30 MB/day of internet egress and ~17,000 useless provider API calls a day.
 
 ### Local development (Docker Compose)
 
-- `docker-compose.yml` uses profiles: `--profile dev` for local development, `--profile prod` for a production-like runtime locally.
+- `docker-compose.yml` uses profiles: `--profile dev` for local development (`backend-dev`, `postgres`, `cloudflared`; since 2026-10-15 it is only brought up from the fixed dev environment `~/.alhabla-dev`, never from a session worktree — § Entorno de desarrollo fijo), `--profile sim` (`backend-sim` on `:3010`, the target of the simulated signed Telnyx webhooks, with `ENVIOS_SIMULADOS=1`; started with `scripts/backend-sim.sh`, also from a worktree) and `--profile prod` for a production-like runtime locally.
 - **Webhooks reach the local backend through a named Cloudflare tunnel on a fixed hostname, `https://dev-api.alhabla.ai`** (`cloudflared` service, `dev` profile). `BASE_URL` in `.env` is that hostname and is the single source of the public URL (`getPublicWebhookBaseUrl`, `lib/serverUrl.ts`) — nothing is auto-detected at runtime any more.
 - **Why it stopped being ngrok (2026-09-19).** ngrok's free tier rotates its hostname on every container restart. The URL is *baked in* when an agent or assistant is synced, so after a restart every Call Control App webhook and every tool URL still pointed at the dead tunnel and **failed silently** — nothing in `/health`, `telnyxSyncError` or the logs says so, and the agent just stalls mid-call. Verified on 2026-09-19: all 7 dev assistants were pointing at two different dead tunnels, and the dev Call Control App webhook at a third. A fixed hostname removes the whole class of bug: register once, valid forever. `lib/ngrok.ts` and `config/serverConfig.ts` were deleted.
 - **One-time setup** (the hostname and the token outlive any reinstall): in Cloudflare Zero Trust › Networks › Tunnels create a tunnel, add a public hostname `dev-api.alhabla.ai` routed to `http://backend-dev:3000`, and put its token in `CLOUDFLARE_TUNNEL_TOKEN` in `.env`. DNS for `alhabla.ai` is already on Cloudflare, so the record is created for you. The token does not expire and carries the routing inside it, so `docker compose --profile dev up` needs nothing else.
@@ -4069,11 +4369,11 @@ Until 2026-09-03 there was a second always-on `alhabla-worker` service (`node di
 
 Supporting infra:
 - **Cloud SQL** (Postgres 15) — reached via Unix socket (`--add-cloudsql-instances`), not a network host. `DATABASE_URL` is a Secret Manager secret formatted as `postgresql://user:pass@localhost/db?host=/cloudsql/PROJECT:REGION:INSTANCE` — never a plain env var, since it embeds the DB password.
-  - **Pool (measured October 2026):** the URL sets `connection_limit=2` per Cloud Run instance; Postgres has `max_connections = 50`; Cloud Run runs with `maxScale` 20 and concurrency 80 per instance, so 20 × 2 = 40 connections leaves room for Cloud Build migrations and a manual proxy. **From PR A on, the rate limiter opens one more connection of its own per instance** (`crearClienteDeUnaConexion` in `lib/prisma.ts`: the same `DATABASE_URL` with `connection_limit=1`, outside the app pool — see the Redis-cut subsection below), so an instance uses `connection_limit + 1` = 3 in normal operation (measured: 3 with 80 concurrent requests). The budget becomes `maxScale × (connection_limit + 1) + migrations + proxy + 3 reserved ≤ max_connections`, and with today's 2 / 20 / 50 that is 60 > 50. **Decided by the owner on 2026-10-10 and revised on 2026-10-11 to cover the worst case below: production lowers `maxScale` of `alhabla-api` from 20 to 11 before PR A is merged** (11 × 3 = 33 ≤ 50 in normal operation, leaving 17 for the 3 reserved, Cloud Build migrations and a manual proxy; the app pool stays at 2, and 11 × 80 concurrent requests is far above current traffic). Set it by hand with `gcloud run services update alhabla-api --max=11`, the **service-level** maximum: it applies immediately and is shared by every revision, while `--max-instances` is per revision and only takes effect when that revision is deployed (if both are set, the lower one wins; Cloud Run's docs recommend the service-level one). Check it with `gcloud run services describe alhabla-api`. The deploy workflow sets neither flag, so later deploys keep it, and since 2026-10-11 it refuses to build, migrate or deploy if the effective maximum is above 11 (the max-instances guard in `deploy-backend.yml`); while a deploy is shifting traffic, instances of the previous revision that are still draining can briefly add to the count. **Worst case the inequality does not cover:** for the 15 min after a half-open episode on the limiter's connection (see the Redis-cut subsection), the discarded connection may still hold its slot if Postgres did not notice the cut, so that instance uses `connection_limit + 2` = 4 (measured; the limiter never opens a third connection of its own while 2 discarded ones are presumed open — it decides on its local count instead). That is why `maxScale` is 11 and not 14: with all 11 instances in that state it is 11 × 4 = 44, plus a migration and a proxy, ≤ the 47 non-reserved slots, so the budget is checked with `connection_limit + 2` (with 14 it would be 14 × 4 = 56 > 50, and Postgres would refuse new connections: the app pool, cold starts, the deploy migration). And 4 only holds while Postgres closes half-open connections within 15 min, which its TCP keepalive decides (Cloud SQL's values not checked): if it takes longer, one more may be added every 15 min until keepalive closes them (measured on a local Postgres with the default keepalive, about 2 h: 5 connections at 16 min). Rejected on 2026-10-11: keeping 14 and accepting that worst case, and `TOPE_DE_DESECHADAS_ABIERTAS = 0` in `lib/limitesDePeticiones.ts` (keeps 3, but every first episode would leave the instance 15 min on its local count). Discarded: `connection_limit=1` in the secret (20 × 2 = 40, but one slow query or interactive transaction would block every other query of the instance) and raising `max_connections` (Cloud SQL flag; restarts the instance). Any later change to `connection_limit` or `maxScale` must keep that inequality — `connection_limit` is a secret edit, done by hand in Secret Manager.
+  - **Pool (measured October 2026):** the URL sets `connection_limit=2` per Cloud Run instance; Postgres has `max_connections = 50`; **today `alhabla-api` runs with a service-level `maxScale` of 11 (since 2026-10-11) and concurrency 80 per instance** — the revision template still carries `maxScale` 20, which does not apply because the lower one wins (checked 2026-11-02). What follows is how that was decided (historical, written before PR A): with `maxScale` 20, 20 × 2 = 40 connections left room for Cloud Build migrations and a manual proxy. **From PR A on, the rate limiter opens one more connection of its own per instance** (`crearClienteDeUnaConexion` in `lib/prisma.ts`: the same `DATABASE_URL` with `connection_limit=1`, outside the app pool — see the Redis-cut subsection below), so an instance uses `connection_limit + 1` = 3 in normal operation (measured: 3 with 80 concurrent requests). The budget becomes `maxScale × (connection_limit + 1) + migrations + proxy + 3 reserved ≤ max_connections`, and with today's 2 / 20 / 50 that is 60 > 50. **Decided by the owner on 2026-10-10 and revised on 2026-10-11 to cover the worst case below: production lowers `maxScale` of `alhabla-api` from 20 to 11 before PR A is merged** (11 × 3 = 33 ≤ 50 in normal operation, leaving 17 for the 3 reserved, Cloud Build migrations and a manual proxy; the app pool stays at 2, and 11 × 80 concurrent requests is far above current traffic). Set it by hand with `gcloud run services update alhabla-api --max=11`, the **service-level** maximum: it applies immediately and is shared by every revision, while `--max-instances` is per revision and only takes effect when that revision is deployed (if both are set, the lower one wins; Cloud Run's docs recommend the service-level one). Check it with `gcloud run services describe alhabla-api`. The deploy workflow sets neither flag, so later deploys keep it, and since 2026-10-11 it refuses to build, migrate or deploy if the effective maximum is above 11 (the max-instances guard in `deploy-backend.yml`); while a deploy is shifting traffic, instances of the previous revision that are still draining can briefly add to the count. **Worst case the inequality does not cover:** for the 15 min after a half-open episode on the limiter's connection (see the Redis-cut subsection), the discarded connection may still hold its slot if Postgres did not notice the cut, so that instance uses `connection_limit + 2` = 4 (measured; the limiter never opens a third connection of its own while 2 discarded ones are presumed open — it decides on its local count instead). That is why `maxScale` is 11 and not 14: with all 11 instances in that state it is 11 × 4 = 44, plus a migration and a proxy, ≤ the 47 non-reserved slots, so the budget is checked with `connection_limit + 2` (with 14 it would be 14 × 4 = 56 > 50, and Postgres would refuse new connections: the app pool, cold starts, the deploy migration). And 4 only holds while Postgres closes half-open connections within 15 min, which its TCP keepalive decides (Cloud SQL's values not checked): if it takes longer, one more may be added every 15 min until keepalive closes them (measured on a local Postgres with the default keepalive, about 2 h: 5 connections at 16 min). Rejected on 2026-10-11: keeping 14 and accepting that worst case, and `TOPE_DE_DESECHADAS_ABIERTAS = 0` in `lib/limitesDePeticiones.ts` (keeps 3, but every first episode would leave the instance 15 min on its local count). Discarded: `connection_limit=1` in the secret (20 × 2 = 40, but one slow query or interactive transaction would block every other query of the instance) and raising `max_connections` (Cloud SQL flag; restarts the instance). Any later change to `connection_limit` or `maxScale` must keep that inequality — `connection_limit` is a secret edit, done by hand in Secret Manager.
 - **Secret Manager** — every sensitive value (`JWT_SECRET`, `STRIPE_SECRET_KEY`, API keys, `DATABASE_URL`, etc.) is injected via `--set-secrets`, not as a plain `--set-env-vars` value.
 - **R2 recordings bucket is private** (RGPD — real customer call audio). Playback URLs are generated on demand by `getSignedRecordingUrl()` (`storage.ts`, `@aws-sdk/s3-request-presigner`, 1h expiry) when the frontend requests a recording — never stored in the DB (a stored presigned URL would eventually expire). `R2_REGION` must be one of R2's location codes (`auto`, `weur`, `eeur`, ...) — a literal `"eu"` is rejected by the SDK.
 - **Image build:** via `gcloud builds submit` (Cloud Build), not local `docker build`. On Apple Silicon, a local build without `--platform=linux/amd64` produces an arm64 image Cloud Run rejects outright; Cloud Build's workers are amd64-native and sidestep it entirely. Needs a `cloudbuild.yaml` with an explicit `--target runtime` — without it, a multi-stage Dockerfile builds its *last* stage by default, which here is `development`.
-- **IAM:** this project's default Compute Engine service account (`PROJECT_NUMBER-compute@developer.gserviceaccount.com`) is reused for both Cloud Build and Cloud Run revisions, and starts with zero roles on a fresh project. Needs `roles/cloudbuild.builds.builder`, `roles/storage.objectViewer`, `roles/artifactregistry.writer` (build-time) and `roles/secretmanager.secretAccessor`, `roles/cloudsql.client` (runtime) granted explicitly.
+- **IAM:** Cloud Build uses this project's default Compute Engine service account (`PROJECT_NUMBER-compute@developer.gserviceaccount.com`), which starts with zero roles on a fresh project and needs `roles/cloudbuild.builds.builder`, `roles/storage.objectViewer` and `roles/artifactregistry.writer` granted explicitly. Cloud Run revisions of `alhabla-api` no longer run as that account (it was reused for both at first): they run as a dedicated one, `alhabla-api@project-84381467-a606-4b71-a6e.iam.gserviceaccount.com`, with `roles/cloudsql.client`, `roles/cloudtasks.enqueuer` and `roles/secretmanager.secretAccessor` at project level (checked 2026-11-02).
 
 #### Corte de Redis a Postgres: cerrojos y límite de peticiones (PR A, octubre de 2026)
 
@@ -4086,7 +4386,7 @@ Plan del corte (decidido por el dueño el 2026-10-10, con 72 h de vigilancia ent
 - **El limitador tiene una conexión propia por instancia**, fuera del pool de `prisma` (`crearClienteDeUnaConexion`: la misma `DATABASE_URL` con `connection_limit=1`; las cuentas de conexiones, en § Pool de arriba), y como mucho una sentencia en vuelo en el cliente (en Postgres, ver la vida de cada sentencia, abajo). En el pool compartido esperaría turno detrás de las consultas de los handlers (medido: con unas 40 peticiones a la vez con consultas de 30 ms, u 80 con 20 ms, vencía el plazo con Postgres sano, se abría el cortacircuitos y la instancia decidía todo en local); con la conexión propia, ningún aviso con 80 a la vez y consultas de 100 ms. Es síncrono a cualquier ritmo: lo que llega mientras hay una sentencia en vuelo espera en una cola y sale todo junto en la siguiente, UNA sentencia para todas sus claves (`incrementarContadores`, `INSERT … SELECT … FROM unnest(…) GROUP BY clave ORDER BY clave ON CONFLICT DO UPDATE … RETURNING`, que bloquea las filas en orden de clave para que dos instancias no se interbloqueen). A la k-ésima de las c peticiones de una clave que vuelve con valor v le toca v − c + k, la posición que le habría dado su INCR: mientras Postgres responde a tiempo, entre todas las instancias pasan exactamente `max` por ventana. Una petición espera como mucho la sentencia en vuelo y la suya (unos 2 viajes a la BD; 1 s en el peor caso). La cuenta local de la instancia solo decide cuando Postgres no puede, en cuatro casos: plazo de 500 ms vencido (Postgres o la red lentos: la sentencia, la cola y lo que llegue hasta que vuelva); error de Postgres; cortacircuitos abierto (3 fallos ⇒ 30 s; luego una sonda, y lo que llega con ella en vuelo espera detrás en la cola, como detrás de cualquier sentencia: sale en la siguiente si la sonda va bien y se decide en local si falla o vence su plazo); y sin conexión que usar (2 desechadas por un plazo en los últimos 15 min, abajo). Nunca da un 500. Una sonda que vence su plazo pero vuelve bien antes de 1 s cierra el cortacircuitos igualmente: tras 30 s sin usarse, la conexión hace 2 viajes (Prisma comprueba antes una conexión inactiva), o 6 si es nueva, y con viajes de más de 250 ms vencería en cada ciclo aunque una sentencia normal cupiera en el plazo (medido con las respuestas retrasadas 420 ms: la sonda vuelve a los ~850 ms y el cortacircuitos se cierra en el segundo ciclo). Lo que decide en local no se manda después a Postgres. Si es seguro que Postgres no lo contó (no se mandó, o el error es P1001, P2024 o `PrismaClientInitializationError`: no hubo conexión), sigue sumando en esa instancia, también en las posiciones que dé Postgres al volver, hasta que acaba la ventana en que se decidió. Si la sentencia ya había salido (P1017 «Server has closed the connection», el P2010 «Timed out during query execution» de un `socket_timeout`, el abandono a los 6 s, un ECONNRESET o cualquier otro error), Postgres puede haberla ejecutado y confirmado aunque la respuesta no llegara: esas peticiones suman en la cuenta local, pero no en las posiciones que dé Postgres al volver, porque su valor ya las incluye si se ejecutó y sumarlas otra vez las contaría dos veces (medido sin descontarlas: con la sentencia confirmada y la conexión cortada antes de la respuesta, la 5.ª de 5 daba 429, y una ráfaga de 40 de una IP adelantaba el primer 429 del límite global de la 101 a la 62). Durante una caída, cada instancia que decide en local deja pasar como mucho `max` por ventana, y las que siguen en Postgres, `max` entre todas (no ven lo decidido en local): con N instancias en cuenta local, hasta (N+1)·max (medido: una en local y otra en Postgres, con max 5, pasan 10). Una instancia que falla y vuelve dentro de la ventana tampoco pasa de `max`, salvo por las peticiones inciertas que Postgres no llegara a ejecutar (también las de una sentencia que Postgres canceló por `statement_timeout`): esas pueden pasar de más, las de las sentencias que fallan así hasta que se abre el cortacircuitos y las de cada sonda. Nunca rechaza de más: todo lo que suma son peticiones de la clave de los últimos `ventanaMs`, y ninguna dos veces (el fin de la ventana de Postgres se cuenta desde la salida de la sentencia, así que una respuesta tardía no lo alarga, y lo decidido en local no pasa a una ventana que Postgres abra después), de modo que un cliente que no pasa de `max` en ningún intervalo de esa duración no recibe un 429, como con INCR (la excepción, la misma que con un INCR que llega tarde: una sentencia que se ejecuta después de que acabe la ventana de su clave cuenta sus peticiones en la siguiente). Al volver la BD, lo decidido en local no gasta el cupo de la ventana siguiente.
 - **Vida de cada sentencia del limitador:** está acotada en los dos lados, solo en su conexión (`crearClienteDeUnaConexion` le pone `options=-c statement_timeout=2000` y `socket_timeout=5`, y sustituye los que traiga `DATABASE_URL`; el pool de la app no cambia): Postgres la cancela a los 2 s de recibirla y el cliente la suelta a los 5 s de mandarla (un `socket_timeout` sin `statement_timeout` corta en el cliente y no en Postgres: con un bloqueo de fila de 2 s y `socket_timeout=1`, Postgres la confirma al soltarse el bloqueo). El `socket_timeout` de Prisma 6.19 no cubre la primera sentencia de cada conexión, la que lleva el PREPARE (medido: congelada, sin respuesta en 20 s; ya preparada, P2010 a los 5 s), así que el limitador la abandona por su cuenta a los 6 s (`ABANDONO_MS`) y la trata como incierta. Los dos plazos no empiezan a la vez: si la red retiene la sentencia más de 5 s y la entrega después (una retransmisión TCP tras un corte que se arregla solo), Postgres puede ejecutarla ya soltada y a la vez que la siguiente, que sale por otra conexión (medido: dos sentencias de la misma instancia activas en `pg_stat_activity`, y la soltada contada 3 s después de que el cliente la soltara). La cuenta no sale mal, porque lo de una sentencia soltada va como incierto, pero «como mucho una en vuelo» vale en el cliente, no en Postgres.
 - **Conexión desechada y tope:** tras cualquier error de su sentencia (o el abandono), el cliente del limitador se desecha (`$disconnect` sin esperar) y la siguiente abre una conexión nueva, si no hay ya 2 desechadas por un plazo en los últimos 15 min. Hace falta porque, con su conexión medio abierta (agujero negro en ella, Postgres sano), Prisma 6.19 nunca devuelve la consulta ni resuelve `$disconnect` si no hay `socket_timeout`, y con él sigue usando la conexión muerta (P2010 «Timed out during query execution» a los N s, una consulta tras otra, sin abrir otra): sin desecharla, la instancia decidiría en local para siempre y el límite dejaría de ser global sin que /health lo notara (medido con dos procesos y solo esa conexión de uno congelada: sin desecharla no volvía a contar en Postgres ni una vez en 60 s, y un cliente de `/cinco` (max 5) repartido entre los dos pasaba 10; desechándola vuelve a los 6 s, con `socket_timeout=2` en `DATABASE_URL` o sin él, y el mismo cliente, a partir de ahí, pasa 5). El cliente desechado no suelta su socket mientras espera la respuesta perdida (lo cierra el sistema operativo cuando da la conexión por muerta) y, si Postgres no se enteró del corte, esa conexión sigue ocupando su hueco en `max_connections` hasta que la cierre el keepalive de Postgres: sin tope, cada episodio sumaría una conexión (medido sin él: de 3 a 6 conexiones de la instancia en cuatro episodios). Por eso, una conexión desechada por un plazo (el P2010 «Timed out during query execution» del `socket_timeout`, que se reconoce por su texto —un test de integración lo comprueba con el error real de Prisma, por si una versión nueva lo cambia—, o el abandono; no un P1017 ni el error del `statement_timeout`) se da por abierta 15 min, y con 2 así no se abre otra: la instancia decide en local hasta que la más antigua cumple los 15 min, **aunque Postgres esté sano**, con hasta (N+1)·max entre instancias (N·max si todas sufrieron lo mismo). Un episodio se recupera en cuanto contesta la conexión nueva (a los 6 s con Postgres sano); se llega a 2 con un atasco de unos 11 s con tráfico en que la conexión nueva conecta pero su primera sentencia tampoco vuelve (5 s del P2010 de la vieja y 6 s del abandono de la nueva), o con dos episodios cortos dentro de 15 min (medido: dos congelaciones con 7 s entre ellas y, 35 s después, con Postgres sano, pasan 6 con max 3 entre dos instancias). Lo anuncia un `console.error` «[Límite] 2 conexiones del limitador desechadas por un plazo en los últimos 15 min pueden seguir abiertas en Postgres; no se abre otra hasta …» (como mucho uno por minuto); /health no lo ve, y para eso está la alerta de logs «alhabla-api · límite de peticiones solo en local» (§ Alertas). Los 15 min son un supuesto, no una medida: lo que tarda Linux en dar por muerta, del lado del cliente, una conexión con datos sin confirmar. Las conexiones que salen de aquí (4 por instancia, o más si Postgres tarda más de 15 min en cerrar las medio abiertas), en § Pool.
-- Mientras una sentencia del limitador lleva más del plazo en vuelo sale un `console.error` por minuto con cuánto lleva, y cada conexión desechada deja un `console.warn` (como mucho uno por minuto) con el error. Al apagar, `cerrarConexionDelLimitador` espera como mucho 500 ms a su `$disconnect`, que con la conexión congelada no resuelve mientras su sentencia sigue en vuelo (o nunca, si es la del PREPARE): sin ese tope el apagado llegaría a su límite de 8 s y saldría con código 1 sin cerrar el pool de `prisma`. No implementa `continueExceeding`, `exponentialBackoff`, `ban` ni `read` del plugin (ninguna ruta los usa). Logs `[Cerrojo]`, `[Compat Redis]`, `[Límite]` y `[Purga]`.
+- Mientras una sentencia del limitador lleva más del plazo en vuelo sale un `console.error` por minuto con cuánto lleva, y cada conexión desechada deja un `console.warn` (como mucho uno por minuto) con el error. Al apagar, `cerrarConexionDelLimitador` espera como mucho 500 ms a su `$disconnect`, que con la conexión congelada no resuelve mientras su sentencia sigue en vuelo (o nunca, si es la del PREPARE): sin ese tope el apagado llegaría a su límite de 8 s y saldría con código 1 sin cerrar el pool de `prisma`. No implementa `continueExceeding`, `exponentialBackoff`, `ban` ni `read` del plugin (ninguna ruta los usa). Logs `[Cerrojo]`, `[Límite]` y `[Purga]` (y `[Compat Redis]` hasta el 2026-10-19).
 - **Despliegue de los PR A y B: sin auto-merge.** Fusionar es desplegar: el environment `production` ya no pide aprobación, así que en cuanto se fusiona a `main` Cloud Build aplica la migración y saca la revisión. Se fusionan a mano en la ventana acordada y antes se comprueba, en solo lectura: que no hay sesiones `idle in transaction` que escriban en `businesses`, que `SELECT count(*) FROM calls WHERE status = 'IN_PROGRESS'` da ≈ 0 y que las colas de Cloud Tasks están casi vacías. Antes de fusionar el PR A, además: (1) **bajar `maxScale` de `alhabla-api` de 20 a 11** (decisión del dueño del 2026-10-10, revisada el 2026-10-11; § Pool; hecho el 2026-10-11, sin revisión nueva): con `connection_limit=2` más la conexión propia del limitador son 3 conexiones por instancia en marcha normal y 4 en el peor caso, y 11 × 4 = 44, más una migración y un proxy, cabe en los 47 huecos no reservados de `max_connections` 50 (con 20 serían 60 en marcha normal; con 14, 56 en el peor caso). Con `gcloud run services update alhabla-api --max=11` (el máximo del servicio, que vale en el acto para todas las revisiones; `--max-instances` es por revisión y solo vale al desplegarla, y si están los dos manda el menor), y comprobar con `gcloud run services describe alhabla-api` que ha quedado en 11 antes de fusionar; mientras el despliegue mueve el tráfico, las instancias de la revisión anterior que se están vaciando pueden sumar un rato. (2) La alerta de logs sobre «no se abre otra hasta» (`[Límite]`, nivel error: una instancia que decide en local hasta 15 min con Postgres sano, que /health no ve) ya está creada desde el 2026-10-11: política `9267553680755852729`, en § Alertas.
 - **Regla de vuelta atrás:** desde la fase 2 (2026-10-19) las revisiones toman los cerrojos solo en Postgres, así que **ninguna revisión anterior a la del PR A puede volver a recibir tráfico** (las viejas los toman solo en Redis: no se excluyen, dobles reservas). Con Memorystore borrado (fase 4) tampoco sirven las del PR A ni del PR B: con `REDIS_URL` y sin Redis, todos sus cerrojos fallan cerrados. Solo se vuelve a revisiones de la fase 2 en adelante.
 
@@ -4117,7 +4417,7 @@ Notification channels, not in code.
 | **Cloud Tasks · cola que no baja** | `cloudtasks.googleapis.com/queue/depth`, any queue, 5-min mean **> 200 for 15 min** | Queues drain in seconds at current traffic; a queue that grows is a task failing in a loop. Same incident peaked at ~9,000. |
 | **alhabla-api · /health caído** | Uptime check `alhabla-api-health-tJzyQ7cVqx8` (HTTPS `api.alhabla.ai/health` every minute from 6 regions, must contain `"status":"ok"`) failing from **more than one region for 60 s** | One region failing is usually the checker; two is us. |
 | **alhabla-api · cerrojos de citas con errores** | Log match (added 2026-10-12, PR A vigilance): stderr `[Cerrojo]` or `[Compat Redis]` (matches nothing since 2026-10-19), or `[Purga] No se pudo purgar`, from `alhabla-api`; at most one email per 30 min, auto-close after 30 min | Every `[Cerrojo]` line is an error: a booking, change or cancellation that did not happen (the lock fails closed, never double-books). Kept after the 72 h of PR A vigilance. |
-| **alhabla-api · llamadas de voz con fallos** | Log match (added 2026-10-17): `textPayload` with `[Telnyx] No se pudo contestar`, `[Telnyx] Error procesando inicio de`, `[Telnyx] No se pudo procesar el evento`, `[Telnyx] Error procesando call.`, `sin assistant Telnyx operativo o suspendido` or `[Salud] ` from `alhabla-api`; at most one email per 30 min, auto-close after 30 min | A voice failure was invisible until then: `/webhooks/telnyx` answers **404, not 5xx**, when `handleCallInitiated` fails, so the 5xx policy never sees it. `[Salud]` comes from `avisarDeLlamadasSinResultado` (`jobs/cleanupZombieCalls.ts`, every 15 min): Telnyx calls that ended 10–25 min ago with cost ≠ 0 and no `outcome` (the conversation insights never arrived), each reported once. A suspended business also logs `sin assistant…`: legitimate after a missed payment. |
+| **alhabla-api · llamadas de voz con fallos** | Log match (added 2026-10-17): `textPayload` with `[Telnyx] No se pudo contestar`, `[Telnyx] Error procesando inicio de`, `[Telnyx] No se pudo procesar el evento`, `[Telnyx] Error procesando call.`, `sin assistant Telnyx operativo` or `[Salud] ` from `alhabla-api`; at most one email per 30 min, auto-close after 30 min | A voice failure was invisible until then: `/webhooks/telnyx` answers **404, not 5xx**, when `handleCallInitiated` fails, so the 5xx policy never sees it. `[Salud]` comes from `avisarDeLlamadasSinResultado` (`jobs/cleanupZombieCalls.ts`, every 15 min): Telnyx calls that ended 10–25 min ago with cost ≠ 0 and no `outcome` (the conversation insights never arrived), each reported once. A business whose service is cut for non-payment also logs it (`[Telnyx] Negocio … sin assistant Telnyx operativo o con el servicio cortado por el pago …`, `adapters/telnyx/webhookHandlers.ts`): legitimate after a missed payment. **Pending:** that log line changed on 2026-10-20 (commit `5df21f5`; until then it read `… operativo o suspendido`), and the policy's filter in Monitoring still matches the old text `sin assistant Telnyx operativo o suspendido`, so that branch of the alert has not fired since; the filter must be updated to `textPayload:"sin assistant Telnyx operativo"` (Monitoring › Alerting, policy `12857991338509678084`; checked 2026-11-02, not changed). |
 | **alhabla-api · WhatsApp rechazado por Meta** | Log match (added 2026-10-17, PR 5): `textPayload:"[WhatsApp] Meta rechazó"`; at most one email per hour, auto-close after 1 h | A deferred `statuses[].failed` on a message to a client (`aplicarEfectosDeEntrega`): a confirmation, reminder or notice that never arrived. 1 in 175 sends up to 2026-10-17. |
 | **alhabla-api · límite de peticiones solo en local** | Log match (added 2026-10-11, PR A): `textPayload:"no se abre otra hasta"` from `alhabla-api`; at most one email per hour, auto-close after 30 min | Fires when an instance has 2 limiter connections discarded by a timeout in 15 min and stops opening new ones: up to 15 min counting the rate limit locally with Postgres healthy, which `/health` does not see (§ Corte de Redis a Postgres, «Conexión desechada y tope»). |
 
@@ -4202,7 +4502,7 @@ App of each environment (§ Telnyx: qué es de desarrollo y qué de producción)
   `telnyxConfigHash`, so check those columns before believing a sync happened (`strict: true`
   re-reads them and raises).
 
-In dev, `backend/scripts/manual/resyncToolsDev.mts` sweeps every business against `BASE_URL`: `docker exec alhabla_backend_dev npx tsx scripts/manual/resyncToolsDev.mts`. It refuses to run with a production `BASE_URL`, because dev and prod still share the Telnyx account and it would repoint real customers' assistants at this process. With the hostname now fixed, this is no longer routine repair — it is how a tool-schema or prompt change reaches assistants that already exist.
+In dev, `backend/scripts/manual/resyncToolsDev.mts` sweeps every business against `BASE_URL`: `docker exec alhabla_backend_dev npx tsx scripts/manual/resyncToolsDev.mts`. It refuses to run with a production `BASE_URL`, because dev and prod still share the Telnyx account (until issue #400 moves dev to its own) and it would repoint real customers' assistants at this process. With the hostname now fixed, this is no longer routine repair — it is how a tool-schema or prompt change reaches assistants that already exist.
 
 This can be verified independently of the app's own DB by querying Telnyx directly with the account's API key and checking the registered URL against what's actually live: `GET https://api.telnyx.com/v2/ai/assistants/:assistantId` (look at `tools[].webhook.url`; `tool_id` is the field to address a single tool, and the native `hangup` tool has neither URL nor webhook), or MCP `ver_assistant_telnyx`.
 
@@ -4211,4 +4511,4 @@ This can be verified independently of the app's own DB by querying Telnyx direct
 - **Telnyx signs the test request**, so it clears `telnyx-signature-ed25519` on our route. The tester is a genuine end-to-end exercise of the production path, not a bypass.
 - **It needs a real `call_control_id`.** `/webhooks/telnyx/tools/:toolName` resolves the business *only* from the `x-alhabla-call-control-id` header (templated from `{{call_control_id}}`) via `prisma.call.findUnique({ where: { callId } })` — there is no assistant id in the tool body to fall back on. With no such `Call` row the route answers `404 Call not found` before reaching `executeVoiceTool`, and with none at all `400 Missing call_control_id`. Pass an existing call's id in `dynamic_variables.call_control_id`, or insert a throwaway `Call` row for the business in the dev DB. **Mind which business that call belongs to**: the tool runs against *its* `businessId`, not the assistant's.
 
-**Drift observed in dev on 2026-09-19, the incident that killed ngrok** (both failure modes at once): the six seeded businesses had `telnyxSyncedAt = 2026-09-14`, so their assistants still pointed at that day's ngrok hostname **and** were missing `notify_when_available` entirely (the tool is unconditional in `telnyxAssistantPayload.ts`, it simply postdates their last sync) — five webhook tools plus `hangup` instead of six plus `hangup`. No `telnyxSyncError` on any of them: nothing had failed, nothing had re-run. The fixed hostname removes the URL half of this permanently; **the tool-set half remains**, because a deploy still does not touch assistants that already exist. A stale assistant is silent; only the provider's API tells you.
+**Drift observed in dev on 2026-09-19, the incident that killed ngrok** (both failure modes at once): the six seeded businesses had `telnyxSyncedAt = 2026-09-14`, so their assistants still pointed at that day's ngrok hostname **and** were missing `notify_when_available` entirely (the tool is unconditional in `telnyxAssistantPayload.ts`, it simply postdates their last sync) — five webhook tools plus `hangup` instead of six plus `hangup`. No `telnyxSyncError` on any of them: nothing had failed, nothing had re-run. The fixed hostname removes the URL half of this permanently; **the tool-set half remains**, because a deploy still does not touch assistants that already exist. A stale assistant is silent; only the provider's API tells you. (Historical counts: today `buildTelnyxVoiceTools` defines up to eight webhook tools plus `hangup`.)
