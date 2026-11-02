@@ -23,7 +23,10 @@ import {
   registrarSalienteContestada,
 } from "../../modules/onboarding/comprobacionDesvio.js";
 import { marcarPataSinCall, motivoDePataSinCall } from "./patasSinCall.js";
-import { guardarTranscripcionDeTelnyx } from "./transcripcion.js";
+import {
+  guardarTranscripcionDelWebhook,
+  guardarTranscripcionDeTelnyx,
+} from "./transcripcion.js";
 import { programarRecuperacionDeTranscripcion } from "../../jobs/recuperarTranscripcion.js";
 
 /**
@@ -91,6 +94,18 @@ const TelnyxCallConversationEndedSchema = z.object({
         call_control_id: z.string().optional(),
         conversation_id: z.string().optional(),
         duration_sec: z.number().optional(),
+        // La transcripción sin redactar (ver guardarTranscripcionDelWebhook).
+        messages: z
+          .array(
+            z
+              .object({
+                role: z.string().optional(),
+                content: z.string().nullable().optional(),
+                timestamp: z.string().optional(),
+              })
+              .passthrough()
+          )
+          .optional(),
       })
       .passthrough(),
   }),
@@ -608,7 +623,7 @@ export async function handleCallConversationEnded(
   payload: unknown
 ): Promise<{ success: boolean }> {
   const event = TelnyxCallConversationEndedSchema.parse(payload);
-  const { call_control_id, conversation_id, duration_sec } =
+  const { call_control_id, conversation_id, duration_sec, messages } =
     event.data.payload;
 
   if (!call_control_id) {
@@ -644,12 +659,28 @@ export async function handleCallConversationEnded(
       },
     });
 
-    if (conversation_id) {
-      // Telnyx puede avisar del fin antes de tener los mensajes (llamada
-      // cmufcsz4b0006s601kncxcf5m, 24-09: llegaron ~40 s después). Con 0
-      // mensajes, o si la descarga falla, se reintenta más tarde en un job
-      // en vez de dar la transcripción por perdida en silencio.
+    // Primero los mensajes del propio evento: llegan sin la redacción de
+    // datos personales que Telnyx aplica a su copia guardada.
+    if (messages?.length) {
+      await guardarTranscripcionDelWebhook(
+        dbCall.id,
+        messages.map((mensaje) => ({
+          role: mensaje.role,
+          content: mensaje.content ?? undefined,
+          timestamp: mensaje.timestamp,
+        }))
+      );
+    } else if (conversation_id) {
+      // Respaldo: la copia de Telnyx, que sale con marcas <PII:…/> en vez
+      // del nombre y el teléfono del cliente. Telnyx puede avisar del fin
+      // antes de tener los mensajes (llamada cmufcsz4b0006s601kncxcf5m,
+      // 24-09: llegaron ~40 s después). Con 0 mensajes, o si la descarga
+      // falla, se reintenta más tarde en un job en vez de dar la
+      // transcripción por perdida en silencio.
       const contexto = `negocio ${dbCall.businessId}, llamada ${dbCall.id}, conversación ${conversation_id}`;
+      console.warn(
+        `[Telnyx] ${callLabel(call_control_id)} terminó sin mensajes en el webhook; se usa la copia de Telnyx, con los datos personales redactados (${contexto})`
+      );
       let guardados = 0;
       let fallo: string | null = null;
       try {

@@ -181,7 +181,9 @@ export interface TelnyxConversation {
 }
 
 export interface TelnyxConversationMessage {
-  role: "user" | "assistant" | "tool";
+  /** `system` y `developer` son avisos informativos de Telnyx (silencios,
+   * buzón de voz, mensajes añadidos por la API). */
+  role: "user" | "assistant" | "tool" | "system" | "developer";
   text: string;
   createdAt?: string;
   sentAt?: string;

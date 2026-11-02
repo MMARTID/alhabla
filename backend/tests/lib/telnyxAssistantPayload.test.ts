@@ -344,7 +344,16 @@ describe("buildTelnyxAssistantPayload", () => {
   it("activa data_retention — Telnyx rechaza grabación con data_retention=false (verificado en vivo 2026-09-11)", () => {
     const payload = buildTelnyxAssistantPayload(baseInput);
 
-    expect(payload.privacySettings).toEqual({ data_retention: true });
+    expect(payload.privacySettings).toMatchObject({ data_retention: true });
+  });
+
+  it("redacta los datos personales de la copia de Telnyx y pide la conversación entera en el webhook de fin, de donde sale la transcripción", () => {
+    const payload = buildTelnyxAssistantPayload(baseInput);
+
+    expect(payload.privacySettings?.pii_redaction).toBe("redact");
+    expect(payload.telephonySettings?.conversation_ended_full_history).toBe(
+      true
+    );
   });
 
   it("activa send_conversation_message_events — sin él, ai.conversations.messages nunca se rellena en llamadas de voz", () => {

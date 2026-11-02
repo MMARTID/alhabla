@@ -395,8 +395,10 @@ exports[`payloads de asistentes (instantáneas) > assistant de la recepcionista,
   },
   "privacySettings": {
     "data_retention": true,
+    "pii_redaction": "redact",
   },
   "telephonySettings": {
+    "conversation_ended_full_history": true,
     "fallback_destination": "+34600000000",
     "noise_suppression": "disabled",
     "recording_settings": {
@@ -854,8 +856,10 @@ exports[`payloads de asistentes (instantáneas) > assistant de la recepcionista,
   },
   "privacySettings": {
     "data_retention": true,
+    "pii_redaction": "redact",
   },
   "telephonySettings": {
+    "conversation_ended_full_history": true,
     "fallback_destination": null,
     "noise_suppression": "disabled",
     "recording_settings": {
@@ -1229,7 +1233,7 @@ Si te escriben en catalán, gallego, euskera o inglés, responde en ese idioma; 
 exports[`payloads de asistentes (instantáneas) > el JSON enviado es idéntico byte a byte (hash) 1`] = `
 {
   "gestor": "e98c3bfa972a5bd367381ff26a58c6d2b9ee626c5ac52e24ac7c18fe833f1d96",
-  "recepcionista": "510cba6ff213f7c44f96dc0b032a0785f0e6b44574f5be72e4f2d3d5463db095",
+  "recepcionista": "a5776f5c2278589ef5e57740e60b456969e762724b3055869c3dd34cb19a7ab8",
 }
 `;
 

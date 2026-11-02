@@ -946,6 +946,11 @@ export function buildTelnyxAssistantPayload(
       // ai.conversations.messages para llamadas de voz — el historial vuelve
       // vacío aunque hubiera conversación real.
       send_conversation_message_events: true,
+      // `call.conversation.ended` trae entera la conversación, tools y sus
+      // resultados incluidos y sin redactar: es de donde sale la
+      // transcripción que ve el dueño (adapters/telnyx/transcripcion.ts),
+      // porque la copia de Telnyx va redactada (pii_redaction, abajo).
+      conversation_ended_full_history: true,
       // Si la conversación con la IA acaba mal (en la prueba del 18-10, tres
       // fallos seguidos del LLM, unos 40 s de silencio), Telnyx pasa la
       // llamada a este número en vez de dejar al cliente sin nadie. Solo
@@ -969,7 +974,17 @@ export function buildTelnyxAssistantPayload(
     // que Alhabla descargue su propia copia. Duración real de esa
     // retención en Telnyx: sin confirmar todavía (no hay un campo de días
     // como en Retell, solo este booleano) — pendiente de la Fase 0.
-    privacySettings: { data_retention: true },
+    //
+    // pii_redaction (2026-11-02): lo que Telnyx guarda (transcripción,
+    // argumentos de las tools, insights) sale con <PII:name/>,
+    // <PII:phone/>, <PII:email_address/>, <PII:address/>… en vez de los
+    // datos del cliente. Probado por voz en español. La llamada en vivo, las
+    // tools y el webhook de fin de conversación los siguen recibiendo
+    // enteros; la grabación no cambia. Solo se aplica a las llamadas: las
+    // conversaciones de chat que crea Alhabla (WhatsApp) no lo heredan, y
+    // Telnyx rechaza con 400 la combinación con `enabled_features`
+    // messaging, que estos assistants no usan.
+    privacySettings: { data_retention: true, pii_redaction: "redact" },
     insightGroupId: input.insightGroupId,
     // Post-conversación (PLAN-CANAL-DUENO.md § 10): el assistant vuelve a
     // ejecutarse tras colgar para llamar a informar_al_negocio.

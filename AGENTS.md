@@ -2139,10 +2139,23 @@ extra-minutes price to subscriptions created before it existed), invoked after a
      - **Lo que no depende del audio.** La transcripción, los insights y el informe salen de la conversación del assistant, así que se guardan siempre.
      - **Chat de WhatsApp.** No se graba, y el aviso de IA lo da la primera respuesta de cada conversación.
 
+   - **De dónde sale la transcripción (2026-11-02).** Los assistants de la recepcionista guardan su
+     copia en Telnyx con `privacy_settings.pii_redaction: "redact"`: la transcripción, los
+     argumentos de las tools y los insights que guarda Telnyx salen con `<PII:name/>`,
+     `<PII:phone/>`, `<PII:email_address/>`, `<PII:address/>`… (probado por voz en español). La
+     llamada en vivo, las tools y el webhook de fin reciben los datos enteros y la grabación no
+     cambia. Por eso `handleCallConversationEnded` guarda la transcripción del dueño con los
+     `payload.messages` del propio `call.conversation.ended` (`guardarTranscripcionDelWebhook`;
+     con `telephony_settings.conversation_ended_full_history: true` traen también tools y
+     resultados, en orden y sin redactar) y solo si vienen vacíos descarga la copia de Telnyx
+     (`guardarTranscripcionDeTelnyx`, redactada, con un `console.warn` que lo dice). La redacción
+     no llega a las conversaciones de chat que crea Alhabla (WhatsApp, el Gestor): no la heredan
+     del assistant. Tampoco se probó que redacte por `ai/assistants/{id}/chat`: en las pruebas
+     no lo hizo. Telnyx rechaza con 400 `pii_redaction` junto a `enabled_features` messaging.
    - **Transcripción diferida (`recuperar-transcripcion`, 2026-10-16, hallazgo 10 de
-     `docs/auditorias/2026-10-16-partes-completas.md`).** `handleCallConversationEnded` guarda la
-     transcripción con `guardarTranscripcionDeTelnyx` (`adapters/telnyx/transcripcion.ts`), pero
-     Telnyx puede mandar `call.conversation.ended` antes de tener los mensajes (llamada
+     `docs/auditorias/2026-10-16-partes-completas.md`).** Si el webhook llega sin mensajes,
+     `handleCallConversationEnded` descarga la transcripción con `guardarTranscripcionDeTelnyx`
+     (`adapters/telnyx/transcripcion.ts`), pero Telnyx puede mandar `call.conversation.ended` antes de tener los mensajes (llamada
      `cmufcsz4b0006s601kncxcf5m`, 24-09: el evento a las 09:53:49, los mensajes ~40 s después; antes
      se perdía en silencio y el evento quedaba `success`). Con 0 mensajes, o si la descarga falla,
      deja un `console.warn` con negocio, llamada y conversación y programa
