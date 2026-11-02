@@ -736,6 +736,10 @@ describe("administración de Alhabla Growth: resumen, historial, conocimiento y 
     }
 
     beforeEach(() => {
+      // La versión nueva de precio.plan.pro sustituye a la vieja en el mismo
+      // instante: una sola fecha, o según en qué milisegundo corra cada
+      // consulta el cierre sale más nuevo que el alta.
+      const sustitucion = hace(2);
       mock.growthAfirmacion.findMany.mockImplementation(
         async ({ where }: { where: Record<string, unknown> }) => {
           if (where.vigenteHasta === null) {
@@ -753,7 +757,7 @@ describe("administración de Alhabla Growth: resumen, historial, conocimiento y 
               {
                 clave: "precio.plan.pro",
                 tipo: "precio",
-                vigenteDesde: hace(2),
+                vigenteDesde: sustitucion,
                 commitSha: "n1",
               },
               {
@@ -768,7 +772,7 @@ describe("administración de Alhabla Growth: resumen, historial, conocimiento y 
             {
               clave: "precio.plan.pro",
               tipo: "precio",
-              vigenteHasta: hace(2),
+              vigenteHasta: sustitucion,
               commitSha: "v1",
             },
             {
