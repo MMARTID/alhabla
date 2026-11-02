@@ -369,6 +369,9 @@ function seccionUsoDeHerramientas({ listaDeEspera }: ContextoDelPrompt): Parrafo
     // Llamada de producción del 14-10: dijo «dijous setze» de una cita del
     // jueves 15. Las tools devuelven el día ya escrito (voiceDateTime.ts).
     "Para decir el día y la hora de una cita usa el campo cuando que te devuelven las herramientas, en el idioma de la conversación: no calcules tú el día de la semana ni del mes.",
+    // Laboratorio del 02-11 con zai-org/GLM-5.3-Flash: copiaba «a las 17:00»
+    // de `cuando` en 62 de 172 turnos (luna lo pasaba a palabras sola).
+    "La hora de cuando viene en cifras: dila con palabras, como se dice por teléfono («a las 17:00» es «a las cinco de la tarde» y «a las 9:30», «a las nueve y media»).",
     // Laboratorio, E4 (30-10): a «dijous» contestó «¿el dos o el nueve?»,
     // dos lunes, sin consultar nada.
     "Si te dicen un día por su nombre («el jueves»), no preguntes qué fecha es ni la calcules: es el próximo con ese nombre de «Próximos días», si la tienes; compruébalo directamente con check_availability y usa el cuando que te devuelve.",
@@ -687,13 +690,37 @@ const SECCIONES_POR_VERSION: Record<VersionDelPrompt, readonly Seccion[]> = {
   v2: SECCIONES_DEL_PROMPT_V2,
 };
 
-/** Las secciones unidas: los párrafos vacíos fuera y una línea en blanco
- * entre los demás. */
-export function componerPrompt(contexto: ContextoDelPrompt): string {
+/** Cómo se escribe el prompt. `json` (el de producción desde el 2026-11-02)
+ * es el mismo texto como un objeto con una clave por sección y la lista de
+ * sus párrafos; `texto` es el Markdown de siempre («## Título» y párrafos),
+ * que queda para el laboratorio. Medido con zai-org/GLM-5.3-Flash en 198
+ * conversaciones (laboratorioDePrompt.ts): texto 79/99, json 81/99. */
+export type FormatoDelPrompt = "json" | "texto";
+
+/** Las secciones unidas: los párrafos vacíos fuera; en texto, una línea en
+ * blanco entre los demás. */
+export function componerPrompt(
+  contexto: ContextoDelPrompt,
+  formato: FormatoDelPrompt = "json"
+): string {
   const secciones =
     SECCIONES_POR_VERSION[contexto.settings.versionDelPrompt] ??
     SECCIONES_DEL_PROMPT;
-  return secciones.flatMap((seccion) => seccion(contexto))
-    .filter(Boolean)
-    .join("\n\n");
+  const parrafos = secciones.map((seccion) =>
+    seccion(contexto).filter((parrafo): parrafo is string => Boolean(parrafo))
+  );
+  if (formato === "texto") return parrafos.flat().join("\n\n");
+  const objeto: Record<string, string[]> = {};
+  for (const [primero, ...resto] of parrafos.filter((p) => p.length > 0)) {
+    // El título es la primera línea («## Idioma» trae su primera frase en
+    // el mismo párrafo, detrás de un salto de línea).
+    const titulo = /^##[ \t]+([^\n]+)(?:\n([\s\S]*))?$/.exec(primero!);
+    if (titulo) {
+      const delTitulo = titulo[2]?.trim() ? [titulo[2].trim()] : [];
+      (objeto[titulo[1]!.trim()] ??= []).push(...delTitulo, ...resto);
+    } else {
+      (objeto["Instrucciones"] ??= []).push(primero!, ...resto);
+    }
+  }
+  return JSON.stringify(objeto, null, 2);
 }

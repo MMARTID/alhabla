@@ -1030,7 +1030,7 @@ const PedirSchema = z.object({
 
 /**
  * Compra un número nuevo para la cuenta con la ruta de la app
- * (POST /business/me/phone/provision, como el dueño): la misma búsqueda,
+ * (POST /phone/business/me/phone/provision, como el dueño): la misma búsqueda,
  * Requirement Group, conexión y sincronización que en el alta, y la misma
  * regla (402 sin suscripción activa o en prueba). Cuesta dinero: siempre con
  * el id de la cuenta escrito, en los dos entornos.
@@ -1056,7 +1056,7 @@ export async function pedirNumero(
   const anotacion = { operacion: "pedir_numero", entorno, businessId };
   const { status, respuesta } = await llamador(entorno, {
     metodo: "POST",
-    ruta: "/business/me/phone/provision",
+    ruta: "/phone/business/me/phone/provision",
     cuerpo: {},
     businessId,
   }).catch((error: Error) => {

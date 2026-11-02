@@ -1,4 +1,5 @@
 import Telnyx from "telnyx";
+import { randomUUID } from "node:crypto";
 import { telnyxAiAdapter } from "./TelnyxAiAdapter.js";
 import { callLabel, errorMessage } from "../../lib/logUtils.js";
 
@@ -65,7 +66,11 @@ export async function contestarConReintentos(input: {
     input.esperar ??
     ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
   const etiqueta = callLabel(input.callControlId);
-  let opciones = input.opciones;
+  // El mismo `command_id` en cada reintento: si un intento que agotó el
+  // tiempo sí llegó, Telnyx ignora el siguiente en vez de contestar dos
+  // veces. Contestar sin la voz es otro comando y lleva uno nuevo, o Telnyx
+  // lo ignoraría como repetido.
+  let opciones = { ...input.opciones, commandId: randomUUID() };
   let sinVoz = input.sinVoz ?? null;
   let intentos = 0;
   let reintentos = 0;
@@ -103,7 +108,7 @@ export async function contestarConReintentos(input: {
         console.error(
           `[Telnyx] ${etiqueta}: Telnyx rechazó contestar con la voz ${sinVoz.voz} (negocio ${input.businessId}); se contesta con la del assistant y su saludo: ${errorMessage(error)}`
         );
-        opciones = sinVoz.opciones;
+        opciones = { ...sinVoz.opciones, commandId: randomUUID() };
         sinVoz = null;
         continue;
       }

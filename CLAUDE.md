@@ -26,7 +26,7 @@ BullMQ en un servicio `alhabla-worker` aparte) migraron el 2026-09-03 a Cloud Ta
 Scheduler, que llaman de vuelta a `alhabla-api` — ya no hace falta un servicio siempre
 encendido. Las dos webs en Vercel (proyectos `alhabla-frontend`, root `frontend`, dominio
 `app.alhabla.ai`; y `alhabla-web`, root `web`, dominio `alhabla.ai`). `alhabla.ai` redirige con
-301 toda ruta de la app a `app.alhabla.ai`. `alhabla-api` tiene un **máximo de 11 instancias**:
+308 toda ruta de la app a `app.alhabla.ai`. `alhabla-api` tiene un **máximo de 11 instancias**:
 es el presupuesto de conexiones de Cloud SQL (`max_connections` 50; 4 por instancia en el peor
 caso), y el deploy se para si alguien lo sube. El DNS está en Cloudflare, y el Worker
 `alhabla-failover-laliga` (`infra/cloudflare/failover-laliga/`) quita y vuelve a poner por sí solo el

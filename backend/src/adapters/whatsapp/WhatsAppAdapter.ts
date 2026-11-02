@@ -11,6 +11,14 @@ import {
  * los negocios que hablan catalán con sus clientes. */
 const TELNYX_TRANSCRIPTION_MODEL = "openai/whisper-large-v3-turbo";
 
+/** La descarga va por fetch directo, sin el timeout del cliente del SDK:
+ * sin plazo propio podía dejar colgado el webhook de WhatsApp. */
+const TIEMPO_PARA_DESCARGAR_AUDIO_MS = 10_000;
+
+/** Una nota de voz larga pasa de los 10 s del cliente (un «Request timed
+ * out» en producción el 2026-10-12): 30 s, como un turno del chat. */
+const TIEMPO_PARA_TRANSCRIBIR_MS = 30_000;
+
 /**
  * Telnyx valida el formato del audio por la EXTENSIÓN del nombre de
  * archivo, no por el `Content-Type` del multipart (comprobado a mano
@@ -157,8 +165,11 @@ export class WhatsAppApiError extends Error {
 
 const SDK_TEMPLATE_PARAMETER_TYPE = "text" as const;
 
+/** Lo que va en `whatsapp_message` al enviar. */
+type ContenidoWhatsApp = Telnyx.Messages.MessageWhatsappParams.WhatsappMessage;
+
 type SdkTemplateComponent = NonNullable<
-  NonNullable<Telnyx.Messages.WhatsappMessageContent["template"]>["components"]
+  NonNullable<ContenidoWhatsApp["template"]>["components"]
 >[number];
 
 /**
@@ -210,7 +221,7 @@ export class WhatsAppAdapter {
 
   private async send(
     message: WhatsAppOutbound,
-    content: Telnyx.Messages.WhatsappMessageContent,
+    content: ContenidoWhatsApp,
     describe: string
   ): Promise<WhatsAppSendResult> {
     const config = this.requireConfig();
@@ -286,17 +297,16 @@ export class WhatsAppAdapter {
       });
     }
 
-    const template: NonNullable<
-      Telnyx.Messages.WhatsappMessageContent["template"]
-    > = message.templateId
-      ? { template_id: message.templateId }
-      : {
-          name: message.templateName,
-          language: {
-            policy: "deterministic",
-            code: message.languageCode ?? "es",
-          },
-        };
+    const template: NonNullable<ContenidoWhatsApp["template"]> =
+      message.templateId
+        ? { template_id: message.templateId }
+        : {
+            name: message.templateName,
+            language: {
+              policy: "deterministic",
+              code: message.languageCode ?? "es",
+            },
+          };
     if (components.length > 0) {
       template.components = components;
     }
@@ -339,7 +349,7 @@ export class WhatsAppAdapter {
         status: "read",
         message_id: messageId,
         typing_indicator: { type: "text" },
-      } as unknown as Telnyx.Messages.WhatsappMessageContent,
+      } as unknown as ContenidoWhatsApp,
       "leído + escribiendo"
     );
   }
@@ -359,17 +369,9 @@ export class WhatsAppAdapter {
         type: "interactive",
         interactive: {
           type: "button",
-          // La API exige `header.type: "text"` (10015 si falta); el SDK no
-          // lo tipa, de ahí la conversión.
+          // La API exige `header.type: "text"` (10015 si falta).
           ...(message.header
-            ? {
-                header: {
-                  type: "text",
-                  text: message.header,
-                } as unknown as NonNullable<
-                  Telnyx.Messages.WhatsappInteractive["header"]
-                >,
-              }
+            ? { header: { type: "text", text: message.header } }
             : {}),
           body: { text: message.body },
           ...(message.footer ? { footer: { text: message.footer } } : {}),
@@ -403,11 +405,7 @@ export class WhatsAppAdapter {
         interactive: {
           type: "cta_url",
           ...(message.header
-            ? {
-                header: { type: "text", text: message.header } as unknown as NonNullable<
-                  Telnyx.Messages.WhatsappInteractive["header"]
-                >,
-              }
+            ? { header: { type: "text", text: message.header } }
             : {}),
           body: { text: message.body },
           ...(message.footer ? { footer: { text: message.footer } } : {}),
@@ -425,36 +423,36 @@ export class WhatsAppAdapter {
   async sendContacts(
     message: WhatsAppContactsMessage
   ): Promise<WhatsAppSendResult> {
-    const contacts = message.contacts.map((contact) => ({
-      // Meta exige `name.formatted_name`; el SDK tipa `name` como string por
-      // error, así que se construye la forma de Meta y se convierte al tipo.
-      name: {
-        formatted_name: contact.formattedName,
-        first_name: contact.firstName ?? contact.formattedName,
-      },
-      ...(contact.company ? { org: { company: contact.company } } : {}),
-      phones: contact.phones.map((phone) => ({
-        phone: phone.number,
-        wa_id: phone.number.replace(/^\+/, ""),
-        type: phone.type ?? "WORK",
-      })),
-      ...(contact.emails
-        ? {
-            emails: contact.emails.map((email) => ({
-              email: email.email,
-              type: email.type ?? "WORK",
-            })),
-          }
-        : {}),
-      ...(contact.urls
-        ? {
-            urls: contact.urls.map((url) => ({
-              url: url.url,
-              type: url.type ?? "WORK",
-            })),
-          }
-        : {}),
-    })) as unknown as Telnyx.Messages.WhatsappContact[];
+    const contacts: NonNullable<ContenidoWhatsApp["contacts"]> =
+      message.contacts.map((contact) => ({
+        // Meta exige `name.formatted_name` (objeto, no string).
+        name: {
+          formatted_name: contact.formattedName,
+          first_name: contact.firstName ?? contact.formattedName,
+        },
+        ...(contact.company ? { org: { company: contact.company } } : {}),
+        phones: contact.phones.map((phone) => ({
+          phone: phone.number,
+          wa_id: phone.number.replace(/^\+/, ""),
+          type: phone.type ?? "WORK",
+        })),
+        ...(contact.emails
+          ? {
+              emails: contact.emails.map((email) => ({
+                email: email.email,
+                type: email.type ?? "WORK",
+              })),
+            }
+          : {}),
+        ...(contact.urls
+          ? {
+              urls: contact.urls.map((url) => ({
+                url: url.url,
+                type: url.type ?? "WORK",
+              })),
+            }
+          : {}),
+      }));
 
     return this.send(
       message,
@@ -553,7 +551,7 @@ export class WhatsAppAdapter {
   /**
    * Descarga un audio entrante (nota de voz) por su `media_id` de Meta. El
    * SDK no modela este recurso (verificado: no hay `whatsapp.media.*` en
-   * telnyx@7.21), así que va por fetch directo — mismo patrón que
+   * telnyx@7.29), así que va por fetch directo — mismo patrón que
    * microsoftGraph.ts/zohoMail.ts para lo que el SDK no cubre. Ruta
    * verificada a mano el 2026-10-02 contra la API real (`GET
    * /v2/whatsapp/media/{phone_number}/{id}`, sin el bug de doble /v2 que
@@ -567,13 +565,15 @@ export class WhatsAppAdapter {
     try {
       const response = await fetch(
         `https://api.telnyx.com/v2/whatsapp/media/${encodeURIComponent(toNumber)}/${encodeURIComponent(mediaId)}`,
-        { headers: { Authorization: `Bearer ${config.apiKey}` } }
+        {
+          headers: { Authorization: `Bearer ${config.apiKey}` },
+          signal: AbortSignal.timeout(TIEMPO_PARA_DESCARGAR_AUDIO_MS),
+        }
       );
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${await response.text()}`);
       }
-      const mimeType =
-        response.headers.get("content-type") ?? "audio/ogg";
+      const mimeType = response.headers.get("content-type") ?? "audio/ogg";
       const buffer = Buffer.from(await response.arrayBuffer());
       return { buffer, mimeType };
     } catch (error) {
@@ -597,10 +597,10 @@ export class WhatsAppAdapter {
         `audio.${extensionFromMimeType(mimeType)}`,
         { type: mimeType }
       );
-      const response = await getTelnyxClient().ai.audio.transcribe({
-        model: TELNYX_TRANSCRIPTION_MODEL,
-        file,
-      });
+      const response = await getTelnyxClient().ai.audio.transcribe(
+        { model: TELNYX_TRANSCRIPTION_MODEL, file },
+        { timeout: TIEMPO_PARA_TRANSCRIBIR_MS }
+      );
       return response.text?.trim() ?? "";
     } catch (error) {
       throw toWhatsAppApiError(error, "al transcribir un audio de WhatsApp");

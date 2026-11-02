@@ -48,19 +48,12 @@ type TelephonySettingsInput = Omit<
 
 /** Modelos de transcripción de respaldo, en orden (hasta 3, todos de
  * streaming y distintos del principal): si el que está en uso falla al
- * empezar o a mitad de llamada, entra el siguiente. Documentado por Telnyx
- * (ajustes de transcripción, release note del 2026-10-09) pero ausente de
- * `TranscriptionSettings` en el SDK 7.24; cada uno hereda el idioma del
- * principal salvo que lleve el suyo. `null` o `[]` los quitan. */
-export type RespaldoDeTranscripcion = {
-  model: NonNullable<TranscriptionSettings["model"]>;
-  language?: string;
-  settings?: TranscriptionSettings["settings"];
-};
+ * empezar o a mitad de llamada, entra el siguiente. Cada uno hereda el
+ * idioma del principal salvo que lleve el suyo; `null` o `[]` los quitan.
+ * Tipados en el SDK desde la 7.29, que solo admite modelos de streaming. */
+export type RespaldoDeTranscripcion = TranscriptionSettings.FallbackModel;
 
-export type TranscriptionSettingsInput = TranscriptionSettings & {
-  fallback_models?: RespaldoDeTranscripcion[] | null;
-};
+export type TranscriptionSettingsInput = TranscriptionSettings;
 
 /** `language` (ISO 639-1) es el idioma en que arranca una voz de Soniox
  * (`Soniox.tts-rt-v2.*`), que habla todos los idiomas; documentado por
@@ -188,7 +181,9 @@ export interface TelnyxConversation {
 }
 
 export interface TelnyxConversationMessage {
-  role: "user" | "assistant" | "tool";
+  /** `system` y `developer` son avisos informativos de Telnyx (silencios,
+   * buzón de voz, mensajes añadidos por la API). */
+  role: "user" | "assistant" | "tool" | "system" | "developer";
   text: string;
   createdAt?: string;
   sentAt?: string;
@@ -594,6 +589,9 @@ export class TelnyxAiAdapter {
       /** La voz de esta llamada en vez de la del assistant (la cooficial de
        * la zona para quien habla en ella). */
       voiceSettings?: VoiceSettingsInput | null;
+      /** Telnyx ignora un segundo comando con el mismo `command_id` en la
+       * misma llamada: el que repite tras un timeout no contesta dos veces. */
+      commandId?: string;
     } = {}
   ): Promise<void> {
     const client = getTelnyxClient();
@@ -611,6 +609,7 @@ export class TelnyxAiAdapter {
             : {}),
         },
         client_state: options.clientState,
+        ...(options.commandId ? { command_id: options.commandId } : {}),
         ...(options.grabar
           ? {
               record: "record-from-answer",
@@ -801,7 +800,8 @@ export class TelnyxAiAdapter {
   // Chat (fase 2 del plan de WhatsApp): conversaciones creadas por Alhabla
   // y turnos por `ai.assistants.chat`. Hallazgos de la fase 0.4 y del
   // 2026-09-20 en dev: la respuesta de `conversations.create` viene envuelta
-  // en `data` aunque el tipo del SDK diga `Conversation`; las claves de los
+  // en `data` aunque el tipo del SDK diga `Conversation` (vuelto a comprobar
+  // con el SDK 7.29 el 2026-11-02, por HTTP y por el SDK); las claves de los
   // `metadata` resuelven como variables dinámicas en las cabeceras de las
   // tools (por eso `call_control_id` en los metadata hace que las tools de
   // voz funcionen en chat sin tocarlas); `system_prompt` se acepta en el
@@ -817,6 +817,8 @@ export class TelnyxAiAdapter {
       name: input.name,
       metadata: input.metadata,
     })) as unknown as { data?: { id?: string }; id?: string };
+    // `data.id` es lo que llega de verdad: con el tipo del SDK, `response.id`
+    // sería undefined. `id` en la raíz por si Telnyx algún día lo arregla.
     const id = response?.data?.id ?? response?.id;
     if (!id) {
       throw new Error("Telnyx no devolvió el id de la conversación creada");
@@ -1170,14 +1172,12 @@ export class TelnyxAiAdapter {
   // Firma de webhooks — Ed25519 con ventana de timestamp.
   //
   // Delega en `TelnyxWebhook` (telnyx/lib/webhooks.js), la clase Ed25519
-  // oficial del SDK — no en `client.webhooks.unwrap()` (el `webhooks` del
-  // cliente principal), que usa la librería `standardwebhooks` (cabeceras
-  // `webhook-id`/`webhook-timestamp`/`webhook-signature`, HMAC): un esquema
-  // completamente distinto que NO corresponde a los webhooks de Call
-  // Control/AI Assistants (`telnyx-signature-ed25519`/`telnyx-timestamp`).
-  // Confirmado leyendo el código fuente de ambos módulos el 2026-09-11 —
-  // el SDK de Telnyx bundlea las dos implementaciones para categorías de
-  // webhook distintas y es fácil confundirlas.
+  // oficial del SDK: cabeceras `telnyx-signature-ed25519`/`telnyx-timestamp`,
+  // firma sobre `timestamp|cuerpo` y 5 minutos de margen. En la 7.29,
+  // `client.webhooks.unwrap()` usa esta misma clase (comprobado en el código
+  // del SDK el 2026-11-02; el 2026-09-11 usaba `standardwebhooks`, HMAC, otro
+  // esquema). Aquí se llama a la clase directamente porque solo hace falta
+  // la verificación, no el evento parseado.
   // ---------------------------------------------------------------------
 
   /**

@@ -67,6 +67,7 @@
  *     [--n 10] [--escenarios E1,E3] [--variantes control,v2] \
  *     [--negocio-de E4=<id>,E18=<id>] [--salida <dir>] [--juez [modelo]] \
  *     [--cliente reactivo|guion] [--modelo-cliente <modelo>] \
+ *     [--modelo-del-assistant <modelo>] \
  *     [--comparar-con <carpeta de otro informe>] [--etiqueta <texto>] \
  *     [--paralelo 3] [--con-citas] [--lista-de-espera si|no|auto] \
  *     [--dry-run] [--si]
@@ -118,14 +119,21 @@ export const PREFIJO_DEL_LABORATORIO = "alhabla-lab-prompt-";
 /** Por encima de estos turnos hace falta `--si`. */
 export const TOPE_DE_TURNOS_SIN_CONFIRMAR = 300;
 
-/** El juez es un modelo alojado por Telnyx y distinto del del assistant
- * (`openai/gpt-5.6-luna` no se sirve por la inferencia pública). */
+/** El juez es un modelo alojado por Telnyx y distinto del del assistant. */
 export const MODELO_DEL_JUEZ = "moonshotai/Kimi-K2.6";
-const MODELO_DEL_ASSISTANT = "openai/gpt-5.6-luna";
+/** El de producción (telnyxAssistantPayload.ts) desde el 2026-11-02. Con
+ * `--modelo-del-assistant` se prueba otro: p. ej. `openai/gpt-5.6-luna`, el
+ * de antes, o Kimi-K2.6. */
+export const MODELO_DEL_ASSISTANT = "zai-org/GLM-5.3-Flash";
 
 /** El cliente reactivo también es un modelo barato alojado por Telnyx y
  * distinto del del assistant: por defecto, el mismo cliente que el juez. */
 export const MODELO_DEL_CLIENTE = MODELO_DEL_JUEZ;
+
+/** El cliente cuando la recepcionista es MODELO_DEL_CLIENTE (Kimi): otro
+ * alojado por Telnyx. El de producción no vale: la inferencia pública de
+ * Telnyx no sirve openai/gpt-5.6-luna (10015, 01-11). */
+export const MODELO_DEL_CLIENTE_ALTERNATIVO = "zai-org/GLM-5.3";
 
 /** Cómo se genera lo que dice el cliente. */
 export const MODOS_DE_CLIENTE = ["reactivo", "guion"] as const;
@@ -143,10 +151,44 @@ export const DESTINO_INERTE_DE_TRANSFERENCIA =
 
 const CLAVE_LISTA_DE_ESPERA = "hueco_libre";
 
-/** Cómo se llama cada variante y qué `versionDelPrompt` lleva. */
+/** Cómo va cada variante con las conversaciones ya terminadas, para seguir
+ * una tanda larga sin esperar al informe: «control 7/9 (78 %) · json 8/9
+ * (89 %) · 2 errores». Los errores de ejecución (p. ej. el cliente simulado
+ * que no contesta) no cuentan como fallo de la recepcionista. */
+export function marcadorParcial(
+  resultados: ReadonlyArray<{
+    tarea: { variante: string };
+    resultado: { ok: boolean; error?: string };
+  }>
+): string {
+  const porVariante = new Map<string, { aciertos: number; validas: number }>();
+  let errores = 0;
+  for (const { tarea, resultado } of resultados) {
+    if (resultado.error) {
+      errores++;
+      continue;
+    }
+    const celda = porVariante.get(tarea.variante) ?? { aciertos: 0, validas: 0 };
+    celda.validas++;
+    if (resultado.ok) celda.aciertos++;
+    porVariante.set(tarea.variante, celda);
+  }
+  const partes = [...porVariante].map(
+    ([variante, { aciertos, validas }]) =>
+      `${variante} ${aciertos}/${validas} (${Math.round((100 * aciertos) / validas)} %)`
+  );
+  if (errores) partes.push(`${errores} ${errores === 1 ? "error" : "errores"}`);
+  return partes.join(" · ") || "sin resultados";
+}
+
+/** Cómo se llama cada variante, qué `versionDelPrompt` lleva y en qué
+ * formato va el prompt (FormatoDelPrompt). `control` es el de producción,
+ * en JSON desde el 2026-11-02; `texto` es el mismo prompt en el Markdown de
+ * antes, para volver a medir el formato. */
 export const VARIANTES = {
-  control: { version: "v1" },
-  v2: { version: "v2" },
+  control: { version: "v1", formato: "json" },
+  v2: { version: "v2", formato: "json" },
+  texto: { version: "v1", formato: "texto" },
 } as const;
 export type NombreDeVariante = keyof typeof VARIANTES;
 
@@ -181,6 +223,8 @@ export interface Opciones {
   cliente: ModoDeCliente;
   /** Modelo del cliente reactivo (distinto del del assistant). */
   modeloDelCliente: string;
+  /** Modelo de la recepcionista; por defecto, el de producción. */
+  modeloDelAssistant: string;
   /** Carpeta de otro informe (o su informe.json) con el que comparar. */
   compararCon: string | null;
   /** Nombre libre de esta ejecución, para distinguirla al comparar. */
@@ -203,6 +247,7 @@ const BANDERAS_CON_VALOR = new Set([
   "lista-de-espera",
   "cliente",
   "modelo-cliente",
+  "modelo-del-assistant",
   "comparar-con",
   "etiqueta",
 ]);
@@ -319,10 +364,18 @@ export function parsearArgumentos(argv: string[]): Opciones {
       `--cliente es ${MODOS_DE_CLIENTE.join(" o ")}, no «${cliente}»`
     );
   }
-  const modeloDelCliente = valores.get("modelo-cliente") ?? MODELO_DEL_CLIENTE;
-  if (modeloDelCliente === MODELO_DEL_ASSISTANT) {
+  const modeloDelAssistant =
+    valores.get("modelo-del-assistant") ?? MODELO_DEL_ASSISTANT;
+  // Si la recepcionista es el cliente de siempre (Kimi), el cliente pasa a
+  // ser otro: un modelo no debe hablar consigo mismo.
+  const modeloDelCliente =
+    valores.get("modelo-cliente") ??
+    (modeloDelAssistant === MODELO_DEL_CLIENTE
+      ? MODELO_DEL_CLIENTE_ALTERNATIVO
+      : MODELO_DEL_CLIENTE);
+  if (modeloDelCliente === modeloDelAssistant) {
     throw new ErrorDeUso(
-      `--modelo-cliente no puede ser el del assistant (${MODELO_DEL_ASSISTANT}): el cliente tiene que ser otro modelo`
+      `--modelo-cliente no puede ser el del assistant (${modeloDelAssistant}): el cliente tiene que ser otro modelo`
     );
   }
 
@@ -337,11 +390,12 @@ export function parsearArgumentos(argv: string[]): Opciones {
     dryRun: sueltas.has("dry-run"),
     si: sueltas.has("si"),
     juez,
-    paralelo: numero("paralelo", 3, 1, 10),
+    paralelo: numero("paralelo", 3, 1, 20),
     conCitas: sueltas.has("con-citas"),
     listaDeEspera: listaDeEspera as Opciones["listaDeEspera"],
     cliente: cliente as ModoDeCliente,
     modeloDelCliente,
+    modeloDelAssistant,
     compararCon: valores.get("comparar-con") ?? null,
     etiqueta: valores.get("etiqueta") ?? null,
   };
@@ -360,6 +414,9 @@ export const AYUDA = `Laboratorio de prompt (PLAN-PROMPT-DINAMICO.md, F0)
                             fijos, para reproducir una conversación exacta
   --modelo-cliente <modelo> modelo del cliente reactivo (por defecto ${MODELO_DEL_CLIENTE});
                             no puede ser el del assistant
+  --modelo-del-assistant <modelo>
+                            modelo de la recepcionista (por defecto ${MODELO_DEL_ASSISTANT});
+                            con ${MODELO_DEL_CLIENTE}, el cliente pasa a ser ${MODELO_DEL_CLIENTE_ALTERNATIVO}
   --comparar-con <carpeta>  carpeta de otro informe: compara cada variante con
                             la misma variante de esa ejecución
   --etiqueta <texto>        nombre de esta ejecución en el informe
@@ -368,7 +425,7 @@ export const AYUDA = `Laboratorio de prompt (PLAN-PROMPT-DINAMICO.md, F0)
   --variantes control,v2    control = prompt v1; v2 solo cuando exista (F2)
   --salida <dir>            informe (por defecto backend/.laboratorio-de-prompt/)
   --juez [modelo]           juez LLM para lo textual (por defecto ${MODELO_DEL_JUEZ})
-  --paralelo <3>            conversaciones a la vez
+  --paralelo <3>            conversaciones a la vez (hasta 20)
   --con-citas               corre también los guiones que reservan o anulan
                             citas en dev (y mandan WhatsApp); exige --si
   --lista-de-espera si|no|auto
@@ -1793,6 +1850,8 @@ export interface Informe {
     /** Cómo se generó lo que dijo el cliente, y con qué modelo. */
     cliente: ModoDeCliente;
     modeloDelCliente: string | null;
+    /** Modelo de la recepcionista (--modelo-del-assistant). */
+    modeloDelAssistant?: string;
     /** Nombre que se le dio a esta ejecución (--etiqueta). */
     etiqueta: string | null;
     /** Turnos de chat como mucho (los del guion o el tope del reactivo). */
@@ -2117,6 +2176,7 @@ export function informeMarkdown(
     `# Laboratorio de prompt ${meta.fecha}${meta.etiqueta ? ` · ${meta.etiqueta}` : ""}`,
     "",
     `${meta.negocio ? `Negocio forzado ${meta.negocio}` : `${negocios.length} negocios de laboratorio`}, n = ${meta.n}, variantes ${meta.variantes.join(", ")}, ` +
+      `recepcionista ${meta.modeloDelAssistant ?? MODELO_DEL_ASSISTANT}, ` +
       `cliente ${meta.cliente}${meta.modeloDelCliente ? ` (${meta.modeloDelCliente})` : ""}` +
       `${meta.juez ? `, juez ${meta.juez}` : ", sin juez"}. Hasta ${meta.turnosTotales} turnos de chat.`,
     "",
@@ -2979,7 +3039,7 @@ export function describirPlan(
     `Variantes: ${opciones.variantes.join(", ")}; n = ${opciones.n}`,
     `Cliente: ${
       opciones.cliente === "reactivo"
-        ? `reactivo, con ${opciones.modeloDelCliente} (el assistant usa ${MODELO_DEL_ASSISTANT})`
+        ? `reactivo, con ${opciones.modeloDelCliente} (el assistant usa ${opciones.modeloDelAssistant})`
         : "con guion (turnos fijos)"
     }`,
     `Conversaciones: ${plan.tareas.length}; turnos de chat: ${plan.turnosTotales}` +
@@ -3144,16 +3204,19 @@ export async function ejecutarLaboratorio(
     try {
       contextos.set(
         negocioId,
-        await deps.cargarContexto({
-          negocioId,
-          variantes: opciones.variantes,
-          fecha,
-          sufijo:
-            plan.negocios.length > 1
-              ? sufijoDelNegocio(negocioId, catalogo, sufijosUsados)
-              : undefined,
-          listaDeEspera: opciones.listaDeEspera,
-        })
+        conModeloDelAssistant(
+          await deps.cargarContexto({
+            negocioId,
+            variantes: opciones.variantes,
+            fecha,
+            sufijo:
+              plan.negocios.length > 1
+                ? sufijoDelNegocio(negocioId, catalogo, sufijosUsados)
+                : undefined,
+            listaDeEspera: opciones.listaDeEspera,
+          }),
+          opciones.modeloDelAssistant
+        )
       );
     } catch (error) {
       const deNegocio = plan.tareas.filter((t) => t.negocioId === negocioId);
@@ -3350,7 +3413,7 @@ export async function ejecutarLaboratorio(
         hechas++;
         if (hechas % 10 === 0 || hechas === ejecutables.length) {
           deps.log(
-            `[Laboratorio] ${hechas}/${ejecutables.length} conversaciones`
+            `[Laboratorio] ${hechas}/${ejecutables.length} conversaciones · ${marcadorParcial(resultados)}`
           );
         }
       },
@@ -3394,6 +3457,7 @@ export async function ejecutarLaboratorio(
         cliente: opciones.cliente,
         modeloDelCliente:
           opciones.cliente === "reactivo" ? opciones.modeloDelCliente : null,
+        modeloDelAssistant: opciones.modeloDelAssistant,
         etiqueta: opciones.etiqueta,
         turnosTotales: plan.turnosTotales,
         saltados,
@@ -3465,6 +3529,24 @@ export function versionDelPromptSoportada(
     versionDelPrompt?: unknown;
   } | null;
   return leidos?.versionDelPrompt === version;
+}
+
+/** Los payloads con otro modelo de recepcionista (`--modelo-del-assistant`);
+ * con el de producción, tal cual. */
+export function conModeloDelAssistant(
+  contexto: ContextoDelNegocio,
+  modelo: string
+): ContextoDelNegocio {
+  if (modelo === MODELO_DEL_ASSISTANT) return contexto;
+  return {
+    ...contexto,
+    payloads: Object.fromEntries(
+      Object.entries(contexto.payloads).map(([variante, payload]) => [
+        variante,
+        { ...payload, model: modelo },
+      ])
+    ) as ContextoDelNegocio["payloads"],
+  };
 }
 
 /**
@@ -3744,7 +3826,7 @@ async function cargarContextoReal(input: {
 
   const payloads = {} as ContextoDelNegocio["payloads"];
   for (const variante of input.variantes) {
-    const { version } = VARIANTES[variante];
+    const { version, formato } = VARIANTES[variante];
     if (version !== "v1" && !v2Disponible) {
       throw new ErrorDeUso(
         `La variante ${variante} (versionDelPrompt «${version}») todavía no existe en este código: llega con F2`
@@ -3767,6 +3849,7 @@ async function cargarContextoReal(input: {
       ocultarNumeroDelNegocio: negocio.hideOwnerNumberFromClients,
       transferenciaAlDueno: transferencia,
       idiomas: idiomas.idiomas,
+      formato,
     });
     const construido = payloadLib.buildTelnyxAssistantPayload({
       businessId: negocio.id,

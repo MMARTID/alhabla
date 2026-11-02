@@ -2,6 +2,9 @@ import { describe, it, expect, vi } from "vitest";
 import {
   ErrorDeUso,
   MODELO_DEL_CLIENTE,
+  MODELO_DEL_ASSISTANT,
+  MODELO_DEL_CLIENTE_ALTERNATIVO,
+  conModeloDelAssistant,
   NegocioNoDisponible,
   PREFIJO_DEL_LABORATORIO,
   TOPE_DE_TURNOS_SIN_CONFIRMAR,
@@ -34,6 +37,7 @@ import {
   parsearArgumentos,
   pareceDespedida,
   planificar,
+  marcadorParcial,
   reconstruirConversacion,
   repartirLlamadas,
   restableceElNegocio,
@@ -151,7 +155,7 @@ function contextoFalso(
       name: nombreDelAssistant(fecha, variante, sufijo),
       instructions: "Eres la recepcionista.",
       greeting: "Hola, gracias por llamar.",
-      model: "openai/gpt-5.6-luna",
+      model: "zai-org/GLM-5.3-Flash",
       tools: [{ type: "webhook", webhook: { name: "get_catalog" } }] as never,
     };
   }
@@ -280,10 +284,38 @@ describe("parsearArgumentos", () => {
       listaDeEspera: "auto",
       cliente: "reactivo",
       modeloDelCliente: MODELO_DEL_CLIENTE,
+      modeloDelAssistant: MODELO_DEL_ASSISTANT,
       compararCon: null,
       etiqueta: null,
     });
     expect(o.salida).toMatch(/backend\/\.laboratorio-de-prompt$/);
+  });
+
+  it("con Kimi de recepcionista, el cliente pasa a ser otro alojado por Telnyx", () => {
+    const o = parsearArgumentos([
+      "--modelo-del-assistant",
+      "moonshotai/Kimi-K2.6",
+    ]);
+    expect(o.modeloDelAssistant).toBe("moonshotai/Kimi-K2.6");
+    expect(o.modeloDelCliente).toBe(MODELO_DEL_CLIENTE_ALTERNATIVO);
+  });
+
+  it("conModeloDelAssistant cambia el modelo de todos los payloads", () => {
+    const contexto = {
+      payloads: {
+        control: { model: MODELO_DEL_ASSISTANT, name: "a" },
+        v2: { model: MODELO_DEL_ASSISTANT, name: "b" },
+      },
+    } as unknown as ContextoDelNegocio;
+    expect(conModeloDelAssistant(contexto, MODELO_DEL_ASSISTANT)).toBe(
+      contexto
+    );
+    const otro = conModeloDelAssistant(contexto, "moonshotai/Kimi-K2.6");
+    expect(Object.values(otro.payloads).map((p) => p.model)).toEqual([
+      "moonshotai/Kimi-K2.6",
+      "moonshotai/Kimi-K2.6",
+    ]);
+    expect(otro.payloads.control.name).toBe("a");
   });
 
   it("lee todas las opciones, también con =", () => {
@@ -344,7 +376,16 @@ describe("parsearArgumentos", () => {
   it.each([
     [["--negocio", "b", "--raro"], /desconocida/],
     [["--cliente", "humano"], /reactivo o guion/],
-    [["--modelo-cliente", "openai/gpt-5.6-luna"], /el del assistant/],
+    [["--modelo-cliente", "zai-org/GLM-5.3-Flash"], /el del assistant/],
+    [
+      [
+        "--modelo-del-assistant",
+        "moonshotai/Kimi-K2.6",
+        "--modelo-cliente",
+        "moonshotai/Kimi-K2.6",
+      ],
+      /el del assistant/,
+    ],
     [["--comparar-con"], /Falta el valor/],
     [["--negocio", "b", "--n", "0"], /entre 1 y 200/],
     [["--negocio", "b", "--n", "x"], /entre 1 y 200/],
@@ -2333,7 +2374,7 @@ describe("siguienteMensajeDelCliente", () => {
       mensajes: Array<{ role: string; content: string }>;
     };
     expect(peticion.modelo).toBe(MODELO_DEL_CLIENTE);
-    expect(peticion.modelo).not.toBe("openai/gpt-5.6-luna");
+    expect(peticion.modelo).not.toBe(MODELO_DEL_ASSISTANT);
     const sistema = peticion.mensajes[0]!.content;
     expect(sistema).toContain(guion("E12a").objetivo);
     expect(sistema).toContain("Servicio que quieres: un corte de pelo");
@@ -3985,5 +4026,21 @@ describe("resultadoSinAssistant", () => {
       ok: false,
       error: "400 10015",
     });
+  });
+});
+
+describe("marcadorParcial", () => {
+  it("cuenta aciertos por variante y deja aparte los errores de ejecución", () => {
+    const marcador = marcadorParcial([
+      { tarea: { variante: "control" }, resultado: { ok: true } },
+      { tarea: { variante: "control" }, resultado: { ok: false } },
+      { tarea: { variante: "json" }, resultado: { ok: true } },
+      {
+        tarea: { variante: "json" },
+        resultado: { ok: false, error: "Request timed out." },
+      },
+    ]);
+
+    expect(marcador).toBe("control 1/2 (50 %) · json 1/1 (100 %) · 1 error");
   });
 });

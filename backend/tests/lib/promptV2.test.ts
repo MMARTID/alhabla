@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
-  buildManagedAgentPrompt,
+  buildManagedAgentPrompt as buildManagedAgentPromptEnJson,
   DEFAULT_AGENT_SETTINGS,
   parseAgentSettings,
 } from "../../src/lib/managedAgentPrompt.js";
@@ -13,6 +13,13 @@ import {
 import { buildTelnyxAssistantPayload } from "../../src/lib/telnyxAssistantPayload.js";
 import { resolverIdiomas } from "../../src/lib/idiomas/resolver.js";
 import { idiomasQueHabla } from "../../src/lib/idiomas/catalogo.js";
+
+/** Las secciones se leen en Markdown («## Sección»), como en
+ * reglasDelPrompt.test.ts; el JSON de producción lo cubre
+ * managedAgentPrompt.test.ts. */
+const buildManagedAgentPrompt = (
+  input: Parameters<typeof buildManagedAgentPromptEnJson>[0]
+) => buildManagedAgentPromptEnJson({ ...input, formato: "texto" });
 
 /**
  * El prompt compacto (v2, F2 de PLAN-PROMPT-DINAMICO.md). El censo de reglas

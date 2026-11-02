@@ -37,6 +37,10 @@ export interface TelnyxWebhookToolInput {
   required?: string[];
   headers?: Array<{ name: string; value: string }>;
   timeoutMs?: number;
+  /** Lo que dice Telnyx mientras espera la respuesta (filler messages):
+   * frases fijas, no del modelo. Solo suenan en voz; en el chat no salen
+   * (comprobado en dev el 2026-11-02). */
+  mensajesDeEspera?: Array<{ content: string; timingMs: number }>;
 }
 
 /**
@@ -63,7 +67,50 @@ export function toTelnyxWebhookTool(
         required: input.required,
       },
       headers: input.headers,
+      ...(input.mensajesDeEspera
+        ? {
+            messages: input.mensajesDeEspera.map((mensaje) => ({
+              type: "request_response_delayed" as const,
+              content: mensaje.content,
+              timing_ms: mensaje.timingMs,
+            })),
+          }
+        : {}),
     },
+  };
+}
+
+/**
+ * Las tools que tardan lo bastante como para que se note el silencio: en
+ * producción, del 19-10 al 02-11, book_appointment tardó 2,0 s de mediana
+ * (3,2 s el máximo) y cancel_appointment 1,1 s; el resto, menos de 0,5 s.
+ * Si a los 1,5 s no han respondido, la recepcionista dice la frase de
+ * espera del idioma principal (no la de cada llamada: las variables de
+ * llamada en estas frases están sin comprobar, y si no se sustituyeran se
+ * leerían las llaves en voz alta).
+ */
+const TOOLS_CON_FRASE_DE_ESPERA = new Set([
+  "book_appointment",
+  "cancel_appointment",
+]);
+const ESPERA_ANTES_DE_LA_FRASE_MS = 1500;
+
+function conFraseDeEspera(
+  tool: TelnyxWebhookToolInput,
+  isoDelPrincipal: string
+): TelnyxWebhookToolInput {
+  if (!TOOLS_CON_FRASE_DE_ESPERA.has(tool.name)) return tool;
+  const idioma =
+    Object.values(IDIOMAS).find((i) => i.iso === isoDelPrincipal) ??
+    IDIOMAS["es-ES"];
+  return {
+    ...tool,
+    mensajesDeEspera: [
+      {
+        content: idioma.fraseDeEspera,
+        timingMs: ESPERA_ANTES_DE_LA_FRASE_MS,
+      },
+    ],
   };
 }
 
@@ -489,9 +536,14 @@ export function adaptManagedPromptForTelnyx(
   // {{telnyx_current_time_<zona>}} sin resolver y el agente sin saber qué
   // día es (fecha inventada para «mañana»).
   const zona = resolveManagedPromptTimezone(timezone);
+  // En el prompt en JSON (FormatoDelPrompt) el nombre cae dentro de una
+  // cadena: unas comillas en «Peluquería "La Rosa"» lo romperían.
+  const nombre = instructions.trimStart().startsWith("{")
+    ? JSON.stringify(businessName).slice(1, -1)
+    : businessName;
   return instructions
     .split("{{nombre_negocio}}")
-    .join(businessName)
+    .join(nombre)
     .split("{{user_number}}")
     .join("{{telnyx_end_user_target}}")
     .replace(RETELL_CURRENT_TIME_PATTERN, `{{telnyx_current_time_${zona}}}`)
@@ -530,7 +582,10 @@ function transcripcionDeSoniox(
 function ajustesDeSoniox(
   pistas: readonly string[] | undefined,
   boostedKeywords: readonly string[] | undefined
-): RespaldoDeTranscripcion & { language: string } {
+): RespaldoDeTranscripcion & {
+  language: string;
+  settings: NonNullable<RespaldoDeTranscripcion["settings"]>;
+} {
   return {
     model: "soniox/stt-rt-v5",
     language: "auto",
@@ -730,7 +785,9 @@ export function buildTelnyxAssistantPayload(
 ): CreateTelnyxAssistantInput {
   const tools: Array<TelnyxWebhookTool | HangupTool | TelnyxTransferTool> = (
     input.tools ?? []
-  ).map(toTelnyxWebhookTool);
+  ).map((tool) =>
+    toTelnyxWebhookTool(conFraseDeEspera(tool, input.idiomas.isoDeLaVoz))
+  );
 
   if (input.transferenciaAlDueno) {
     tools.push(
@@ -768,16 +825,22 @@ export function buildTelnyxAssistantPayload(
     // (LLM+STT+TTS) factura una TARIFA PLANA de $0.05 por minuto
     // (redondeado a bloques de 60s) sin importar el modelo — mismo coste
     // exacto con Kimi-K2.6 y con gpt-5.6-luna en llamadas de duración
-    // comparable. El modelo NO afecta al coste; se mantiene gpt-5.6-luna
-    // por preferencia del usuario, no por ahorro. La única palanca real de
+    // comparable. El modelo NO afecta al coste. La única palanca real de
     // coste es la duración de la llamada.
-    model: "openai/gpt-5.6-luna",
-    // gpt-5.6-luna NO lo aloja Telnyx: `GET /v2/ai/models` lo da con
-    // `owned_by: "openai"`, así que la conversación sale a OpenAI (fuera del
-    // EEE; docs/auditorias/2026-10-16-pipelines-ue-y-datos.md). Kimi-K2.6,
-    // el fallback, sí es de Telnyx (`owned_by: "Telnyx"`): no exige una
-    // Integration Secret propia, y es el modelo ya validado con llamadas
-    // reales antes de este cambio.
+    //
+    // Desde el 2026-11-02, zai-org/GLM-5.3-Flash (decisión del usuario). Lo
+    // aloja Telnyx (antes gpt-5.6-luna, de OpenAI y fuera del EEE;
+    // docs/auditorias/2026-10-16-pipelines-ue-y-datos.md) y es el único
+    // modelo de assistants que Telnyx sirve en la región EU con
+    // `privacy_settings.in_transit_data_locality` (Kimi-K2.6 no está en EU:
+    // 422/10027 medido el 02-11). En el laboratorio de prompt
+    // (laboratorioDePrompt.ts) acierta como luna (~80 %) y contesta unas
+    // tres veces más rápido (~1,2 s por turno frente a ~3,9 s).
+    model: "zai-org/GLM-5.3-Flash",
+    // Kimi-K2.6 también es de Telnyx (`owned_by: "Telnyx"`), no exige una
+    // Integration Secret y es el modelo validado con llamadas reales antes
+    // de luna. No se sirve en EU: si algún día se activa
+    // `in_transit_data_locality`, el respaldo tendrá que ser otro.
     fallbackConfig: { model: "moonshotai/Kimi-K2.6" },
     // voice_speed retirado (encontrado 2026-09-14): la propia documentación
     // del SDK dice "only applicable for Telnyx Natural voices" — la cuenta
@@ -897,8 +960,13 @@ export function buildTelnyxAssistantPayload(
     // 2026-10-02: la espera, la de flux; sin puntuación, 0.5 s (medido con
     // llamadas reales el 2026-10-03, ver transcripcionDeSoniox); con
     // puntuación y con número, los defaults de Telnyx.
+    //
+    // El saludo no se puede cortar: lleva el aviso de IA (Reglamento europeo
+    // de IA, art. 50) y, si toca, el de grabación, y tienen que oírse
+    // enteros. Telnyx pone este caso de ejemplo en su guía de interrupciones.
     interruptionSettings: soniox
       ? {
+          disable_greeting_interruption: true,
           start_speaking_plan: {
             wait_seconds: 0.1,
             transcription_endpointing_plan: {
@@ -909,6 +977,7 @@ export function buildTelnyxAssistantPayload(
           },
         }
       : {
+          disable_greeting_interruption: true,
           start_speaking_plan: { wait_seconds: 0.1 },
           interrupt_prediction_threshold: 0.4,
         },
@@ -946,6 +1015,11 @@ export function buildTelnyxAssistantPayload(
       // ai.conversations.messages para llamadas de voz — el historial vuelve
       // vacío aunque hubiera conversación real.
       send_conversation_message_events: true,
+      // `call.conversation.ended` trae entera la conversación, tools y sus
+      // resultados incluidos y sin redactar: es de donde sale la
+      // transcripción que ve el dueño (adapters/telnyx/transcripcion.ts),
+      // porque la copia de Telnyx va redactada (pii_redaction, abajo).
+      conversation_ended_full_history: true,
       // Si la conversación con la IA acaba mal (en la prueba del 18-10, tres
       // fallos seguidos del LLM, unos 40 s de silencio), Telnyx pasa la
       // llamada a este número en vez de dejar al cliente sin nadie. Solo
@@ -969,7 +1043,17 @@ export function buildTelnyxAssistantPayload(
     // que Alhabla descargue su propia copia. Duración real de esa
     // retención en Telnyx: sin confirmar todavía (no hay un campo de días
     // como en Retell, solo este booleano) — pendiente de la Fase 0.
-    privacySettings: { data_retention: true },
+    //
+    // pii_redaction (2026-11-02): lo que Telnyx guarda (transcripción,
+    // argumentos de las tools, insights) sale con <PII:name/>,
+    // <PII:phone/>, <PII:email_address/>, <PII:address/>… en vez de los
+    // datos del cliente. Probado por voz en español. La llamada en vivo, las
+    // tools y el webhook de fin de conversación los siguen recibiendo
+    // enteros; la grabación no cambia. Solo se aplica a las llamadas: las
+    // conversaciones de chat que crea Alhabla (WhatsApp) no lo heredan, y
+    // Telnyx rechaza con 400 la combinación con `enabled_features`
+    // messaging, que estos assistants no usan.
+    privacySettings: { data_retention: true, pii_redaction: "redact" },
     insightGroupId: input.insightGroupId,
     // Post-conversación (PLAN-CANAL-DUENO.md § 10): el assistant vuelve a
     // ejecutarse tras colgar para llamar a informar_al_negocio.

@@ -18,7 +18,10 @@ import {
   normalizarIdiomas,
 } from "./idiomas/ajustes.js";
 import { instruccionesDeIdioma, resolverIdiomas } from "./idiomas/resolver.js";
-import { componerPrompt } from "./seccionesDelPrompt.js";
+import {
+  componerPrompt,
+  type FormatoDelPrompt,
+} from "./seccionesDelPrompt.js";
 
 // Lo que otros módulos importan de aquí desde antes de partir el prompt en
 // secciones.
@@ -268,6 +271,9 @@ export function buildManagedAgentPrompt(input: {
    * su principal con la cooficial de su zona (lib/idiomas/zona.ts).
    * Sin ellos, los que habla con su principal. */
   idiomas?: readonly CodigoDeIdioma[];
+  /** `json` por defecto (ver FormatoDelPrompt); `texto` solo para el
+   * laboratorio y los tests que leen las reglas como Markdown. */
+  formato?: FormatoDelPrompt;
 }) {
   const settings = parseAgentSettings(input.settings);
   // Las secciones, su orden y su texto viven en lib/seccionesDelPrompt.ts;
@@ -289,5 +295,5 @@ export function buildManagedAgentPrompt(input: {
     recordatorioPorWhatsapp: input.recordatorioPorWhatsapp !== false,
     ocultarNumero: input.ocultarNumeroDelNegocio === true,
     transferenciaAlDueno: input.transferenciaAlDueno,
-  });
+  }, input.formato);
 }

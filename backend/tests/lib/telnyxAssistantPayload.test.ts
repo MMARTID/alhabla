@@ -183,6 +183,19 @@ describe("buildTelnyxHangupTool", () => {
 });
 
 describe("adaptManagedPromptForTelnyx", () => {
+  it("escapa el nombre del negocio dentro del prompt en JSON: unas comillas no lo rompen", () => {
+    const result = adaptManagedPromptForTelnyx(
+      JSON.stringify({ Rol: ["Eres la recepcionista de {{nombre_negocio}}."] }),
+      'Peluquería "La Rosa"',
+      "Europe/Madrid"
+    );
+
+    expect(JSON.parse(result)).toEqual({
+      Rol: ['Eres la recepcionista de Peluquería "La Rosa".'],
+    });
+  });
+
+
   it("sustituye {{nombre_negocio}} por el nombre real del negocio, en texto plano", () => {
     const result = adaptManagedPromptForTelnyx(
       "Eres la recepcionista virtual de {{nombre_negocio}}.",
@@ -331,7 +344,7 @@ describe("buildTelnyxAssistantPayload", () => {
   it("fija el modelo LLM primario y su fallback — decisión explícita del usuario 2026-09-12; el modelo NO afecta al coste (ai-voice-assistant es tarifa plana por minuto, confirmado con una llamada real)", () => {
     const payload = buildTelnyxAssistantPayload(baseInput);
 
-    expect(payload.model).toBe("openai/gpt-5.6-luna");
+    expect(payload.model).toBe("zai-org/GLM-5.3-Flash");
     expect(payload.fallbackConfig).toEqual({ model: "moonshotai/Kimi-K2.6" });
   });
 
@@ -344,7 +357,16 @@ describe("buildTelnyxAssistantPayload", () => {
   it("activa data_retention — Telnyx rechaza grabación con data_retention=false (verificado en vivo 2026-09-11)", () => {
     const payload = buildTelnyxAssistantPayload(baseInput);
 
-    expect(payload.privacySettings).toEqual({ data_retention: true });
+    expect(payload.privacySettings).toMatchObject({ data_retention: true });
+  });
+
+  it("redacta los datos personales de la copia de Telnyx y pide la conversación entera en el webhook de fin, de donde sale la transcripción", () => {
+    const payload = buildTelnyxAssistantPayload(baseInput);
+
+    expect(payload.privacySettings?.pii_redaction).toBe("redact");
+    expect(payload.telephonySettings?.conversation_ended_full_history).toBe(
+      true
+    );
   });
 
   it("activa send_conversation_message_events — sin él, ai.conversations.messages nunca se rellena en llamadas de voz", () => {
@@ -456,6 +478,65 @@ describe("buildTelnyxAssistantPayload", () => {
     expect(payload.interruptionSettings?.interrupt_prediction_threshold).toBe(0.4);
   });
 
+  it("no deja cortar el saludo, que lleva el aviso de IA", () => {
+    const flux = buildTelnyxAssistantPayload(baseInput);
+    const soniox = buildTelnyxAssistantPayload({
+      ...baseInput,
+      idiomas: idiomas(["ca-ES"], "ca-ES"),
+      voice: "Soniox.tts-rt-v2.Marta",
+    });
+
+    expect(flux.interruptionSettings?.disable_greeting_interruption).toBe(true);
+    expect(soniox.interruptionSettings?.disable_greeting_interruption).toBe(
+      true
+    );
+  });
+
+  describe("frase de espera de las tools lentas", () => {
+    const mensajes = (
+      payload: ReturnType<typeof buildTelnyxAssistantPayload>,
+      nombre: string
+    ) => {
+      const tool = payload.tools?.find(
+        (t) => t.type === "webhook" && t.webhook.name === nombre
+      );
+      return tool?.type === "webhook" ? tool.webhook.messages : undefined;
+    };
+
+    it("reservar y cancelar la dicen a los 1,5 s en el idioma principal; las demás, no", () => {
+      const payload = buildTelnyxAssistantPayload({
+        ...baseInput,
+        tools: buildTelnyxVoiceTools("https://api.example.com"),
+      });
+
+      for (const nombre of ["book_appointment", "cancel_appointment"]) {
+        expect(mensajes(payload, nombre)).toEqual([
+          {
+            type: "request_response_delayed",
+            content: "Un momento, por favor.",
+            timing_ms: 1500,
+          },
+        ]);
+      }
+      for (const nombre of ["get_catalog", "check_availability"]) {
+        expect(mensajes(payload, nombre)).toBeUndefined();
+      }
+    });
+
+    it("con el catalán de principal, la dice en catalán", () => {
+      const payload = buildTelnyxAssistantPayload({
+        ...baseInput,
+        idiomas: idiomas(["ca-ES"], "ca-ES"),
+        voice: "Soniox.tts-rt-v2.Marta",
+        tools: buildTelnyxVoiceTools("https://api.example.com"),
+      });
+
+      expect(mensajes(payload, "book_appointment")?.[0]?.content).toBe(
+        "Un moment, si us plau."
+      );
+    });
+  });
+
   describe("con catalán, euskera o gallego (Soniox)", () => {
     // Desde el 2026-10-05 el principal manda: con catalán habla ocho
     // idiomas (los `languages` que se pasan aquí no cuentan).
@@ -502,6 +583,7 @@ describe("buildTelnyxAssistantPayload", () => {
       expect(payload.transcription?.settings).not.toHaveProperty("keyterm");
       expect(payload.transcription?.settings).not.toHaveProperty("eot_threshold");
       expect(payload.interruptionSettings).toEqual({
+        disable_greeting_interruption: true,
         start_speaking_plan: {
           wait_seconds: 0.1,
           transcription_endpointing_plan: {

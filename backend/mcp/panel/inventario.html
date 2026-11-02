@@ -418,7 +418,7 @@ function dialogoPedir(businessId) {
     <p><b>${esc(c.nombre)}</b> <span class="detalle mono">${esc(c.id)}</span></p>
     <ul>
       <li>Se compra en Telnyx un número geográfico de España: <b>1 $ + 1 $/mes</b>.</li>
-      <li>Por la ruta de la app (POST /business/me/phone/provision, como el dueño): exige suscripción activa o en prueba.</li>
+      <li>Por la ruta de la app (POST /phone/business/me/phone/provision, como el dueño): exige suscripción activa o en prueba.</li>
       ${c.numero ? `<li>La cuenta ya tiene ${esc(c.numero.numero ?? "un número")}: si está activo, la app no compra otro.</li>` : ""}
     </ul>
     <p style="margin-top:12px">Escribe el id de la cuenta para confirmar la compra:</p>

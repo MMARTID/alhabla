@@ -713,6 +713,16 @@ describe("TelnyxAiAdapter", () => {
       );
     });
 
+    it("manda el command_id que recibe, para que Telnyx ignore el repetido", async () => {
+      mockAnswer.mockResolvedValue({});
+
+      await adapter.answerCallWithAssistant("call_ctrl_1", "assistant_123", {
+        commandId: "cmd-1",
+      });
+
+      expect(mockAnswer.mock.calls[0][1].command_id).toBe("cmd-1");
+    });
+
     it("sin voz propia, la del assistant: no manda voice_settings", async () => {
       mockAnswer.mockResolvedValue({});
 

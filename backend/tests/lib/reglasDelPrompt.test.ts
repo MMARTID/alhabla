@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import {
-  buildManagedAgentPrompt,
+  buildManagedAgentPrompt as buildManagedAgentPromptEnJson,
   DEFAULT_AGENT_SETTINGS,
   VERSIONES_DEL_PROMPT,
   type VersionDelPrompt,
@@ -26,6 +26,12 @@ import {
 } from "../../src/lib/voiceDateTime.js";
 import type { TransferenciaAlDueno } from "../../src/lib/transferenciaAlDueno.js";
 import { reglasDelChat } from "../../src/lib/seccionesDelPrompt.js";
+/** Estas reglas se leen en Markdown («## Sección»); que el JSON de
+ * producción lleve exactamente los mismos párrafos lo comprueba
+ * managedAgentPrompt.test.ts («el JSON lleva los mismos párrafos…»). */
+const buildManagedAgentPrompt = (
+  input: Parameters<typeof buildManagedAgentPromptEnJson>[0]
+) => buildManagedAgentPromptEnJson({ ...input, formato: "texto" });
 
 /**
  * Censo de reglas del prompt de la recepcionista (F0 de

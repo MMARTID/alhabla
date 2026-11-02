@@ -311,6 +311,8 @@ describe("«Comprobar desvío» de punta a punta (integración)", () => {
         grabar: false,
         // Sin idioma guardado: la voz del assistant.
         voiceSettings: null,
+        // contestarLlamada.ts: el mismo en cada reintento del answer.
+        commandId: expect.any(String),
       }
     );
     expect(await prisma.call.count({ where: { businessId } })).toBe(1);
