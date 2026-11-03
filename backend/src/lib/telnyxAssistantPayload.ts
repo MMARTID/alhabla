@@ -235,6 +235,17 @@ export function buildTelnyxTransferTool(input: {
  * instruyéndole a usarlas: los 25/25 escenarios de `telnyxCallBattery.ts`
  * fallaron porque ningún assistant de las 5 cuentas de prueba las tenía.
  */
+/** `idioma` de las tools que devuelven una fecha (cuandoEnSuIdioma en
+ * voiceTools/service.ts): con él, `cuando` llega ya en el idioma de quien
+ * llama. Laboratorio del 03-11 (E3): con el `cuando` en castellano, el
+ * primer turno tras la tool salía en castellano a quien hablaba inglés. */
+const IDIOMA_DE_LA_RESPUESTA = {
+  type: "string",
+  enum: [...CODIGOS_DE_IDIOMA],
+  description:
+    "El idioma en que te habla quien llama ahora (por ejemplo, en-GB si te habla en inglés). Con él, cuando llega ya en ese idioma.",
+} as const;
+
 export function buildTelnyxVoiceTools(
   baseUrl: string
 ): TelnyxWebhookToolInput[] {
@@ -280,6 +291,7 @@ export function buildTelnyxVoiceTools(
           description:
             "Solo para cambiar una cita que ya tiene: el bookingId que devolvió find_my_appointment, o el que devolvió book_appointment si es la cita reservada en esta misma llamada. Su hora no cuenta como ocupada y, al reservar con el token de esta comprobación, el sistema anula la cita antigua (solo si la nueva queda reservada).",
         },
+        idioma: IDIOMA_DE_LA_RESPUESTA,
       },
       required: ["startDateTime", "durationMinutes"],
     },
@@ -312,6 +324,7 @@ export function buildTelnyxVoiceTools(
           description:
             "true SOLO si book_appointment respondió CLIENT_PHONE_CONFIRMATION_REQUIRED, le repetiste ese teléfono tal como venía y el cliente dijo que sí.",
         },
+        idioma: IDIOMA_DE_LA_RESPUESTA,
       },
       required: ["clientName", "availabilityToken"],
     },
@@ -319,7 +332,7 @@ export function buildTelnyxVoiceTools(
       name: "find_my_appointment",
       description:
         "Busca la próxima cita del negocio asociada al número desde el que llama. Devuelve su bookingId (para cancelarla, o para cambiarla con replacesBookingId en check_availability) y clientName (el nombre con el que se reservó; puede venir vacío en citas antiguas): úsalo si el cliente quiere la cita nueva al mismo nombre. Úsala solo si quien llama pide cambiar o cancelar una cita existente y no te ha dado datos concretos.",
-      properties: {},
+      properties: { idioma: IDIOMA_DE_LA_RESPUESTA },
     },
     {
       name: "cancel_appointment",

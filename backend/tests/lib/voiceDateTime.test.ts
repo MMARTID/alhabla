@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  cuandoEnOtroIdioma,
   cuandoParaDecir,
   horaParaDecir,
   inicioDelDiaEnZona,
@@ -207,5 +208,41 @@ describe("horaParaDecir", () => {
     expect(horaParaDecir(17, 40)).toBe("a las cinco y cuarenta de la tarde");
     expect(horaParaDecir(17, 51)).toBe("a las cinco y cincuenta y uno de la tarde");
     expect(horaParaDecir(8, 1)).toBe("a las ocho y uno de la mañana");
+  });
+});
+
+describe("cuandoEnOtroIdioma", () => {
+  const ahora = new Date("2026-10-14T16:00:00Z"); // miércoles en Madrid
+
+  it("en inglés: hoy y mañana en inglés y la hora como se dice allí", () => {
+    expect(
+      cuandoEnOtroIdioma("2026-10-15T17:00:00+02:00", "Europe/Madrid", "en-GB", ahora)
+    ).toBe("tomorrow, Thursday 15 October, 5 pm");
+    expect(
+      cuandoEnOtroIdioma("2026-10-14T19:30:00+02:00", "Europe/Madrid", "en-GB", ahora)
+    ).toBe("today, Wednesday 14 October, 7:30 pm");
+    expect(
+      cuandoEnOtroIdioma("2026-10-20T12:00:00+02:00", "Europe/Madrid", "en-GB", ahora)
+    ).toBe("Tuesday 20 October, 12 pm");
+  });
+
+  it("en los demás, el día de ese idioma y la hora en cifras", () => {
+    expect(
+      cuandoEnOtroIdioma("2026-10-15T17:00:00+02:00", "Europe/Madrid", "fr-FR", ahora)
+    ).toBe("demain, jeudi 15 octobre, 17:00");
+    expect(
+      cuandoEnOtroIdioma("2026-10-16T09:00:00+02:00", "Europe/Madrid", "de-DE", ahora)
+    ).toBe("Freitag, 16. Oktober, 9:00");
+    expect(
+      cuandoEnOtroIdioma("2026-10-15T17:00:00+02:00", "Europe/Madrid", "ca-ES", ahora)
+    ).toBe("demà, dijous, 15 d’octubre, 17:00");
+  });
+
+  it("en la zona del negocio y null con un instante que no es fecha", () => {
+    // 22:30 UTC del 14 son las 00:30 del 15 en Madrid: mañana.
+    expect(
+      cuandoEnOtroIdioma("2026-10-14T22:30:00Z", "Europe/Madrid", "en-GB", ahora)
+    ).toBe("tomorrow, Thursday 15 October, 12:30 am");
+    expect(cuandoEnOtroIdioma("no es una fecha", "Europe/Madrid", "en-GB")).toBeNull();
   });
 });
