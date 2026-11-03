@@ -2605,10 +2605,20 @@ export function esPlazoAgotado(error: unknown): boolean {
   return /timed? ?out/i.test(mensajeDeError(error));
 }
 
+/** El 10027 de Telnyx («The requested model is currently unavailable»): el
+ * modelo deja de estar disponible unos minutos. El 03-11 tumbó 88 de 132
+ * conversaciones con Kimi-K2.6 de cliente simulado. */
+export function esModeloNoDisponible(error: unknown): boolean {
+  return /\b10027\b|model is currently unavailable/i.test(
+    mensajeDeError(error)
+  );
+}
+
 /**
- * Reintenta los 429 de Telnyx. Con `tambienPlazo`, también un plazo agotado:
- * solo para lo que se puede repetir sin efectos (el cliente simulado y el
- * juez); repetir un turno del assistant duplicaría el mensaje del cliente.
+ * Reintenta los 429 de Telnyx. Con `tambienPlazo`, también un plazo agotado
+ * y un modelo no disponible (con más espera: dura minutos): solo para lo que
+ * se puede repetir sin efectos (el cliente simulado y el juez); repetir un
+ * turno del assistant duplicaría el mensaje del cliente.
  */
 async function conReintentos<T>(
   deps: Pick<DependenciasDelLaboratorio, "dormir">,
@@ -2619,10 +2629,13 @@ async function conReintentos<T>(
     try {
       return await accion();
     } catch (error) {
+      const noDisponible = tambienPlazo && esModeloNoDisponible(error);
       const reintentable =
-        esLimiteDeTelnyx(error) || (tambienPlazo && esPlazoAgotado(error));
-      if (!reintentable || intento >= 4) throw error;
-      await deps.dormir(2_000 * intento);
+        noDisponible ||
+        esLimiteDeTelnyx(error) ||
+        (tambienPlazo && esPlazoAgotado(error));
+      if (!reintentable || intento >= (noDisponible ? 6 : 4)) throw error;
+      await deps.dormir((noDisponible ? 15_000 : 2_000) * intento);
     }
   }
 }
