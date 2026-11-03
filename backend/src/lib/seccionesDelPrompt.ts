@@ -402,11 +402,11 @@ function seccionCierre(): Parrafos {
     // comprehension_issue, así que el negocio no puede saber por qué la perdió.
     // Una sola frase mal entendida no puede terminar una llamada.
     // `hangup` y no `end_call` (el nombre de la tool en Retell): la tool
-    // nativa de Telnyx se llama así. Con «end_call», GLM-5.3-Flash colgaba
-    // tras la despedida del cliente en 1 de 149 conversaciones del
-    // laboratorio (03-11; con «hangup» en el prompt v3, 24 de 76), y en dos
-    // llamadas de voz de AI Tests (Cekura, catalán y dariya) se despidió y
-    // dejó al cliente esperando hasta que saltó el silencio de 30 s.
+    // nativa de Telnyx se llama así. Con «end_call», en 6 de 13 llamadas de
+    // voz GLM-5.3-Flash se despedía y esperaba a que el cliente volviera a
+    // decir adiós para colgar. Con «hangup» y «en ese mismo turno», 6 de 6
+    // colgaron con su despedida (AI Tests de Telnyx, 04-11). El laboratorio
+    // por chat no lo mide: allí la tool no existe y nunca se llama.
     "Si ordenan colgar con claridad y no queda nada pendiente, usa hangup en ese turno sin despedida.",
     "Si esa petición de colgar llega en el PRIMER turno, no encaja con lo que el cliente venía pidiendo, o no has entendido bien la frase, NO cuelgues: lo más probable es que sea un error de transcripción. Pregunta una sola vez ('perdona, ¿te he entendido bien?, ¿quieres que colguemos?') y usa hangup solo si lo confirma. Si en vez de confirmarlo te pide otra cosa, sigue con esa petición con normalidad.",
     "Ante una despedida normal, di una sola frase breve y usa hangup en ese mismo turno, también si cierras tú.",
