@@ -70,10 +70,15 @@
  *     [--modelo-del-assistant <modelo>] \
  *     [--comparar-con <carpeta de otro informe>] [--etiqueta <texto>] \
  *     [--paralelo 3] [--con-citas] [--lista-de-espera si|no|auto] \
- *     [--dry-run] [--si]
+ *     [--presupuesto 4] [--dry-run] [--si]
  * Con más de 300 turnos o con `--con-citas` hace falta `--si`. `--dry-run` no
  * llama a Telnyx: construye los payloads y cuenta lo que haría, con el
- * negocio y el modo de cliente de cada escenario.
+ * negocio y el modo de cliente de cada escenario, y lo que costaría.
+ *
+ * Ninguna tanda pasa de `--presupuesto` euros en Telnyx (4 por defecto): si
+ * la estimación previa pasa, no arranca, y si lo gastado de verdad llega
+ * (informes de uso de Telnyx, mirados cada minuto), no empieza más
+ * conversaciones. El informe dice lo que costó.
  */
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
@@ -121,6 +126,10 @@ export const TOPE_DE_TURNOS_SIN_CONFIRMAR = 300;
 
 /** El juez es un modelo alojado por Telnyx y distinto del del assistant. */
 export const MODELO_DEL_JUEZ = "moonshotai/Kimi-K2.6";
+
+/** Lo más que puede costar una tanda si no se dice otra cosa (decisión del
+ * usuario del 2026-11-03). */
+export const PRESUPUESTO_POR_DEFECTO_EUR = 4;
 /** El de producción (telnyxAssistantPayload.ts) desde el 2026-11-02. Con
  * `--modelo-del-assistant` se prueba otro: p. ej. `openai/gpt-5.6-luna`, el
  * de antes, o Kimi-K2.6. */
@@ -229,6 +238,8 @@ export interface Opciones {
   compararCon: string | null;
   /** Nombre libre de esta ejecución, para distinguirla al comparar. */
   etiqueta: string | null;
+  /** Lo más que puede costar la tanda en Telnyx, en euros (`--presupuesto`). */
+  presupuestoEur: number;
 }
 
 export const SALIDA_POR_DEFECTO = resolve(
@@ -250,6 +261,7 @@ const BANDERAS_CON_VALOR = new Set([
   "modelo-del-assistant",
   "comparar-con",
   "etiqueta",
+  "presupuesto",
 ]);
 const BANDERAS_SUELTAS = new Set(["dry-run", "si", "con-citas", "ayuda"]);
 
@@ -398,7 +410,20 @@ export function parsearArgumentos(argv: string[]): Opciones {
     modeloDelAssistant,
     compararCon: valores.get("comparar-con") ?? null,
     etiqueta: valores.get("etiqueta") ?? null,
+    presupuestoEur: leerPresupuesto(valores.get("presupuesto")),
   };
+}
+
+/** `--presupuesto 4` o `2,5`: euros, más de 0 y como mucho 50. */
+function leerPresupuesto(bruto: string | undefined): number {
+  if (bruto === undefined) return PRESUPUESTO_POR_DEFECTO_EUR;
+  const euros = Number(bruto.replace(",", "."));
+  if (!Number.isFinite(euros) || euros <= 0 || euros > 50) {
+    throw new ErrorDeUso(
+      `--presupuesto es un importe en euros entre 0 y 50 (por ejemplo, 4 o 2,5), no «${bruto}»`
+    );
+  }
+  return euros;
 }
 
 export const AYUDA = `Laboratorio de prompt (PLAN-PROMPT-DINAMICO.md, F0)
@@ -429,8 +454,150 @@ export const AYUDA = `Laboratorio de prompt (PLAN-PROMPT-DINAMICO.md, F0)
   --con-citas               corre también los guiones que reservan o anulan
                             citas en dev (y mandan WhatsApp); exige --si
   --lista-de-espera si|no|auto
+  --presupuesto <${PRESUPUESTO_POR_DEFECTO_EUR}>          lo más que puede costar la tanda en Telnyx, en
+                            euros: si la estimación pasa, no arranca; si lo
+                            gastado de verdad llega, no empieza más conversaciones
   --dry-run                 no llama a Telnyx: construye payloads y cuenta
   --si                      imprescindible con más de ${TOPE_DE_TURNOS_SIN_CONFIRMAR} turnos o con --con-citas`;
+
+// ---------------------------------------------------------------------------
+// Presupuesto
+// ---------------------------------------------------------------------------
+
+/** Lo que cuesta de media una conversación del laboratorio en Telnyx (la
+ * recepcionista, el cliente simulado y el juez). Medido con los informes de
+ * uso de Telnyx (usage_reports, inferencia por hora) frente a las tandas del
+ * 2026-11-03: entre 0,017 y 0,024 $. Se redondea hacia arriba. */
+export const DOLARES_POR_CONVERSACION = 0.025;
+
+/** Telnyx cobra en dólares y el tope se da en euros. Se cuenta un dólar por
+ * euro, a la baja: mientras el euro valga más que el dólar, el tope en
+ * dólares nunca pasa del de euros. */
+export const DOLARES_POR_EURO = 1;
+
+/** Cada cuánto, como mucho, se pregunta a Telnyx lo gastado. */
+export const MS_ENTRE_LECTURAS_DEL_GASTO = 60_000;
+
+/** El grupo de insights (vacío) de los assistants del laboratorio. Sin
+ * grupo, Telnyx les pone el «Default» de la cuenta (comprobado el 03-11: con
+ * `insight_group_id` a null o sin él, igual) y cada conversación de prueba
+ * lanzaba sus 6 insights, que nadie lee. */
+export const GRUPO_DE_INSIGHTS_DEL_LABORATORIO =
+  "alhabla-laboratorio (sin insights)";
+
+function enEuros(dolares: number): string {
+  return `${(dolares / DOLARES_POR_EURO).toFixed(2).replace(".", ",")} €`;
+}
+
+export function costeEstimadoEnDolares(conversaciones: number): number {
+  return conversaciones * DOLARES_POR_CONVERSACION;
+}
+
+/** Antes de gastar nada: la tanda entera no puede pasar del presupuesto. */
+export function exigirPresupuesto(
+  conversaciones: number,
+  presupuestoEur: number
+): void {
+  const estimado = costeEstimadoEnDolares(conversaciones);
+  if (estimado > presupuestoEur * DOLARES_POR_EURO) {
+    throw new ErrorDeUso(
+      `La tanda costaría unos ${enEuros(estimado)} (${conversaciones} conversaciones a unos ${String(DOLARES_POR_CONVERSACION).replace(".", ",")} $) y el presupuesto es ${enEuros(presupuestoEur * DOLARES_POR_EURO)}: baja --n, --variantes o --escenarios, o sube --presupuesto`
+    );
+  }
+}
+
+export interface FrenoDelPresupuesto {
+  /** false cuando lo gastado según Telnyx llega al presupuesto: no se
+   * empieza ninguna conversación más (las que van por la mitad acaban). */
+  puedeSeguir(): Promise<boolean>;
+  /** Lo gastado desde que empezó la tanda según Telnyx, leído ahora; null
+   * si no se puede leer. */
+  gastado(): Promise<number | null>;
+  readonly parado: boolean;
+}
+
+/**
+ * El freno de la tanda. Telnyx da el gasto por horas (usage_reports), así
+ * que se lee el de la cuenta desde la hora en punto en que empezó y se le
+ * resta lo que ya llevaba esa hora al empezar. Cuenta todo lo de la cuenta
+ * en ese rato (también llamadas reales o el Gestor), pero Telnyx lo apunta
+ * con unos minutos de retraso (medido el 03-11): la guarda principal es la
+ * estimación previa (exigirPresupuesto) y esto es la red por si la tanda
+ * sale más cara de lo estimado. Sin `gastoDesde` (o si falla la primera
+ * lectura) solo queda la estimación previa, y lo dice.
+ */
+export async function crearFrenoDelPresupuesto(input: {
+  presupuestoEur: number;
+  inicio: Date;
+  ahora: () => Date;
+  gastoDesde?: (hora: Date) => Promise<number>;
+  log: (mensaje: string) => void;
+  avisos: string[];
+}): Promise<FrenoDelPresupuesto> {
+  const tope = input.presupuestoEur * DOLARES_POR_EURO;
+  const hora = new Date(input.inicio);
+  hora.setUTCMinutes(0, 0, 0);
+  let leer = input.gastoDesde;
+  let base = 0;
+  if (leer) {
+    try {
+      base = await leer(hora);
+    } catch (error) {
+      const aviso = `No se puede leer el gasto en Telnyx (${mensajeDeError(error)}): el presupuesto solo se controla con la estimación previa`;
+      input.avisos.push(aviso);
+      console.error(`[Laboratorio] ${aviso}`);
+      leer = undefined;
+    }
+  }
+  let ultimaLectura = input.ahora().getTime();
+  let ultimoGasto: number | null = leer ? 0 : null;
+  let enCurso: Promise<void> | null = null;
+  let errorAvisado = false;
+  let parado = false;
+
+  const actualizar = async (): Promise<void> => {
+    if (!leer) return;
+    try {
+      ultimoGasto = Math.max(0, (await leer(hora)) - base);
+    } catch (error) {
+      if (!errorAvisado) {
+        errorAvisado = true;
+        console.error(
+          `[Laboratorio] No se pudo leer el gasto en Telnyx; sigue con la última lectura: ${mensajeDeError(error)}`
+        );
+      }
+    }
+  };
+
+  return {
+    get parado() {
+      return parado;
+    },
+    async puedeSeguir() {
+      if (parado) return false;
+      const ahora = input.ahora().getTime();
+      if (leer && ahora - ultimaLectura >= MS_ENTRE_LECTURAS_DEL_GASTO) {
+        ultimaLectura = ahora;
+        enCurso ??= actualizar().finally(() => {
+          enCurso = null;
+        });
+      }
+      if (enCurso) await enCurso;
+      if (ultimoGasto !== null && ultimoGasto >= tope) {
+        parado = true;
+        const aviso = `Presupuesto agotado: Telnyx lleva ${enEuros(ultimoGasto)} desde el inicio (tope ${enEuros(tope)}); no se empiezan más conversaciones`;
+        input.avisos.push(aviso);
+        input.log(`[Laboratorio] ${aviso}`);
+      }
+      return !parado;
+    },
+    async gastado() {
+      if (!leer) return null;
+      await actualizar();
+      return ultimoGasto;
+    },
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Guardas
@@ -1868,6 +2035,15 @@ export interface Informe {
       negocio?: string;
     }>;
     avisos: string[];
+    /** Lo que costó en Telnyx (desde el 03-11; los informes de antes no lo
+     * llevan). `realUsd`: lo gastado por la cuenta en ese rato, null si no
+     * se pudo leer. */
+    coste?: {
+      presupuestoEur: number;
+      estimadoUsd: number;
+      realUsd: number | null;
+      sinCorrerPorPresupuesto: number;
+    };
   };
   resumen: ResumenDeCelda[];
   repeticiones: Array<{
@@ -2182,6 +2358,12 @@ export function informeMarkdown(
       `recepcionista ${meta.modeloDelAssistant ?? MODELO_DEL_ASSISTANT}, ` +
       `cliente ${meta.cliente}${meta.modeloDelCliente ? ` (${meta.modeloDelCliente})` : ""}` +
       `${meta.juez ? `, juez ${meta.juez}` : ", sin juez"}. Hasta ${meta.turnosTotales} turnos de chat.`,
+    ...(meta.coste
+      ? [
+          "",
+          `Coste: ${meta.coste.realUsd === null ? "sin leer en Telnyx" : `${enEuros(meta.coste.realUsd)} según Telnyx al terminar (lo apunta con unos minutos de retraso)`} (estimado ${enEuros(meta.coste.estimadoUsd)}, presupuesto ${enEuros(meta.coste.presupuestoEur * DOLARES_POR_EURO)}${meta.coste.sinCorrerPorPresupuesto > 0 ? `; ${meta.coste.sinCorrerPorPresupuesto} sin correr por el presupuesto` : ""}).`,
+        ]
+      : []),
     "",
     tablaMarkdown(informe),
     "",
@@ -2509,6 +2691,13 @@ export interface DependenciasDelLaboratorio {
   ahora(): Date;
   dormir(ms: number): Promise<void>;
   log(mensaje: string): void;
+  /** Lo gastado por la cuenta de Telnyx desde esa hora en punto, en dólares
+   * (informes de uso). Sin él, el presupuesto solo se controla con la
+   * estimación previa. */
+  gastoEnTelnyxDesde?(hora: Date): Promise<number>;
+  /** El id del grupo de insights vacío del laboratorio
+   * (GRUPO_DE_INSIGHTS_DEL_LABORATORIO); lo crea si no existe. */
+  grupoDeInsightsDelLaboratorio?(): Promise<string>;
   /** Los negocios de laboratorio; por defecto, los sembrados. */
   catalogo?: CatalogoDeNegocios;
   /**
@@ -3189,7 +3378,10 @@ export async function ejecutarLaboratorio(
           : "ninguno cumple los filtros (--escenarios; los que reservan, solo con --con-citas)")
     );
   }
-  if (!opciones.dryRun) exigirConfirmacion(plan, opciones);
+  if (!opciones.dryRun) {
+    exigirConfirmacion(plan, opciones);
+    exigirPresupuesto(plan.tareas.length, opciones.presupuestoEur);
+  }
 
   // Lo anterior con lo que comparar, antes de gastar nada: si la ruta está
   // mal, que falle ya.
@@ -3290,6 +3482,9 @@ export async function ejecutarLaboratorio(
         avisos,
       })
     );
+    deps.log(
+      `[Laboratorio] Coste estimado: ${enEuros(costeEstimadoEnDolares(plan.tareas.length))} (${plan.tareas.length} conversaciones; presupuesto ${enEuros(opciones.presupuestoEur * DOLARES_POR_EURO)})`
+    );
     return { plan, informe: null, rutaDelInforme: null, limpieza: null };
   }
 
@@ -3321,6 +3516,17 @@ export async function ejecutarLaboratorio(
   };
 
   try {
+    // Sin insights: sin un grupo propio, Telnyx les pone el «Default».
+    let grupoDeInsights: string | undefined;
+    if (deps.grupoDeInsightsDelLaboratorio) {
+      try {
+        grupoDeInsights = await deps.grupoDeInsightsDelLaboratorio();
+      } catch (error) {
+        const aviso = `No se pudo usar el grupo de insights «${GRUPO_DE_INSIGHTS_DEL_LABORATORIO}» (${mensajeDeError(error)}): cada conversación lanzará los insights del grupo Default y costará algo más`;
+        avisos.push(aviso);
+        console.error(`[Laboratorio] ${aviso}`);
+      }
+    }
     // Un assistant por (negocio, variante), solo de los que se van a usar.
     const sinAssistant = new Map<string, string>();
     const usados = new Set(
@@ -3338,7 +3544,12 @@ export async function ejecutarLaboratorio(
         let creado: { id: string };
         try {
           creado = await registro.crear(
-            () => deps.adaptador.createAssistant(payload),
+            () =>
+              deps.adaptador.createAssistant(
+                grupoDeInsights
+                  ? { ...payload, insightGroupId: grupoDeInsights }
+                  : payload
+              ),
             (assistant) => registro.anotarAssistant(assistant.id, payload.name)
           );
         } catch (error) {
@@ -3369,10 +3580,19 @@ export async function ejecutarLaboratorio(
     let hechas = 0;
     const cerrojos = crearCerrojosPorNegocio();
     const restablecer = deps.restablecerNegocio?.bind(deps);
+    const freno = await crearFrenoDelPresupuesto({
+      presupuestoEur: opciones.presupuestoEur,
+      inicio: deps.ahora(),
+      ahora: () => deps.ahora(),
+      gastoDesde: deps.gastoEnTelnyxDesde?.bind(deps),
+      log: deps.log,
+      avisos,
+    });
     await enParalelo(
       ejecutables,
       opciones.paralelo,
       async (tarea) => {
+        if (!(await freno.puedeSeguir())) return;
         const clave = `${tarea.negocioId}:${tarea.variante}`;
         const entorno = entornos.get(clave);
         if (!entorno) {
@@ -3424,9 +3644,21 @@ export async function ejecutarLaboratorio(
           );
         }
       },
-      cancelado
+      () => cancelado() || freno.parado
     );
     if (cancelado()) avisos.push("Interrumpido: el informe es parcial");
+    const sinCorrerPorPresupuesto = freno.parado
+      ? ejecutables.length - hechas
+      : 0;
+    if (sinCorrerPorPresupuesto > 0) {
+      avisos.push(
+        `${sinCorrerPorPresupuesto} conversaciones sin correr por el presupuesto: el informe es parcial`
+      );
+    }
+    const gastoReal = await freno.gastado();
+    deps.log(
+      `[Laboratorio] Coste: ${gastoReal === null ? "no se pudo leer en Telnyx" : `${enEuros(gastoReal)} según Telnyx, que lo apunta con unos minutos de retraso`} (estimado ${enEuros(costeEstimadoEnDolares(hechas))}, presupuesto ${enEuros(opciones.presupuestoEur * DOLARES_POR_EURO)})`
+    );
 
     const resumen: ResumenDeCelda[] = [];
     const repeticiones: Informe["repeticiones"] = [];
@@ -3470,6 +3702,12 @@ export async function ejecutarLaboratorio(
         saltados,
         assistants,
         avisos,
+        coste: {
+          presupuestoEur: opciones.presupuestoEur,
+          estimadoUsd: costeEstimadoEnDolares(hechas),
+          realUsd: gastoReal,
+          sinCorrerPorPresupuesto,
+        },
       },
       resumen,
       repeticiones,
@@ -3920,9 +4158,86 @@ async function cargarContextoReal(input: {
   };
 }
 
+/** Los productos de Telnyx en los que gasta una tanda: la recepcionista y
+ * el cliente simulado y el juez (inferencia), y por si acaso los assistants
+ * de voz y de mensajes. */
+const PRODUCTOS_QUE_GASTA_EL_LABORATORIO = [
+  "inference",
+  "ai-voice-assistant",
+  "ai-messaging-assistant",
+] as const;
+
+async function llamarApiDeTelnyx(
+  ruta: string,
+  init: RequestInit = {}
+): Promise<Record<string, unknown>> {
+  const respuesta = await fetch(`https://api.telnyx.com/v2${ruta}`, {
+    ...init,
+    headers: {
+      Authorization: `Bearer ${process.env.TELNYX_API_KEY ?? ""}`,
+      "Content-Type": "application/json",
+      ...init.headers,
+    },
+  });
+  const cuerpo = (await respuesta.json().catch(() => ({}))) as Record<
+    string,
+    unknown
+  >;
+  if (!respuesta.ok) {
+    throw new Error(
+      `Telnyx ${respuesta.status} en ${ruta}: ${JSON.stringify(cuerpo).slice(0, 300)}`
+    );
+  }
+  return cuerpo;
+}
+
+/** Dólares gastados por la cuenta desde `hora`, sumando las horas de los
+ * informes de uso (usage_reports) de PRODUCTOS_QUE_GASTA_EL_LABORATORIO. */
+async function gastoEnTelnyxDesde(hora: Date): Promise<number> {
+  const hasta = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+  let total = 0;
+  for (const producto of PRODUCTOS_QUE_GASTA_EL_LABORATORIO) {
+    const parametros = new URLSearchParams({
+      product: producto,
+      dimensions: "date_time",
+      metrics: "cost",
+      start_date: hora.toISOString(),
+      end_date: hasta,
+    });
+    const cuerpo = await llamarApiDeTelnyx(`/usage_reports?${parametros}`);
+    for (const fila of (cuerpo.data as Array<{ cost?: unknown }>) ?? []) {
+      total += Number(fila.cost) || 0;
+    }
+  }
+  return total;
+}
+
+/** El id de GRUPO_DE_INSIGHTS_DEL_LABORATORIO, creándolo vacío si falta. */
+async function grupoDeInsightsDelLaboratorio(): Promise<string> {
+  const lista = await llamarApiDeTelnyx("/ai/conversations/insight-groups");
+  const grupos = (lista.data as Array<{ id: string; name: string }>) ?? [];
+  const existente = grupos.find(
+    (grupo) => grupo.name === GRUPO_DE_INSIGHTS_DEL_LABORATORIO
+  );
+  if (existente) return existente.id;
+  const creado = await llamarApiDeTelnyx("/ai/conversations/insight-groups", {
+    method: "POST",
+    body: JSON.stringify({
+      name: GRUPO_DE_INSIGHTS_DEL_LABORATORIO,
+      description:
+        "Grupo vacío para los assistants del laboratorio de prompt (scripts/laboratorioDePrompt.ts): sin él Telnyx les pone el grupo Default y cada conversación de prueba lanza sus insights.",
+    }),
+  });
+  const id = ((creado.data ?? creado) as { id?: string }).id;
+  if (!id) throw new Error("Telnyx no devolvió el id del grupo creado");
+  return id;
+}
+
 function dependenciasReales(): DependenciasDelLaboratorio {
   return {
     adaptador: telnyxAiAdapter,
+    gastoEnTelnyxDesde,
+    grupoDeInsightsDelLaboratorio,
     cargarContexto: cargarContextoReal,
     marcadorDeChat: async (input) => {
       // El mismo marcador que antepone el chat real (modules/whatsapp).
