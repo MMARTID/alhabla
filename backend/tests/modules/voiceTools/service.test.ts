@@ -3702,7 +3702,7 @@ describe("executeVoiceTool preferencia_de_grabacion", () => {
 describe("executeVoiceTool: la pregunta de grabar", () => {
   const mockedToca = vi.mocked(tocaPreguntarPorGrabar);
   const PREGUNTA =
-    "Mientras lo compruebo, ¿te parece bien que grabe tus llamadas para que Peluquería Ana pueda revisarlas?";
+    "¿Te parece bien que grabe tus llamadas para que Peluquería Ana pueda revisarlas?";
   const comprobar = (callId?: string, params: Record<string, unknown> = {}) =>
     executeVoiceTool({
       businessId: "business_123",
@@ -3837,6 +3837,19 @@ describe("executeVoiceTool: la pregunta de grabar", () => {
 
     expect(respuesta.result).not.toHaveProperty("available");
     expect(respuesta.result.message).toMatch(/^Hecho: no se graba/);
+  });
+
+  it("con el nombre provisional del alta, la pregunta dice «el negocio»", async () => {
+    mockedBusinessFindUnique.mockResolvedValue(
+      buildBusiness({ name: "Negocio de ana@ejemplo.com" }) as any
+    );
+    mockedToca.mockResolvedValue(true);
+
+    const result = await comprobar("v3:ctrl_1");
+
+    expect(result.result.pregunta_de_grabacion).toBe(
+      "¿Te parece bien que grabe tus llamadas para que el negocio pueda revisarlas?"
+    );
   });
 
   it("si no se puede guardar lo comprobado, va todo junto, como antes", async () => {

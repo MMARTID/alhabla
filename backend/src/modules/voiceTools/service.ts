@@ -3686,10 +3686,12 @@ async function conPreguntaDeGrabacion(
 }
 
 /** La pregunta, con el nombre del negocio si se puede decir (no el
- * provisional del alta, que lleva el email del dueño). */
+ * provisional del alta, que lleva el email del dueño). Sin «Mientras lo
+ * compruebo, » delante desde el 03-11: GLM lo repetía tal cual y el turno
+ * dejaba de ser solo la pregunta (E8 del laboratorio). */
 function preguntaDeGrabacion(nombreDelNegocio: string): string {
   const quien = nombreDelNegocioDecible(nombreDelNegocio) ?? "el negocio";
-  return `Mientras lo compruebo, ¿te parece bien que grabe tus llamadas para que ${quien} pueda revisarlas?`;
+  return `¿Te parece bien que grabe tus llamadas para que ${quien} pueda revisarlas?`;
 }
 
 /**
