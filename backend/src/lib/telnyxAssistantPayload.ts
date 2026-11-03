@@ -811,8 +811,11 @@ export function buildTelnyxAssistantPayload(
 
   if (input.includeHangupTool ?? true) {
     tools.push(
+      // Telnyx solo deja cambiar la descripción: es lo que el modelo ve de la
+      // tool. Con la de antes («cuando la conversación haya terminado») se
+      // despedía y no colgaba (laboratorio y AI Tests del 03-11).
       buildTelnyxHangupTool(
-        "Cuelga la llamada cuando la conversación haya terminado."
+        "Cuelga la llamada. Llámala en el mismo turno en que te despides, justo después de tu frase de despedida: si no, la llamada se queda abierta y el cliente espera en silencio. También cuando te pidan colgar con claridad. Nunca en el chat de WhatsApp."
       )
     );
   }

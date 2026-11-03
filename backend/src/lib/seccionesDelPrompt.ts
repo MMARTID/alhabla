@@ -401,9 +401,15 @@ function seccionCierre(): Parrafos {
     // 10 s sin decir nada. La llamada quedó registrada como NO_ANSWER con
     // comprehension_issue, así que el negocio no puede saber por qué la perdió.
     // Una sola frase mal entendida no puede terminar una llamada.
-    "Si ordenan colgar con claridad y no queda nada pendiente, usa end_call en ese turno sin despedida.",
-    "Si esa petición de colgar llega en el PRIMER turno, no encaja con lo que el cliente venía pidiendo, o no has entendido bien la frase, NO cuelgues: lo más probable es que sea un error de transcripción. Pregunta una sola vez ('perdona, ¿te he entendido bien?, ¿quieres que colguemos?') y usa end_call solo si lo confirma. Si en vez de confirmarlo te pide otra cosa, sigue con esa petición con normalidad.",
-    "Ante una despedida normal, di una sola frase breve y usa end_call en ese turno.",
+    // `hangup` y no `end_call` (el nombre de la tool en Retell): la tool
+    // nativa de Telnyx se llama así. Con «end_call», GLM-5.3-Flash colgaba
+    // tras la despedida del cliente en 1 de 149 conversaciones del
+    // laboratorio (03-11; con «hangup» en el prompt v3, 24 de 76), y en dos
+    // llamadas de voz de AI Tests (Cekura, catalán y dariya) se despidió y
+    // dejó al cliente esperando hasta que saltó el silencio de 30 s.
+    "Si ordenan colgar con claridad y no queda nada pendiente, usa hangup en ese turno sin despedida.",
+    "Si esa petición de colgar llega en el PRIMER turno, no encaja con lo que el cliente venía pidiendo, o no has entendido bien la frase, NO cuelgues: lo más probable es que sea un error de transcripción. Pregunta una sola vez ('perdona, ¿te he entendido bien?, ¿quieres que colguemos?') y usa hangup solo si lo confirma. Si en vez de confirmarlo te pide otra cosa, sigue con esa petición con normalidad.",
+    "Ante una despedida normal, di una sola frase breve y usa hangup en ese mismo turno, también si cierras tú.",
   ];
 }
 
@@ -456,7 +462,7 @@ function seccionChat({ ocultarNumero }: ContextoDelPrompt): Parrafos {
     // En el chat no hay saludo del sistema: el aviso de que es una IA lo da
     // la primera respuesta de cada conversación (art. 50 del Reglamento de
     // IA, como en las llamadas).
-    "En el chat no hay saludo del sistema: en tu primera respuesta di, en una frase corta, que le atiende la recepcionista de IA de {{nombre_negocio}}. En el chat no se graba ni se cuelga: no hables de grabar, de colgar ni de audio, y no uses preferencia_de_grabacion ni end_call.",
+    "En el chat no hay saludo del sistema: en tu primera respuesta di, en una frase corta, que le atiende la recepcionista de IA de {{nombre_negocio}}. En el chat no se graba ni se cuelga: no hables de grabar, de colgar ni de audio, y no uses preferencia_de_grabacion ni hangup.",
     "Escribe dos o tres líneas cortas, sin emojis ni símbolos; una lista breve vale si ayuda a elegir. Al reservar pregúntale su nombre antes de ofrecerle reservar, aunque su perfil de WhatsApp muestre uno, y no preguntes por el WhatsApp, porque ya te escribe por WhatsApp: confirma solo la reserva, usa smsConsent true y, si book_appointment devuelve mensajeCliente = \"whatsapp\", dile que la confirmación le llega por aquí.",
     `Si dice que ha pulsado Cambiar en el recordatorio de una cita, búscala con find_my_appointment y cámbiala con el flujo normal: confírmasela, pregunta qué día y hora quiere, compruébala con su bookingId en replacesBookingId y, con su confirmación, reserva la nueva; la vieja se anula sola. Si prefiere hablar con alguien, ${
       ocultarNumero

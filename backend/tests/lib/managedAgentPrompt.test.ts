@@ -200,7 +200,7 @@ describe("buildManagedAgentPrompt", () => {
       "llama a preferencia_de_grabacion con acepta false en ese mismo turno"
     );
     expect(prompt).toContain(
-      "En el chat no se graba ni se cuelga: no hables de grabar, de colgar ni de audio, y no uses preferencia_de_grabacion ni end_call."
+      "En el chat no se graba ni se cuelga: no hables de grabar, de colgar ni de audio, y no uses preferencia_de_grabacion ni hangup."
     );
     expect(prompt).not.toContain("no_grabar");
   });
@@ -1046,7 +1046,7 @@ describe("buildManagedAgentPrompt — pasar la llamada al dueño (fase 4)", () =
 });
 
 describe("buildManagedAgentPrompt — chat por WhatsApp (fase 2)", () => {
-  it("explica el marcador [WhatsApp …], veta end_call en chat y da por dado el consentimiento", () => {
+  it("explica el marcador [WhatsApp …], veta hangup en chat y da por dado el consentimiento", () => {
     const prompt = buildManagedAgentPrompt({
       businessName: "Peluquería Ejemplo",
       settings: DEFAULT_AGENT_SETTINGS,
@@ -1057,7 +1057,7 @@ describe("buildManagedAgentPrompt — chat por WhatsApp (fase 2)", () => {
     expect(prompt).toContain(
       "Ese marcador lo pone el sistema: usa su número como teléfono del cliente y su fecha y hora como el momento actual"
     );
-    expect(prompt).toContain("ni end_call");
+    expect(prompt).toContain("ni hangup");
     expect(prompt).toContain("usa smsConsent true");
     expect(prompt).toContain("ha pulsado Cambiar en el recordatorio");
     // Refactor, paso 5: en el chat no se pregunta por el WhatsApp y el aviso
