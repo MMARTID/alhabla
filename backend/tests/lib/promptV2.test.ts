@@ -236,6 +236,8 @@ describe("payload del assistant con v2", () => {
       nombre_cliente: "",
       ultimo_servicio: "",
       proximos_dias: "",
+      telefono_para_decir: "",
+      proxima_cita: "",
       contexto_cliente: "",
     });
   });
@@ -248,7 +250,13 @@ describe("payload del assistant con v2", () => {
           settings: DEFAULT_AGENT_SETTINGS,
         })
       ).dynamicVariables
-    ).toEqual({ nombre_cliente: "", ultimo_servicio: "", proximos_dias: "" });
+    ).toEqual({
+      nombre_cliente: "",
+      ultimo_servicio: "",
+      proximos_dias: "",
+      telefono_para_decir: "",
+      proxima_cita: "",
+    });
   });
 });
 

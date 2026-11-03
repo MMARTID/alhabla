@@ -307,6 +307,8 @@ describe("«Comprobar desvío» de punta a punta (integración)", () => {
           ultimo_servicio: "",
           contexto_cliente: "",
           proximos_dias: expect.stringMatching(/^Próximos días: hoy, /),
+          telefono_para_decir: "seis cero cero, cero cero cero, cero cero cero",
+          proxima_cita: "",
         },
         grabar: false,
         // Sin idioma guardado: la voz del assistant.

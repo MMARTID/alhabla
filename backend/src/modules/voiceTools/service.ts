@@ -1,10 +1,13 @@
 import { prisma } from "../../lib/prisma.js";
 import { randomUUID } from "node:crypto";
 import {
+  borrarClave,
+  consumirClave,
   guardarClave,
   guardarClaveSiNoExiste,
   leerClave,
 } from "../../lib/almacenTemporal.js";
+import { nombreDelNegocioDecible } from "../../lib/nombreDelNegocio.js";
 import { nombreParaElCliente } from "../../lib/nombreProfesional.js";
 import { precioParaDecir } from "../../lib/precio.js";
 import {
@@ -92,7 +95,11 @@ import {
 } from "../whatsapp/mensajesCliente.js";
 import { cancelarReserva } from "../bookings/cancelacion.js";
 import { listaDeEsperaDisponible } from "../whatsapp/service.js";
-import { isValidE164Phone, normalizarTelefono } from "../../lib/phone.js";
+import {
+  isValidE164Phone,
+  normalizarTelefono,
+  telefonoParaDecir,
+} from "../../lib/phone.js";
 import { procesarInformeFinal } from "../whatsapp/recados.js";
 import {
   servicioSuspendidoPorPago,
@@ -157,45 +164,42 @@ type AvailabilityDraft = {
    * profesional se ocupó, seguía habiendo hueco con otro y el agente decía
    * que no quedaba nada. */
   professionalRequested?: boolean;
-  /** El profesional pedido está marcado "no sugerir" para estos servicios y
-   * check_availability devolvió una recomendación. book_appointment con este
-   * token exige `professionalConfirmed: true` (el cliente insistió tras oír
-   * la propuesta): es la red de seguridad para que un prompt antiguo no
-   * reserve con esa persona sin haber propuesto antes a la recomendada. */
-  recommendationOffered?: {
-    professionalId: string;
-    professionalName: string;
-    availabilityToken: string;
-  };
   /** La cita que el cliente cambia (`replacesBookingId` de
    * check_availability, ya comprobada como suya): book_appointment no la
    * cuenta como ocupada y la anula si la nueva queda guardada. */
   replacesBookingId?: string;
 };
 
-/** Lo que el agente lee cuando hay alguien mejor que proponer. Lleva su
- * propio token para que "vale, con Laura" se reserve sin otra comprobación. */
+/** Lo que el agente lee cuando hay alguien mejor que proponer: solo esa
+ * persona y su token, para que "vale, con Laura" se reserve sin otra
+ * comprobación. Sin el porqué: con él delante lo decía («es quien más hace
+ * este servicio»), E20 del laboratorio, 0 de 4 con v1. */
 type RecommendationForAgent = {
   professional: { id: string; name: string };
-  isSpecialist: boolean;
   availabilityToken: string;
-  instructions: string;
 };
 
-function instruccionesDeRecomendacion(
-  recomendado: string | null,
-  pedido: string | null,
-  isSpecialist: boolean
-): string {
+/**
+ * `siguiente_paso` de una recomendación. La propuesta va sola en su turno y
+ * el hueco de la persona pedida no se da: si el cliente insiste, se pide con
+ * otra comprobación (professionalConfirmed), así que no hay token con el que
+ * reservarla sin haber propuesto antes. Que nunca diga que la persona pedida
+ * no hace el servicio ya lo dice «## Profesionales».
+ */
+function siguientePasoConRecomendacion(recomendado: string | null): string {
   // Sin nombre real (provisional del alta) se habla de «otra persona del
-  // equipo» / «la persona que pediste»: nunca se dice «Profesional 2».
+  // equipo»: nunca se dice «Profesional 2».
   const quien = recomendado ?? "otra persona del equipo";
-  const aQuien = pedido ?? "la persona que pidió";
-  const porQue = isSpecialist
-    ? `${quien} es quien más hace este servicio`
-    : `${quien} es la persona más indicada`;
-  const sinNombres = recomendado && pedido ? "" : " No digas nombres provisionales tipo «Profesional 1».";
-  return `Propón UNA sola vez, en positivo, reservar con ${quien} (${porQue} y tiene hueco a esa hora); reserva con su availabilityToken si el cliente acepta. Si el cliente insiste en ${aQuien}, reserva con el availabilityToken principal y professionalConfirmed: true, sin explicar nada. Nunca digas ni insinúes que ${aQuien} no hace o no domina este servicio.${sinNombres}`;
+  return `Di solo esto, sin dar motivos: «A esa hora te la puedo dejar con ${quien}. ¿Te parece bien?», y espera. Si acepta, usa el availabilityToken de recommendation y sigue con el resumen. Si prefiere a quien pidió, repite check_availability igual con professionalConfirmed true.`;
+}
+
+/** Que en esta llamada ya se propuso a otra persona en lugar de la pedida:
+ * solo entonces vale professionalConfirmed. */
+function claveDeRecomendacionPropuesta(
+  callId: string,
+  professionalId: string
+): string {
+  return `recomendacion_propuesta:${callId}:${professionalId}`;
 }
 
 /**
@@ -204,17 +208,13 @@ function instruccionesDeRecomendacion(
  * llegue justo cuando aplica. Las frases para el cliente van entre «…»
  * para que las diga en el idioma de la conversación.
  */
-function siguientePasoConHueco(
-  canal: "voice" | "client_chat",
-  conRecomendacion: boolean
-): string {
-  const antes = conRecomendacion ? "Primero sigue recommendation. " : "";
+function siguientePasoConHueco(canal: "voice" | "client_chat"): string {
   // En el chat, el nombre se pregunta aunque el perfil de WhatsApp muestre
   // uno (paso 3 de «## Reserva» y «## Chat por WhatsApp»).
   if (canal === "client_chat") {
-    return `${antes}Guarda el availabilityToken. Pídele su nombre aunque veas el de su perfil y resume en un solo turno servicio, día y hora (cuando) y nombre; pregunta solo si lo reservas. Sin confirmaciones sueltas como «¿te viene bien esa hora?».`;
+    return `Guarda el availabilityToken. Pídele su nombre aunque veas el de su perfil y resume en un solo turno servicio, día y hora (cuando) y nombre; pregunta solo si lo reservas. Sin confirmaciones sueltas como «¿te viene bien esa hora?».`;
   }
-  return `${antes}Guarda el availabilityToken. Con su nombre (pídelo antes si falta), resume en un solo turno servicio, día y hora (cuando) y nombre y haz la pregunta del paso 3 de Reserva (la cita y el WhatsApp). No pidas confirmaciones sueltas como «¿te viene bien esa hora?».`;
+  return `Guarda el availabilityToken. Con su nombre (pídelo antes si falta), resume en un solo turno servicio, día y hora (cuando) y nombre y haz la pregunta del paso 3 de Reserva (la cita y el WhatsApp). No pidas confirmaciones sueltas como «¿te viene bien esa hora?».`;
 }
 
 const SIGUIENTE_PASO_CON_ALTERNATIVA =
@@ -584,8 +584,9 @@ async function executeCheckAvailability(
         ? params.professionalId
         : undefined;
     // true solo cuando el cliente ya oyó la recomendación e insistió en la
-    // persona que pidió: entonces no se vuelve a proponer a nadie.
-    const professionalConfirmed = params?.professionalConfirmed === true;
+    // persona que pidió: entonces no se vuelve a proponer a nadie. Se
+    // comprueba más abajo que la propuesta se hizo de verdad.
+    const pideConfirmada = params?.professionalConfirmed === true;
     const replacesBookingId =
       typeof params?.replacesBookingId === "string" && params.replacesBookingId
         ? params.replacesBookingId
@@ -638,7 +639,6 @@ async function executeCheckAvailability(
         );
       }
     }
-    let requestedProfessionalName = "la persona que pidió";
     if (professionalId) {
       const knownProfessional = await prisma.professional.findFirst({
         where: {
@@ -647,9 +647,8 @@ async function executeCheckAvailability(
           active: true,
           deletedAt: null,
         },
-        select: { id: true, name: true },
+        select: { id: true },
       });
-      if (knownProfessional?.name) requestedProfessionalName = knownProfessional.name;
       if (!knownProfessional) {
         return {
           success: true,
@@ -813,31 +812,57 @@ async function executeCheckAvailability(
 
     // El cliente pidió por su nombre a alguien marcado "no sugerir" y hay
     // alguien mejor libre a esa hora: se le propone UNA vez, con su propio
-    // token. Si el cliente ya insistió (professionalConfirmed), no se
-    // vuelve a proponer.
-    const recommendation: RecommendationForAgent | undefined =
-      recommendedProfessional && !professionalConfirmed
-        ? {
-            professional: recommendedProfessional.professional,
-            isSpecialist: recommendedProfessional.isSpecialist,
-            availabilityToken: await createAvailabilityDraft({
-              businessId: business.id,
-              callId,
-              startDateTime,
-              durationMinutes,
-              serviceIds: serviceIds ?? [],
-              professionalId: recommendedProfessional.professional.id,
-              professionalRequested: true,
-              ...delCambio,
-            }),
-            instructions: instruccionesDeRecomendacion(
-              nombreParaElCliente(recommendedProfessional.professional.name),
-              nombreParaElCliente(requestedProfessionalName),
-              recommendedProfessional.isSpecialist
+    // token, y nada más (ni el hueco de la persona pedida). Si insiste,
+    // vuelve con professionalConfirmed y entonces no se vuelve a proponer;
+    // pero solo si la propuesta se hizo en esta llamada: GLM-5.3-Flash lo
+    // mandaba en la primera comprobación (E20 del laboratorio).
+    if (recommendedProfessional && professionalId) {
+      const yaPropuesta =
+        pideConfirmada &&
+        (!callId ||
+          (await leerClave(
+            claveDeRecomendacionPropuesta(callId, professionalId)
+          ).catch(() => null)) !== null);
+      if (pideConfirmada && !yaPropuesta) {
+        console.warn(
+          `[VoiceTools] ${callLabel} check_availability con professionalConfirmed sin haber propuesto antes a nadie (negocio ${business.id}): se propone ahora`
+        );
+      }
+      if (!yaPropuesta) {
+        const recommendation: RecommendationForAgent = {
+          professional: recommendedProfessional.professional,
+          availabilityToken: await createAvailabilityDraft({
+            businessId: business.id,
+            callId,
+            startDateTime,
+            durationMinutes,
+            serviceIds: serviceIds ?? [],
+            professionalId: recommendedProfessional.professional.id,
+            professionalRequested: true,
+            ...delCambio,
+          }),
+        };
+        if (callId) {
+          await guardarClave(
+            claveDeRecomendacionPropuesta(callId, professionalId),
+            recommendedProfessional.professional.id,
+            AVAILABILITY_TOKEN_TTL_SECONDS * 1000,
+            { businessId: business.id }
+          );
+        }
+        return {
+          success: true,
+          result: {
+            available: true,
+            cuando: paraElAgente.cuando,
+            recommendation,
+            siguiente_paso: siguientePasoConRecomendacion(
+              nombreParaElCliente(recommendedProfessional.professional.name)
             ),
-          }
-        : undefined;
-    const conRecomendacion = recommendation ? { recommendation } : {};
+          },
+        };
+      }
+    }
 
     if (availability.available) {
       const asignado = availability.availableProfessionals[0];
@@ -850,15 +875,6 @@ async function executeCheckAvailability(
         professionalId: professionalId ?? asignado?.id,
         professionalRequested: Boolean(professionalId),
         ...delCambio,
-        ...(recommendation && professionalId
-          ? {
-              recommendationOffered: {
-                professionalId: recommendation.professional.id,
-                professionalName: recommendation.professional.name,
-                availabilityToken: recommendation.availabilityToken,
-              },
-            }
-          : {}),
       });
       // Sin profesional pedido, el hueco va a availableProfessionals[0]: el
       // agente puede decir con quién queda y, si es especialista, decirlo en
@@ -887,11 +903,7 @@ async function executeCheckAvailability(
           ...paraElAgente,
           availabilityToken,
           ...assignedProfessional,
-          ...conRecomendacion,
-          siguiente_paso: siguientePasoConHueco(
-            canalDeLaTool(callId),
-            Boolean(recommendation)
-          ),
+          siguiente_paso: siguientePasoConHueco(canalDeLaTool(callId)),
           ...(comoDecirlo ? { como_decirlo: comoDecirlo } : {}),
         },
       };
@@ -944,7 +956,6 @@ async function executeCheckAvailability(
           result: {
             ...paraElAgente,
             suggestedNextSlot: null,
-            ...conRecomendacion,
             ...paraCuandoNoLeVale,
           },
         };
@@ -972,8 +983,7 @@ async function executeCheckAvailability(
             ),
             availabilityToken: suggestedToken,
           },
-          ...conRecomendacion,
-          ...paraCuandoNoLeVale,
+            ...paraCuandoNoLeVale,
           siguiente_paso: SIGUIENTE_PASO_CON_ALTERNATIVA,
         },
       };
@@ -983,7 +993,6 @@ async function executeCheckAvailability(
       success: true,
       result: {
         ...paraElAgente,
-        ...conRecomendacion,
         ...paraCuandoNoLeVale,
       },
     };
@@ -1988,7 +1997,7 @@ const RESERVA_QUE_SE_REINTENTA: ReadonlySet<string> = new Set([
   "CLIENT_NAME_REQUIRED",
   "CLIENT_PHONE_INVALID",
   "CLIENT_PHONE_REQUIRED",
-  "PROFESSIONAL_CONFIRMATION_REQUIRED",
+  "CLIENT_PHONE_CONFIRMATION_REQUIRED",
   "AVAILABILITY_TOKEN_EXPIRED",
 ]);
 
@@ -2098,7 +2107,7 @@ async function reservarCita(
     professionalId?: string;
     availabilityToken?: string;
     smsConsent?: boolean;
-    professionalConfirmed?: boolean;
+    phoneConfirmed?: boolean;
   };
   const clientName = rawParams.clientName;
   const clientEmail = rawParams.clientEmail;
@@ -2129,27 +2138,6 @@ async function reservarCita(
         success: false,
         code: "AVAILABILITY_TOKEN_EXPIRED",
         message: "La comprobación de disponibilidad caducó. Vuelvo a comprobar la hora que prefieras.",
-      },
-    };
-  }
-
-  // check_availability propuso a alguien mejor para este servicio y el
-  // agente intenta reservar con la persona pedida sin decir que el cliente
-  // insistió. Se frena una vez: o el cliente acepta a quien se le propuso
-  // (token de la recomendación) o insiste (professionalConfirmed). Es la red
-  // de seguridad para prompts editados a mano que no conocen la regla.
-  if (draft?.recommendationOffered && rawParams.professionalConfirmed !== true) {
-    const recomendado = draft.recommendationOffered;
-    return {
-      success: true,
-      result: {
-        success: false,
-        code: "PROFESSIONAL_CONFIRMATION_REQUIRED",
-        recommendation: {
-          professional: { id: recomendado.professionalId, name: recomendado.professionalName },
-          availabilityToken: recomendado.availabilityToken,
-        },
-        message: `Antes de reservar, propón una sola vez reservar con ${nombreParaElCliente(recomendado.professionalName) ?? "otra persona del equipo"}, que tiene hueco a esa hora (usa su availabilityToken si el cliente acepta). Si el cliente insiste en la persona que pidió, repite book_appointment con este mismo availabilityToken y professionalConfirmed: true. No expliques el motivo ni digas que alguien no hace este servicio.`,
       },
     };
   }
@@ -2211,7 +2199,31 @@ async function reservarCita(
         success: false,
         code: "CLIENT_PHONE_INVALID",
         message:
-          "Ese teléfono no es válido. Pídeselo otra vez, repíteselo en grupos de tres cifras y, cuando lo confirme, vuelve a llamar a book_appointment con el mismo availabilityToken y el teléfono en clientPhone.",
+          "Ese teléfono no es válido. Pídeselo otra vez y vuelve a llamar a book_appointment con el mismo availabilityToken y el teléfono en clientPhone: te dirá cómo repetírselo.",
+      },
+    };
+  }
+
+  // Por voz, un teléfono dictado se confirma antes de reservar, y lo que se
+  // repite es lo que el backend entendió, no lo que recuerda el modelo: el
+  // laboratorio del 03-11 con GLM-5.3-Flash repitió «cero uno nueve» de un
+  // número acabado en 0199 (y reservó con el bueno). En el chat el número
+  // llega escrito: no hace falta. Al cambiar una cita (replacesBookingId)
+  // tampoco: el teléfono es el que ya se dio para ella.
+  if (
+    telefonoNormalizado &&
+    rawParams.phoneConfirmed !== true &&
+    !draft?.replacesBookingId &&
+    canalDeLaTool(callId) === "voice"
+  ) {
+    const paraDecir = telefonoParaDecir(telefonoNormalizado);
+    return {
+      success: true,
+      result: {
+        success: false,
+        code: "CLIENT_PHONE_CONFIRMATION_REQUIRED",
+        telefono_para_decir: paraDecir,
+        message: `Todavía no está reservada. Repítele el teléfono tal cual: «${paraDecir}». Si dice que sí, vuelve a llamar a book_appointment con lo mismo y phoneConfirmed: true. Si corrige alguna cifra, vuelve a llamarla con el número entero corregido, sin phoneConfirmed.`,
       },
     };
   }
@@ -2342,7 +2354,7 @@ async function reservarCita(
           success: false,
           code: "CLIENT_PHONE_REQUIRED",
           message:
-            "Llama con número oculto y la cita se quedaría sin teléfono de contacto. Pídeselo, repíteselo en grupos de tres cifras y, cuando lo confirme, vuelve a llamar a book_appointment con el mismo availabilityToken y el teléfono en clientPhone. Si no quiere darlo, vuelve a llamar sin él: la cita se guarda igual.",
+            "Llama con número oculto y la cita se quedaría sin teléfono de contacto. Pídeselo y, en cuanto te lo diga, vuelve a llamar a book_appointment con el mismo availabilityToken y el teléfono en clientPhone: te dirá cómo repetírselo. Si no quiere darlo, vuelve a llamar sin él: la cita se guarda igual.",
         },
       };
     }
@@ -3468,6 +3480,7 @@ const DATOS_QUE_SE_PIDEN_EN_LA_LLAMADA: ReadonlySet<string> = new Set([
   "CLIENT_NAME_REQUIRED",
   "CLIENT_PHONE_INVALID",
   "CLIENT_PHONE_REQUIRED",
+  "CLIENT_PHONE_CONFIRMATION_REQUIRED",
 ]);
 
 /**
@@ -3523,6 +3536,20 @@ async function executePreferenciaDeGrabacion(
       `[VoiceTools] ${callLabel} preferencia_de_grabacion sin callId (negocio ${business.id}): no se guarda`
     );
   }
+  if (await respuestaSinPreguntaOida(callId)) {
+    console.warn(
+      `[Grabación] ${callLabel}: preferencia_de_grabacion (acepta ${acepta}) en el mismo turno que la pregunta (negocio ${business.id}): no se guarda`
+    );
+    return {
+      success: true,
+      result: {
+        success: false,
+        code: "GRABACION_SIN_RESPUESTA",
+        message:
+          "Quien llama aún no ha contestado: no se ha guardado nada. En este turno di solo la pregunta de grabación y espera su respuesta; con ella, vuelve a llamar a preferencia_de_grabacion.",
+      },
+    };
+  }
   const resultado = callId
     ? await guardarPreferenciaDeGrabacion({
         callId,
@@ -3539,10 +3566,73 @@ async function executePreferenciaDeGrabacion(
     sin_llamada:
       "No se pudo guardar. Sigue con lo que había pedido sin comentarlo.",
   };
+  // Lo que check_availability había comprobado y se guardó para después de
+  // la pregunta (conPreguntaDeGrabacion): ahora sí se le da, en esta misma
+  // respuesta, para que conteste con ello sin otra comprobación.
+  const pendiente = await loComprobadoAntesDeLaPregunta(callId, callLabel);
+  if (pendiente) {
+    return {
+      success: true,
+      result: {
+        ...pendiente.result,
+        grabacion: { guardada: resultado !== "sin_llamada", message: mensajes[resultado] },
+        siguiente_paso: `${mensajes[resultado]} Lo que había pedido ya está comprobado, aquí mismo: contesta con ello en este turno. ${pendiente.result.siguiente_paso ?? ""}`.trim(),
+      },
+    };
+  }
   return {
     success: true,
     result: { success: resultado !== "sin_llamada", message: mensajes[resultado] },
   };
+}
+
+/** Lo comprobado que espera a que quien llama conteste a la pregunta de
+ * grabación: un turno, a lo sumo lo que dura un token de disponibilidad. */
+function claveDeLoComprobado(callId: string): string {
+  return `grabacion_pendiente:${callId}`;
+}
+
+/** Menos que esto entre la pregunta y la respuesta es el mismo turno: nadie
+ * oye la pregunta y contesta en dos segundos (solo leerla en voz alta tarda
+ * más). Lo hacía GLM-5.3-Flash en el laboratorio: llamaba a
+ * preferencia_de_grabacion en el mismo turno en que la preguntaba, con una
+ * respuesta inventada. */
+const MS_MINIMOS_PARA_CONTESTAR_A_LA_GRABACION = 2_000;
+
+type LoComprobado = { preguntadaEn: number; result: Record<string, unknown> };
+
+async function loComprobadoAntesDeLaPregunta(
+  callId: string | undefined,
+  callLabel: string
+): Promise<{ result: Record<string, unknown> & { siguiente_paso?: string } } | null> {
+  if (!callId) return null;
+  try {
+    const crudo = await consumirClave(claveDeLoComprobado(callId));
+    if (!crudo) return null;
+    const guardado = JSON.parse(crudo) as LoComprobado;
+    return { result: guardado.result };
+  } catch (error) {
+    console.error(
+      `[Grabación] ${callLabel}: no se pudo recuperar lo comprobado antes de la pregunta (llamada ${callId}): ${errorMessage(error)}`
+    );
+    return null;
+  }
+}
+
+/** ¿Llega la respuesta a la pregunta de grabación en el mismo turno en que
+ * se hizo? Entonces no la ha dado quien llama. */
+async function respuestaSinPreguntaOida(
+  callId: string | undefined
+): Promise<boolean> {
+  if (!callId) return false;
+  const crudo = await leerClave(claveDeLoComprobado(callId)).catch(() => null);
+  if (!crudo) return false;
+  try {
+    const { preguntadaEn } = JSON.parse(crudo) as LoComprobado;
+    return Date.now() - preguntadaEn < MS_MINIMOS_PARA_CONTESTAR_A_LA_GRABACION;
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -3573,17 +3663,61 @@ async function conPreguntaDeGrabacion(
     businessId: business.id,
     etiqueta: callLabel,
   });
-  if (!toca) return respuesta;
+  if (!toca) {
+    // Una comprobación nueva deja viejo lo que esperaba a la pregunta (no
+    // contestó con claridad y se volvió a comprobar): que
+    // preferencia_de_grabacion no devuelva después un hueco caducado.
+    await borrarClave(claveDeLoComprobado(callId)).catch(() => undefined);
+    return respuesta;
+  }
   console.log(
     `[Grabación] ${callLabel}: se le pide permiso para grabar (negocio ${business.id})`
   );
+  // Lo comprobado no se le da todavía: con el hueco y la pregunta en la
+  // misma respuesta, GLM-5.3-Flash los juntaba en el mismo turno (E8 del
+  // laboratorio). Se guarda y se lo devuelve preferencia_de_grabacion
+  // cuando quien llama conteste.
+  const guardado: LoComprobado = {
+    preguntadaEn: Date.now(),
+    result: respuesta.result ?? {},
+  };
+  try {
+    await guardarClave(
+      claveDeLoComprobado(callId),
+      JSON.stringify(guardado),
+      AVAILABILITY_TOKEN_TTL_SECONDS * 1000,
+      { businessId: business.id }
+    );
+  } catch (error) {
+    // Sin dónde guardarlo, la pregunta va junto a lo comprobado, como antes.
+    console.error(
+      `[Grabación] ${callLabel}: no se pudo guardar lo comprobado antes de la pregunta (negocio ${business.id}, llamada ${callId}); va todo junto: ${errorMessage(error)}`
+    );
+    return {
+      ...respuesta,
+      result: {
+        ...respuesta.result,
+        pregunta_de_grabacion: preguntaDeGrabacion(business.name),
+      },
+    };
+  }
   return {
-    ...respuesta,
+    success: true,
     result: {
-      ...respuesta.result,
-      pregunta_de_grabacion: `Mientras lo compruebo, ¿te parece bien que grabe tus llamadas para que ${business.name} pueda revisarlas?`,
+      pregunta_de_grabacion: preguntaDeGrabacion(business.name),
+      siguiente_paso:
+        "Lo que pidió ya está comprobado, pero todavía no se lo digas: en este turno di solo pregunta_de_grabacion, en el idioma de la conversación, y espera su respuesta. Con ella llama a preferencia_de_grabacion (acepta true o false), que te devuelve lo comprobado para contestarle. Si no contesta con claridad, vuelve a llamar a check_availability igual.",
     },
   };
+}
+
+/** La pregunta, con el nombre del negocio si se puede decir (no el
+ * provisional del alta, que lleva el email del dueño). Sin «Mientras lo
+ * compruebo, » delante desde el 03-11: GLM lo repetía tal cual y el turno
+ * dejaba de ser solo la pregunta (E8 del laboratorio). */
+function preguntaDeGrabacion(nombreDelNegocio: string): string {
+  const quien = nombreDelNegocioDecible(nombreDelNegocio) ?? "el negocio";
+  return `¿Te parece bien que grabe tus llamadas para que ${quien} pueda revisarlas?`;
 }
 
 /**

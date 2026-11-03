@@ -591,7 +591,7 @@ describe("check_availability: siguiente_paso según el caso", () => {
     expect(mockedListaDeEspera).not.toHaveBeenCalled();
   });
 
-  it("con una recomendación: primero sus instructions, después el resumen", async () => {
+  it("con una recomendación: solo la propuesta, con la frase y sin el resumen", async () => {
     mockedProfessionalFindFirst.mockResolvedValue({
       id: "prof_marta",
       name: "Marta",
@@ -612,8 +612,9 @@ describe("check_availability: siguiente_paso según el caso", () => {
 
     expect(result!.recommendation).toBeDefined();
     expect(result!.siguiente_paso).toMatch(
-      /^Primero sigue recommendation\. Guarda el availabilityToken\./
+      /^Di solo esto, sin dar motivos: «A esa hora te la puedo dejar con Laura\. ¿Te parece bien\?»/
     );
+    expect(result!.availabilityToken).toBeUndefined();
     expectCamposCortos(result);
   });
 });

@@ -43,6 +43,7 @@ import {
   restableceElNegocio,
   resumirCelda,
   siguienteMensajeDelCliente,
+  esModeloNoDisponible,
   tablaDeComparacion,
   tablaMarkdown,
   telefonosDelTexto,
@@ -1065,6 +1066,34 @@ describe("evaluarComprobacion", () => {
     );
     // Sin ninguna con teléfono, no se cumple: nunca llegó a reservar con él.
     expect(evaluar(corregido, reserva([undefined]))).toBe(false);
+  });
+
+  it("argumentoPatron con soloLaUltima: el teléfono mal dictado que solo se confirmó no cuenta (E21)", () => {
+    const corregido: Comprobacion = {
+      tipo: "argumentoPatron",
+      herramienta: "book_appointment",
+      campo: "clientPhone",
+      patron: "0199$",
+      debeCoincidir: true,
+      soloLasQueLoTraen: true,
+      soloLaUltima: true,
+      descripcion: "x",
+    };
+    const reserva = (telefonos: string[]) =>
+      conversacion(
+        ["a"],
+        telefonos.map((clientPhone) => ({
+          nombre: "book_appointment",
+          turno: 1,
+          argumentos: { clientPhone },
+        }))
+      );
+    expect(
+      evaluar(corregido, reserva(["+12025550198", "+12025550199", "+12025550199"]))
+    ).toBe(true);
+    expect(evaluar(corregido, reserva(["+12025550199", "+12025550198"]))).toBe(
+      false
+    );
   });
 
   it("argumentoPatron: todas las llamadas, y sin llamadas se cumple", () => {
@@ -3217,6 +3246,46 @@ describe("ejecutarLaboratorio con el cliente reactivo", () => {
     expect(repeticion.metricas.turnos).toBe(topeDeTurnos(guionDe("E1")));
   });
 
+  it("reintenta el cliente simulado cuando su modelo no está disponible (10027)", async () => {
+    const noDisponible = new Error(
+      '422 {"errors":[{"code":"10027","title":"Unprocessable Entity","detail":"The requested model is currently unavailable."}]}'
+    );
+    const completarChat = vi
+      .fn()
+      .mockRejectedValueOnce(noDisponible)
+      .mockRejectedValueOnce(noDisponible)
+      .mockResolvedValue('{"mensaje":"Vale, gracias","fin":true}');
+    const adaptador = adaptadorConChat(() => "No la tenemos.", {
+      completarChat,
+    });
+    const { deps } = dependencias(adaptador);
+
+    const resultado = await ejecutarLaboratorio(
+      parsearArgumentos([
+        "--negocio",
+        "biz_1",
+        "--escenarios",
+        "E1",
+        "--n",
+        "1",
+      ]),
+      deps
+    );
+
+    expect(deps.dormir).toHaveBeenNthCalledWith(1, 15_000);
+    expect(deps.dormir).toHaveBeenNthCalledWith(2, 30_000);
+    expect(resultado.informe!.resumen[0]!.errores).toBe(0);
+  });
+
+  it("esModeloNoDisponible reconoce el 10027 de Telnyx y nada más", () => {
+    expect(
+      esModeloNoDisponible(
+        new Error("The requested model is currently unavailable.")
+      )
+    ).toBe(true);
+    expect(esModeloNoDisponible(new Error("modelo caído"))).toBe(false);
+  });
+
   it("un fallo del LLM del cliente es un error de ejecución, no un fallo del prompt", async () => {
     const adaptador = adaptadorConChat(() => "No la tenemos.", {
       completarChat: vi.fn(async () => {
@@ -3690,6 +3759,16 @@ describe("variablesComunes", () => {
     expect(variablesComunes([con(""), con("")])).toBeUndefined();
     expect(variablesComunes([])).toBeUndefined();
     expect(variablesComunes([con("Marta"), con("")])).toBe("distintas");
+  });
+
+  it("el número de cada llamada no las hace distintas ni va en las comunes", () => {
+    const desde = (telefono: string) => ({
+      saludo: "s",
+      variables: { ...con("Marta").variables, telefono_para_decir: telefono },
+    });
+    expect(
+      variablesComunes([desde("seis uno dos"), desde("seis uno tres")])
+    ).toEqual({ nombre_cliente: "Marta", ultimo_servicio: "Corte" });
   });
 });
 

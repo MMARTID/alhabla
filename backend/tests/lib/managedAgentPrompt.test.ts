@@ -903,8 +903,9 @@ describe("buildManagedAgentPrompt — profesionales y especialidades", () => {
   it("explica la recomendación única y cómo reservar si el cliente insiste", () => {
     expect(prompt).toContain("## Profesionales");
     expect(prompt).toContain("propón UNA sola vez");
-    expect(prompt).toContain("professionalConfirmed: true");
-    expect(prompt).toContain("PROFESSIONAL_CONFIRMATION_REQUIRED");
+    expect(prompt).toContain(
+      "vuelve a llamar a check_availability con professionalConfirmed: true"
+    );
   });
 
   it("prohíbe decir que a alguien no se le da bien un servicio o mencionar niveles", () => {

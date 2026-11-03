@@ -379,7 +379,9 @@ exports[`payloads de asistentes (instantáneas) > assistant de la recepcionista,
   "conversationFlow": null,
   "dynamicVariables": {
     "nombre_cliente": "",
+    "proxima_cita": "",
     "proximos_dias": "",
+    "telefono_para_decir": "",
     "ultimo_servicio": "",
   },
   "fallbackConfig": {
@@ -452,7 +454,7 @@ exports[`payloads de asistentes (instantáneas) > assistant de la recepcionista,
               "type": "number",
             },
             "professionalConfirmed": {
-              "description": "true SOLO si ya propusiste una vez a la persona que recomendó la herramienta y el cliente insistió en la que pidió por su nombre. Nunca lo envíes en la primera comprobación.",
+              "description": "true SOLO si check_availability te devolvió una recommendation, la propusiste y el cliente prefiere a la persona que pidió por su nombre: entonces te da su hueco. Nunca en la primera comprobación.",
               "type": "boolean",
             },
             "professionalId": {
@@ -508,11 +510,11 @@ exports[`payloads de asistentes (instantáneas) > assistant de la recepcionista,
               "type": "string",
             },
             "clientPhone": {
-              "description": "Teléfono de contacto solo si el cliente da uno distinto al número desde el que llama o book_appointment te lo pidió, tal como lo confirmó al repetírselo (opcional).",
+              "description": "Teléfono de contacto solo si el cliente da uno distinto al número desde el que llama o book_appointment te lo pidió (opcional). Pásalo en cuanto lo dicte: si hay que confirmarlo, la respuesta te dice cómo repetírselo.",
               "type": "string",
             },
-            "professionalConfirmed": {
-              "description": "true SOLO si check_availability devolvió una recomendación, la propusiste una vez y el cliente insistió en la persona que pidió. Sin esto, la reserva se frena hasta que lo hayas propuesto.",
+            "phoneConfirmed": {
+              "description": "true SOLO si book_appointment respondió CLIENT_PHONE_CONFIRMATION_REQUIRED, le repetiste ese teléfono tal como venía y el cliente dijo que sí.",
               "type": "boolean",
             },
             "smsConsent": {
@@ -855,7 +857,9 @@ exports[`payloads de asistentes (instantáneas) > assistant de la recepcionista,
   "conversationFlow": null,
   "dynamicVariables": {
     "nombre_cliente": "",
+    "proxima_cita": "",
     "proximos_dias": "",
+    "telefono_para_decir": "",
     "ultimo_servicio": "",
   },
   "fallbackConfig": {
@@ -1255,7 +1259,7 @@ Si te escriben en catalán, gallego, euskera o inglés, responde en ese idioma; 
 exports[`payloads de asistentes (instantáneas) > el JSON enviado es idéntico byte a byte (hash) 1`] = `
 {
   "gestor": "e98c3bfa972a5bd367381ff26a58c6d2b9ee626c5ac52e24ac7c18fe833f1d96",
-  "recepcionista": "0550ac20c0a977c9c9355f3842075e513b7bd6dfa7710aeef9aa8e61e784ebd3",
+  "recepcionista": "7e5cb80b123685fd77499dd80798884e87d95aa0635656c3ad7570890d399659",
 }
 `;
 
@@ -1291,7 +1295,7 @@ exports[`payloads de asistentes (instantáneas) > tools de voz de la recepcionis
         "type": "number",
       },
       "professionalConfirmed": {
-        "description": "true SOLO si ya propusiste una vez a la persona que recomendó la herramienta y el cliente insistió en la que pidió por su nombre. Nunca lo envíes en la primera comprobación.",
+        "description": "true SOLO si check_availability te devolvió una recommendation, la propusiste y el cliente prefiere a la persona que pidió por su nombre: entonces te da su hueco. Nunca en la primera comprobación.",
         "type": "boolean",
       },
       "professionalId": {
@@ -1341,11 +1345,11 @@ exports[`payloads de asistentes (instantáneas) > tools de voz de la recepcionis
         "type": "string",
       },
       "clientPhone": {
-        "description": "Teléfono de contacto solo si el cliente da uno distinto al número desde el que llama o book_appointment te lo pidió, tal como lo confirmó al repetírselo (opcional).",
+        "description": "Teléfono de contacto solo si el cliente da uno distinto al número desde el que llama o book_appointment te lo pidió (opcional). Pásalo en cuanto lo dicte: si hay que confirmarlo, la respuesta te dice cómo repetírselo.",
         "type": "string",
       },
-      "professionalConfirmed": {
-        "description": "true SOLO si check_availability devolvió una recomendación, la propusiste una vez y el cliente insistió en la persona que pidió. Sin esto, la reserva se frena hasta que lo hayas propuesto.",
+      "phoneConfirmed": {
+        "description": "true SOLO si book_appointment respondió CLIENT_PHONE_CONFIRMATION_REQUIRED, le repetiste ese teléfono tal como venía y el cliente dijo que sí.",
         "type": "boolean",
       },
       "smsConsent": {

@@ -545,6 +545,7 @@ describe("executeVoiceTool book_appointment — vinculación a la llamada correc
           durationMinutes: 60,
           professionalId: "professional_123",
           clientPhone: "+34611222333",
+          phoneConfirmed: true,
         },
       })
     );
@@ -814,7 +815,7 @@ describe("executeVoiceTool — catálogo y token de disponibilidad", () => {
       },
     });
 
-    expect(result.result.cuando).toMatch(/martes, 25 de agosto, a las 17:00$/);
+    expect(result.result.cuando).toMatch(/martes, 25 de agosto, a las cinco de la tarde$/);
   });
 
   it("rechaza con un error explícito un serviceId que no existe en el negocio (el LLM puede corromper IDs al copiarlos)", async () => {
@@ -1276,10 +1277,10 @@ describe("executeVoiceTool check_availability — restricciones de reserva del n
 
     expect(result.result.suggestedNextSlot).toMatchObject({
       startDateTime: "2026-08-28T10:00:00+02:00",
-      cuando: "viernes, 28 de agosto, a las 10:00",
+      cuando: "viernes, 28 de agosto, a las diez de la mañana",
       availabilityToken: expect.any(String),
     });
-    expect(result.result.cuando).toBe("pasado mañana, jueves, 27 de agosto, a las 20:00");
+    expect(result.result.cuando).toBe("pasado mañana, jueves, 27 de agosto, a las ocho de la tarde");
     expect(draftsGuardados()).toHaveLength(1);
   });
 });
@@ -3197,7 +3198,10 @@ describe("executeVoiceTool book_appointment — teléfono del cliente", () => {
   }
 
   it("guarda en E.164 el teléfono que dicta el cliente", async () => {
-    const result = await reservarCon({ clientPhone: "612 34 56 78" });
+    const result = await reservarCon({
+      clientPhone: "612 34 56 78",
+      phoneConfirmed: true,
+    });
 
     expect(result.result.success).toBe(true);
     expect(mockedBookAppointment).toHaveBeenCalledWith(
@@ -3212,7 +3216,10 @@ describe("executeVoiceTool book_appointment — teléfono del cliente", () => {
   });
 
   it("si dicta el mismo número desde el que llama, la reserva guarda null", async () => {
-    const result = await reservarCon({ clientPhone: "0034 600 999 888" });
+    const result = await reservarCon({
+      clientPhone: "0034 600 999 888",
+      phoneConfirmed: true,
+    });
 
     expect(result.result.success).toBe(true);
     expect(mockedBookAppointment).toHaveBeenCalledWith(
@@ -3222,6 +3229,44 @@ describe("executeVoiceTool book_appointment — teléfono del cliente", () => {
       expect.objectContaining({
         create: expect.objectContaining({ clientPhone: undefined }),
       })
+    );
+  });
+
+  // Laboratorio del 03-11: GLM-5.3-Flash repitió de memoria «cero uno
+  // nueve» de un número acabado en 0199. Ahora repite lo que entendió el
+  // backend y solo se reserva cuando el cliente dice que sí.
+  it("por voz, un teléfono dictado se confirma antes de reservar, con el número escrito para decirlo", async () => {
+    const result = await reservarCon({ clientPhone: "612 34 56 78" });
+
+    expect(result.result).toMatchObject({
+      success: false,
+      code: "CLIENT_PHONE_CONFIRMATION_REQUIRED",
+      telefono_para_decir: "seis uno dos, tres cuatro cinco, seis siete ocho",
+    });
+    expect(result.result.message).toContain(
+      "«seis uno dos, tres cuatro cinco, seis siete ocho»"
+    );
+    expect(result.result.message).toContain("phoneConfirmed: true");
+    expect(mockedBookAppointment).not.toHaveBeenCalled();
+    expect(mockedBookingUpsert).not.toHaveBeenCalled();
+    expect(mockedGuardarIntento).not.toHaveBeenCalled();
+  });
+
+  it("en el chat de WhatsApp el teléfono llega escrito: reserva sin pedir confirmación", async () => {
+    mockedCallFindUnique.mockResolvedValue({
+      id: "call_row_chat",
+      fromNumber: "+34600999888",
+      businessId: "business_123",
+      startedAt: new Date(),
+    } as any);
+    const result = await reservarCon(
+      { clientPhone: "612 34 56 78" },
+      "whatsapp:chat:conversacion_1"
+    );
+
+    expect(result.result.success).toBe(true);
+    expect(mockedBookAppointment).toHaveBeenCalledWith(
+      expect.objectContaining({ clientPhone: "+34612345678" })
     );
   });
 
@@ -3235,7 +3280,7 @@ describe("executeVoiceTool book_appointment — teléfono del cliente", () => {
         success: false,
         code: "CLIENT_PHONE_INVALID",
       });
-      expect(result.result.message).toContain("grupos de tres");
+      expect(result.result.message).toContain("te dirá cómo repetírselo");
       expect(mockedBookAppointment).not.toHaveBeenCalled();
       expect(mockedBookingUpsert).not.toHaveBeenCalled();
       expect(mockedGuardarIntento).not.toHaveBeenCalled();
@@ -3276,7 +3321,10 @@ describe("executeVoiceTool book_appointment — teléfono del cliente", () => {
     });
 
     it("con el teléfono que dicta, reserva a la primera con ese teléfono", async () => {
-      const result = await reservarCon({ clientPhone: "612345678" });
+      const result = await reservarCon({
+        clientPhone: "612345678",
+        phoneConfirmed: true,
+      });
 
       expect(result.result.success).toBe(true);
       expect(mockedBookAppointment).toHaveBeenCalledWith(
@@ -3654,7 +3702,7 @@ describe("executeVoiceTool preferencia_de_grabacion", () => {
 describe("executeVoiceTool: la pregunta de grabar", () => {
   const mockedToca = vi.mocked(tocaPreguntarPorGrabar);
   const PREGUNTA =
-    "Mientras lo compruebo, ¿te parece bien que grabe tus llamadas para que Peluquería Ana pueda revisarlas?";
+    "¿Te parece bien que grabe tus llamadas para que Peluquería Ana pueda revisarlas?";
   const comprobar = (callId?: string, params: Record<string, unknown> = {}) =>
     executeVoiceTool({
       businessId: "business_123",
@@ -3694,9 +3742,30 @@ describe("executeVoiceTool: la pregunta de grabar", () => {
 
   afterEach(() => {
     mockedToca.mockResolvedValue(false);
+    vi.useRealTimers();
   });
 
-  it("si toca, va con la disponibilidad, para la llamada y el negocio del webhook", async () => {
+  const mockedGuardar = vi.mocked(guardarPreferenciaDeGrabacion);
+  const contestar = (acepta: boolean, callId = "v3:ctrl_1") =>
+    executeVoiceTool({
+      businessId: "business_123",
+      toolName: "preferencia_de_grabacion",
+      params: { acepta },
+      callLabel: `llamada ${callId}`,
+      callId,
+    });
+  /** La pregunta se hace a las 10:00:00 y quien llama contesta `ms` después. */
+  async function preguntarYContestarA(ms: number, acepta = true) {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-08-20T10:00:00Z"));
+    mockedToca.mockResolvedValue(true);
+    const pregunta = await comprobar("v3:ctrl_1");
+    vi.setSystemTime(new Date(Date.parse("2026-08-20T10:00:00Z") + ms));
+    const respuesta = await contestar(acepta);
+    return { pregunta, respuesta };
+  }
+
+  it("si toca, solo va la pregunta: lo comprobado espera a que conteste", async () => {
     mockedToca.mockResolvedValue(true);
 
     const result = await comprobar("v3:ctrl_1");
@@ -3706,8 +3775,101 @@ describe("executeVoiceTool: la pregunta de grabar", () => {
       businessId: "business_123",
       etiqueta: "llamada v3:ctrl_1",
     });
-    expect(result.result.available).toBe(true);
     expect(result.result.pregunta_de_grabacion).toBe(PREGUNTA);
+    expect(result.result.siguiente_paso).toMatch(/di solo pregunta_de_grabacion/);
+    // Ni el hueco ni su token: no puede juntarlos con la pregunta.
+    expect(result.result).not.toHaveProperty("available");
+    expect(result.result).not.toHaveProperty("availabilityToken");
+    expect(result.result).not.toHaveProperty("cuando");
+  });
+
+  it("con su respuesta, preferencia_de_grabacion devuelve lo comprobado, una sola vez", async () => {
+    mockedGuardar.mockResolvedValue("aceptada");
+
+    const { respuesta } = await preguntarYContestarA(4_000);
+
+    expect(mockedGuardar).toHaveBeenCalledWith(
+      expect.objectContaining({ callId: "v3:ctrl_1", acepta: true })
+    );
+    expect(respuesta.result).toMatchObject({
+      available: true,
+      availabilityToken: expect.any(String),
+      cuando: expect.any(String),
+      grabacion: { guardada: true },
+    });
+    expect(respuesta.result.siguiente_paso).toMatch(
+      /^Hecho: se graba desde ahora.*contesta con ello en este turno\. Guarda el availabilityToken/
+    );
+    // Lo comprobado se consume: otro «no grabes» ya no lo repite.
+    mockedGuardar.mockResolvedValue("rechazada");
+    const otra = await contestar(false);
+    expect(otra.result).not.toHaveProperty("available");
+  });
+
+  it("si llega en el mismo turno que la pregunta, no guarda nada y pide esperar", async () => {
+    mockedGuardar.mockResolvedValue("aceptada");
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    const { respuesta } = await preguntarYContestarA(800);
+
+    expect(mockedGuardar).not.toHaveBeenCalled();
+    expect(respuesta.result).toMatchObject({
+      success: false,
+      code: "GRABACION_SIN_RESPUESTA",
+    });
+    // Lo comprobado sigue esperando a la respuesta de verdad.
+    vi.setSystemTime(new Date(Date.parse("2026-08-20T10:00:05Z")));
+    const despues = await contestar(true);
+    expect(mockedGuardar).toHaveBeenCalledTimes(1);
+    expect(despues.result).toMatchObject({ available: true });
+  });
+
+  it("una comprobación nueva descarta lo que esperaba a la pregunta", async () => {
+    mockedGuardar.mockResolvedValue("rechazada");
+    mockedToca.mockResolvedValue(true);
+    await comprobar("v3:ctrl_1");
+    // No contestó con claridad: se vuelve a comprobar y ya no toca preguntar.
+    mockedToca.mockResolvedValue(false);
+    const otra = await comprobar("v3:ctrl_1");
+    expect(otra.result.available).toBe(true);
+
+    const respuesta = await contestar(false);
+
+    expect(respuesta.result).not.toHaveProperty("available");
+    expect(respuesta.result.message).toMatch(/^Hecho: no se graba/);
+  });
+
+  it("con el nombre provisional del alta, la pregunta dice «el negocio»", async () => {
+    mockedBusinessFindUnique.mockResolvedValue(
+      buildBusiness({ name: "Negocio de ana@ejemplo.com" }) as any
+    );
+    mockedToca.mockResolvedValue(true);
+
+    const result = await comprobar("v3:ctrl_1");
+
+    expect(result.result.pregunta_de_grabacion).toBe(
+      "¿Te parece bien que grabe tus llamadas para que el negocio pueda revisarlas?"
+    );
+  });
+
+  it("si no se puede guardar lo comprobado, va todo junto, como antes", async () => {
+    mockedToca.mockResolvedValue(true);
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const original = almacenEnMemoria.guardarClave.getMockImplementation()!;
+    almacenEnMemoria.guardarClave.mockImplementation((clave, ...resto) =>
+      clave.startsWith("grabacion_pendiente:")
+        ? Promise.reject(new Error("Postgres caído"))
+        : original(clave, ...resto)
+    );
+
+    try {
+      const result = await comprobar("v3:ctrl_1");
+
+      expect(result.result.available).toBe(true);
+      expect(result.result.pregunta_de_grabacion).toBe(PREGUNTA);
+    } finally {
+      almacenEnMemoria.guardarClave.mockImplementation(original);
+    }
   });
 
   it("si no toca (ya se preguntó, ya graba o ya lo decidió), la disponibilidad va sola", async () => {
@@ -3749,11 +3911,14 @@ describe("executeVoiceTool: la pregunta de grabar", () => {
       },
     } as any);
 
-    const result = await comprobar("v3:ctrl_1");
+    mockedGuardar.mockResolvedValue("aceptada");
 
-    expect(result.result).toMatchObject({ code: "CAPACITY_REACHED" });
-    expect(result.result.suggestedNextSlot).toBeTruthy();
-    expect(result.result.pregunta_de_grabacion).toBe(PREGUNTA);
+    const { pregunta, respuesta } = await preguntarYContestarA(4_000);
+
+    expect(pregunta.result.pregunta_de_grabacion).toBe(PREGUNTA);
+    expect(pregunta.result).not.toHaveProperty("suggestedNextSlot");
+    expect(respuesta.result).toMatchObject({ code: "CAPACITY_REACHED" });
+    expect(respuesta.result.suggestedNextSlot).toBeTruthy();
   });
 
   it("con un error o un «no» sin alternativa no se pregunta", async () => {
@@ -3885,8 +4050,8 @@ describe("executeVoiceTool notify_when_available", () => {
 
 // Tres niveles por profesional y servicio (17-09-2026). Cuando el cliente
 // pide por su nombre a alguien marcado "no sugerir", check_availability
-// devuelve una recomendación con su propio token y book_appointment frena
-// UNA vez hasta que el cliente acepte a la persona propuesta o insista.
+// devuelve solo la propuesta, con su propio token (03-11); el hueco de la
+// persona pedida llega con otra comprobación, si el cliente insiste.
 describe("executeVoiceTool — recomendación de profesional", () => {
 
   function draftsGuardados() {
@@ -3941,12 +4106,8 @@ describe("executeVoiceTool — recomendación de profesional", () => {
     },
   };
 
-  it("traduce la recomendación a algo que el agente pueda decir, con su token, y guarda la marca en el draft del pedido", async () => {
-    mockedCheckAvailability.mockResolvedValue(
-      disponibleConRecomendacion as any
-    );
-
-    const result = await executeVoiceTool({
+  const comprobarConMarta = (extra: Record<string, unknown> = {}) =>
+    executeVoiceTool({
       businessId: "business_123",
       toolName: "check_availability",
       callId: "call_123",
@@ -3955,70 +4116,72 @@ describe("executeVoiceTool — recomendación de profesional", () => {
         durationMinutes: 30,
         serviceIds: ["corte"],
         professionalId: "aprendiz",
+        ...extra,
       },
     });
 
-    expect(result.result.available).toBe(true);
-    expect(result.result.recommendation).toEqual({
-      professional: { id: "senior", name: "Laura" },
-      isSpecialist: true,
-      availabilityToken: expect.any(String),
-      instructions: expect.stringContaining("Propón UNA sola vez"),
-    });
-    expect(result.result.recommendation.instructions).toContain("Marta");
-    expect(result.result.recommendation.instructions).toContain(
-      "Laura es quien más hace este servicio"
+  it("propone solo a la recomendada, con su token: sin el porqué ni el hueco de la persona pedida", async () => {
+    mockedCheckAvailability.mockResolvedValue(
+      disponibleConRecomendacion as any
     );
-    // Los campos internos del ranking no llegan al LLM.
-    expect(result.result).not.toHaveProperty("recommendedProfessional");
-    expect(result.result).not.toHaveProperty("specialistIds");
 
+    const result = await comprobarConMarta();
+
+    expect(result.result).toEqual({
+      available: true,
+      cuando: expect.any(String),
+      recommendation: {
+        professional: { id: "senior", name: "Laura" },
+        availabilityToken: expect.any(String),
+      },
+      siguiente_paso: expect.stringContaining(
+        "«A esa hora te la puedo dejar con Laura. ¿Te parece bien?»"
+      ),
+    });
+    expect(result.result.siguiente_paso).toContain("Si prefiere a quien pidió");
+    expect(result.result.siguiente_paso).toContain("professionalConfirmed true");
+    expect(result.result.siguiente_paso).not.toMatch(/quien más hace|más indicada/);
+
+    // Un solo draft, el de Laura: con la persona pedida no hay token con el
+    // que reservar sin haberla propuesto antes.
     const drafts = draftsGuardados();
-    const delPedido = drafts.find(
-      (draft) => draft.token === result.result.availabilityToken
+    expect(drafts).toHaveLength(1);
+    expect(drafts[0]).toMatchObject({
+      token: result.result.recommendation.availabilityToken,
+      professionalId: "senior",
+      professionalRequested: true,
+    });
+  });
+
+  it("con professionalConfirmed tras la propuesta, da el hueco de la persona pedida sin volver a proponer", async () => {
+    mockedCheckAvailability.mockResolvedValue(
+      disponibleConRecomendacion as any
     );
-    const delRecomendado = drafts.find(
-      (draft) => draft.token === result.result.recommendation.availabilityToken
+
+    await comprobarConMarta();
+    const result = await comprobarConMarta({ professionalConfirmed: true });
+
+    expect(result.result.available).toBe(true);
+    expect(result.result).not.toHaveProperty("recommendation");
+    const delPedido = draftsGuardados().find(
+      (draft) => draft.token === result.result.availabilityToken
     );
     expect(delPedido).toMatchObject({
       professionalId: "aprendiz",
       professionalRequested: true,
-      recommendationOffered: {
-        professionalId: "senior",
-        professionalName: "Laura",
-        availabilityToken: delRecomendado?.token,
-      },
     });
-    // Quien acepta a Laura la quiere a ella: su token es filtro duro.
-    expect(delRecomendado).toMatchObject({
-      professionalId: "senior",
-      professionalRequested: true,
-    });
-    expect(delRecomendado).not.toHaveProperty("recommendationOffered");
   });
 
-  it("si el cliente ya insistió (professionalConfirmed), no vuelve a proponer a nadie", async () => {
+  it("professionalConfirmed sin haber propuesto antes en esta llamada no vale: propone primero", async () => {
     mockedCheckAvailability.mockResolvedValue(
       disponibleConRecomendacion as any
     );
+    vi.spyOn(console, "warn").mockImplementation(() => {});
 
-    const result = await executeVoiceTool({
-      businessId: "business_123",
-      toolName: "check_availability",
-      callId: "call_123",
-      params: {
-        startDateTime: "2026-08-25T17:00:00+02:00",
-        durationMinutes: 30,
-        serviceIds: ["corte"],
-        professionalId: "aprendiz",
-        professionalConfirmed: true,
-      },
-    });
+    const result = await comprobarConMarta({ professionalConfirmed: true });
 
-    expect(result.result.available).toBe(true);
-    expect(result.result).not.toHaveProperty("recommendation");
-    expect(draftsGuardados()).toHaveLength(1);
-    expect(draftsGuardados()[0]).not.toHaveProperty("recommendationOffered");
+    expect(result.result.recommendation.professional.name).toBe("Laura");
+    expect(result.result).not.toHaveProperty("availabilityToken");
   });
 
   it("también recomienda cuando la persona pedida está ocupada a esa hora", async () => {
@@ -4034,26 +4197,13 @@ describe("executeVoiceTool — recomendación de profesional", () => {
       },
     } as any);
 
-    const result = await executeVoiceTool({
-      businessId: "business_123",
-      toolName: "check_availability",
-      callId: "call_123",
-      params: {
-        startDateTime: "2026-08-25T17:00:00+02:00",
-        durationMinutes: 30,
-        serviceIds: ["corte"],
-        professionalId: "aprendiz",
-      },
-    });
+    const result = await comprobarConMarta();
 
-    expect(result.result.available).toBe(false);
     expect(result.result.recommendation.professional).toEqual({
       id: "senior",
       name: "Laura",
     });
-    expect(result.result.recommendation.instructions).toContain(
-      "Laura es la persona más indicada"
-    );
+    expect(result.result.siguiente_paso).toContain("con Laura");
   });
 
   it("sin profesional pedido, dice con quién queda la cita y si es especialista", async () => {
@@ -4093,7 +4243,7 @@ describe("executeVoiceTool — recomendación de profesional", () => {
     });
   });
 
-  it("book_appointment frena una vez si hubo recomendación y el cliente no ha insistido", async () => {
+  it("el token de la persona pedida (tras insistir) reserva con ella como filtro duro", async () => {
     await guardarDraft(
       "availability_draft:token-marta",
       JSON.stringify({
@@ -4104,49 +4254,6 @@ describe("executeVoiceTool — recomendación de profesional", () => {
         serviceIds: ["corte"],
         professionalId: "aprendiz",
         professionalRequested: true,
-        recommendationOffered: {
-          professionalId: "senior",
-          professionalName: "Laura",
-          availabilityToken: "token-laura",
-        },
-      })
-    );
-
-    const result = await executeVoiceTool({
-      businessId: "business_123",
-      toolName: "book_appointment",
-      callId: "call_123",
-      params: { clientName: "María", availabilityToken: "token-marta" },
-    });
-
-    expect(result.result).toMatchObject({
-      success: false,
-      code: "PROFESSIONAL_CONFIRMATION_REQUIRED",
-      recommendation: {
-        professional: { id: "senior", name: "Laura" },
-        availabilityToken: "token-laura",
-      },
-    });
-    expect(result.result.message).toContain("professionalConfirmed: true");
-    expect(mockedCheckAvailability).not.toHaveBeenCalled();
-  });
-
-  it("con professionalConfirmed reserva con la persona pedida como filtro duro", async () => {
-    await guardarDraft(
-      "availability_draft:token-marta",
-      JSON.stringify({
-        businessId: "business_123",
-        callId: "call_123",
-        startDateTime: "2026-08-25T17:00:00+02:00",
-        durationMinutes: 30,
-        serviceIds: ["corte"],
-        professionalId: "aprendiz",
-        professionalRequested: true,
-        recommendationOffered: {
-          professionalId: "senior",
-          professionalName: "Laura",
-          availabilityToken: "token-laura",
-        },
       })
     );
     mockedCheckAvailability.mockResolvedValue({
@@ -4159,22 +4266,18 @@ describe("executeVoiceTool — recomendación de profesional", () => {
       businessId: "business_123",
       toolName: "book_appointment",
       callId: "call_123",
-      params: {
-        clientName: "María",
-        availabilityToken: "token-marta",
-        professionalConfirmed: true,
-      },
+      params: { clientName: "María", availabilityToken: "token-marta" },
     });
 
-    // Ha pasado la puerta: la reserva sigue su curso normal (aquí se frena por
-    // el mock de disponibilidad, no por la recomendación).
-    expect(result.result.code).not.toBe("PROFESSIONAL_CONFIRMATION_REQUIRED");
+    // La reserva sigue su curso normal (aquí se frena por el mock de
+    // disponibilidad) con Marta como filtro.
+    expect(result.result.code).toBe("ALL_PROFESSIONALS_BUSY");
     expect(mockedCheckAvailability).toHaveBeenCalledWith(
       expect.objectContaining({ professionalId: "aprendiz" })
     );
   });
 
-  it("el token de la persona recomendada reserva sin frenar: el cliente la aceptó", async () => {
+  it("el token de la persona recomendada reserva con ella: el cliente la aceptó", async () => {
     await guardarDraft(
       "availability_draft:token-laura",
       JSON.stringify({
@@ -4200,7 +4303,7 @@ describe("executeVoiceTool — recomendación de profesional", () => {
       params: { clientName: "María", availabilityToken: "token-laura" },
     });
 
-    expect(result.result.code).not.toBe("PROFESSIONAL_CONFIRMATION_REQUIRED");
+    expect(result.result.code).toBe("ALL_PROFESSIONALS_BUSY");
     expect(mockedCheckAvailability).toHaveBeenCalledWith(
       expect.objectContaining({ professionalId: "senior" })
     );

@@ -21,6 +21,9 @@ import {
   type VariablesDeLaLlamada,
 } from "./seccionesDelPrompt.js";
 import { proximosDias } from "./proximosDias.js";
+import { telefonoParaDecir } from "./phone.js";
+import { cuandoParaDecir } from "./voiceDateTime.js";
+import { nombreParaElCliente } from "./nombreProfesional.js";
 
 /**
  * Lo que la recepcionista sabe de una llamada antes de descolgar
@@ -66,7 +69,7 @@ export async function resolverContextoDeLlamada(input: {
   const ahora = input.ahora ?? new Date();
   const telefono = telefonoDelCliente(input.telefono, business);
 
-  const [primeraLlamada, cliente, reserva] = await Promise.all([
+  const [primeraLlamada, cliente, reserva, proxima] = await Promise.all([
     // Los chats de WhatsApp son filas Call sintéticas: no cuentan.
     prisma.call.findFirst({
       where: { businessId: business.id, voiceProvider: { not: "whatsapp" } },
@@ -94,6 +97,29 @@ export async function resolverContextoDeLlamada(input: {
           select: { clientName: true, serviceIds: true },
         })
       : null,
+    // La que encontraría find_my_appointment (voiceTools/service.ts), con el
+    // mismo criterio: así «quiero cambiar mi cita» no espera a una tool.
+    telefono
+      ? prisma.booking.findFirst({
+          where: {
+            call: { businessId: business.id },
+            isCancelled: false,
+            programedAt: { gte: ahora },
+            OR: [
+              { clientPhone: telefono },
+              { clientPhone: null, call: { fromNumber: telefono } },
+            ],
+          },
+          orderBy: { programedAt: "asc" },
+          select: {
+            id: true,
+            programedAt: true,
+            serviceIds: true,
+            clientName: true,
+            professional: { select: { name: true } },
+          },
+        })
+      : null,
   ]);
 
   const servicios = reserva?.serviceIds.length
@@ -119,6 +145,14 @@ export async function resolverContextoDeLlamada(input: {
   const tipo: BusinessType = isBusinessType(business.businessType)
     ? business.businessType
     : "other";
+  const proximaCita = proxima
+    ? await describirProximaCita(proxima, {
+        timezone: business.timezone ?? "Europe/Madrid",
+        // Como el saludo: en los sectores con datoSensible, sin el servicio.
+        conServicio: !PERFILES_DE_SECTOR[tipo].datoSensible,
+        ahora,
+      })
+    : "";
   const grabar = estadoDeGrabacion(cliente?.grabacionAceptada) === "aceptada";
   // La llamada en curso aún no está guardada: sin ninguna anterior, es la
   // primera.
@@ -180,6 +214,46 @@ export async function resolverContextoDeLlamada(input: {
       // El bloque del prompt v2; v1 no lo usa y Telnyx lo ignora.
       contexto_cliente: contextoDelCliente(nombre, ultimoServicio),
       proximos_dias: proximosDias(ahora, business.timezone ?? "Europe/Madrid"),
+      telefono_para_decir: telefono ? (telefonoParaDecir(telefono) ?? "") : "",
+      proxima_cita: proximaCita,
     },
   };
+}
+
+/**
+ * `{{proxima_cita}}`: «mañana, martes, 10 de noviembre, a las cinco de la
+ * tarde: Corte, con Laura, a nombre de Marta (bookingId …)». El bookingId va
+ * para cambiarla o anularla sin find_my_appointment; cancel_appointment y
+ * check_availability vuelven a comprobar que es de quien llama.
+ */
+async function describirProximaCita(
+  cita: {
+    id: string;
+    programedAt: Date;
+    serviceIds: string[];
+    clientName: string | null;
+    professional: { name: string } | null;
+  },
+  opciones: { timezone: string; conServicio: boolean; ahora: Date }
+): Promise<string> {
+  const servicios =
+    opciones.conServicio && cita.serviceIds.length > 0
+      ? await prisma.service.findMany({
+          where: { id: { in: cita.serviceIds } },
+          select: { name: true },
+        })
+      : [];
+  const cuando = cuandoParaDecir(
+    cita.programedAt,
+    opciones.timezone,
+    opciones.ahora
+  );
+  const profesional = nombreParaElCliente(cita.professional?.name);
+  const nombre = cita.clientName?.trim();
+  const partes = [
+    servicios.map((servicio) => servicio.name).join(" y "),
+    profesional ? `con ${profesional}` : "",
+    nombre ? `a nombre de ${nombre}` : "",
+  ].filter(Boolean);
+  return `${cuando ?? ""}${partes.length ? `: ${partes.join(", ")}` : ""} (bookingId ${cita.id})`;
 }
