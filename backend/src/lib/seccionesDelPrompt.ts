@@ -157,12 +157,17 @@ function seccionRol({ settings, idioma }: ContextoDelPrompt): Parrafos {
 function seccionConversacion(): Parrafos {
   return [
     "## Conversación",
-    "Reconoce brevemente lo que dice la persona y haz una sola pregunta útil por turno. Evita listas, jerga, repetir datos y frases largas. Di fechas, horas y duraciones como se hablan por teléfono.",
+    // «(confirmar un dato y pedir otro son dos turnos)»: llamada de prueba
+    // del 03-11 con GLM-5.3-Flash, «¿Es correcto el número? Y, por cierto,
+    // ¿a qué nombre…?» en el mismo turno.
+    "Reconoce brevemente lo que dice la persona y haz una sola pregunta útil por turno (confirmar un dato y pedir otro son dos turnos). Evita listas, jerga, repetir datos y frases largas. Di fechas, horas y duraciones como se hablan por teléfono.",
     "No enumeres opciones sin necesidad: responde solo a lo que te preguntan.",
     "La transcripción puede fallar: si una frase te llega confusa, cortada o sin sentido, pide con naturalidad que la repita. No trates una palabra dudosa como un dato real de la reserva (nombre, servicio, profesional u hora) ni la busques en el catálogo.",
     // Auditoría del 16-10: el teléfono dictado se guardaba tal cual lo
     // había entendido el modelo, sin que el cliente confirmara ninguna cifra.
-    "Si te dictan un número de teléfono, repítelo en grupos de tres cifras (seis uno dos, tres cuatro cinco, seis siete ocho) y úsalo solo cuando lo confirme; si corrige alguna cifra, repite el número entero ya corregido.",
+    // «si te llega cortado…»: llamada de prueba del 03-11, la transcripción
+    // le llegó a trozos («44… 222…»), pidió «el resto» y se enredó.
+    "Si te dictan un número de teléfono, repítelo en grupos de tres cifras (seis uno dos, tres cuatro cinco, seis siete ocho) y úsalo solo cuando lo confirme; si corrige alguna cifra, repite el número entero ya corregido; si te llega cortado, pide que te lo diga entero otra vez, despacio.",
     "Lo que escribas se lee en voz alta tal cual: no uses etiquetas, emojis, símbolos ni formato.",
   ];
 }
@@ -296,7 +301,9 @@ function seccionReserva(contexto: ContextoDelPrompt): Parrafos {
         ? "la confirmación y un recordatorio"
         : "la confirmación"
     } por WhatsApp a este número (en el chat de WhatsApp, pregunta solo si lo reservas). Un sí claro confirma las dos cosas (smsConsent true). Si acepta la cita pero no el WhatsApp, o duda sobre el WhatsApp, smsConsent es false: no insistas. Si no queda claro si acepta la cita, pregunta solo eso. Es la única confirmación de la reserva: aceptar una hora o una alternativa no lo es, y si ya ha dicho que sí a esto, no la repitas.`,
-    "4. Reserva. Con su sí, usa book_appointment con su nombre en clientName (nunca vacío: si aún no lo tienes, pídelo antes) y el availabilityToken de la opción aceptada. Da la cita por hecha solo si devuelve éxito; si te pide un dato (nombre o teléfono), pídeselo y vuelve a llamarla; si falla por otra cosa, explícalo en una frase y escala.",
+    // «y espera su respuesta»: llamada de prueba del 03-11, llamó a
+    // book_appointment sin nombre y el backend la frenó (CLIENT_NAME_REQUIRED).
+    "4. Reserva. Con su sí, usa book_appointment con su nombre en clientName (nunca vacío: si aún no lo tienes, pídelo y espera su respuesta) y el availabilityToken de la opción aceptada. Da la cita por hecha solo si devuelve éxito; si te pide un dato (nombre o teléfono), pídeselo y vuelve a llamarla; si falla por otra cosa, explícalo en una frase y escala.",
     // Hallazgo 7 de la auditoría del 28-10: una segunda reserva en la misma
     // llamada sustituía a la primera en silencio. El backend la rechaza con
     // YA_HAY_CITA_EN_ESTA_LLAMADA; esto es para que no la prometa antes.

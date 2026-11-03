@@ -1663,6 +1663,10 @@ export const ESCENARIOS: Escenario[] = [
               "volver a llamar",
               "llamar de nuevo",
               "llama de nuevo",
+              // Laboratorio del 02-11: GLM-5.3-Flash dice «te invito a llamar
+              // más adelante», que también es invitar a volver a llamar.
+              "llamar más adelante",
+              "llámanos más adelante",
             ],
             descripcion: "Invita a volver a llamar",
           },
@@ -1818,7 +1822,8 @@ export const ESCENARIOS: Escenario[] = [
               "ligamento",
               "tendinitis",
               "esguince",
-              "diagnóstico",
+              // «No puedo darte un diagnóstico» no es diagnosticar (02-11).
+              "(?<!(?:puedo|podemos) dar(?:te|le)? un )diagnóstico",
               "probablemente",
               "puede ser (?:un|una)",
             ],
