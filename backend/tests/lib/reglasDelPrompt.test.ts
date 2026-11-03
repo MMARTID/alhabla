@@ -978,9 +978,9 @@ const REGLAS: readonly Regla[] = [
   {
     id: "proponer-recomendacion-una-vez",
     descripcion:
-      "Si check_availability recomienda a otra persona, la propone UNA sola vez; si el cliente insiste, reserva con professionalConfirmed true sin explicar nada.",
+      "Si check_availability recomienda a otra persona, la propone UNA sola vez; si el cliente insiste, vuelve a comprobar con professionalConfirmed true sin explicar nada.",
     origen:
-      "PR #65 (f7c6b31, 17-09): el backend frena la reserva con PROFESSIONAL_CONFIRMATION_REQUIRED si no se propuso.",
+      "PR #65 (f7c6b31, 17-09). Desde el 03-11 (E20) check_availability da solo la propuesta, sin el porqué ni el hueco de la persona pedida, que llega con professionalConfirmed y solo si la propuesta se hizo en esa llamada.",
     lugares: [
       {
         en: "prompt",
@@ -1000,12 +1000,12 @@ const REGLAS: readonly Regla[] = [
       },
       {
         en: "descripcionDeTool",
-        tool: "book_appointment",
-        texto: "la propusiste una vez",
+        tool: "check_availability",
+        texto: "la propusiste y el cliente prefiere a la persona que pidió",
       },
       {
         en: "guardaDelBackend",
-        simbolo: "PROFESSIONAL_CONFIRMATION_REQUIRED",
+        simbolo: "claveDeRecomendacionPropuesta",
         fichero: SERVICIO_DE_VOZ,
       },
     ],
@@ -1029,9 +1029,11 @@ const REGLAS: readonly Regla[] = [
         texto:
           "Nunca menciones niveles, categorías ni recomendaciones del sistema.",
       },
+      // Desde el 03-11 la respuesta de la recomendación no lleva el porqué:
+      // sin él delante no lo puede decir.
       {
         en: "guardaDelBackend",
-        simbolo: "instruccionesDeRecomendacion",
+        simbolo: "siguientePasoConRecomendacion",
         fichero: SERVICIO_DE_VOZ,
       },
     ],
@@ -1109,6 +1111,13 @@ const REGLAS: readonly Regla[] = [
         tool: "preferencia_de_grabacion",
         texto:
           "cuando conteste con claridad a la pregunta_de_grabacion que te dio check_availability",
+      },
+      // 03-11 (E8): lo comprobado espera a la respuesta, y una respuesta en
+      // el mismo turno que la pregunta no se guarda.
+      {
+        en: "guardaDelBackend",
+        simbolo: "GRABACION_SIN_RESPUESTA",
+        fichero: SERVICIO_DE_VOZ,
       },
     ],
   },

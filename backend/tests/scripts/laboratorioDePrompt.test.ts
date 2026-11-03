@@ -43,6 +43,7 @@ import {
   restableceElNegocio,
   resumirCelda,
   siguienteMensajeDelCliente,
+  esModeloNoDisponible,
   tablaDeComparacion,
   tablaMarkdown,
   telefonosDelTexto,
@@ -3207,6 +3208,46 @@ describe("ejecutarLaboratorio con el cliente reactivo", () => {
     const repeticion = resultado.informe!.repeticiones[0]!.resultados[0]!;
     expect(repeticion.terminoElCliente).toBe("tope");
     expect(repeticion.metricas.turnos).toBe(topeDeTurnos(guionDe("E1")));
+  });
+
+  it("reintenta el cliente simulado cuando su modelo no está disponible (10027)", async () => {
+    const noDisponible = new Error(
+      '422 {"errors":[{"code":"10027","title":"Unprocessable Entity","detail":"The requested model is currently unavailable."}]}'
+    );
+    const completarChat = vi
+      .fn()
+      .mockRejectedValueOnce(noDisponible)
+      .mockRejectedValueOnce(noDisponible)
+      .mockResolvedValue('{"mensaje":"Vale, gracias","fin":true}');
+    const adaptador = adaptadorConChat(() => "No la tenemos.", {
+      completarChat,
+    });
+    const { deps } = dependencias(adaptador);
+
+    const resultado = await ejecutarLaboratorio(
+      parsearArgumentos([
+        "--negocio",
+        "biz_1",
+        "--escenarios",
+        "E1",
+        "--n",
+        "1",
+      ]),
+      deps
+    );
+
+    expect(deps.dormir).toHaveBeenNthCalledWith(1, 15_000);
+    expect(deps.dormir).toHaveBeenNthCalledWith(2, 30_000);
+    expect(resultado.informe!.resumen[0]!.errores).toBe(0);
+  });
+
+  it("esModeloNoDisponible reconoce el 10027 de Telnyx y nada más", () => {
+    expect(
+      esModeloNoDisponible(
+        new Error("The requested model is currently unavailable.")
+      )
+    ).toBe(true);
+    expect(esModeloNoDisponible(new Error("modelo caído"))).toBe(false);
   });
 
   it("un fallo del LLM del cliente es un error de ejecución, no un fallo del prompt", async () => {

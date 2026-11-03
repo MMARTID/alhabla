@@ -273,7 +273,7 @@ export function buildTelnyxVoiceTools(
         professionalConfirmed: {
           type: "boolean",
           description:
-            "true SOLO si ya propusiste una vez a la persona que recomendó la herramienta y el cliente insistió en la que pidió por su nombre. Nunca lo envíes en la primera comprobación.",
+            "true SOLO si check_availability te devolvió una recommendation, la propusiste y el cliente prefiere a la persona que pidió por su nombre: entonces te da su hueco. Nunca en la primera comprobación.",
         },
         replacesBookingId: {
           type: "string",
@@ -306,11 +306,6 @@ export function buildTelnyxVoiceTools(
           type: "boolean",
           description:
             "true si el cliente dijo que sí a recibir la confirmación y un recordatorio por WhatsApp en este número; false si dijo que no, dudó o no se le preguntó.",
-        },
-        professionalConfirmed: {
-          type: "boolean",
-          description:
-            "true SOLO si check_availability devolvió una recomendación, la propusiste una vez y el cliente insistió en la persona que pidió. Sin esto, la reserva se frena hasta que lo hayas propuesto.",
         },
         phoneConfirmed: {
           type: "boolean",
