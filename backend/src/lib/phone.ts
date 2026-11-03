@@ -55,3 +55,54 @@ export function formatearTelefonoLegible(e164: string): string {
 export function esLineaDeClientesEspanola(e164: string): boolean {
   return /^\+34(?:6\d{8}|7[1-9]\d{7}|[89][1-8]\d{7})$/.test(e164);
 }
+
+const CIFRAS_HABLADAS = [
+  "cero",
+  "uno",
+  "dos",
+  "tres",
+  "cuatro",
+  "cinco",
+  "seis",
+  "siete",
+  "ocho",
+  "nueve",
+];
+
+/** «0199» → «cero uno nueve nueve». */
+function cifrasHabladas(cifras: string): string {
+  return [...cifras].map((cifra) => CIFRAS_HABLADAS[Number(cifra)]).join(" ");
+}
+
+/** Grupos de tres cifras; si sobra una, el último grupo lleva cuatro. */
+function enGruposDeTres(cifras: string): string[] {
+  const grupos = cifras.match(/\d{1,3}/g) ?? [];
+  if (grupos.length > 1 && grupos[grupos.length - 1].length === 1) {
+    const ultima = grupos.pop() as string;
+    grupos[grupos.length - 1] += ultima;
+  }
+  return grupos;
+}
+
+/**
+ * Un teléfono en E.164 como se le repite al cliente, cifra a cifra y en
+ * grupos de tres: «+34612345678» es «seis uno dos, tres cuatro cinco, seis
+ * siete ocho» (sin el prefijo de España) y «+12025550199», «más uno, dos
+ * cero dos, cinco cinco cinco, cero uno nueve nueve». book_appointment lo
+ * devuelve para que la recepcionista lo lea en vez de recordarlo: el
+ * laboratorio del 03-11 con GLM-5.3-Flash repitió «cero uno nueve» de un
+ * número acabado en 0199. null si no es E.164.
+ */
+export function telefonoParaDecir(e164: string): string | null {
+  if (!isValidE164Phone(e164)) return null;
+  const espanol = /^\+34(\d{9})$/.exec(e164);
+  if (espanol) {
+    return enGruposDeTres(espanol[1]).map(cifrasHabladas).join(", ");
+  }
+  // Norteamérica (+1): prefijo, 3, 3 y 4, como se dicta allí.
+  const norteamericano = /^\+1(\d{3})(\d{3})(\d{4})$/.exec(e164);
+  const grupos = norteamericano
+    ? ["1", ...norteamericano.slice(1)]
+    : enGruposDeTres(e164.slice(1));
+  return `más ${grupos.map(cifrasHabladas).join(", ")}`;
+}

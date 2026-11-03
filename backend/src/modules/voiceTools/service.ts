@@ -91,7 +91,11 @@ import {
 } from "../whatsapp/mensajesCliente.js";
 import { cancelarReserva } from "../bookings/cancelacion.js";
 import { listaDeEsperaDisponible } from "../whatsapp/service.js";
-import { isValidE164Phone, normalizarTelefono } from "../../lib/phone.js";
+import {
+  isValidE164Phone,
+  normalizarTelefono,
+  telefonoParaDecir,
+} from "../../lib/phone.js";
 import { procesarInformeFinal } from "../whatsapp/recados.js";
 import {
   servicioSuspendidoPorPago,
@@ -1962,6 +1966,7 @@ const RESERVA_QUE_SE_REINTENTA: ReadonlySet<string> = new Set([
   "CLIENT_NAME_REQUIRED",
   "CLIENT_PHONE_INVALID",
   "CLIENT_PHONE_REQUIRED",
+  "CLIENT_PHONE_CONFIRMATION_REQUIRED",
   "PROFESSIONAL_CONFIRMATION_REQUIRED",
   "AVAILABILITY_TOKEN_EXPIRED",
 ]);
@@ -2073,6 +2078,7 @@ async function reservarCita(
     availabilityToken?: string;
     smsConsent?: boolean;
     professionalConfirmed?: boolean;
+    phoneConfirmed?: boolean;
   };
   const clientName = rawParams.clientName;
   const clientEmail = rawParams.clientEmail;
@@ -2185,7 +2191,31 @@ async function reservarCita(
         success: false,
         code: "CLIENT_PHONE_INVALID",
         message:
-          "Ese teléfono no es válido. Pídeselo otra vez, repíteselo en grupos de tres cifras y, cuando lo confirme, vuelve a llamar a book_appointment con el mismo availabilityToken y el teléfono en clientPhone.",
+          "Ese teléfono no es válido. Pídeselo otra vez y vuelve a llamar a book_appointment con el mismo availabilityToken y el teléfono en clientPhone: te dirá cómo repetírselo.",
+      },
+    };
+  }
+
+  // Por voz, un teléfono dictado se confirma antes de reservar, y lo que se
+  // repite es lo que el backend entendió, no lo que recuerda el modelo: el
+  // laboratorio del 03-11 con GLM-5.3-Flash repitió «cero uno nueve» de un
+  // número acabado en 0199 (y reservó con el bueno). En el chat el número
+  // llega escrito: no hace falta. Al cambiar una cita (replacesBookingId)
+  // tampoco: el teléfono es el que ya se dio para ella.
+  if (
+    telefonoNormalizado &&
+    rawParams.phoneConfirmed !== true &&
+    !draft?.replacesBookingId &&
+    canalDeLaTool(callId) === "voice"
+  ) {
+    const paraDecir = telefonoParaDecir(telefonoNormalizado);
+    return {
+      success: true,
+      result: {
+        success: false,
+        code: "CLIENT_PHONE_CONFIRMATION_REQUIRED",
+        telefono_para_decir: paraDecir,
+        message: `Todavía no está reservada. Repítele el teléfono tal cual: «${paraDecir}». Si dice que sí, vuelve a llamar a book_appointment con lo mismo y phoneConfirmed: true. Si corrige alguna cifra, vuelve a llamarla con el número entero corregido, sin phoneConfirmed.`,
       },
     };
   }
@@ -2316,7 +2346,7 @@ async function reservarCita(
           success: false,
           code: "CLIENT_PHONE_REQUIRED",
           message:
-            "Llama con número oculto y la cita se quedaría sin teléfono de contacto. Pídeselo, repíteselo en grupos de tres cifras y, cuando lo confirme, vuelve a llamar a book_appointment con el mismo availabilityToken y el teléfono en clientPhone. Si no quiere darlo, vuelve a llamar sin él: la cita se guarda igual.",
+            "Llama con número oculto y la cita se quedaría sin teléfono de contacto. Pídeselo y, en cuanto te lo diga, vuelve a llamar a book_appointment con el mismo availabilityToken y el teléfono en clientPhone: te dirá cómo repetírselo. Si no quiere darlo, vuelve a llamar sin él: la cita se guarda igual.",
         },
       };
     }
@@ -3442,6 +3472,7 @@ const DATOS_QUE_SE_PIDEN_EN_LA_LLAMADA: ReadonlySet<string> = new Set([
   "CLIENT_NAME_REQUIRED",
   "CLIENT_PHONE_INVALID",
   "CLIENT_PHONE_REQUIRED",
+  "CLIENT_PHONE_CONFIRMATION_REQUIRED",
 ]);
 
 /**

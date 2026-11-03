@@ -1115,12 +1115,15 @@ export function evaluarComprobacion(
     }
     case "argumentoPatron": {
       const todas = llamadasDe(conversacion, [comprobacion.herramienta]);
-      const llamadas = comprobacion.soloLasQueLoTraen
+      const conElCampo = comprobacion.soloLasQueLoTraen
         ? todas.filter(
             (llamada) =>
               valorComoTexto(llamada.argumentos[comprobacion.campo]) !== ""
           )
         : todas;
+      const llamadas = comprobacion.soloLaUltima
+        ? conElCampo.slice(-1)
+        : conElCampo;
       if (comprobacion.soloLasQueLoTraen && llamadas.length === 0) {
         return resultado(
           false,
@@ -3583,21 +3586,35 @@ export function neutralizarTransferencia(
   };
 }
 
+/** Variables que cambian con cada llamada aunque el cliente sea el mismo
+ * (cada llamada de laboratorio llega de un número): no cuentan para las
+ * comunes y van solo en los metadata de cada conversación. */
+export const VARIABLES_DE_CADA_LLAMADA: readonly string[] = [
+  "telefono_para_decir",
+];
+
 /**
  * Las variables del prompt que comparten todas las llamadas (las del
  * assistant de prueba, que valen para todas sus conversaciones), undefined
- * si no hay ninguna con valor, o «distintas».
+ * si no hay ninguna con valor, o «distintas». Sin VARIABLES_DE_CADA_LLAMADA.
  */
 export function variablesComunes(
   contextos: ContextoDeLaLlamada[]
 ): Record<string, string> | undefined | "distintas" {
   const conValor = (variables: Record<string, string>) =>
     Object.values(variables).some((valor) => valor !== "");
+  const sinLasDeCadaLlamada = contextos.map((contexto) =>
+    Object.fromEntries(
+      Object.entries(contexto.variables).filter(
+        ([clave]) => !VARIABLES_DE_CADA_LLAMADA.includes(clave)
+      )
+    )
+  );
   const distintas = new Set(
-    contextos.map((contexto) => JSON.stringify(contexto.variables))
+    sinLasDeCadaLlamada.map((variables) => JSON.stringify(variables))
   );
   if (distintas.size > 1) return "distintas";
-  const unica = contextos[0]?.variables;
+  const unica = sinLasDeCadaLlamada[0];
   return unica && conValor(unica) ? unica : undefined;
 }
 

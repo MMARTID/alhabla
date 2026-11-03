@@ -1410,9 +1410,9 @@ const REGLAS: readonly Regla[] = [
   {
     id: "telefono-dictado-en-grupos-de-tres",
     descripcion:
-      "Un teléfono dictado se repite en grupos de tres cifras y se usa solo cuando el cliente lo confirma; si corrige una cifra, se repite el número entero.",
+      "Un teléfono dictado se repite en grupos de tres cifras y se usa solo cuando el cliente lo confirma; si corrige una cifra, se repite el número entero. El de la cita lo escribe el backend para decirlo y por voz no se reserva sin la confirmación.",
     origen:
-      "PR #312 (de12e69, auditoría del 16-10): se guardaba tal cual lo había entendido el modelo, sin que el cliente confirmara ninguna cifra.",
+      "PR #312 (de12e69, auditoría del 16-10): se guardaba tal cual lo había entendido el modelo, sin que el cliente confirmara ninguna cifra. Laboratorio del 03-11: GLM-5.3-Flash repitió de memoria «cero uno nueve» de un número acabado en 0199.",
     lugares: [
       {
         en: "prompt",
@@ -1422,12 +1422,70 @@ const REGLAS: readonly Regla[] = [
       {
         en: "prompt",
         seccion: "Conversación",
-        texto: "úsalo solo cuando lo confirme",
+        texto: "Úsalo solo cuando lo confirme",
+      },
+      {
+        en: "prompt",
+        seccion: "Conversación",
+        texto: "pásalo enseguida a book_appointment: te dirá cómo repetirlo",
       },
       {
         en: "descripcionDeTool",
         tool: "book_appointment",
-        texto: "tal como lo confirmó al repetírselo",
+        texto: "el cliente dijo que sí",
+      },
+      {
+        en: "respuestaDeTool",
+        tool: "book_appointment",
+        campo: "telefono_para_decir",
+      },
+      {
+        en: "guardaDelBackend",
+        simbolo: "CLIENT_PHONE_CONFIRMATION_REQUIRED",
+        fichero: "src/modules/voiceTools/service.ts",
+      },
+    ],
+  },
+  {
+    id: "proxima-cita-en-una-variable",
+    descripcion:
+      "La próxima cita de quien llama llega en {{proxima_cita}} con su bookingId: se nombra solo si pregunta por ella o quiere cambiarla o anularla, y entonces no hace falta find_my_appointment.",
+    origen:
+      "Variables del 03-11: la cita pendiente costaba una find_my_appointment antes de poder contestar.",
+    lugares: [
+      {
+        en: "prompt",
+        seccion: "Cliente",
+        texto: "Nómbrala solo si pregunta por ella o quiere cambiarla o anularla",
+      },
+      {
+        en: "prompt",
+        seccion: "Cita existente",
+        texto: "y no está en «Su próxima cita», usa find_my_appointment",
+      },
+      {
+        en: "guardaDelBackend",
+        simbolo: "describirProximaCita",
+        fichero: "src/lib/contextoDeLlamada.ts",
+      },
+    ],
+  },
+  {
+    id: "numero-de-quien-llama-para-decir",
+    descripcion:
+      "El número desde el que llama llega ya escrito para decirlo en {{telefono_para_decir}}: si lo dice, lo lee tal cual.",
+    origen:
+      "Variables del 03-11: recibía «+34…» y lo leía de memoria, el mismo fallo que E21.",
+    lugares: [
+      {
+        en: "prompt",
+        seccion: "Cliente",
+        texto: "Su número, para decirlo tal cual: {{telefono_para_decir}}.",
+      },
+      {
+        en: "guardaDelBackend",
+        simbolo: "telefonoParaDecir",
+        fichero: "src/lib/contextoDeLlamada.ts",
       },
     ],
   },

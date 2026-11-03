@@ -295,7 +295,7 @@ export function buildTelnyxVoiceTools(
         clientPhone: {
           type: "string",
           description:
-            "Teléfono de contacto solo si el cliente da uno distinto al número desde el que llama o book_appointment te lo pidió, tal como lo confirmó al repetírselo (opcional).",
+            "Teléfono de contacto solo si el cliente da uno distinto al número desde el que llama o book_appointment te lo pidió (opcional). Pásalo en cuanto lo dicte: si hay que confirmarlo, la respuesta te dice cómo repetírselo.",
         },
         availabilityToken: {
           type: "string",
@@ -311,6 +311,11 @@ export function buildTelnyxVoiceTools(
           type: "boolean",
           description:
             "true SOLO si check_availability devolvió una recomendación, la propusiste una vez y el cliente insistió en la persona que pidió. Sin esto, la reserva se frena hasta que lo hayas propuesto.",
+        },
+        phoneConfirmed: {
+          type: "boolean",
+          description:
+            "true SOLO si book_appointment respondió CLIENT_PHONE_CONFIRMATION_REQUIRED, le repetiste ese teléfono tal como venía y el cliente dijo que sí.",
         },
       },
       required: ["clientName", "availabilityToken"],

@@ -1067,6 +1067,34 @@ describe("evaluarComprobacion", () => {
     expect(evaluar(corregido, reserva([undefined]))).toBe(false);
   });
 
+  it("argumentoPatron con soloLaUltima: el teléfono mal dictado que solo se confirmó no cuenta (E21)", () => {
+    const corregido: Comprobacion = {
+      tipo: "argumentoPatron",
+      herramienta: "book_appointment",
+      campo: "clientPhone",
+      patron: "0199$",
+      debeCoincidir: true,
+      soloLasQueLoTraen: true,
+      soloLaUltima: true,
+      descripcion: "x",
+    };
+    const reserva = (telefonos: string[]) =>
+      conversacion(
+        ["a"],
+        telefonos.map((clientPhone) => ({
+          nombre: "book_appointment",
+          turno: 1,
+          argumentos: { clientPhone },
+        }))
+      );
+    expect(
+      evaluar(corregido, reserva(["+12025550198", "+12025550199", "+12025550199"]))
+    ).toBe(true);
+    expect(evaluar(corregido, reserva(["+12025550199", "+12025550198"]))).toBe(
+      false
+    );
+  });
+
   it("argumentoPatron: todas las llamadas, y sin llamadas se cumple", () => {
     const utc = conversacion(
       ["a"],
@@ -3654,6 +3682,16 @@ describe("variablesComunes", () => {
     expect(variablesComunes([con(""), con("")])).toBeUndefined();
     expect(variablesComunes([])).toBeUndefined();
     expect(variablesComunes([con("Marta"), con("")])).toBe("distintas");
+  });
+
+  it("el número de cada llamada no las hace distintas ni va en las comunes", () => {
+    const desde = (telefono: string) => ({
+      saludo: "s",
+      variables: { ...con("Marta").variables, telefono_para_decir: telefono },
+    });
+    expect(
+      variablesComunes([desde("seis uno dos"), desde("seis uno tres")])
+    ).toEqual({ nombre_cliente: "Marta", ultimo_servicio: "Corte" });
   });
 });
 

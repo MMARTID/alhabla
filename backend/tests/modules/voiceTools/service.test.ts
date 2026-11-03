@@ -545,6 +545,7 @@ describe("executeVoiceTool book_appointment — vinculación a la llamada correc
           durationMinutes: 60,
           professionalId: "professional_123",
           clientPhone: "+34611222333",
+          phoneConfirmed: true,
         },
       })
     );
@@ -814,7 +815,7 @@ describe("executeVoiceTool — catálogo y token de disponibilidad", () => {
       },
     });
 
-    expect(result.result.cuando).toMatch(/martes, 25 de agosto, a las 17:00$/);
+    expect(result.result.cuando).toMatch(/martes, 25 de agosto, a las cinco de la tarde$/);
   });
 
   it("rechaza con un error explícito un serviceId que no existe en el negocio (el LLM puede corromper IDs al copiarlos)", async () => {
@@ -1276,10 +1277,10 @@ describe("executeVoiceTool check_availability — restricciones de reserva del n
 
     expect(result.result.suggestedNextSlot).toMatchObject({
       startDateTime: "2026-08-28T10:00:00+02:00",
-      cuando: "viernes, 28 de agosto, a las 10:00",
+      cuando: "viernes, 28 de agosto, a las diez de la mañana",
       availabilityToken: expect.any(String),
     });
-    expect(result.result.cuando).toBe("pasado mañana, jueves, 27 de agosto, a las 20:00");
+    expect(result.result.cuando).toBe("pasado mañana, jueves, 27 de agosto, a las ocho de la tarde");
     expect(draftsGuardados()).toHaveLength(1);
   });
 });
@@ -3197,7 +3198,10 @@ describe("executeVoiceTool book_appointment — teléfono del cliente", () => {
   }
 
   it("guarda en E.164 el teléfono que dicta el cliente", async () => {
-    const result = await reservarCon({ clientPhone: "612 34 56 78" });
+    const result = await reservarCon({
+      clientPhone: "612 34 56 78",
+      phoneConfirmed: true,
+    });
 
     expect(result.result.success).toBe(true);
     expect(mockedBookAppointment).toHaveBeenCalledWith(
@@ -3212,7 +3216,10 @@ describe("executeVoiceTool book_appointment — teléfono del cliente", () => {
   });
 
   it("si dicta el mismo número desde el que llama, la reserva guarda null", async () => {
-    const result = await reservarCon({ clientPhone: "0034 600 999 888" });
+    const result = await reservarCon({
+      clientPhone: "0034 600 999 888",
+      phoneConfirmed: true,
+    });
 
     expect(result.result.success).toBe(true);
     expect(mockedBookAppointment).toHaveBeenCalledWith(
@@ -3222,6 +3229,44 @@ describe("executeVoiceTool book_appointment — teléfono del cliente", () => {
       expect.objectContaining({
         create: expect.objectContaining({ clientPhone: undefined }),
       })
+    );
+  });
+
+  // Laboratorio del 03-11: GLM-5.3-Flash repitió de memoria «cero uno
+  // nueve» de un número acabado en 0199. Ahora repite lo que entendió el
+  // backend y solo se reserva cuando el cliente dice que sí.
+  it("por voz, un teléfono dictado se confirma antes de reservar, con el número escrito para decirlo", async () => {
+    const result = await reservarCon({ clientPhone: "612 34 56 78" });
+
+    expect(result.result).toMatchObject({
+      success: false,
+      code: "CLIENT_PHONE_CONFIRMATION_REQUIRED",
+      telefono_para_decir: "seis uno dos, tres cuatro cinco, seis siete ocho",
+    });
+    expect(result.result.message).toContain(
+      "«seis uno dos, tres cuatro cinco, seis siete ocho»"
+    );
+    expect(result.result.message).toContain("phoneConfirmed: true");
+    expect(mockedBookAppointment).not.toHaveBeenCalled();
+    expect(mockedBookingUpsert).not.toHaveBeenCalled();
+    expect(mockedGuardarIntento).not.toHaveBeenCalled();
+  });
+
+  it("en el chat de WhatsApp el teléfono llega escrito: reserva sin pedir confirmación", async () => {
+    mockedCallFindUnique.mockResolvedValue({
+      id: "call_row_chat",
+      fromNumber: "+34600999888",
+      businessId: "business_123",
+      startedAt: new Date(),
+    } as any);
+    const result = await reservarCon(
+      { clientPhone: "612 34 56 78" },
+      "whatsapp:chat:conversacion_1"
+    );
+
+    expect(result.result.success).toBe(true);
+    expect(mockedBookAppointment).toHaveBeenCalledWith(
+      expect.objectContaining({ clientPhone: "+34612345678" })
     );
   });
 
@@ -3235,7 +3280,7 @@ describe("executeVoiceTool book_appointment — teléfono del cliente", () => {
         success: false,
         code: "CLIENT_PHONE_INVALID",
       });
-      expect(result.result.message).toContain("grupos de tres");
+      expect(result.result.message).toContain("te dirá cómo repetírselo");
       expect(mockedBookAppointment).not.toHaveBeenCalled();
       expect(mockedBookingUpsert).not.toHaveBeenCalled();
       expect(mockedGuardarIntento).not.toHaveBeenCalled();
@@ -3276,7 +3321,10 @@ describe("executeVoiceTool book_appointment — teléfono del cliente", () => {
     });
 
     it("con el teléfono que dicta, reserva a la primera con ese teléfono", async () => {
-      const result = await reservarCon({ clientPhone: "612345678" });
+      const result = await reservarCon({
+        clientPhone: "612345678",
+        phoneConfirmed: true,
+      });
 
       expect(result.result.success).toBe(true);
       expect(mockedBookAppointment).toHaveBeenCalledWith(
