@@ -1,6 +1,10 @@
 import { describe, it, expect, vi } from "vitest";
 import {
+  DOLARES_POR_CONVERSACION,
   ErrorDeUso,
+  PRESUPUESTO_POR_DEFECTO_EUR,
+  crearFrenoDelPresupuesto,
+  exigirPresupuesto,
   MODELO_DEL_CLIENTE,
   MODELO_DEL_ASSISTANT,
   MODELO_DEL_CLIENTE_ALTERNATIVO,
@@ -4085,5 +4089,151 @@ describe("marcadorParcial", () => {
     ]);
 
     expect(marcador).toBe("control 1/2 (50 %) · json 1/1 (100 %) · 1 error");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Presupuesto (03-11: ninguna tanda puede costar más de 4 € en Telnyx)
+// ---------------------------------------------------------------------------
+
+describe("presupuesto de la tanda", () => {
+  it("--presupuesto: 4 € por defecto, admite la coma y rechaza lo que no es un importe", () => {
+    expect(opciones().presupuestoEur).toBe(PRESUPUESTO_POR_DEFECTO_EUR);
+    expect(opciones(["--presupuesto", "2,5"]).presupuestoEur).toBe(2.5);
+    for (const malo of ["0", "-1", "abc", "60"]) {
+      expect(() => opciones(["--presupuesto", malo])).toThrow(ErrorDeUso);
+    }
+  });
+
+  it("no deja empezar una tanda cuya estimación pasa del presupuesto", () => {
+    const caben = Math.floor(4 / DOLARES_POR_CONVERSACION);
+    expect(() => exigirPresupuesto(caben, 4)).not.toThrow();
+    expect(() => exigirPresupuesto(caben + 1, 4)).toThrow(/--presupuesto/);
+  });
+
+  it("una tanda que no cabe falla antes de crear ningún assistant", async () => {
+    const adaptador = adaptadorFalso();
+    const { deps } = dependencias(adaptador);
+
+    await expect(
+      ejecutarLaboratorio(
+        opciones(["--escenarios", "E1", "--n", "5", "--presupuesto", "0,1"]),
+        deps
+      )
+    ).rejects.toThrow(/presupuesto es 0,10 €/);
+    expect(adaptador.createAssistant).not.toHaveBeenCalled();
+  });
+
+  it("el freno lee el gasto como mucho una vez por minuto, desde la hora en punto, y para al llegar al tope", async () => {
+    let ms = Date.parse("2026-11-03T15:20:00Z");
+    const gastos = [10, 12, 14.5];
+    const gastoDesde = vi.fn(async (hora: Date) => {
+      expect(hora.toISOString()).toBe("2026-11-03T15:00:00.000Z");
+      return gastos.shift()!;
+    });
+    const avisos: string[] = [];
+    const freno = await crearFrenoDelPresupuesto({
+      presupuestoEur: 4,
+      inicio: new Date(ms),
+      ahora: () => new Date(ms),
+      gastoDesde,
+      log: () => {},
+      avisos,
+    });
+
+    expect(await freno.puedeSeguir()).toBe(true);
+    expect(gastoDesde).toHaveBeenCalledTimes(1);
+    ms += 61_000;
+    expect(await freno.puedeSeguir()).toBe(true); // lleva 2 $
+    ms += 30_000;
+    expect(await freno.puedeSeguir()).toBe(true); // no vuelve a leer
+    expect(gastoDesde).toHaveBeenCalledTimes(2);
+    ms += 31_000;
+    expect(await freno.puedeSeguir()).toBe(false); // lleva 4,5 $
+    expect(freno.parado).toBe(true);
+    expect(avisos.join("\n")).toMatch(/Presupuesto agotado: Telnyx lleva 4,50 €/);
+  });
+
+  it("si no se puede leer el gasto, sigue con la estimación previa y lo avisa", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const avisos: string[] = [];
+    const freno = await crearFrenoDelPresupuesto({
+      presupuestoEur: 4,
+      inicio: new Date(),
+      ahora: () => new Date(),
+      gastoDesde: async () => {
+        throw new Error("Telnyx 401");
+      },
+      log: () => {},
+      avisos,
+    });
+
+    expect(await freno.puedeSeguir()).toBe(true);
+    expect(await freno.gastado()).toBeNull();
+    expect(avisos.join("\n")).toMatch(/solo se controla con la estimación previa/);
+  });
+
+  it("en la tanda, al agotarse no empieza más conversaciones y el informe dice cuántas quedaron", async () => {
+    let ms = Date.parse("2026-11-03T15:20:00Z");
+    let gasto = 0;
+    const adaptador = adaptadorFalso();
+    const { deps, escritos } = dependencias(adaptador, {
+      // Cada vez que se pregunta la hora ha pasado un minuto, y cada lectura
+      // del gasto suma 1,5 $.
+      ahora: () => new Date((ms += 61_000)),
+      gastoEnTelnyxDesde: vi.fn(async () => (gasto += 1.5)),
+    });
+
+    const resultado = await ejecutarLaboratorio(
+      opciones(["--escenarios", "E1", "--n", "6", "--paralelo", "1"]),
+      deps
+    );
+
+    const meta = resultado.informe!.meta;
+    expect(meta.coste).toMatchObject({
+      presupuestoEur: 4,
+      sinCorrerPorPresupuesto: 4,
+      realUsd: expect.any(Number),
+    });
+    expect(meta.avisos.join("\n")).toMatch(
+      /4 conversaciones sin correr por el presupuesto/
+    );
+    const markdown = escritos.find((e) => e.ruta.endsWith("informe.md"))!;
+    expect(markdown.contenido).toMatch(/Coste: .* según Telnyx .*4 sin correr por el presupuesto/);
+  });
+
+  it("crea los assistants con el grupo de insights vacío del laboratorio", async () => {
+    const adaptador = adaptadorFalso();
+    const { deps } = dependencias(adaptador, {
+      grupoDeInsightsDelLaboratorio: vi.fn(async () => "grupo-lab"),
+    });
+
+    await ejecutarLaboratorio(opciones(["--escenarios", "E1", "--n", "1"]), deps);
+
+    expect(adaptador.createAssistant).toHaveBeenCalledWith(
+      expect.objectContaining({ insightGroupId: "grupo-lab" })
+    );
+  });
+
+  it("si no hay grupo de insights, crea los assistants igual y lo avisa", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const adaptador = adaptadorFalso();
+    const { deps } = dependencias(adaptador, {
+      grupoDeInsightsDelLaboratorio: vi.fn(async () => {
+        throw new Error("Telnyx 500");
+      }),
+    });
+
+    const resultado = await ejecutarLaboratorio(
+      opciones(["--escenarios", "E1", "--n", "1"]),
+      deps
+    );
+
+    expect(adaptador.createAssistant).toHaveBeenCalledWith(
+      expect.not.objectContaining({ insightGroupId: expect.anything() })
+    );
+    expect(resultado.informe!.meta.avisos.join("\n")).toMatch(
+      /grupo de insights/
+    );
   });
 });
