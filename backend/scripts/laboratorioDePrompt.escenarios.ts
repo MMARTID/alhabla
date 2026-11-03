@@ -1094,21 +1094,17 @@ export const ESCENARIOS: Escenario[] = [
         requiere:
           "Una llamada antigua cuyo número tiene una cita futura en el negocio.",
         comprobaciones: [
+          // Desde el 03-11 la cita llega en {{proxima_cita}} con su
+          // bookingId: no hace falta find_my_appointment.
           {
-            tipo: "llama",
+            tipo: "noLlama",
             herramientas: ["find_my_appointment"],
-            turno: 1,
-            descripcion: "Empieza por find_my_appointment",
+            descripcion: "Usa la cita de {{proxima_cita}}, sin find_my_appointment",
           },
           {
             tipo: "orden",
-            herramientas: [
-              "find_my_appointment",
-              "check_availability",
-              "book_appointment",
-            ],
-            descripcion:
-              "find, check_availability con la cita a cambiar y book",
+            herramientas: ["check_availability", "book_appointment"],
+            descripcion: "check_availability con la cita a cambiar y book",
           },
           {
             tipo: "argumentoPatron",
@@ -1151,11 +1147,12 @@ export const ESCENARIOS: Escenario[] = [
         requiere:
           "Una llamada antigua cuyo número tiene una cita futura en el negocio.",
         comprobaciones: [
+          // Desde el 03-11 la cita llega en {{proxima_cita}} con su
+          // bookingId: no hace falta find_my_appointment.
           {
-            tipo: "llama",
+            tipo: "noLlama",
             herramientas: ["find_my_appointment"],
-            turno: 1,
-            descripcion: "Busca la cita primero",
+            descripcion: "Usa la cita de {{proxima_cita}}, sin find_my_appointment",
           },
           {
             tipo: "noLlama",
@@ -1168,8 +1165,7 @@ export const ESCENARIOS: Escenario[] = [
             herramientas: ["cancel_appointment"],
             minimo: 1,
             maximo: 1,
-            despuesDe: ["find_my_appointment"],
-            descripcion: "Anula una sola vez, tras buscar la cita y el sí",
+            descripcion: "Anula una sola vez, tras el sí",
           },
         ],
         rubrica: [
