@@ -70,6 +70,20 @@ export async function createTestCall(
   });
 }
 
+/** Una llamada en la que ya se preguntó por la grabación: check_availability
+ * devuelve el hueco tal cual. Sin esto, la primera comprobación de la
+ * llamada trae solo la pregunta y lo comprobado espera a
+ * preferencia_de_grabacion (conPreguntaDeGrabacion, desde el 03-11). */
+export function createTestCallYaPreguntada(
+  businessId: string,
+  overrides: Partial<Call> = {}
+): Promise<Call> {
+  return createTestCall(businessId, {
+    grabacionPreguntadaAt: new Date(),
+    ...overrides,
+  });
+}
+
 export async function createTestProfessional(
   businessId: string,
   name = "Profesional de prueba"
