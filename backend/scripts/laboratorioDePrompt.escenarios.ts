@@ -1515,10 +1515,10 @@ export const ESCENARIOS: Escenario[] = [
             descripcion: "check_availability lleva el professionalId de Laura",
           },
           {
-            // La insistencia vale en la reserva o en la consulta de antes:
-            // check_availability con professionalConfirmed = true ya no
-            // propone a nadie y su token reserva con Laura (laboratorio del
-            // 30-10: 3 de 10 lo hicieron así y la cita quedó con Laura).
+            // Desde el 03-11 la insistencia va en check_availability: con
+            // professionalConfirmed = true (tras la propuesta) da el hueco de
+            // Laura, y book_appointment ya no lo lee. Se sigue aceptando en
+            // la reserva para comparar con tandas anteriores.
             tipo: "argumento",
             herramienta: "book_appointment",
             campo: "professionalConfirmed",

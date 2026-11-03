@@ -219,7 +219,9 @@ function seccionGrabacion(): Parrafos {
     // nombre, y guardaba un «no».
     "## Grabación",
     "La transcripción se guarda siempre; el audio, solo si quien llama lo acepta. No preguntes nunca por tu cuenta si puedes grabar.",
-    "Si la respuesta de check_availability trae pregunta_de_grabacion, no contestes todavía a lo que te pidió: di solo esa pregunta, en el idioma de la conversación, y espera. Si dice que sí (sí, vale, claro, de acuerdo), llama a preferencia_de_grabacion con acepta true; si dice que no, con acepta false; si su respuesta no es clara, no la llames. Después contesta a lo que había pedido con lo que te dio la herramienta.",
+    // Desde el 03-11 check_availability no da lo comprobado junto a la
+    // pregunta: lo devuelve preferencia_de_grabacion con la respuesta (E8).
+    "Si la respuesta de check_availability trae pregunta_de_grabacion, no contestes todavía a lo que te pidió: di solo esa pregunta, en el idioma de la conversación, y espera. Si dice que sí (sí, vale, claro, de acuerdo), llama a preferencia_de_grabacion con acepta true; si dice que no, con acepta false: te devuelve lo que había pedido, para contestarle. Si su respuesta no es clara, no la llames y vuelve a llamar a check_availability.",
     "Si en cualquier momento dice con sus palabras que no quiere que se grabe, llama a preferencia_de_grabacion con acepta false en ese mismo turno y dile en una frase que de acuerdo. Fuera de esos dos casos (contestar a pregunta_de_grabacion o pedir que no se grabe) no uses preferencia_de_grabacion ni hables de grabar. Si pregunta si le estás grabando: solo si el saludo lo dijo o si lo ha aceptado en esta llamada.",
     "Si pregunta qué se hace con sus datos, dile que {{nombre_negocio}} los usa solo para gestionar sus citas y que puede pedirle que se los enseñe o los borre.",
   ];
@@ -343,7 +345,9 @@ function seccionProfesionales(): Parrafos {
     // pelo (llamadas de prueba del 14-10).
     "Envía professionalId a check_availability solo si el cliente ha pedido a alguien por su nombre. Si no lo ha nombrado, no elijas tú: la herramienta devuelve en assignedProfessional con quién queda la cita. Si isSpecialist es true, al confirmar puedes decir en positivo que esa persona es especialista en el servicio que ha pedido, nombrándolo como en el catálogo; si no, no hables de especialidades.",
     "Si el cliente pide a alguien por su nombre y la herramienta no devuelve recommendation, reserva con esa persona sin ningún comentario sobre ella.",
-    "Si check_availability devuelve recommendation, sigue sus instructions: propón UNA sola vez, en positivo, reservar con la persona recomendada; si el cliente acepta, usa el availabilityToken de la recomendación; si insiste en quien pidió, reserva con el availabilityToken principal y professionalConfirmed: true, sin volver a proponer ni explicar nada. Si book_appointment responde PROFESSIONAL_CONFIRMATION_REQUIRED, haz exactamente eso.",
+    // Desde el 03-11 check_availability da solo la propuesta, sin el porqué
+    // ni el hueco de la persona pedida: ese llega con professionalConfirmed.
+    "Si check_availability devuelve recommendation, propón UNA sola vez, en positivo, reservar con la persona recomendada, como dice su siguiente_paso; si el cliente acepta, usa el availabilityToken de la recomendación; si insiste en quien pidió, vuelve a llamar a check_availability con professionalConfirmed: true, sin volver a proponer ni explicar nada.",
     "Nunca digas ni insinúes que un profesional no hace un servicio, no lo domina o no se le da bien. Nunca menciones niveles, categorías ni recomendaciones del sistema.",
   ];
 }

@@ -454,7 +454,7 @@ exports[`payloads de asistentes (instantáneas) > assistant de la recepcionista,
               "type": "number",
             },
             "professionalConfirmed": {
-              "description": "true SOLO si ya propusiste una vez a la persona que recomendó la herramienta y el cliente insistió en la que pidió por su nombre. Nunca lo envíes en la primera comprobación.",
+              "description": "true SOLO si check_availability te devolvió una recommendation, la propusiste y el cliente prefiere a la persona que pidió por su nombre: entonces te da su hueco. Nunca en la primera comprobación.",
               "type": "boolean",
             },
             "professionalId": {
@@ -515,10 +515,6 @@ exports[`payloads de asistentes (instantáneas) > assistant de la recepcionista,
             },
             "phoneConfirmed": {
               "description": "true SOLO si book_appointment respondió CLIENT_PHONE_CONFIRMATION_REQUIRED, le repetiste ese teléfono tal como venía y el cliente dijo que sí.",
-              "type": "boolean",
-            },
-            "professionalConfirmed": {
-              "description": "true SOLO si check_availability devolvió una recomendación, la propusiste una vez y el cliente insistió en la persona que pidió. Sin esto, la reserva se frena hasta que lo hayas propuesto.",
               "type": "boolean",
             },
             "smsConsent": {
@@ -1263,7 +1259,7 @@ Si te escriben en catalán, gallego, euskera o inglés, responde en ese idioma; 
 exports[`payloads de asistentes (instantáneas) > el JSON enviado es idéntico byte a byte (hash) 1`] = `
 {
   "gestor": "e98c3bfa972a5bd367381ff26a58c6d2b9ee626c5ac52e24ac7c18fe833f1d96",
-  "recepcionista": "6fddb831fcfbb433eb1413acd3abc4fce4fac3d8e6f54b215f38e5e924deaab9",
+  "recepcionista": "7e5cb80b123685fd77499dd80798884e87d95aa0635656c3ad7570890d399659",
 }
 `;
 
@@ -1299,7 +1295,7 @@ exports[`payloads de asistentes (instantáneas) > tools de voz de la recepcionis
         "type": "number",
       },
       "professionalConfirmed": {
-        "description": "true SOLO si ya propusiste una vez a la persona que recomendó la herramienta y el cliente insistió en la que pidió por su nombre. Nunca lo envíes en la primera comprobación.",
+        "description": "true SOLO si check_availability te devolvió una recommendation, la propusiste y el cliente prefiere a la persona que pidió por su nombre: entonces te da su hueco. Nunca en la primera comprobación.",
         "type": "boolean",
       },
       "professionalId": {
@@ -1354,10 +1350,6 @@ exports[`payloads de asistentes (instantáneas) > tools de voz de la recepcionis
       },
       "phoneConfirmed": {
         "description": "true SOLO si book_appointment respondió CLIENT_PHONE_CONFIRMATION_REQUIRED, le repetiste ese teléfono tal como venía y el cliente dijo que sí.",
-        "type": "boolean",
-      },
-      "professionalConfirmed": {
-        "description": "true SOLO si check_availability devolvió una recomendación, la propusiste una vez y el cliente insistió en la persona que pidió. Sin esto, la reserva se frena hasta que lo hayas propuesto.",
         "type": "boolean",
       },
       "smsConsent": {
