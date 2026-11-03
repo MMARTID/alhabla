@@ -149,6 +149,39 @@ const CASOS: Array<[string, Parameters<typeof buildManagedAgentPrompt>[0]]> = [
       settings: DEFAULT_AGENT_SETTINGS,
     },
   ],
+  // La versión escrita desde cero el 03-11 (lib/seccionesDelPromptV3.ts):
+  // la típica y la que lleva todo lo condicional.
+  [
+    "v3: peluquería por defecto",
+    {
+      businessName: "Peluquería Ana",
+      businessType: "peluqueria",
+      settings: { ...DEFAULT_AGENT_SETTINGS, versionDelPrompt: "v3" },
+    },
+  ],
+  [
+    "v3: fisioterapia con todo activo y un solo idioma",
+    {
+      businessName: "Fisio Centro",
+      businessDetails: "Aceptamos tarjeta. Primera visita: 50 €.",
+      businessType: "fisioterapia",
+      settings: {
+        ...DEFAULT_AGENT_SETTINGS,
+        versionDelPrompt: "v3",
+        darPrecios: "nunca",
+        escalation: "request_callback",
+        responseStyle: "concise",
+      },
+      timezone: "Atlantic/Canary",
+      minAdvanceBookingMinutes: 120,
+      maxAppointmentDurationMinutes: 90,
+      listaDeEspera: false,
+      recordatorioPorWhatsapp: false,
+      ocultarNumeroDelNegocio: true,
+      transferenciaAlDueno: transferencia("siempre"),
+      idiomas: ["es-ES"],
+    },
+  ],
 ];
 
 describe("prompt gestionado (instantáneas)", () => {

@@ -2,6 +2,7 @@ import type { BusinessType } from "./businessType.js";
 import { PERFILES_DE_SECTOR } from "./sectores/perfiles.js";
 import type { TransferenciaAlDueno } from "./transferenciaAlDueno.js";
 import type { AgentSettings, VersionDelPrompt } from "./managedAgentPrompt.js";
+import { SECCIONES_DEL_PROMPT_V3 } from "./seccionesDelPromptV3.js";
 
 /**
  * Las secciones del prompt gestionado de la recepcionista: una función por
@@ -520,6 +521,7 @@ export const SECCIONES_DEL_PROMPT: readonly Seccion[] = [
  * (agentSettings.versionDelPrompt). */
 const SECCIONES_POR_VERSION: Record<VersionDelPrompt, readonly Seccion[]> = {
   v1: SECCIONES_DEL_PROMPT,
+  v3: SECCIONES_DEL_PROMPT_V3,
 };
 
 /** Cómo se escribe el prompt. `json` (el de producción desde el 2026-11-02)

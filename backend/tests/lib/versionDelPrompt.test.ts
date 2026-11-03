@@ -10,6 +10,7 @@ import {
   componerPrompt,
   SECCIONES_DEL_PROMPT,
 } from "../../src/lib/seccionesDelPrompt.js";
+import { SECCIONES_DEL_PROMPT_V3 } from "../../src/lib/seccionesDelPromptV3.js";
 import { syncAgentToTelnyx } from "../../src/lib/telnyxAgentSync.js";
 import { businessesRoutes } from "../../src/modules/businesses/routes.js";
 import { prisma } from "../../src/lib/prisma.js";
@@ -21,16 +22,6 @@ const buildManagedAgentPrompt = (
   input: Parameters<typeof buildManagedAgentPromptEnJson>[0]
 ) => buildManagedAgentPromptEnJson({ ...input, formato: "texto" });
 
-// parseAgentSettings es la real, envuelta: el test del PATCH le hace leer
-// de lo guardado una versión que el body no puede traer, para distinguir
-// «conserva la guardada» de «el esquema puso la de por defecto».
-vi.mock("../../src/lib/managedAgentPrompt.js", async (importOriginal) => {
-  const real =
-    await importOriginal<
-      typeof import("../../src/lib/managedAgentPrompt.js")
-    >();
-  return { ...real, parseAgentSettings: vi.fn(real.parseAgentSettings) };
-});
 vi.mock("../../src/lib/prisma.js", () => ({
   prisma: {
     business: {
@@ -72,7 +63,6 @@ const mockedAgentFindMany = vi.mocked(prisma.agent.findMany);
 const mockedAgentUpdate = vi.mocked(prisma.agent.update);
 const mockedUpdateAssistant = vi.mocked(telnyxAiAdapter.updateAssistant);
 const mockedListVoices = vi.mocked(telnyxAiAdapter.listVoices);
-const mockedParseAgentSettings = vi.mocked(parseAgentSettings);
 
 /** Los ajustes que ya hay en BD en los negocios de hoy: sin el campo. */
 const AJUSTES_SIN_CAMPO = {
@@ -118,6 +108,61 @@ describe("agentSettings.versionDelPrompt", () => {
       parseAgentSettings({ ...AJUSTES_SIN_CAMPO, versionDelPrompt: "v1" })
         .versionDelPrompt
     ).toBe("v1");
+  });
+
+  it("«v3» se conserva", () => {
+    expect(
+      parseAgentSettings({ ...AJUSTES_SIN_CAMPO, versionDelPrompt: "v3" })
+        .versionDelPrompt
+    ).toBe("v3");
+  });
+});
+
+describe("el prompt con «v3»", () => {
+  const ENTRADA = {
+    businessName: "Peluquería Ana",
+    businessType: "peluqueria" as const,
+    timezone: "Europe/Madrid",
+  };
+  const conV3 = buildManagedAgentPrompt({
+    ...ENTRADA,
+    settings: { ...AJUSTES_SIN_CAMPO, versionDelPrompt: "v3" },
+  });
+
+  it("usa SECCIONES_DEL_PROMPT_V3: los principios detrás de Rol y el repaso antes de Idioma", () => {
+    const contexto = {
+      settings: parseAgentSettings({
+        ...AJUSTES_SIN_CAMPO,
+        versionDelPrompt: "v3",
+      }),
+      idioma: { instruccion: "Habla en español.", recordatorio: null },
+      timezone: "Europe/Madrid",
+      listaDeEspera: true,
+      recordatorioPorWhatsapp: true,
+      ocultarNumero: false,
+    };
+    const esperado = SECCIONES_DEL_PROMPT_V3.flatMap((seccion) =>
+      seccion(contexto)
+    )
+      .filter(Boolean)
+      .join("\n\n");
+    expect(componerPrompt(contexto, "texto")).toBe(esperado);
+    const titulos = conV3.match(/^## .+$/gm) ?? [];
+    expect(titulos.slice(0, 2)).toEqual(["## Rol", "## Principios"]);
+    expect(titulos.slice(-2)).toEqual(["## Antes de responder", "## Idioma"]);
+  });
+
+  it("no deja condiciones ni plantillas sin resolver", () => {
+    expect(conV3).not.toMatch(/\[SI |\$\{|undefined|\bnull\b/);
+  });
+
+  it("no cambia el prompt de «v1»", () => {
+    const sinCampo = buildManagedAgentPrompt({
+      ...ENTRADA,
+      settings: AJUSTES_SIN_CAMPO,
+    });
+    expect(conV3).not.toBe(sinCampo);
+    expect(sinCampo).not.toContain("## Principios");
   });
 });
 
@@ -278,48 +323,32 @@ describe("PATCH /business/me y versionDelPrompt", () => {
   });
 
   it("guardar los ajustes sin el campo conserva el que ya tenía el negocio", async () => {
-    // Mientras solo exista «v1», la guardada y la de por defecto son la
-    // misma: se hace que lo guardado se lea como «v2» (lo que traerá F2)
-    // para comprobar que la ruta usa la guardada y no el .default del body.
-    const guardados = { ...AJUSTES_SIN_CAMPO, versionDelPrompt: "v2" };
+    // Lo guardado es «v3» y el body no la trae: la ruta usa la guardada y
+    // no el .default («v1») del body.
     mockedBusinessFindUnique.mockResolvedValue({
       name: "Peluquería Test",
       businessDetails: null,
-      agentSettings: guardados,
+      agentSettings: { ...AJUSTES_SIN_CAMPO, versionDelPrompt: "v3" },
       timezone: "Europe/Madrid",
     } as any);
-    const parsearReal = (
-      await vi.importActual<
-        typeof import("../../src/lib/managedAgentPrompt.js")
-      >("../../src/lib/managedAgentPrompt.js")
-    ).parseAgentSettings;
-    mockedParseAgentSettings.mockImplementation((bruto) =>
-      bruto === guardados
-        ? ({ ...parsearReal(bruto), versionDelPrompt: "v2" } as any)
-        : parsearReal(bruto)
-    );
 
-    try {
-      const respuesta = await patch({
-        agentSettings: { ...AJUSTES_SIN_CAMPO, tone: "direct" },
-      });
+    const respuesta = await patch({
+      agentSettings: { ...AJUSTES_SIN_CAMPO, tone: "direct" },
+    });
 
-      expect(respuesta.statusCode).toBe(200);
-      expect(mockedBusinessFindUnique).toHaveBeenCalledWith({
-        where: { id: "biz_1" },
-        select: { agentSettings: true },
-      });
-      const datos = mockedBusinessUpdate.mock.calls[0][0].data as Record<
-        string,
-        unknown
-      >;
-      expect(datos.agentSettings).toMatchObject({
-        tone: "direct",
-        versionDelPrompt: "v2",
-      });
-    } finally {
-      mockedParseAgentSettings.mockImplementation(parsearReal);
-    }
+    expect(respuesta.statusCode).toBe(200);
+    expect(mockedBusinessFindUnique).toHaveBeenCalledWith({
+      where: { id: "biz_1" },
+      select: { agentSettings: true },
+    });
+    const datos = mockedBusinessUpdate.mock.calls[0][0].data as Record<
+      string,
+      unknown
+    >;
+    expect(datos.agentSettings).toMatchObject({
+      tone: "direct",
+      versionDelPrompt: "v3",
+    });
   });
 
   it("guardar otros ajustes del negocio no toca agentSettings", async () => {

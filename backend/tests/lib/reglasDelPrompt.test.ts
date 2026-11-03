@@ -2033,6 +2033,9 @@ describe("censo de reglas del prompt", () => {
  */
 const LIMITES_DEL_PROMPT = {
   v1: { techo: 18_000, techoConTodoActivo: 19_500 },
+  // v3, escrita desde cero el 03-11 (lib/seccionesDelPromptV3.ts): unos
+  // 35.000 caracteres en la típica, con los principios y los ejemplos.
+  v3: { techo: 38_000, techoConTodoActivo: 41_000 },
   // F2 (PLAN-PROMPT-DINAMICO.md): el prompt compacto debe quedar por debajo
   // de 12.000 en cualquier combinación de ajustes (objetivo ~8.400 en El
   // petit saló, ~9.300 con todo activo). Descomentar cuando exista la versión
@@ -2082,4 +2085,28 @@ describe("tamaño del prompt (v1)", () => {
       ).toBeLessThan(LIMITES_DEL_PROMPT.v1.techoConTodoActivo);
     }
   });
+});
+
+describe("tamaño del prompt (v3)", () => {
+  for (const id of Object.keys(VARIANTES) as IdDeVariante[]) {
+    const entrada = VARIANTES[id];
+    const ajustes = (entrada.settings ?? DEFAULT_AGENT_SETTINGS) as Record<
+      string,
+      unknown
+    >;
+    const caracteres = buildManagedAgentPrompt({
+      ...entrada,
+      settings: { ...ajustes, versionDelPrompt: "v3" },
+    }).length;
+    const techo =
+      id === "todoActivo"
+        ? LIMITES_DEL_PROMPT.v3.techoConTodoActivo
+        : LIMITES_DEL_PROMPT.v3.techo;
+    it(`la variante «${id}» queda por debajo de ${techo} caracteres`, () => {
+      expect(
+        caracteres,
+        `El prompt v3 de «${id}» mide ${caracteres} caracteres y el techo es ${techo}`
+      ).toBeLessThan(techo);
+    });
+  }
 });

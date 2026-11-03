@@ -39,10 +39,13 @@ export const MODOS_DE_DAR_PRECIOS = [
 ] as const;
 export type ModoDeDarPrecios = (typeof MODOS_DE_DAR_PRECIOS)[number];
 
-/** Versiones del prompt de la recepcionista. Solo existe la actual («v1»);
- * la siguiente se añade aquí y a SECCIONES_POR_VERSION
- * (lib/seccionesDelPrompt.ts) para activarla negocio a negocio. */
-export const VERSIONES_DEL_PROMPT = ["v1"] as const;
+/** Versiones del prompt de la recepcionista: «v1», la de todos los
+ * negocios, y «v3», la escrita desde cero el 2026-11-03
+ * (lib/seccionesDelPromptV3.ts), que solo se activa negocio a negocio
+ * cuando gane a v1 en el laboratorio. Cada una tiene sus secciones en
+ * SECCIONES_POR_VERSION (lib/seccionesDelPrompt.ts). «v2» es la compacta de
+ * F2, aparcada en la PR #394. */
+export const VERSIONES_DEL_PROMPT = ["v1", "v3"] as const;
 export type VersionDelPrompt = (typeof VERSIONES_DEL_PROMPT)[number];
 
 /** Los campos de AgentSettings por separado: parseAgentSettings los lee

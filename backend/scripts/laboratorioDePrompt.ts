@@ -188,6 +188,7 @@ export function marcadorParcial(
 export const VARIANTES = {
   control: { version: "v1", formato: "json" },
   v2: { version: "v2", formato: "json" },
+  v3: { version: "v3", formato: "json" },
   texto: { version: "v1", formato: "texto" },
 } as const;
 export type NombreDeVariante = keyof typeof VARIANTES;
@@ -3741,15 +3742,11 @@ async function cargarContextoReal(input: {
   const businessType = isBusinessType(negocio.businessType)
     ? negocio.businessType
     : "other";
-  // Hasta que exista versionDelPrompt (o su valor «v2») el código solo
-  // tiene el prompt de siempre.
+  // Hasta que exista versionDelPrompt el código solo tiene el prompt de
+  // siempre.
   const conVersionDelPrompt = versionDelPromptSoportada(
     prompt.parseAgentSettings,
     "v1"
-  );
-  const v2Disponible = versionDelPromptSoportada(
-    prompt.parseAgentSettings,
-    "v2"
   );
 
   // Llamadas antiguas y cerradas, sin cita: una Call solo admite una.
@@ -3831,9 +3828,12 @@ async function cargarContextoReal(input: {
   const payloads = {} as ContextoDelNegocio["payloads"];
   for (const variante of input.variantes) {
     const { version, formato } = VARIANTES[variante];
-    if (version !== "v1" && !v2Disponible) {
+    if (
+      version !== "v1" &&
+      !versionDelPromptSoportada(prompt.parseAgentSettings, version)
+    ) {
       throw new ErrorDeUso(
-        `La variante ${variante} (versionDelPrompt «${version}») todavía no existe en este código: llega con F2`
+        `La variante ${variante} (versionDelPrompt «${version}») no existe en este código`
       );
     }
     // El control es siempre «v1», aunque el negocio tenga otra guardada.
