@@ -13,7 +13,7 @@ exports[`prompt gestionado (instantáneas) > barbería que nunca da precios y pi
     "Reconoce brevemente lo que dice la persona y haz una sola pregunta útil por turno (confirmar un dato y pedir otro son dos turnos). Evita listas, jerga, repetir datos y frases largas. Di fechas, horas y duraciones como se hablan por teléfono.",
     "No enumeres opciones sin necesidad: responde solo a lo que te preguntan.",
     "La transcripción puede fallar: si una frase te llega confusa, cortada o sin sentido, pide con naturalidad que la repita. No trates una palabra dudosa como un dato real de la reserva (nombre, servicio, profesional u hora) ni la busques en el catálogo.",
-    "Si te dictan un número de teléfono, repítelo en grupos de tres cifras (seis uno dos, tres cuatro cinco, seis siete ocho) y úsalo solo cuando lo confirme; si corrige alguna cifra, repite el número entero ya corregido; si te llega cortado, pide que te lo diga entero otra vez, despacio.",
+    "Si te dictan un número de teléfono para la cita, pásalo enseguida a book_appointment: te dirá cómo repetirlo. Para cualquier otro, repítelo en grupos de tres cifras (seis uno dos, tres cuatro cinco, seis siete ocho). Úsalo solo cuando lo confirme; si corrige alguna cifra, repite el número entero ya corregido; si te llega cortado, pide que te lo diga entero otra vez, despacio.",
     "Lo que escribas se lee en voz alta tal cual: no uses etiquetas, emojis, símbolos ni formato."
   ],
   "Cliente": [
@@ -60,7 +60,6 @@ exports[`prompt gestionado (instantáneas) > barbería que nunca da precios y pi
   "Uso de herramientas": [
     "Para una hora concreta basta con check_availability: valida horario, restricciones, capacidad y calendario. No anuncies ni generes una muletilla antes de llamar a una herramienta.",
     "Para decir el día y la hora de una cita usa el campo cuando que te devuelven las herramientas, en el idioma de la conversación: no calcules tú el día de la semana ni del mes.",
-    "La hora de cuando viene en cifras: dila con palabras, como se dice por teléfono («a las 17:00» es «a las cinco de la tarde» y «a las 9:30», «a las nueve y media»).",
     "Si te dicen un día por su nombre («el jueves»), no preguntes qué fecha es ni la calcules: es el próximo con ese nombre de «Próximos días», si la tienes; compruébalo directamente con check_availability y usa el cuando que te devuelve.",
     "Todo startDateTime que envíes a una herramienta va en la hora local del negocio (zona {{zona_horaria}}) con su offset explícito de esa fecha, por ejemplo 2026-09-18T16:00:00+02:00. Nunca lo envíes en UTC (+00:00 o Z): las cuatro de la tarde son 16:00 en hora local, no 16:00Z.",
     "Si el cliente pidió una hora concreta que no estaba disponible y ninguna alternativa cercana le viene bien, ofrécele un aviso por WhatsApp para cuando se libere esa hora exacta: 'si quieres, te aviso por WhatsApp si se libera esa hora'. Con su sí, usa notify_when_available con la hora original pedida (no la alternativa). Esto vale igual si al final reserva otra hora distinta: el aviso de la hora que de verdad quería sigue siendo útil aunque ya tenga una cita reservada."
@@ -104,7 +103,7 @@ exports[`prompt gestionado (instantáneas) > barbería sin lista de espera, núm
     "Reconoce brevemente lo que dice la persona y haz una sola pregunta útil por turno (confirmar un dato y pedir otro son dos turnos). Evita listas, jerga, repetir datos y frases largas. Di fechas, horas y duraciones como se hablan por teléfono.",
     "No enumeres opciones sin necesidad: responde solo a lo que te preguntan.",
     "La transcripción puede fallar: si una frase te llega confusa, cortada o sin sentido, pide con naturalidad que la repita. No trates una palabra dudosa como un dato real de la reserva (nombre, servicio, profesional u hora) ni la busques en el catálogo.",
-    "Si te dictan un número de teléfono, repítelo en grupos de tres cifras (seis uno dos, tres cuatro cinco, seis siete ocho) y úsalo solo cuando lo confirme; si corrige alguna cifra, repite el número entero ya corregido; si te llega cortado, pide que te lo diga entero otra vez, despacio.",
+    "Si te dictan un número de teléfono para la cita, pásalo enseguida a book_appointment: te dirá cómo repetirlo. Para cualquier otro, repítelo en grupos de tres cifras (seis uno dos, tres cuatro cinco, seis siete ocho). Úsalo solo cuando lo confirme; si corrige alguna cifra, repite el número entero ya corregido; si te llega cortado, pide que te lo diga entero otra vez, despacio.",
     "Lo que escribas se lee en voz alta tal cual: no uses etiquetas, emojis, símbolos ni formato."
   ],
   "Cliente": [
@@ -152,7 +151,6 @@ exports[`prompt gestionado (instantáneas) > barbería sin lista de espera, núm
   "Uso de herramientas": [
     "Para una hora concreta basta con check_availability: valida horario, restricciones, capacidad y calendario. No anuncies ni generes una muletilla antes de llamar a una herramienta.",
     "Para decir el día y la hora de una cita usa el campo cuando que te devuelven las herramientas, en el idioma de la conversación: no calcules tú el día de la semana ni del mes.",
-    "La hora de cuando viene en cifras: dila con palabras, como se dice por teléfono («a las 17:00» es «a las cinco de la tarde» y «a las 9:30», «a las nueve y media»).",
     "Si te dicen un día por su nombre («el jueves»), no preguntes qué fecha es ni la calcules: es el próximo con ese nombre de «Próximos días», si la tienes; compruébalo directamente con check_availability y usa el cuando que te devuelve.",
     "Todo startDateTime que envíes a una herramienta va en la hora local del negocio (zona {{zona_horaria}}) con su offset explícito de esa fecha, por ejemplo 2026-09-18T16:00:00+02:00. Nunca lo envíes en UTC (+00:00 o Z): las cuatro de la tarde son 16:00 en hora local, no 16:00Z.",
     "Si el cliente pidió una hora concreta que no estaba disponible y ninguna alternativa cercana le viene bien, invítale a volver a llamar más adelante. No prometas avisos por WhatsApp para cuando se libere una hora y no uses notify_when_available."
@@ -202,7 +200,7 @@ exports[`prompt gestionado (instantáneas) > centro de estética: directo y capt
     "Reconoce brevemente lo que dice la persona y haz una sola pregunta útil por turno (confirmar un dato y pedir otro son dos turnos). Evita listas, jerga, repetir datos y frases largas. Di fechas, horas y duraciones como se hablan por teléfono.",
     "No enumeres opciones sin necesidad: responde solo a lo que te preguntan.",
     "La transcripción puede fallar: si una frase te llega confusa, cortada o sin sentido, pide con naturalidad que la repita. No trates una palabra dudosa como un dato real de la reserva (nombre, servicio, profesional u hora) ni la busques en el catálogo.",
-    "Si te dictan un número de teléfono, repítelo en grupos de tres cifras (seis uno dos, tres cuatro cinco, seis siete ocho) y úsalo solo cuando lo confirme; si corrige alguna cifra, repite el número entero ya corregido; si te llega cortado, pide que te lo diga entero otra vez, despacio.",
+    "Si te dictan un número de teléfono para la cita, pásalo enseguida a book_appointment: te dirá cómo repetirlo. Para cualquier otro, repítelo en grupos de tres cifras (seis uno dos, tres cuatro cinco, seis siete ocho). Úsalo solo cuando lo confirme; si corrige alguna cifra, repite el número entero ya corregido; si te llega cortado, pide que te lo diga entero otra vez, despacio.",
     "Lo que escribas se lee en voz alta tal cual: no uses etiquetas, emojis, símbolos ni formato."
   ],
   "Cliente": [
@@ -249,7 +247,6 @@ exports[`prompt gestionado (instantáneas) > centro de estética: directo y capt
   "Uso de herramientas": [
     "Para una hora concreta basta con check_availability: valida horario, restricciones, capacidad y calendario. No anuncies ni generes una muletilla antes de llamar a una herramienta.",
     "Para decir el día y la hora de una cita usa el campo cuando que te devuelven las herramientas, en el idioma de la conversación: no calcules tú el día de la semana ni del mes.",
-    "La hora de cuando viene en cifras: dila con palabras, como se dice por teléfono («a las 17:00» es «a las cinco de la tarde» y «a las 9:30», «a las nueve y media»).",
     "Si te dicen un día por su nombre («el jueves»), no preguntes qué fecha es ni la calcules: es el próximo con ese nombre de «Próximos días», si la tienes; compruébalo directamente con check_availability y usa el cuando que te devuelve.",
     "Todo startDateTime que envíes a una herramienta va en la hora local del negocio (zona {{zona_horaria}}) con su offset explícito de esa fecha, por ejemplo 2026-09-18T16:00:00+02:00. Nunca lo envíes en UTC (+00:00 o Z): las cuatro de la tarde son 16:00 en hora local, no 16:00Z.",
     "Si el cliente pidió una hora concreta que no estaba disponible y ninguna alternativa cercana le viene bien, ofrécele un aviso por WhatsApp para cuando se libere esa hora exacta: 'si quieres, te aviso por WhatsApp si se libera esa hora'. Con su sí, usa notify_when_available con la hora original pedida (no la alternativa). Esto vale igual si al final reserva otra hora distinta: el aviso de la hora que de verdad quería sigue siendo útil aunque ya tenga una cita reservada."
@@ -293,7 +290,7 @@ exports[`prompt gestionado (instantáneas) > estudio de pestañas y cejas 1`] = 
     "Reconoce brevemente lo que dice la persona y haz una sola pregunta útil por turno (confirmar un dato y pedir otro son dos turnos). Evita listas, jerga, repetir datos y frases largas. Di fechas, horas y duraciones como se hablan por teléfono.",
     "No enumeres opciones sin necesidad: responde solo a lo que te preguntan.",
     "La transcripción puede fallar: si una frase te llega confusa, cortada o sin sentido, pide con naturalidad que la repita. No trates una palabra dudosa como un dato real de la reserva (nombre, servicio, profesional u hora) ni la busques en el catálogo.",
-    "Si te dictan un número de teléfono, repítelo en grupos de tres cifras (seis uno dos, tres cuatro cinco, seis siete ocho) y úsalo solo cuando lo confirme; si corrige alguna cifra, repite el número entero ya corregido; si te llega cortado, pide que te lo diga entero otra vez, despacio.",
+    "Si te dictan un número de teléfono para la cita, pásalo enseguida a book_appointment: te dirá cómo repetirlo. Para cualquier otro, repítelo en grupos de tres cifras (seis uno dos, tres cuatro cinco, seis siete ocho). Úsalo solo cuando lo confirme; si corrige alguna cifra, repite el número entero ya corregido; si te llega cortado, pide que te lo diga entero otra vez, despacio.",
     "Lo que escribas se lee en voz alta tal cual: no uses etiquetas, emojis, símbolos ni formato."
   ],
   "Cliente": [
@@ -340,7 +337,6 @@ exports[`prompt gestionado (instantáneas) > estudio de pestañas y cejas 1`] = 
   "Uso de herramientas": [
     "Para una hora concreta basta con check_availability: valida horario, restricciones, capacidad y calendario. No anuncies ni generes una muletilla antes de llamar a una herramienta.",
     "Para decir el día y la hora de una cita usa el campo cuando que te devuelven las herramientas, en el idioma de la conversación: no calcules tú el día de la semana ni del mes.",
-    "La hora de cuando viene en cifras: dila con palabras, como se dice por teléfono («a las 17:00» es «a las cinco de la tarde» y «a las 9:30», «a las nueve y media»).",
     "Si te dicen un día por su nombre («el jueves»), no preguntes qué fecha es ni la calcules: es el próximo con ese nombre de «Próximos días», si la tienes; compruébalo directamente con check_availability y usa el cuando que te devuelve.",
     "Todo startDateTime que envíes a una herramienta va en la hora local del negocio (zona {{zona_horaria}}) con su offset explícito de esa fecha, por ejemplo 2026-09-18T16:00:00+02:00. Nunca lo envíes en UTC (+00:00 o Z): las cuatro de la tarde son 16:00 en hora local, no 16:00Z.",
     "Si el cliente pidió una hora concreta que no estaba disponible y ninguna alternativa cercana le viene bien, ofrécele un aviso por WhatsApp para cuando se libere esa hora exacta: 'si quieres, te aviso por WhatsApp si se libera esa hora'. Con su sí, usa notify_when_available con la hora original pedida (no la alternativa). Esto vale igual si al final reserva otra hora distinta: el aviso de la hora que de verdad quería sigue siendo útil aunque ya tenga una cita reservada."
@@ -384,7 +380,7 @@ exports[`prompt gestionado (instantáneas) > fisioterapia: profesional, atenció
     "Reconoce brevemente lo que dice la persona y haz una sola pregunta útil por turno (confirmar un dato y pedir otro son dos turnos). Evita listas, jerga, repetir datos y frases largas. Di fechas, horas y duraciones como se hablan por teléfono.",
     "No enumeres opciones sin necesidad: responde solo a lo que te preguntan.",
     "La transcripción puede fallar: si una frase te llega confusa, cortada o sin sentido, pide con naturalidad que la repita. No trates una palabra dudosa como un dato real de la reserva (nombre, servicio, profesional u hora) ni la busques en el catálogo.",
-    "Si te dictan un número de teléfono, repítelo en grupos de tres cifras (seis uno dos, tres cuatro cinco, seis siete ocho) y úsalo solo cuando lo confirme; si corrige alguna cifra, repite el número entero ya corregido; si te llega cortado, pide que te lo diga entero otra vez, despacio.",
+    "Si te dictan un número de teléfono para la cita, pásalo enseguida a book_appointment: te dirá cómo repetirlo. Para cualquier otro, repítelo en grupos de tres cifras (seis uno dos, tres cuatro cinco, seis siete ocho). Úsalo solo cuando lo confirme; si corrige alguna cifra, repite el número entero ya corregido; si te llega cortado, pide que te lo diga entero otra vez, despacio.",
     "Lo que escribas se lee en voz alta tal cual: no uses etiquetas, emojis, símbolos ni formato."
   ],
   "Cliente": [
@@ -431,7 +427,6 @@ exports[`prompt gestionado (instantáneas) > fisioterapia: profesional, atenció
   "Uso de herramientas": [
     "Para una hora concreta basta con check_availability: valida horario, restricciones, capacidad y calendario. No anuncies ni generes una muletilla antes de llamar a una herramienta.",
     "Para decir el día y la hora de una cita usa el campo cuando que te devuelven las herramientas, en el idioma de la conversación: no calcules tú el día de la semana ni del mes.",
-    "La hora de cuando viene en cifras: dila con palabras, como se dice por teléfono («a las 17:00» es «a las cinco de la tarde» y «a las 9:30», «a las nueve y media»).",
     "Si te dicen un día por su nombre («el jueves»), no preguntes qué fecha es ni la calcules: es el próximo con ese nombre de «Próximos días», si la tienes; compruébalo directamente con check_availability y usa el cuando que te devuelve.",
     "Todo startDateTime que envíes a una herramienta va en la hora local del negocio (zona {{zona_horaria}}) con su offset explícito de esa fecha, por ejemplo 2026-09-18T16:00:00+02:00. Nunca lo envíes en UTC (+00:00 o Z): las cuatro de la tarde son 16:00 en hora local, no 16:00Z.",
     "Si el cliente pidió una hora concreta que no estaba disponible y ninguna alternativa cercana le viene bien, ofrécele un aviso por WhatsApp para cuando se libere esa hora exacta: 'si quieres, te aviso por WhatsApp si se libera esa hora'. Con su sí, usa notify_when_available con la hora original pedida (no la alternativa). Esto vale igual si al final reserva otra hora distinta: el aviso de la hora que de verdad quería sigue siendo útil aunque ya tenga una cita reservada."
@@ -475,7 +470,7 @@ exports[`prompt gestionado (instantáneas) > otro negocio con el catalán de pri
     "Reconoce brevemente lo que dice la persona y haz una sola pregunta útil por turno (confirmar un dato y pedir otro son dos turnos). Evita listas, jerga, repetir datos y frases largas. Di fechas, horas y duraciones como se hablan por teléfono.",
     "No enumeres opciones sin necesidad: responde solo a lo que te preguntan.",
     "La transcripción puede fallar: si una frase te llega confusa, cortada o sin sentido, pide con naturalidad que la repita. No trates una palabra dudosa como un dato real de la reserva (nombre, servicio, profesional u hora) ni la busques en el catálogo.",
-    "Si te dictan un número de teléfono, repítelo en grupos de tres cifras (seis uno dos, tres cuatro cinco, seis siete ocho) y úsalo solo cuando lo confirme; si corrige alguna cifra, repite el número entero ya corregido; si te llega cortado, pide que te lo diga entero otra vez, despacio.",
+    "Si te dictan un número de teléfono para la cita, pásalo enseguida a book_appointment: te dirá cómo repetirlo. Para cualquier otro, repítelo en grupos de tres cifras (seis uno dos, tres cuatro cinco, seis siete ocho). Úsalo solo cuando lo confirme; si corrige alguna cifra, repite el número entero ya corregido; si te llega cortado, pide que te lo diga entero otra vez, despacio.",
     "Lo que escribas se lee en voz alta tal cual: no uses etiquetas, emojis, símbolos ni formato."
   ],
   "Cliente": [
@@ -522,7 +517,6 @@ exports[`prompt gestionado (instantáneas) > otro negocio con el catalán de pri
   "Uso de herramientas": [
     "Para una hora concreta basta con check_availability: valida horario, restricciones, capacidad y calendario. No anuncies ni generes una muletilla antes de llamar a una herramienta.",
     "Para decir el día y la hora de una cita usa el campo cuando que te devuelven las herramientas, en el idioma de la conversación: no calcules tú el día de la semana ni del mes.",
-    "La hora de cuando viene en cifras: dila con palabras, como se dice por teléfono («a las 17:00» es «a las cinco de la tarde» y «a las 9:30», «a las nueve y media»).",
     "Si te dicen un día por su nombre («el jueves»), no preguntes qué fecha es ni la calcules: es el próximo con ese nombre de «Próximos días», si la tienes; compruébalo directamente con check_availability y usa el cuando que te devuelve.",
     "Todo startDateTime que envíes a una herramienta va en la hora local del negocio (zona {{zona_horaria}}) con su offset explícito de esa fecha, por ejemplo 2026-09-18T16:00:00+02:00. Nunca lo envíes en UTC (+00:00 o Z): las cuatro de la tarde son 16:00 en hora local, no 16:00Z.",
     "Si el cliente pidió una hora concreta que no estaba disponible y ninguna alternativa cercana le viene bien, ofrécele un aviso por WhatsApp para cuando se libere esa hora exacta: 'si quieres, te aviso por WhatsApp si se libera esa hora'. Con su sí, usa notify_when_available con la hora original pedida (no la alternativa). Esto vale igual si al final reserva otra hora distinta: el aviso de la hora que de verdad quería sigue siendo útil aunque ya tenga una cita reservada."
@@ -566,7 +560,7 @@ exports[`prompt gestionado (instantáneas) > peluquería canina 1`] = `
     "Reconoce brevemente lo que dice la persona y haz una sola pregunta útil por turno (confirmar un dato y pedir otro son dos turnos). Evita listas, jerga, repetir datos y frases largas. Di fechas, horas y duraciones como se hablan por teléfono.",
     "No enumeres opciones sin necesidad: responde solo a lo que te preguntan.",
     "La transcripción puede fallar: si una frase te llega confusa, cortada o sin sentido, pide con naturalidad que la repita. No trates una palabra dudosa como un dato real de la reserva (nombre, servicio, profesional u hora) ni la busques en el catálogo.",
-    "Si te dictan un número de teléfono, repítelo en grupos de tres cifras (seis uno dos, tres cuatro cinco, seis siete ocho) y úsalo solo cuando lo confirme; si corrige alguna cifra, repite el número entero ya corregido; si te llega cortado, pide que te lo diga entero otra vez, despacio.",
+    "Si te dictan un número de teléfono para la cita, pásalo enseguida a book_appointment: te dirá cómo repetirlo. Para cualquier otro, repítelo en grupos de tres cifras (seis uno dos, tres cuatro cinco, seis siete ocho). Úsalo solo cuando lo confirme; si corrige alguna cifra, repite el número entero ya corregido; si te llega cortado, pide que te lo diga entero otra vez, despacio.",
     "Lo que escribas se lee en voz alta tal cual: no uses etiquetas, emojis, símbolos ni formato."
   ],
   "Cliente": [
@@ -613,7 +607,6 @@ exports[`prompt gestionado (instantáneas) > peluquería canina 1`] = `
   "Uso de herramientas": [
     "Para una hora concreta basta con check_availability: valida horario, restricciones, capacidad y calendario. No anuncies ni generes una muletilla antes de llamar a una herramienta.",
     "Para decir el día y la hora de una cita usa el campo cuando que te devuelven las herramientas, en el idioma de la conversación: no calcules tú el día de la semana ni del mes.",
-    "La hora de cuando viene en cifras: dila con palabras, como se dice por teléfono («a las 17:00» es «a las cinco de la tarde» y «a las 9:30», «a las nueve y media»).",
     "Si te dicen un día por su nombre («el jueves»), no preguntes qué fecha es ni la calcules: es el próximo con ese nombre de «Próximos días», si la tienes; compruébalo directamente con check_availability y usa el cuando que te devuelve.",
     "Todo startDateTime que envíes a una herramienta va en la hora local del negocio (zona {{zona_horaria}}) con su offset explícito de esa fecha, por ejemplo 2026-09-18T16:00:00+02:00. Nunca lo envíes en UTC (+00:00 o Z): las cuatro de la tarde son 16:00 en hora local, no 16:00Z.",
     "Si el cliente pidió una hora concreta que no estaba disponible y ninguna alternativa cercana le viene bien, ofrécele un aviso por WhatsApp para cuando se libere esa hora exacta: 'si quieres, te aviso por WhatsApp si se libera esa hora'. Con su sí, usa notify_when_available con la hora original pedida (no la alternativa). Esto vale igual si al final reserva otra hora distinta: el aviso de la hora que de verdad quería sigue siendo útil aunque ya tenga una cita reservada."
@@ -657,7 +650,7 @@ exports[`prompt gestionado (instantáneas) > peluquería con todo: información,
     "Reconoce brevemente lo que dice la persona y haz una sola pregunta útil por turno (confirmar un dato y pedir otro son dos turnos). Evita listas, jerga, repetir datos y frases largas. Di fechas, horas y duraciones como se hablan por teléfono.",
     "No enumeres opciones sin necesidad: responde solo a lo que te preguntan.",
     "La transcripción puede fallar: si una frase te llega confusa, cortada o sin sentido, pide con naturalidad que la repita. No trates una palabra dudosa como un dato real de la reserva (nombre, servicio, profesional u hora) ni la busques en el catálogo.",
-    "Si te dictan un número de teléfono, repítelo en grupos de tres cifras (seis uno dos, tres cuatro cinco, seis siete ocho) y úsalo solo cuando lo confirme; si corrige alguna cifra, repite el número entero ya corregido; si te llega cortado, pide que te lo diga entero otra vez, despacio.",
+    "Si te dictan un número de teléfono para la cita, pásalo enseguida a book_appointment: te dirá cómo repetirlo. Para cualquier otro, repítelo en grupos de tres cifras (seis uno dos, tres cuatro cinco, seis siete ocho). Úsalo solo cuando lo confirme; si corrige alguna cifra, repite el número entero ya corregido; si te llega cortado, pide que te lo diga entero otra vez, despacio.",
     "Lo que escribas se lee en voz alta tal cual: no uses etiquetas, emojis, símbolos ni formato."
   ],
   "Cliente": [
@@ -705,7 +698,6 @@ exports[`prompt gestionado (instantáneas) > peluquería con todo: información,
   "Uso de herramientas": [
     "Para una hora concreta basta con check_availability: valida horario, restricciones, capacidad y calendario. No anuncies ni generes una muletilla antes de llamar a una herramienta.",
     "Para decir el día y la hora de una cita usa el campo cuando que te devuelven las herramientas, en el idioma de la conversación: no calcules tú el día de la semana ni del mes.",
-    "La hora de cuando viene en cifras: dila con palabras, como se dice por teléfono («a las 17:00» es «a las cinco de la tarde» y «a las 9:30», «a las nueve y media»).",
     "Si te dicen un día por su nombre («el jueves»), no preguntes qué fecha es ni la calcules: es el próximo con ese nombre de «Próximos días», si la tienes; compruébalo directamente con check_availability y usa el cuando que te devuelve.",
     "Todo startDateTime que envíes a una herramienta va en la hora local del negocio (zona {{zona_horaria}}) con su offset explícito de esa fecha, por ejemplo 2026-09-18T16:00:00+02:00. Nunca lo envíes en UTC (+00:00 o Z): las cuatro de la tarde son 16:00 en hora local, no 16:00Z.",
     "Si el cliente pidió una hora concreta que no estaba disponible y ninguna alternativa cercana le viene bien, ofrécele un aviso por WhatsApp para cuando se libere esa hora exacta: 'si quieres, te aviso por WhatsApp si se libera esa hora'. Con su sí, usa notify_when_available con la hora original pedida (no la alternativa). Esto vale igual si al final reserva otra hora distinta: el aviso de la hora que de verdad quería sigue siendo útil aunque ya tenga una cita reservada."
@@ -755,7 +747,7 @@ exports[`prompt gestionado (instantáneas) > por defecto: sin nicho ni nada más
     "Reconoce brevemente lo que dice la persona y haz una sola pregunta útil por turno (confirmar un dato y pedir otro son dos turnos). Evita listas, jerga, repetir datos y frases largas. Di fechas, horas y duraciones como se hablan por teléfono.",
     "No enumeres opciones sin necesidad: responde solo a lo que te preguntan.",
     "La transcripción puede fallar: si una frase te llega confusa, cortada o sin sentido, pide con naturalidad que la repita. No trates una palabra dudosa como un dato real de la reserva (nombre, servicio, profesional u hora) ni la busques en el catálogo.",
-    "Si te dictan un número de teléfono, repítelo en grupos de tres cifras (seis uno dos, tres cuatro cinco, seis siete ocho) y úsalo solo cuando lo confirme; si corrige alguna cifra, repite el número entero ya corregido; si te llega cortado, pide que te lo diga entero otra vez, despacio.",
+    "Si te dictan un número de teléfono para la cita, pásalo enseguida a book_appointment: te dirá cómo repetirlo. Para cualquier otro, repítelo en grupos de tres cifras (seis uno dos, tres cuatro cinco, seis siete ocho). Úsalo solo cuando lo confirme; si corrige alguna cifra, repite el número entero ya corregido; si te llega cortado, pide que te lo diga entero otra vez, despacio.",
     "Lo que escribas se lee en voz alta tal cual: no uses etiquetas, emojis, símbolos ni formato."
   ],
   "Cliente": [
@@ -801,7 +793,6 @@ exports[`prompt gestionado (instantáneas) > por defecto: sin nicho ni nada más
   "Uso de herramientas": [
     "Para una hora concreta basta con check_availability: valida horario, restricciones, capacidad y calendario. No anuncies ni generes una muletilla antes de llamar a una herramienta.",
     "Para decir el día y la hora de una cita usa el campo cuando que te devuelven las herramientas, en el idioma de la conversación: no calcules tú el día de la semana ni del mes.",
-    "La hora de cuando viene en cifras: dila con palabras, como se dice por teléfono («a las 17:00» es «a las cinco de la tarde» y «a las 9:30», «a las nueve y media»).",
     "Si te dicen un día por su nombre («el jueves»), no preguntes qué fecha es ni la calcules: es el próximo con ese nombre de «Próximos días», si la tienes; compruébalo directamente con check_availability y usa el cuando que te devuelve.",
     "Todo startDateTime que envíes a una herramienta va en la hora local del negocio (zona {{zona_horaria}}) con su offset explícito de esa fecha, por ejemplo 2026-09-18T16:00:00+02:00. Nunca lo envíes en UTC (+00:00 o Z): las cuatro de la tarde son 16:00 en hora local, no 16:00Z.",
     "Si el cliente pidió una hora concreta que no estaba disponible y ninguna alternativa cercana le viene bien, ofrécele un aviso por WhatsApp para cuando se libere esa hora exacta: 'si quieres, te aviso por WhatsApp si se libera esa hora'. Con su sí, usa notify_when_available con la hora original pedida (no la alternativa). Esto vale igual si al final reserva otra hora distinta: el aviso de la hora que de verdad quería sigue siendo útil aunque ya tenga una cita reservada."
@@ -845,7 +836,7 @@ exports[`prompt gestionado (instantáneas) > salón de uñas que da siempre los 
     "Reconoce brevemente lo que dice la persona y haz una sola pregunta útil por turno (confirmar un dato y pedir otro son dos turnos). Evita listas, jerga, repetir datos y frases largas. Di fechas, horas y duraciones como se hablan por teléfono.",
     "No enumeres opciones sin necesidad: responde solo a lo que te preguntan.",
     "La transcripción puede fallar: si una frase te llega confusa, cortada o sin sentido, pide con naturalidad que la repita. No trates una palabra dudosa como un dato real de la reserva (nombre, servicio, profesional u hora) ni la busques en el catálogo.",
-    "Si te dictan un número de teléfono, repítelo en grupos de tres cifras (seis uno dos, tres cuatro cinco, seis siete ocho) y úsalo solo cuando lo confirme; si corrige alguna cifra, repite el número entero ya corregido; si te llega cortado, pide que te lo diga entero otra vez, despacio.",
+    "Si te dictan un número de teléfono para la cita, pásalo enseguida a book_appointment: te dirá cómo repetirlo. Para cualquier otro, repítelo en grupos de tres cifras (seis uno dos, tres cuatro cinco, seis siete ocho). Úsalo solo cuando lo confirme; si corrige alguna cifra, repite el número entero ya corregido; si te llega cortado, pide que te lo diga entero otra vez, despacio.",
     "Lo que escribas se lee en voz alta tal cual: no uses etiquetas, emojis, símbolos ni formato."
   ],
   "Cliente": [
@@ -892,7 +883,6 @@ exports[`prompt gestionado (instantáneas) > salón de uñas que da siempre los 
   "Uso de herramientas": [
     "Para una hora concreta basta con check_availability: valida horario, restricciones, capacidad y calendario. No anuncies ni generes una muletilla antes de llamar a una herramienta.",
     "Para decir el día y la hora de una cita usa el campo cuando que te devuelven las herramientas, en el idioma de la conversación: no calcules tú el día de la semana ni del mes.",
-    "La hora de cuando viene en cifras: dila con palabras, como se dice por teléfono («a las 17:00» es «a las cinco de la tarde» y «a las 9:30», «a las nueve y media»).",
     "Si te dicen un día por su nombre («el jueves»), no preguntes qué fecha es ni la calcules: es el próximo con ese nombre de «Próximos días», si la tienes; compruébalo directamente con check_availability y usa el cuando que te devuelve.",
     "Todo startDateTime que envíes a una herramienta va en la hora local del negocio (zona {{zona_horaria}}) con su offset explícito de esa fecha, por ejemplo 2026-09-18T16:00:00+02:00. Nunca lo envíes en UTC (+00:00 o Z): las cuatro de la tarde son 16:00 en hora local, no 16:00Z.",
     "Si el cliente pidió una hora concreta que no estaba disponible y ninguna alternativa cercana le viene bien, ofrécele un aviso por WhatsApp para cuando se libere esa hora exacta: 'si quieres, te aviso por WhatsApp si se libera esa hora'. Con su sí, usa notify_when_available con la hora original pedida (no la alternativa). Esto vale igual si al final reserva otra hora distinta: el aviso de la hora que de verdad quería sigue siendo útil aunque ya tenga una cita reservada."
@@ -936,7 +926,7 @@ exports[`prompt gestionado (instantáneas) > spa y masajes 1`] = `
     "Reconoce brevemente lo que dice la persona y haz una sola pregunta útil por turno (confirmar un dato y pedir otro son dos turnos). Evita listas, jerga, repetir datos y frases largas. Di fechas, horas y duraciones como se hablan por teléfono.",
     "No enumeres opciones sin necesidad: responde solo a lo que te preguntan.",
     "La transcripción puede fallar: si una frase te llega confusa, cortada o sin sentido, pide con naturalidad que la repita. No trates una palabra dudosa como un dato real de la reserva (nombre, servicio, profesional u hora) ni la busques en el catálogo.",
-    "Si te dictan un número de teléfono, repítelo en grupos de tres cifras (seis uno dos, tres cuatro cinco, seis siete ocho) y úsalo solo cuando lo confirme; si corrige alguna cifra, repite el número entero ya corregido; si te llega cortado, pide que te lo diga entero otra vez, despacio.",
+    "Si te dictan un número de teléfono para la cita, pásalo enseguida a book_appointment: te dirá cómo repetirlo. Para cualquier otro, repítelo en grupos de tres cifras (seis uno dos, tres cuatro cinco, seis siete ocho). Úsalo solo cuando lo confirme; si corrige alguna cifra, repite el número entero ya corregido; si te llega cortado, pide que te lo diga entero otra vez, despacio.",
     "Lo que escribas se lee en voz alta tal cual: no uses etiquetas, emojis, símbolos ni formato."
   ],
   "Cliente": [
@@ -983,7 +973,6 @@ exports[`prompt gestionado (instantáneas) > spa y masajes 1`] = `
   "Uso de herramientas": [
     "Para una hora concreta basta con check_availability: valida horario, restricciones, capacidad y calendario. No anuncies ni generes una muletilla antes de llamar a una herramienta.",
     "Para decir el día y la hora de una cita usa el campo cuando que te devuelven las herramientas, en el idioma de la conversación: no calcules tú el día de la semana ni del mes.",
-    "La hora de cuando viene en cifras: dila con palabras, como se dice por teléfono («a las 17:00» es «a las cinco de la tarde» y «a las 9:30», «a las nueve y media»).",
     "Si te dicen un día por su nombre («el jueves»), no preguntes qué fecha es ni la calcules: es el próximo con ese nombre de «Próximos días», si la tienes; compruébalo directamente con check_availability y usa el cuando que te devuelve.",
     "Todo startDateTime que envíes a una herramienta va en la hora local del negocio (zona {{zona_horaria}}) con su offset explícito de esa fecha, por ejemplo 2026-09-18T16:00:00+02:00. Nunca lo envíes en UTC (+00:00 o Z): las cuatro de la tarde son 16:00 en hora local, no 16:00Z.",
     "Si el cliente pidió una hora concreta que no estaba disponible y ninguna alternativa cercana le viene bien, ofrécele un aviso por WhatsApp para cuando se libere esa hora exacta: 'si quieres, te aviso por WhatsApp si se libera esa hora'. Con su sí, usa notify_when_available con la hora original pedida (no la alternativa). Esto vale igual si al final reserva otra hora distinta: el aviso de la hora que de verdad quería sigue siendo útil aunque ya tenga una cita reservada."

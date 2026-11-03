@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   cuandoParaDecir,
+  horaParaDecir,
   inicioDelDiaEnZona,
   instanteEnHoraLocal,
   normalizeVoiceToolDateTime,
@@ -151,30 +152,60 @@ describe("cuandoParaDecir", () => {
 
   it("dice el día de la semana, el del mes y la hora local, con hoy, mañana y pasado mañana", () => {
     expect(cuandoParaDecir("2026-10-14T19:30:00+02:00", "Europe/Madrid", ahora)).toBe(
-      "hoy, miércoles, 14 de octubre, a las 19:30"
+      "hoy, miércoles, 14 de octubre, a las siete y media de la tarde"
     );
     expect(cuandoParaDecir("2026-10-15T17:00:00+02:00", "Europe/Madrid", ahora)).toBe(
-      "mañana, jueves, 15 de octubre, a las 17:00"
+      "mañana, jueves, 15 de octubre, a las cinco de la tarde"
     );
     expect(cuandoParaDecir("2026-10-16T09:00:00+02:00", "Europe/Madrid", ahora)).toBe(
-      "pasado mañana, viernes, 16 de octubre, a las 09:00"
+      "pasado mañana, viernes, 16 de octubre, a las nueve de la mañana"
     );
     expect(cuandoParaDecir("2026-10-20T12:30:00+02:00", "Europe/Madrid", ahora)).toBe(
-      "martes, 20 de octubre, a las 12:30"
+      "martes, 20 de octubre, a las doce y media del mediodía"
     );
   });
 
   it("en la zona del negocio, aunque el instante venga en UTC", () => {
     // 22:30 UTC del 14 son las 00:30 del 15 en Madrid: mañana.
     expect(cuandoParaDecir("2026-10-14T22:30:00Z", "Europe/Madrid", ahora)).toBe(
-      "mañana, jueves, 15 de octubre, a las 00:30"
+      "mañana, jueves, 15 de octubre, a las doce y media de la noche"
     );
     expect(cuandoParaDecir(new Date("2026-10-15T15:00:00Z"), "Atlantic/Canary", ahora)).toBe(
-      "mañana, jueves, 15 de octubre, a las 16:00"
+      "mañana, jueves, 15 de octubre, a las cuatro de la tarde"
     );
   });
 
   it("una fecha que no lo es devuelve null", () => {
     expect(cuandoParaDecir("mañana", "Europe/Madrid", ahora)).toBeNull();
+  });
+});
+
+// Laboratorio del 02-11: GLM-5.3-Flash copiaba «a las 17:00» tal cual.
+describe("horaParaDecir", () => {
+  it("las horas en punto, con su franja del día", () => {
+    expect(horaParaDecir(9, 0)).toBe("a las nueve de la mañana");
+    expect(horaParaDecir(12, 0)).toBe("a las doce del mediodía");
+    expect(horaParaDecir(13, 0)).toBe("a la una del mediodía");
+    expect(horaParaDecir(17, 0)).toBe("a las cinco de la tarde");
+    expect(horaParaDecir(21, 0)).toBe("a las nueve de la noche");
+    expect(horaParaDecir(3, 0)).toBe("a las tres de la madrugada");
+  });
+
+  it("cuarto, media y menos cuarto", () => {
+    expect(horaParaDecir(9, 30)).toBe("a las nueve y media de la mañana");
+    expect(horaParaDecir(13, 15)).toBe("a la una y cuarto del mediodía");
+    expect(horaParaDecir(16, 45)).toBe("a las cinco menos cuarto de la tarde");
+    expect(horaParaDecir(12, 45)).toBe("a la una menos cuarto del mediodía");
+    expect(horaParaDecir(11, 45)).toBe("a las doce menos cuarto de la mañana");
+    expect(horaParaDecir(23, 45)).toBe("a las doce menos cuarto de la noche");
+  });
+
+  it("el resto de minutos en palabras", () => {
+    expect(horaParaDecir(10, 5)).toBe("a las diez y cinco de la mañana");
+    expect(horaParaDecir(18, 20)).toBe("a las seis y veinte de la tarde");
+    expect(horaParaDecir(18, 21)).toBe("a las seis y veintiuno de la tarde");
+    expect(horaParaDecir(17, 40)).toBe("a las cinco y cuarenta de la tarde");
+    expect(horaParaDecir(17, 51)).toBe("a las cinco y cincuenta y uno de la tarde");
+    expect(horaParaDecir(8, 1)).toBe("a las ocho y uno de la mañana");
   });
 });

@@ -2439,8 +2439,15 @@ Telnyx assistant itself (MCP `ver_assistant_telnyx`), not only the DB.
   reserva guarda `null`. Con número oculto (`fromNumber` que no es un teléfono, p. ej.
   «anonymous»; aún no se ha visto ninguna llamada así) el evento ya no dice «Teléfono:
   anonymous» y `book_appointment` frena una vez por llamada con `CLIENT_PHONE_REQUIRED`
-  (clave `telefono_pedido:<calls.id>`); la segunda vez reserva sin teléfono. Ninguno de los
-  dos códigos cuenta como intento de reserva fallido. `clientEmail` ya no está en la tool.
+  (clave `telefono_pedido:<calls.id>`); la segunda vez reserva sin teléfono. Por voz, un
+  `clientPhone` válido no se reserva hasta que el cliente lo confirma (desde el 03-11): la
+  primera vez responde `CLIENT_PHONE_CONFIRMATION_REQUIRED` con `telefono_para_decir`
+  («seis uno dos, tres cuatro cinco, seis siete ocho», `telefonoParaDecir` en `lib/phone.ts`),
+  la recepcionista lo lee tal cual y repite la llamada con `phoneConfirmed: true`. No se pide
+  en el chat de WhatsApp (el número llega escrito) ni al cambiar una cita
+  (`replacesBookingId`). Ninguno de estos códigos cuenta como intento de reserva fallido. El
+  `cuando` de las tools trae la hora en palabras («a las cinco de la tarde», `horaParaDecir`
+  en `lib/voiceDateTime.ts`). `clientEmail` ya no está en la tool.
 - **A tool that fails never returns HTTP 500.** The tools resolve to `{success: true, result: {success: false, code, message}}` on failure — a Spanish, LLM-speakable message the agent can relay, never a raw exception — and `handleTelnyxToolInvocation` answers 200 with `result` as the body. Only what happens around the tool answers otherwise: 400 without the `X-Alhabla-Call-Control-Id` header, 404 when no `Call` has that id, 500 when the business has no voice config or something throws before a result. `book_appointment`'s calendar-related failures are classified into `*_RECONNECT_REQUIRED` (Google/Outlook/CalDAV credentials revoked — needs manual reconnect), `CALENDAR_TIMEOUT` / `CALENDAR_RATE_LIMITED` (the provider request took over `CALENDAR_REQUEST_TIMEOUT_MS`/`GRAPH_REQUEST_TIMEOUT_MS`, both 8s — a margin under the 20 s tool timeout (`CANAL_DE_TOOLS_DE_VOZ.timeoutMs`) so the backend cuts the request itself instead of leaving it dangling; Telnyx only applies it at the tool level, sibling of `type` — until 2026-10-02 it went inside `webhook`, where Telnyx stores it without applying it, so every Telnyx tool ran at its 5s default) or `BOOK_APPOINTMENT_FAILED`/`BOOK_APPOINTMENT_UNEXPECTED_ERROR` (anything else). Every failure except `*_RECONNECT_REQUIRED` also enqueues `retry-failed-booking` (see Background Jobs) after saving a `Lead` with the attempted booking.
 - **`serviceIds`/`professionalId` supplied by the LLM to `book_appointment` are verified against `businessId` before use** (`prisma.service.findFirst`/`prisma.professional.findFirst` scoped by `businessId`). An ID that doesn't belong to the business is treated as if it had never been given (falls back to auto-resolution) rather than failing the booking or silently trusting a cross-tenant ID.
 

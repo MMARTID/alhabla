@@ -167,7 +167,10 @@ function seccionConversacion(): Parrafos {
     // había entendido el modelo, sin que el cliente confirmara ninguna cifra.
     // «si te llega cortado…»: llamada de prueba del 03-11, la transcripción
     // le llegó a trozos («44… 222…»), pidió «el resto» y se enredó.
-    "Si te dictan un número de teléfono, repítelo en grupos de tres cifras (seis uno dos, tres cuatro cinco, seis siete ocho) y úsalo solo cuando lo confirme; si corrige alguna cifra, repite el número entero ya corregido; si te llega cortado, pide que te lo diga entero otra vez, despacio.",
+    // «pásalo enseguida a book_appointment»: laboratorio del 03-11, repitió
+    // de memoria «cero uno nueve» de un número acabado en 0199; ahora repite
+    // lo que devuelve el backend (telefonoParaDecir en lib/phone.ts).
+    "Si te dictan un número de teléfono para la cita, pásalo enseguida a book_appointment: te dirá cómo repetirlo. Para cualquier otro, repítelo en grupos de tres cifras (seis uno dos, tres cuatro cinco, seis siete ocho). Úsalo solo cuando lo confirme; si corrige alguna cifra, repite el número entero ya corregido; si te llega cortado, pide que te lo diga entero otra vez, despacio.",
     "Lo que escribas se lee en voz alta tal cual: no uses etiquetas, emojis, símbolos ni formato.",
   ];
 }
@@ -352,8 +355,9 @@ function seccionUsoDeHerramientas({ listaDeEspera }: ContextoDelPrompt): Parrafo
     // jueves 15. Las tools devuelven el día ya escrito (voiceDateTime.ts).
     "Para decir el día y la hora de una cita usa el campo cuando que te devuelven las herramientas, en el idioma de la conversación: no calcules tú el día de la semana ni del mes.",
     // Laboratorio del 02-11 con zai-org/GLM-5.3-Flash: copiaba «a las 17:00»
-    // de `cuando` en 62 de 172 turnos (luna lo pasaba a palabras sola).
-    "La hora de cuando viene en cifras: dila con palabras, como se dice por teléfono («a las 17:00» es «a las cinco de la tarde» y «a las 9:30», «a las nueve y media»).",
+    // de `cuando` en 62 de 172 turnos. Desde el 03-11 `cuando` ya trae la
+    // hora en palabras (horaParaDecir en voiceDateTime.ts) y la regla que lo
+    // pedía aquí sobra.
     // Laboratorio, E4 (30-10): a «dijous» contestó «¿el dos o el nueve?»,
     // dos lunes, sin consultar nada.
     "Si te dicen un día por su nombre («el jueves»), no preguntes qué fecha es ni la calcules: es el próximo con ese nombre de «Próximos días», si la tienes; compruébalo directamente con check_availability y usa el cuando que te devuelve.",
