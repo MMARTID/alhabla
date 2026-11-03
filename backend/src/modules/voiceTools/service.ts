@@ -8,6 +8,11 @@ import {
   leerClave,
 } from "../../lib/almacenTemporal.js";
 import { nombreDelNegocioDecible } from "../../lib/nombreDelNegocio.js";
+import {
+  esCodigoDeIdioma,
+  IDIOMAS,
+  type CodigoDeIdioma,
+} from "../../lib/idiomas/catalogo.js";
 import { nombreParaElCliente } from "../../lib/nombreProfesional.js";
 import { precioParaDecir } from "../../lib/precio.js";
 import {
@@ -66,6 +71,7 @@ import {
   proveedorDesdeErrorDeReconexion,
 } from "../../adapters/calendar/errors.js";
 import {
+  cuandoEnOtroIdioma,
   cuandoParaDecir,
   instanteEnHoraLocal,
   normalizeVoiceToolDateTime,
@@ -190,6 +196,37 @@ function siguientePasoConRecomendacion(recomendado: string | null): string {
   // equipo»: nunca se dice «Profesional 2».
   const quien = recomendado ?? "otra persona del equipo";
   return `Di solo esto, sin dar motivos: «A esa hora te la puedo dejar con ${quien}. ¿Te parece bien?», y espera. Si acepta, usa el availabilityToken de recommendation y sigue con el resumen. Si prefiere a quien pidió, repite check_availability igual con professionalConfirmed true.`;
+}
+
+/** El idioma en que pide la respuesta la recepcionista (`idioma` de
+ * check_availability, book_appointment y find_my_appointment), si no es el
+ * castellano: con él, `cuando` va en ese idioma y la respuesta lleva
+ * `contesta_en`. Laboratorio del 03-11 (E3): con el `cuando` en castellano
+ * delante, el primer turno tras la tool salía en castellano a un cliente
+ * que hablaba inglés. */
+function idiomaDeLaRespuesta(
+  params: Record<string, unknown> | undefined
+): CodigoDeIdioma | null {
+  const idioma = params?.idioma;
+  return esCodigoDeIdioma(idioma) && idioma !== "es-ES" ? idioma : null;
+}
+
+/** `cuando` en el idioma de la respuesta (en castellano, con la hora en
+ * palabras de cuandoParaDecir). */
+function cuandoEnSuIdioma(
+  instante: string | Date,
+  timeZone: string,
+  idioma: CodigoDeIdioma | null
+): string | null {
+  return idioma
+    ? cuandoEnOtroIdioma(instante, timeZone, idioma)
+    : cuandoParaDecir(instante, timeZone);
+}
+
+function contestaEn(
+  idioma: CodigoDeIdioma | null
+): { contesta_en?: string } {
+  return idioma ? { contesta_en: IDIOMAS[idioma].nombreEnPrompt } : {};
 }
 
 /** Que en esta llamada ya se propuso a otra persona en lugar de la pedida:
@@ -585,6 +622,7 @@ async function executeCheckAvailability(
     // persona que pidió: entonces no se vuelve a proponer a nadie. Se
     // comprueba más abajo que la propuesta se hizo de verdad.
     const pideConfirmada = params?.professionalConfirmed === true;
+    const idioma = idiomaDeLaRespuesta(params);
     const replacesBookingId =
       typeof params?.replacesBookingId === "string" && params.replacesBookingId
         ? params.replacesBookingId
@@ -753,10 +791,12 @@ async function executeCheckAvailability(
           available: false,
           code,
           message: MENSAJE_TOMA_NOTA_SIN_CALENDARIO,
-          cuando: cuandoParaDecir(
+          cuando: cuandoEnSuIdioma(
             startDateTime,
-            business.timezone || "Europe/Madrid"
+            business.timezone || "Europe/Madrid",
+            idioma
           ),
+          ...contestaEn(idioma),
         },
       };
     }
@@ -799,13 +839,19 @@ async function executeCheckAvailability(
     const specialistIds = availability.available ? availability.specialistIds : undefined;
     const paraElAgente: Omit<typeof sinRecomendacion, "specialistIds"> & {
       cuando: string | null;
+      contesta_en?: string;
     } = {
       ...(Object.fromEntries(
         Object.entries(sinRecomendacion).filter(([clave]) => clave !== "specialistIds")
       ) as Omit<typeof sinRecomendacion, "specialistIds">),
       // El día y la hora pedidos, como se dicen (voiceDateTime.ts): que la
       // recepcionista no calcule el día de la semana ni del mes.
-      cuando: cuandoParaDecir(startDateTime, business.timezone || "Europe/Madrid"),
+      cuando: cuandoEnSuIdioma(
+        startDateTime,
+        business.timezone || "Europe/Madrid",
+        idioma
+      ),
+      ...contestaEn(idioma),
     };
 
     // El cliente pidió por su nombre a alguien marcado "no sugerir" y hay
@@ -853,6 +899,7 @@ async function executeCheckAvailability(
           result: {
             available: true,
             cuando: paraElAgente.cuando,
+            ...contestaEn(idioma),
             recommendation,
             siguiente_paso: siguientePasoConRecomendacion(
               nombreParaElCliente(recommendedProfessional.professional.name)
@@ -975,9 +1022,10 @@ async function executeCheckAvailability(
           ...paraElAgente,
           suggestedNextSlot: {
             ...alternativa,
-            cuando: cuandoParaDecir(
+            cuando: cuandoEnSuIdioma(
               alternativa.startDateTime,
-              business.timezone || "Europe/Madrid"
+              business.timezone || "Europe/Madrid",
+              idioma
             ),
             availabilityToken: suggestedToken,
           },
@@ -2071,6 +2119,7 @@ async function reservarCita(
   /** Lo rellena: si cambia una cita y si la petición quedó pendiente. */
   intento: IntentoDeReserva
 ): Promise<ResultadoDeTool> {
+  const idioma = idiomaDeLaRespuesta(params);
   const rawParams = params as {
     clientName?: string;
     startDateTime?: string;
@@ -2736,7 +2785,12 @@ async function reservarCita(
               success: true,
               message: "Cita agendada correctamente.",
               bookingId: existingBooking.id,
-              cuando: cuandoParaDecir(startDateTime, business.timezone || "Europe/Madrid"),
+              cuando: cuandoEnSuIdioma(
+                startDateTime,
+                business.timezone || "Europe/Madrid",
+                idioma
+              ),
+              ...contestaEn(idioma),
               professionalId: resolvedProfessionalId,
               professionalName: nombreParaElCliente(resolvedProfessionalName),
               mensajeCliente: mensajeClienteRepetido,
@@ -3023,7 +3077,12 @@ async function reservarCita(
             // Para cambiarle la hora en esta misma llamada
             // (replacesBookingId en check_availability).
             ...(reservaGuardadaId ? { bookingId: reservaGuardadaId } : {}),
-            cuando: cuandoParaDecir(startDateTime, business.timezone || "Europe/Madrid"),
+            cuando: cuandoEnSuIdioma(
+              startDateTime,
+              business.timezone || "Europe/Madrid",
+              idioma
+            ),
+            ...contestaEn(idioma),
             eventLink: (result as { htmlLink?: string })?.htmlLink,
             professionalId: resolvedProfessionalId,
             // Para que la confirmación pueda decir con quién queda la cita
@@ -3155,8 +3214,10 @@ async function reservarCita(
 async function executeFindMyAppointment(
   business: BusinessVoiceConfig,
   callLabel: string,
-  callId?: string
+  callId?: string,
+  params?: Record<string, unknown>
 ): Promise<ResultadoDeTool> {
+  const idioma = idiomaDeLaRespuesta(params);
   const call = await resolveCallForBusiness(callId, business.id, callLabel);
   const callerNumber = call?.fromNumber;
 
@@ -3221,7 +3282,12 @@ async function executeFindMyAppointment(
     result: {
       success: true,
       bookingId: booking.id,
-      cuando: cuandoParaDecir(booking.programedAt, business.timezone || "Europe/Madrid"),
+      cuando: cuandoEnSuIdioma(
+        booking.programedAt,
+        business.timezone || "Europe/Madrid",
+        idioma
+      ),
+      ...contestaEn(idioma),
       serviceNames: services.map((s) => s.name),
       professionalName: nombreParaElCliente(booking.professional?.name),
       // Sin este campo, al "cambiar la cita al mismo nombre" el LLM no tenía
@@ -3752,7 +3818,7 @@ export async function executeVoiceTool(
       return reserva;
     }
     case "find_my_appointment":
-      return executeFindMyAppointment(business, callLabel, callId);
+      return executeFindMyAppointment(business, callLabel, callId, params);
     case "cancel_appointment":
       return executeCancelAppointment(business, params, callLabel, callId);
     case "notify_when_available":
