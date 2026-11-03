@@ -1067,6 +1067,34 @@ describe("evaluarComprobacion", () => {
     expect(evaluar(corregido, reserva([undefined]))).toBe(false);
   });
 
+  it("argumentoPatron con soloLaUltima: el teléfono mal dictado que solo se confirmó no cuenta (E21)", () => {
+    const corregido: Comprobacion = {
+      tipo: "argumentoPatron",
+      herramienta: "book_appointment",
+      campo: "clientPhone",
+      patron: "0199$",
+      debeCoincidir: true,
+      soloLasQueLoTraen: true,
+      soloLaUltima: true,
+      descripcion: "x",
+    };
+    const reserva = (telefonos: string[]) =>
+      conversacion(
+        ["a"],
+        telefonos.map((clientPhone) => ({
+          nombre: "book_appointment",
+          turno: 1,
+          argumentos: { clientPhone },
+        }))
+      );
+    expect(
+      evaluar(corregido, reserva(["+12025550198", "+12025550199", "+12025550199"]))
+    ).toBe(true);
+    expect(evaluar(corregido, reserva(["+12025550199", "+12025550198"]))).toBe(
+      false
+    );
+  });
+
   it("argumentoPatron: todas las llamadas, y sin llamadas se cumple", () => {
     const utc = conversacion(
       ["a"],

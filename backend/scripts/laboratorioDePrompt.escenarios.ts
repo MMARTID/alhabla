@@ -108,6 +108,11 @@ export type Comprobacion = Base &
          * primer book_appointment va sin teléfono a propósito (el backend
          * contesta que lo pida). Sin ninguna que lo traiga, no se cumple. */
         soloLasQueLoTraen?: boolean;
+        /** Solo la última de esas llamadas: desde el 03-11, por voz, el
+         * book_appointment con un teléfono dictado no reserva hasta que el
+         * cliente lo confirma, así que el número mal dictado de E21 llega
+         * en una llamada que solo pide repetirlo. Cuenta la que reserva. */
+        soloLaUltima?: boolean;
       }
     | ({
         /** Texto de la recepcionista: debe (o no debe) casar con alguno
@@ -1603,6 +1608,7 @@ export const ESCENARIOS: Escenario[] = [
               "5\\D{0,3}5\\D{0,3}5\\D{0,3}0\\D{0,3}1\\D{0,3}9\\D{0,3}9(?!\\d)",
             debeCoincidir: true,
             soloLasQueLoTraen: true,
+            soloLaUltima: true,
             descripcion: "Reserva con el número corregido",
           },
         ],

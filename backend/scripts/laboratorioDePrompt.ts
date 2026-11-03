@@ -1115,12 +1115,15 @@ export function evaluarComprobacion(
     }
     case "argumentoPatron": {
       const todas = llamadasDe(conversacion, [comprobacion.herramienta]);
-      const llamadas = comprobacion.soloLasQueLoTraen
+      const conElCampo = comprobacion.soloLasQueLoTraen
         ? todas.filter(
             (llamada) =>
               valorComoTexto(llamada.argumentos[comprobacion.campo]) !== ""
           )
         : todas;
+      const llamadas = comprobacion.soloLaUltima
+        ? conElCampo.slice(-1)
+        : conElCampo;
       if (comprobacion.soloLasQueLoTraen && llamadas.length === 0) {
         return resultado(
           false,
