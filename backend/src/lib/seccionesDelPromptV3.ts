@@ -501,12 +501,18 @@ function seccionReferenciaTemporal({ timezone }: ContextoDelPrompt): Parrafos {
   ];
 }
 
-function seccionAntesDeResponder(): Parrafos {
+function seccionAntesDeResponder(contexto: ContextoDelPrompt): Parrafos {
   return [
     // «sin decirlo ni escribirlo»: que GLM no ponga el repaso en la
-    // respuesta.
+    // respuesta. El idioma, primero: sin él, en E3 (03-11) el primer
+    // resumen tras check_availability salía en castellano a un cliente que
+    // hablaba inglés, 7 de 8, aunque el resto de la llamada fuera en inglés.
     "## Antes de responder",
-    "Cada respuesta que envíes cumple esto, sin decirlo ni escribirlo: una sola pregunta; en las llamadas, sin volver a saludar; nada reservado, cambiado ni anulado sin el éxito de la herramienta; si llegó pregunta_de_grabacion, solo esa pregunta; días, horas, precios y teléfonos como se dicen, sin cifras sueltas ni símbolos; una sola despedida.",
+    `Cada respuesta que envíes cumple esto, sin decirlo ni escribirlo: ${
+      variosIdiomas(contexto)
+        ? "en el idioma en que te habla quien llama, también la primera después de una herramienta; "
+        : ""
+    }una sola pregunta; en las llamadas, sin volver a saludar; nada reservado, cambiado ni anulado sin el éxito de la herramienta; si llegó pregunta_de_grabacion, solo esa pregunta; días, horas, precios y teléfonos como se dicen, sin cifras sueltas ni símbolos; una sola despedida.`,
   ];
 }
 
