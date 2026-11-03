@@ -286,6 +286,60 @@ const DIAS_RELATIVOS: Record<number, string> = {
  * día relativo (hoy, mañana, pasado mañana) se cuenta desde `ahora`. Una
  * entrada que no es una fecha válida devuelve null.
  */
+/**
+ * `cuando` en otro idioma que el castellano (`locale`, uno de
+ * CODIGOS_DE_IDIOMA): el día con el formato de ese idioma, «hoy» y «mañana»
+ * en él, y la hora en cifras, como se lee allí («Friday 6 November, 5 pm»,
+ * «vendredi 6 novembre, 17:00»). Laboratorio del 03-11 (E3): con el
+ * `cuando` en castellano delante, GLM-5.3-Flash contestaba en castellano el
+ * primer turno tras check_availability a un cliente que hablaba inglés.
+ */
+export function cuandoEnOtroIdioma(
+  instante: string | Date,
+  timeZone: string,
+  locale: string,
+  ahora: Date = new Date()
+): string | null {
+  const fecha = instante instanceof Date ? instante : new Date(instante);
+  if (Number.isNaN(fecha.getTime())) return null;
+  const zona = timeZone || "Europe/Madrid";
+  try {
+    const dia = new Intl.DateTimeFormat(locale, {
+      timeZone: zona,
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+    }).format(fecha);
+    const enIngles = locale.startsWith("en");
+    const enPunto =
+      new Intl.DateTimeFormat("en-GB", { timeZone: zona, minute: "2-digit" })
+        .format(fecha)
+        .replace(/^0+/, "") === "";
+    // En inglés, «5 pm» y no «17:00» ni «5:00 pm».
+    const hora = new Intl.DateTimeFormat(locale, {
+      timeZone: zona,
+      hour: "numeric",
+      ...(enIngles && enPunto ? {} : { minute: "2-digit" }),
+      ...(enIngles ? { hour12: true } : {}),
+    }).format(fecha);
+    const diferencia = Math.round(
+      (Date.parse(fechaEnZona(fecha, zona)) -
+        Date.parse(fechaEnZona(ahora, zona))) /
+        86_400_000
+    );
+    const relativo =
+      diferencia === 0 || diferencia === 1
+        ? new Intl.RelativeTimeFormat(locale, { numeric: "auto" }).format(
+            diferencia,
+            "day"
+          )
+        : null;
+    return `${relativo ? `${relativo}, ` : ""}${dia}, ${hora}`;
+  } catch {
+    return null;
+  }
+}
+
 export function cuandoParaDecir(
   instante: string | Date,
   timeZone: string,

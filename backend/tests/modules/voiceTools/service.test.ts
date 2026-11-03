@@ -3536,6 +3536,27 @@ describe("executeVoiceTool — cambio de cita (reservar la nueva antes de anular
     expect(mockedCancelarReserva).not.toHaveBeenCalled();
   });
 
+  it("con idioma, la reserva devuelve cuando en ese idioma y contesta_en", async () => {
+    const { result: comprobacion } = await comprobar();
+    mockedBookingFindFirst.mockResolvedValue(null);
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    const result = await executeVoiceTool({
+      businessId: "business_123",
+      toolName: "book_appointment",
+      callId: "call_1",
+      params: {
+        clientName: "María",
+        availabilityToken: comprobacion!.availabilityToken,
+        idioma: "en-GB",
+      },
+    });
+
+    expect(result.result.success).toBe(true);
+    expect(result.result.cuando).toMatch(/(?:pm|am)$/);
+    expect(result.result.contesta_en).toBe("inglés");
+  });
+
   it("si la cita que cambia es la de esta misma conversación, la mueve de hora sin anularla", async () => {
     // El chat reutiliza su Call: la reserva que se cambia es la fila que el
     // upsert va a mover.
@@ -3699,6 +3720,84 @@ describe("executeVoiceTool preferencia_de_grabacion", () => {
 // Cuándo pedir permiso para grabar lo decide el backend (lib/grabacion.ts):
 // la pregunta va en la primera respuesta de check_availability de la
 // llamada, «mientras comprueba la disponibilidad».
+// Laboratorio del 03-11 (E3): con el `cuando` en castellano delante, el
+// primer turno tras la tool salía en castellano a quien hablaba inglés.
+describe("executeVoiceTool: el idioma de la respuesta", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockedBusinessFindUnique.mockResolvedValue(buildBusiness() as any);
+    mockedServiceFindMany.mockResolvedValue([
+      { id: "service_123", name: "Corte", durationMinutes: 30 },
+    ] as any);
+    mockedProfessionalFindMany.mockResolvedValue([]);
+    mockedGetBusyIntervals.mockResolvedValue({
+      intervals: [],
+      calendarAvailabilityKnown: true,
+    } as any);
+    mockedCheckAvailability.mockResolvedValue({
+      available: true,
+      message: "Hay disponibilidad.",
+      capacityUsed: 0,
+      capacityTotal: 1,
+      availableProfessionals: [{ id: "professional_123", name: "Ana" }],
+    } as any);
+  });
+
+  const comprobar = (idioma?: unknown) =>
+    executeVoiceTool({
+      businessId: "business_123",
+      toolName: "check_availability",
+      params: {
+        startDateTime: "2026-08-25T17:00:00+02:00",
+        durationMinutes: 30,
+        serviceIds: ["service_123"],
+        ...(idioma === undefined ? {} : { idioma }),
+      },
+      callId: "v3:ctrl_1",
+    });
+
+  it("con idioma en-GB, check_availability da cuando en inglés y contesta_en", async () => {
+    const result = await comprobar("en-GB");
+
+    expect(result.result.cuando).toMatch(/^(?:[a-z]+, )?Tuesday 25 August, 5 pm$/);
+    expect(result.result.contesta_en).toBe("inglés");
+    expect(result.result.availabilityToken).toEqual(expect.any(String));
+  });
+
+  it("sin idioma, en castellano o con uno que no existe, como siempre", async () => {
+    for (const idioma of [undefined, "es-ES", "klingon"]) {
+      const result = await comprobar(idioma);
+      expect(result.result.cuando).toMatch(/martes, 25 de agosto, a las cinco de la tarde$/);
+      expect(result.result).not.toHaveProperty("contesta_en");
+    }
+  });
+
+  it("find_my_appointment también, con la cita que encuentra", async () => {
+    mockedCallFindUnique.mockResolvedValue({
+      id: "call_row_1",
+      fromNumber: "+34600999888",
+      businessId: "business_123",
+    } as any);
+    mockedBookingFindFirst.mockResolvedValue({
+      id: "booking_1",
+      programedAt: new Date("2026-09-20T10:00:00+02:00"),
+      serviceIds: [],
+      clientName: "Pilar",
+      professional: null,
+    } as any);
+
+    const result = await executeVoiceTool({
+      businessId: "business_123",
+      toolName: "find_my_appointment",
+      params: { idioma: "fr-FR" },
+      callId: "call_vapi_1",
+    });
+
+    expect(result.result.cuando).toMatch(/dimanche 20 septembre, 10:00$/);
+    expect(result.result.contesta_en).toBe("francés");
+  });
+});
+
 describe("executeVoiceTool: la pregunta de grabar", () => {
   const mockedToca = vi.mocked(tocaPreguntarPorGrabar);
   const PREGUNTA =
