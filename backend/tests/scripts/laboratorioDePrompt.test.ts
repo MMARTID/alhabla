@@ -3683,6 +3683,16 @@ describe("variablesComunes", () => {
     expect(variablesComunes([])).toBeUndefined();
     expect(variablesComunes([con("Marta"), con("")])).toBe("distintas");
   });
+
+  it("el número de cada llamada no las hace distintas ni va en las comunes", () => {
+    const desde = (telefono: string) => ({
+      saludo: "s",
+      variables: { ...con("Marta").variables, telefono_para_decir: telefono },
+    });
+    expect(
+      variablesComunes([desde("seis uno dos"), desde("seis uno tres")])
+    ).toEqual({ nombre_cliente: "Marta", ultimo_servicio: "Corte" });
+  });
 });
 
 describe("crearCerrojosPorNegocio", () => {

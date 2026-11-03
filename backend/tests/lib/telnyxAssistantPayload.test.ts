@@ -660,6 +660,8 @@ describe("buildTelnyxAssistantPayload", () => {
       nombre_cliente: "",
       ultimo_servicio: "",
       proximos_dias: "",
+      telefono_para_decir: "",
+      proxima_cita: "",
     });
   });
 

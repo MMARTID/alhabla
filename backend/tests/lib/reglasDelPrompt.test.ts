@@ -1447,6 +1447,49 @@ const REGLAS: readonly Regla[] = [
     ],
   },
   {
+    id: "proxima-cita-en-una-variable",
+    descripcion:
+      "La próxima cita de quien llama llega en {{proxima_cita}} con su bookingId: se nombra solo si pregunta por ella o quiere cambiarla o anularla, y entonces no hace falta find_my_appointment.",
+    origen:
+      "Variables del 03-11: la cita pendiente costaba una find_my_appointment antes de poder contestar.",
+    lugares: [
+      {
+        en: "prompt",
+        seccion: "Cliente",
+        texto: "Nómbrala solo si pregunta por ella o quiere cambiarla o anularla",
+      },
+      {
+        en: "prompt",
+        seccion: "Cita existente",
+        texto: "y no está en «Su próxima cita», usa find_my_appointment",
+      },
+      {
+        en: "guardaDelBackend",
+        simbolo: "describirProximaCita",
+        fichero: "src/lib/contextoDeLlamada.ts",
+      },
+    ],
+  },
+  {
+    id: "numero-de-quien-llama-para-decir",
+    descripcion:
+      "El número desde el que llama llega ya escrito para decirlo en {{telefono_para_decir}}: si lo dice, lo lee tal cual.",
+    origen:
+      "Variables del 03-11: recibía «+34…» y lo leía de memoria, el mismo fallo que E21.",
+    lugares: [
+      {
+        en: "prompt",
+        seccion: "Cliente",
+        texto: "Su número, para decirlo tal cual: {{telefono_para_decir}}.",
+      },
+      {
+        en: "guardaDelBackend",
+        simbolo: "telefonoParaDecir",
+        fichero: "src/lib/contextoDeLlamada.ts",
+      },
+    ],
+  },
+  {
     id: "transcripcion-dudosa",
     descripcion:
       "Si una frase llega confusa, cortada o sin sentido, pide que la repita; no trata una palabra dudosa como dato de la reserva ni la busca en el catálogo.",
