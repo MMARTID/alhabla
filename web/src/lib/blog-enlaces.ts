@@ -29,7 +29,7 @@ export const ENLACES_DE_SIGUE_LEYENDO = 4;
 export const SIGUE_LEYENDO: Readonly<Record<string, readonly string[]>> = {
   "mensajes-automaticos-whatsapp-business": [
     "whatsapp-business-para-citas",
-    "recordatorios-de-citas-por-whatsapp",
+    "whatsapp-business-web-y-pc",
     "whatsapp-business-o-whatsapp-normal",
     "quitar-contestador-movil",
   ],
@@ -148,14 +148,14 @@ export const SIGUE_LEYENDO: Readonly<Record<string, readonly string[]>> = {
     "cuanto-cuesta-una-recepcionista-en-espana",
   ],
   "whatsapp-business-para-citas": [
-    "recordatorios-de-citas-por-whatsapp",
+    "whatsapp-business-api",
     "whatsapp-business-google-calendar",
     "whatsapp-business-o-whatsapp-normal",
     "mensajes-automaticos-whatsapp-business",
   ],
   "whatsapp-business-o-whatsapp-normal": [
     "mensajes-automaticos-whatsapp-business",
-    "whatsapp-business-para-citas",
+    "whatsapp-business-web-y-pc",
     "chatbot-ia-whatsapp-business",
     "whatsapp-business-google-calendar",
   ],
@@ -163,11 +163,23 @@ export const SIGUE_LEYENDO: Readonly<Record<string, readonly string[]>> = {
     "whatsapp-business-o-whatsapp-normal",
     "ia-que-contesta-llamadas",
     "whatsapp-business-google-calendar",
-    "que-hace-una-recepcionista-virtual",
+    "whatsapp-business-api",
+  ],
+  "whatsapp-business-web-y-pc": [
+    "whatsapp-business-o-whatsapp-normal",
+    "mensajes-automaticos-whatsapp-business",
+    "whatsapp-business-api",
+    "whatsapp-business-para-citas",
+  ],
+  "whatsapp-business-api": [
+    "chatbot-ia-whatsapp-business",
+    "whatsapp-business-web-y-pc",
+    "whatsapp-business-google-calendar",
+    "whatsapp-business-o-whatsapp-normal",
   ],
   "whatsapp-business-google-calendar": [
     "whatsapp-business-para-citas",
-    "recordatorios-de-citas-por-whatsapp",
+    "whatsapp-business-api",
     "chatbot-ia-whatsapp-business",
     "whatsapp-business-o-whatsapp-normal",
   ],
