@@ -27,6 +27,24 @@ export const ENLACES_DE_SIGUE_LEYENDO = 4;
 
 /** «Sigue leyendo» de cada artículo: cuatro, por tema y de más a menos cercano. */
 export const SIGUE_LEYENDO: Readonly<Record<string, readonly string[]>> = {
+  "mensajes-automaticos-whatsapp-business": [
+    "whatsapp-business-para-citas",
+    "recordatorios-de-citas-por-whatsapp",
+    "reservas-fuera-de-horario",
+    "quitar-contestador-movil",
+  ],
+  "quitar-contestador-movil": [
+    "desvio-de-llamadas-si-no-contesta",
+    "desviar-llamadas-sin-cambiar-de-numero",
+    "contestador-automatico-vs-recepcionista-virtual",
+    "mensajes-automaticos-whatsapp-business",
+  ],
+  "cuanto-cuesta-una-recepcionista-en-espana": [
+    "cuanto-cuesta-una-recepcionista-de-ia",
+    "que-hace-una-recepcionista-virtual",
+    "reservas-fuera-de-horario",
+    "baja-de-un-trabajador-reorganizar-agenda",
+  ],
   "agenda-para-spa": [
     "cabinas-y-profesionales-centro-de-estetica",
     "recordatorios-de-citas-por-whatsapp",
@@ -36,7 +54,7 @@ export const SIGUE_LEYENDO: Readonly<Record<string, readonly string[]>> = {
   "baja-de-un-trabajador-reorganizar-agenda": [
     "cabinas-y-profesionales-centro-de-estetica",
     "cambiar-cita-por-whatsapp-peluqueria",
-    "lista-de-espera-huecos-libres",
+    "cuanto-cuesta-una-recepcionista-en-espana",
     "agenda-para-spa",
   ],
   "cabinas-y-profesionales-centro-de-estetica": [
@@ -60,7 +78,7 @@ export const SIGUE_LEYENDO: Readonly<Record<string, readonly string[]>> = {
   "contestador-automatico-vs-recepcionista-virtual": [
     "que-hace-una-recepcionista-virtual",
     "cuanto-cuesta-una-recepcionista-de-ia",
-    "ia-que-contesta-llamadas",
+    "quitar-contestador-movil",
     "cuantas-llamadas-pierde-una-peluqueria",
   ],
   "cuantas-llamadas-pierde-una-barberia": [
@@ -76,7 +94,7 @@ export const SIGUE_LEYENDO: Readonly<Record<string, readonly string[]>> = {
     "contestador-automatico-vs-recepcionista-virtual",
   ],
   "cuanto-cuesta-una-recepcionista-de-ia": [
-    "que-hace-una-recepcionista-virtual",
+    "cuanto-cuesta-una-recepcionista-en-espana",
     "contestador-automatico-vs-recepcionista-virtual",
     "ia-que-contesta-llamadas",
     "desvio-de-llamadas-si-no-contesta",
@@ -89,7 +107,7 @@ export const SIGUE_LEYENDO: Readonly<Record<string, readonly string[]>> = {
   ],
   "desvio-de-llamadas-si-no-contesta": [
     "desviar-llamadas-sin-cambiar-de-numero",
-    "ia-que-contesta-llamadas",
+    "quitar-contestador-movil",
     "cuanto-cuesta-una-recepcionista-de-ia",
     "cuantas-llamadas-pierde-una-barberia",
   ],
@@ -121,19 +139,19 @@ export const SIGUE_LEYENDO: Readonly<Record<string, readonly string[]>> = {
     "whatsapp-business-para-citas",
     "cambiar-cita-por-whatsapp-peluqueria",
     "citas-recurrentes-salon-de-unas",
-    "agenda-para-spa",
+    "mensajes-automaticos-whatsapp-business",
   ],
   "reservas-fuera-de-horario": [
     "ia-que-contesta-llamadas",
     "whatsapp-business-para-citas",
     "cuantas-llamadas-pierde-una-barberia",
-    "contestador-automatico-vs-recepcionista-virtual",
+    "cuanto-cuesta-una-recepcionista-en-espana",
   ],
   "whatsapp-business-para-citas": [
     "recordatorios-de-citas-por-whatsapp",
     "cambiar-cita-por-whatsapp-peluqueria",
     "reservas-fuera-de-horario",
-    "que-hace-una-recepcionista-virtual",
+    "mensajes-automaticos-whatsapp-business",
   ],
 };
 
@@ -167,12 +185,12 @@ export const GUIAS_POR_SECTOR: Readonly<Record<SectorSlug, readonly string[]>> =
   fisioterapia: [
     "recepcionista-virtual-para-fisioterapia",
     "ia-que-contesta-llamadas",
-    "reservas-fuera-de-horario",
+    "cuanto-cuesta-una-recepcionista-en-espana",
   ],
   "pestanas-y-cejas": [
     "citas-recurrentes-salon-de-unas",
     "lista-de-espera-huecos-libres",
-    "whatsapp-business-para-citas",
+    "mensajes-automaticos-whatsapp-business",
   ],
   "spa-y-masajes": [
     "agenda-para-spa",
@@ -181,7 +199,7 @@ export const GUIAS_POR_SECTOR: Readonly<Record<SectorSlug, readonly string[]>> =
   ],
   "peluqueria-canina": [
     "recordatorios-de-citas-por-whatsapp",
-    "desviar-llamadas-sin-cambiar-de-numero",
+    "quitar-contestador-movil",
     "que-hace-una-recepcionista-virtual",
   ],
 };
