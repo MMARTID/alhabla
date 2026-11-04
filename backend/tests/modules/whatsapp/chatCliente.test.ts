@@ -89,7 +89,13 @@ const NEGOCIO = {
   active: true,
   clientChatEnabled: true,
   subscriptionStatus: "ACTIVE",
-  agents: [{ id: "agent_1", telnyxAssistantId: "assistant-1" }],
+  agents: [
+    {
+      id: "agent_1",
+      telnyxAssistantId: "assistant-1",
+      telnyxChatAssistantId: "assistant-chat-1",
+    },
+  ],
 };
 
 function entrante(overrides: Partial<InboundMessage> = {}): InboundMessage {
@@ -363,6 +369,31 @@ describe("conversarConRecepcionista", () => {
     expect(mockedChat).not.toHaveBeenCalled();
   });
 
+  it("un agente de antes de separar los assistants contesta con el de llamadas hasta su próxima sincronización", async () => {
+    mockedBizFindUnique.mockResolvedValueOnce({
+      ...NEGOCIO,
+      agents: [
+        {
+          id: "agent_1",
+          telnyxAssistantId: "assistant-1",
+          telnyxChatAssistantId: null,
+        },
+      ],
+    } as never);
+    const aviso = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const message = entrante();
+    await conversarConRecepcionista({
+      message,
+      businessId: "biz_1",
+      texto: message.text!,
+    });
+    expect(mockedChat.mock.calls[0]![0]).toBe("assistant-1");
+    expect(aviso).toHaveBeenCalledWith(
+      expect.stringContaining("aún no tiene assistant de chat")
+    );
+    aviso.mockRestore();
+  });
+
   it("un turno normal: marcador + texto al assistant, respuesta tal cual (sin etiqueta Beta), turno anotado", async () => {
     const message = entrante();
     const resultado = await conversarConRecepcionista({
@@ -377,7 +408,8 @@ describe("conversarConRecepcionista", () => {
     });
     expect(mockedChat).toHaveBeenCalledTimes(1);
     const [assistantId, turno] = mockedChat.mock.calls[0]!;
-    expect(assistantId).toBe("assistant-1");
+    // El assistant de chat del agente, no el de las llamadas.
+    expect(assistantId).toBe("assistant-chat-1");
     expect(turno.conversationId).toBe("conv_1");
     expect(turno.name).toBe("Marta");
     expect(turno.content.startsWith(`[WhatsApp · ${MOVIL} · `)).toBe(true);

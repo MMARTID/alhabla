@@ -64,6 +64,7 @@ function inventario(
         businessId: `cuenta${entorno}000001`,
         name: "Recepcionista",
         telnyxAssistantId: assistantId,
+        telnyxChatAssistantId: `${assistantId}-chat`,
         active: true,
         deletedAt: borrado,
         promptManuallyEdited: false,
@@ -85,6 +86,9 @@ function fuentes(cambios: Partial<Fuentes> = {}): Fuentes {
     listarAssistants: async () => [
       { id: AGENTE_DEV, name: "dev", createdAt: null },
       { id: AGENTE_PROD, name: "prod", createdAt: null },
+      // Los de chat de clientes de cada agente (desde el 04-11).
+      { id: `${AGENTE_DEV}-chat`, name: "dev chat", createdAt: null },
+      { id: `${AGENTE_PROD}-chat`, name: "prod chat", createdAt: null },
       { id: GESTOR, name: "alhabla-gestor", createdAt: null },
       { id: DE_AGENTE_BORRADO, name: "viejo", createdAt: null },
       { id: FANTASMA, name: "alhabla-x", createdAt: "2026-09-11T10:00:00Z" },
@@ -232,7 +236,7 @@ describe("buscarFantasmas", () => {
     // El de voz, el de WhatsApp, el que se está comprando, el de Cloud Run,
     // el del WABA y el de reserva (etiqueta whatsapp-sector) están en uso.
     expect(f.numeros.map((n) => n.id)).toEqual(["n-libre"]);
-    expect(f.enLaCuenta).toEqual({ assistants: 5, numeros: 7 });
+    expect(f.enLaCuenta).toEqual({ assistants: 7, numeros: 7 });
   });
 
   it("si falta una fuente no marca nada", async () => {
