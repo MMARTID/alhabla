@@ -2,10 +2,10 @@
 
 import Link from "next/link";
 import { SiteFooter } from "@/components/site-footer";
-import { useState } from "react";
+import { useState, type CSSProperties } from "react";
 import { ArrowRight, Check, Headphones } from "lucide-react";
 
-import { DemoVoiceCall } from "@/components/demo-voice-call";
+import { DemoVoiceCallDiferida } from "@/components/demo-voice-call-diferida";
 import { HeroHilos } from "@/components/hero-hilos";
 import { SiteHeader } from "@/components/site-header";
 import { Reveal } from "@/components/scroll-reveal";
@@ -73,28 +73,28 @@ export function MainLanding() {
       <section id="contenido" className="relative isolate overflow-hidden border-b border-[#e5e5e5]" tabIndex={-1}>
         <HeroHilos />
         <div className="mx-auto flex max-w-4xl flex-col items-center space-y-7 px-4 py-16 text-center sm:px-6 sm:py-24 lg:px-8 lg:py-28">
-          <Reveal y={14}>
+          <div className="entrada-hero" style={{ "--entrada-y": "14px" } as CSSProperties}>
             <span className="badge-soft">Recepcionista de IA para negocios con cita previa</span>
-          </Reveal>
-          <Reveal delay={0.06} y={16}>
+          </div>
+          <div className="entrada-hero" style={{ "--entrada-retardo": "0.06s" } as CSSProperties}>
             <h1 className="text-balance text-[2.75rem] font-black leading-[1.02] tracking-[-0.045em] text-[#0a0a0a] sm:text-6xl lg:text-[4.6rem]">
               Tu negocio no tiene que parar para atender el teléfono.
             </h1>
             <p className="mx-auto mt-6 max-w-xl text-lg leading-8 text-[#52525b]">
               Alhabla atiende tus llamadas con IA para que no pierdas ninguna, y tú lo gestionas todo por WhatsApp o desde el panel.
             </p>
-          </Reveal>
-          <Reveal delay={0.12} y={16}>
+          </div>
+          <div className="entrada-hero" style={{ "--entrada-retardo": "0.12s" } as CSSProperties}>
             <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:justify-center">
               <Link href="/planes" className="btn-primary h-12 px-6" data-evento="clic_probar" data-ubicacion="portada">Probar 7 días gratis <ArrowRight className="h-4 w-4" aria-hidden="true" /></Link>
               <button type="button" onClick={() => setIsDemoOpen(true)} className="btn-secondary h-12 px-6"><Headphones className="h-4 w-4" aria-hidden="true" /> Escuchar cómo atiende</button>
             </div>
-          </Reveal>
-          <Reveal delay={0.18} y={12}>
+          </div>
+          <div className="entrada-hero" style={{ "--entrada-retardo": "0.18s", "--entrada-y": "12px" } as CSSProperties}>
             <p className="flex flex-wrap justify-center gap-x-5 gap-y-2 text-sm font-medium text-[#3f3f46]">
               {["Tu número de siempre", "Con tu calendario o sin él", "Sin permanencia"].map((item) => <span key={item} className="inline-flex items-center gap-1.5"><Check className="h-4 w-4 text-[#8b5cf6]" aria-hidden="true" />{item}</span>)}
             </p>
-          </Reveal>
+          </div>
         </div>
       </section>
 
@@ -214,7 +214,7 @@ export function MainLanding() {
 
       <section className="bg-[#0a0a0a] text-white"><Reveal className="mx-auto flex max-w-7xl flex-col items-start justify-between gap-7 px-4 py-16 sm:px-6 sm:py-20 lg:flex-row lg:items-center lg:px-8"><div><h2 className="max-w-xl text-3xl font-black tracking-tight sm:text-5xl">Que ninguna llamada a tu negocio se quede sin respuesta.</h2></div><Link href="/planes" className="btn-purple shrink-0" data-evento="clic_probar" data-ubicacion="portada_cierre">Empezar ahora <ArrowRight className="h-4 w-4" aria-hidden="true" /></Link></Reveal></section>
       <SiteFooter />
-      <DemoVoiceCall open={isDemoOpen} onClose={() => setIsDemoOpen(false)} />
+      <DemoVoiceCallDiferida open={isDemoOpen} onClose={() => setIsDemoOpen(false)} />
     </main>
   );
 }

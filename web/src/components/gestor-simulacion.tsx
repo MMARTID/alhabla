@@ -45,7 +45,7 @@ import {
   type VistaResumen,
   type VistaServicios,
 } from "@/lib/gestor-guiones";
-import { MODELO } from "@/lib/portatil-3d";
+import { MODELO } from "@/lib/portatil-3d-credito";
 import { Reveal } from "@/components/scroll-reveal";
 import type { PortatilMontado } from "./gestor-mac-escena";
 import styles from "./gestor-simulacion.module.css";

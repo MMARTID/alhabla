@@ -12,7 +12,7 @@ import { Check } from "lucide-react";
 import { useMovimientoReducido } from "@/hooks/use-movimiento-reducido";
 import { PantallaBloqueo } from "@/components/pantalla-bloqueo";
 import type { NicheAccent } from "@/lib/niche-landings";
-import { MODELO } from "@/lib/portatil-3d";
+import { MODELO } from "@/lib/portatil-3d-credito";
 import { GUION_GENERAL, relato, type GuionRelato } from "@/lib/relato-guiones";
 import { marcarRelato } from "@/lib/relato-fijo";
 import {

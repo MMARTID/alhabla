@@ -477,6 +477,32 @@ body {
   }
 }
 
+/* Entrada del hero de la portada, en CSS y no con `Reveal`. `Reveal` manda el
+   HTML con opacity 0 y lo enseña al hidratar framer-motion: el H1, que es el
+   LCP, esperaba a todo el JS (medido el 2026-11-04: FCP 1,1 s y LCP 5,6 s en
+   móvil, 91 % de «retraso de renderizado»). Esta animación arranca con el
+   primer pintado, sin JS; con movimiento reducido no hay animación. */
+@keyframes entrada-hero {
+  from {
+    opacity: 0;
+    transform: translateY(var(--entrada-y, 16px));
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.entrada-hero {
+  animation: entrada-hero 0.6s cubic-bezier(0.22, 1, 0.36, 1) var(--entrada-retardo, 0s) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .entrada-hero {
+    animation: none;
+  }
+}
+
 /* Cuerpo de los artículos del blog (MDX sin plugin de tipografía). */
 .articulo {
   @apply text-base leading-7 text-[#27272a];
