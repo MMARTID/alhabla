@@ -19,10 +19,12 @@ describe("sitemap", () => {
     );
   });
 
-  it("sale como XML bien formado y con imágenes", () => {
+  it("sale como XML bien formado", () => {
+    // Las imágenes del sitemap son solo las propias de alhabla.ai (el test
+    // siguiente): desde que todas las portadas del blog son de banco, puede no
+    // haber ninguna, y eso es correcto.
     const doc = leerXml();
     expect(doc.getElementsByTagName("parsererror")).toHaveLength(0);
-    expect(doc.getElementsByTagNameNS(IMAGEN_NS, "loc").length).toBeGreaterThan(0);
   });
 
   it("solo declara imágenes propias de alhabla.ai, nunca de banco", () => {
