@@ -3,6 +3,7 @@ import { enqueueRecuperarTranscripcionJob } from "../lib/cloudTasks.js";
 import type { RecuperarTranscripcionJob } from "../lib/jobTypes.js";
 import { errorMessage } from "../lib/logUtils.js";
 import { guardarTranscripcionDeTelnyx } from "../adapters/telnyx/transcripcion.js";
+import { pedirInformeDeLlamada } from "./informeDeLlamada.js";
 
 /** Espera antes de cada intento (el primero es el 1). Telnyx puede tardar en
  * escribir los mensajes después de `call.conversation.ended` (~40 s en la
@@ -105,6 +106,11 @@ export async function processRecuperarTranscripcionJob(
     console.log(
       `[Telnyx] Transcripción recuperada en el intento ${intento} con ${guardados} mensajes (${describir(contexto)})`
     );
+    await pedirInformeDeLlamada({
+      callRowId: call.id,
+      businessId: call.businessId,
+      origen: `recuperar la transcripción (intento ${intento})`,
+    });
     return;
   }
 

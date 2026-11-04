@@ -83,6 +83,13 @@ export interface RecuperarTranscripcionJob {
   intento?: number;
 }
 
+/** El informe de una llamada de Telnyx a partir de su transcripción (ver
+ * jobs/informeDeLlamada.ts). */
+export interface InformeDeLlamadaJob {
+  /** Call.id (la fila), no el call_control_id: va en el nombre de la tarea. */
+  callId: string;
+}
+
 export interface SendWhatsappJobLegado {
   toNumber: string;
   templateName: string;

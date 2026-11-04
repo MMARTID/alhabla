@@ -3,6 +3,8 @@ import {
   adaptManagedPromptForTelnyx,
   buildTelnyxAssistantName,
   buildTelnyxAssistantPayload,
+  buildTelnyxChatAssistantPayload,
+  buildTelnyxChatTools,
   buildTelnyxHangupTool,
   buildTelnyxTransferTool,
   buildTelnyxVoiceTools,
@@ -758,9 +760,9 @@ describe("buildTelnyxVoiceTools — notify_when_available (PR 4)", () => {
   });
 });
 
-describe("buildTelnyxVoiceTools — informar_al_negocio (PR 5, post-conversación)", () => {
-  it("la tool existe, con el resultado obligatorio, el recado como objeto opcional y la cabecera del call_control_id", () => {
-    const tool = buildTelnyxVoiceTools("https://api.alhabla.ai").find(
+describe("informar_al_negocio (PR 5): en el chat; en las llamadas, el backend", () => {
+  it("la tool del chat existe, con el resultado obligatorio, el recado como objeto opcional y la cabecera del call_control_id", () => {
+    const tool = buildTelnyxChatTools("https://api.alhabla.ai").find(
       (t) => t.name === "informar_al_negocio"
     );
     expect(tool).toBeDefined();
@@ -794,7 +796,10 @@ describe("buildTelnyxVoiceTools — informar_al_negocio (PR 5, post-conversació
     );
   });
 
-  it("el payload del assistant activa la post-conversación", () => {
+  it("el assistant de llamadas no la tiene y apaga la post-conversación", () => {
+    expect(
+      buildTelnyxVoiceTools("https://api.alhabla.ai").map((t) => t.name)
+    ).not.toContain("informar_al_negocio");
     const payload = buildTelnyxAssistantPayload({
       businessId: "biz_1",
       agentId: "agent_1",
@@ -805,7 +810,56 @@ describe("buildTelnyxVoiceTools — informar_al_negocio (PR 5, post-conversació
       idiomas: idiomas(["es-ES"]),
       voice: "Telnyx.KokoroTTS.af",
     });
-    expect(payload.postConversationSettings).toEqual({ enabled: true });
+    // false y no ausente: Telnyx mezcla el campo y los de antes lo tienen.
+    expect(payload.postConversationSettings).toEqual({ enabled: false });
+  });
+
+  it("las tools de reservar son las mismas en los dos assistants (la misma tool de la biblioteca)", () => {
+    const voz = buildTelnyxVoiceTools("https://api.alhabla.ai");
+    const chat = buildTelnyxChatTools("https://api.alhabla.ai");
+    const comunes = voz.filter((tool) =>
+      chat.some((otra) => otra.name === tool.name)
+    );
+    expect(comunes.map((tool) => tool.name)).toEqual([
+      "get_catalog",
+      "check_availability",
+      "book_appointment",
+      "find_my_appointment",
+      "cancel_appointment",
+      "notify_when_available",
+    ]);
+    for (const tool of comunes) {
+      expect(chat.find((otra) => otra.name === tool.name)).toEqual(tool);
+    }
+    expect(chat.map((tool) => tool.name)).not.toContain(
+      "preferencia_de_grabacion"
+    );
+  });
+});
+
+describe("buildTelnyxChatAssistantPayload", () => {
+  it("solo prompt, modelo y tools: sin voz, telefonía, saludo ni flujo", () => {
+    const payload = buildTelnyxChatAssistantPayload({
+      businessId: "biz_1",
+      agentId: "agent_1",
+      businessName: "Peluquería Ana",
+      timezone: "Europe/Madrid",
+      instructions: "Eres la recepcionista de {{nombre_negocio}}.",
+      toolIds: ["tool-1", "tool-2"],
+      insightGroupId: "grupo",
+    });
+    expect(payload).toEqual({
+      name: "alhabla-chat-biz_1-agent_1",
+      instructions: "Eres la recepcionista de Peluquería Ana.",
+      model: "zai-org/GLM-5.3-Flash",
+      fallbackConfig: { model: "moonshotai/Kimi-K2.6" },
+      enabledFeatures: [],
+      privacySettings: { data_retention: true },
+      insightGroupId: "grupo",
+      tools: [],
+      toolIds: ["tool-1", "tool-2"],
+      conversationFlow: null,
+    });
   });
 });
 

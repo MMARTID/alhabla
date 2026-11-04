@@ -20,6 +20,7 @@ import {
 import { instruccionesDeIdioma, resolverIdiomas } from "./idiomas/resolver.js";
 import {
   componerPrompt,
+  type CanalDelPrompt,
   type FormatoDelPrompt,
 } from "./seccionesDelPrompt.js";
 
@@ -273,17 +274,23 @@ export function buildManagedAgentPrompt(input: {
   /** `json` por defecto (ver FormatoDelPrompt); `texto` solo para el
    * laboratorio y los tests que leen las reglas como Markdown. */
   formato?: FormatoDelPrompt;
+  /** El prompt del assistant de llamadas (`voz`, por defecto: también el
+   * de las demos y la copia que enseña el panel) o el del chat de clientes
+   * por WhatsApp (`chat`). Ver seccionesDelPrompt.ts. */
+  canal?: CanalDelPrompt;
 }) {
   const settings = parseAgentSettings(input.settings);
   // Las secciones, su orden y su texto viven en lib/seccionesDelPrompt.ts;
   // aquí solo se resuelve lo que necesitan.
   return componerPrompt({
+    canal: input.canal ?? "voz",
     settings,
     // parseAgentSettings ya deja en `languages` los que habla con su
     // principal (normalizarIdiomas).
     idioma: instruccionesDeIdioma(
       input.idiomas ?? settings.languages,
-      settings.voiceLanguage
+      settings.voiceLanguage,
+      input.canal
     ),
     businessType: input.businessType,
     businessDetails: input.businessDetails?.trim(),

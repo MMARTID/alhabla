@@ -479,6 +479,12 @@ model Agent {
   telnyxConfigHash  String?
   telnyxSyncedAt    DateTime?
   telnyxSyncError   String?   @db.Text
+  // El assistant del chat de clientes por WhatsApp (tipo
+  // «recepcionista_chat» de lib/tiposDeAsistente.ts), aparte del de voz
+  // desde el 2026-11-04: cada uno lleva solo su prompt y sus tools.
+  // `telnyxAssistantId` sigue siendo el de las llamadas (el del número).
+  telnyxChatAssistantId String? @unique
+  telnyxChatConfigHash  String?
 
   business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
   calls    Call[]

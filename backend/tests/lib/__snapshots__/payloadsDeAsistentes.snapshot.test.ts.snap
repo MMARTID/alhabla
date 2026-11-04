@@ -400,7 +400,7 @@ exports[`payloads de asistentes (instantáneas) > assistant de la recepcionista,
   "model": "zai-org/GLM-5.3-Flash",
   "name": "alhabla-neg_1-ag_1",
   "postConversationSettings": {
-    "enabled": true,
+    "enabled": false,
   },
   "privacySettings": {
     "data_retention": true,
@@ -719,7 +719,7 @@ exports[`payloads de asistentes (instantáneas) > assistant de la recepcionista,
           ],
           "type": "object",
         },
-        "description": "Guarda lo que contesta quien llama sobre grabar sus llamadas (el audio es solo para que el negocio las revise). Con acepta true se empieza a grabar y se recuerda para sus próximas llamadas; con false no se graba (o se deja de grabar) y no se guarda el audio; la transcripción sí. Úsala solo en dos casos: cuando conteste con claridad a la pregunta_de_grabacion que te dio check_availability, o cuando pida con sus palabras que no se grabe. Nunca en otro momento, ni con lo que conteste a otras preguntas (su nombre, la hora, el WhatsApp). No la uses en el chat de WhatsApp.",
+        "description": "Guarda lo que contesta quien llama sobre grabar sus llamadas (el audio es solo para que el negocio las revise). Con acepta true se empieza a grabar y se recuerda para sus próximas llamadas; con false no se graba (o se deja de grabar) y no se guarda el audio; la transcripción sí. Úsala solo en dos casos: cuando conteste con claridad a la pregunta_de_grabacion que te dio check_availability, o cuando pida con sus palabras que no se grabe. Nunca en otro momento, ni con lo que conteste a otras preguntas (su nombre, la hora, el WhatsApp).",
         "headers": [
           {
             "name": "X-Alhabla-Call-Control-Id",
@@ -729,109 +729,6 @@ exports[`payloads de asistentes (instantáneas) > assistant de la recepcionista,
         "method": "POST",
         "name": "preferencia_de_grabacion",
         "url": "https://api.alhabla.test/webhooks/telnyx/tools/preferencia_de_grabacion",
-      },
-    },
-    {
-      "timeout_ms": 20000,
-      "type": "webhook",
-      "webhook": {
-        "body_parameters": {
-          "properties": {
-            "dudas_sin_respuesta": {
-              "description": "Preguntas del cliente que no pudiste responder porque no tenías esa información (formas de pago, aparcamiento, si hacéis algo…), una por elemento y con sus palabras. No incluyas lo que sí respondiste ni lo que era para el negocio (recados, quejas). Si respondiste a todo, no lo envíes.",
-              "items": {
-                "type": "string",
-              },
-              "type": "array",
-            },
-            "fallo_de_tool": {
-              "description": "true si alguna herramienta (disponibilidad, reserva, cancelación) falló o devolvió error durante la llamada.",
-              "type": "boolean",
-            },
-            "idioma_del_cliente": {
-              "description": "El idioma en que habló quien llama la mayor parte de la llamada: es-ES español de España, en-GB inglés, fr-FR francés, ca-ES catalán, eu-ES euskera, gl-ES gallego, de-DE alemán, it-IT italiano, pt-PT portugués, nl-NL neerlandés, ru-RU ruso. Si no llegó a hablar, no lo envíes.",
-              "enum": [
-                "es-ES",
-                "en-GB",
-                "fr-FR",
-                "ca-ES",
-                "eu-ES",
-                "gl-ES",
-                "de-DE",
-                "it-IT",
-                "pt-PT",
-                "nl-NL",
-                "ru-RU",
-              ],
-              "type": "string",
-            },
-            "motivo_escalada": {
-              "description": "Por qué no se resolvió en la llamada. NO_APLICA si se resolvió.",
-              "enum": [
-                "CLIENTE_LO_PIDIO",
-                "FALLO_TECNICO",
-                "FUERA_DE_HORARIO",
-                "CONSULTA_COMPLEJA",
-                "NO_APLICA",
-              ],
-              "type": "string",
-            },
-            "recado": {
-              "description": "Solo si el cliente dejó un recado explícito o pidió que el negocio le llame. Si no, no lo envíes.",
-              "properties": {
-                "motivo": {
-                  "description": "Qué quiere o qué pregunta, en una o dos frases, con sus palabras.",
-                  "type": "string",
-                },
-                "nombre": {
-                  "description": "Nombre que dio el cliente; vacío si no lo dijo.",
-                  "type": "string",
-                },
-                "quiere_que_le_llamen": {
-                  "description": "true si pidió que el negocio le devuelva la llamada.",
-                  "type": "boolean",
-                },
-                "telefono": {
-                  "description": "Teléfono al que quiere que le llamen, SOLO si el cliente lo dictó o confirmó que le llamen al número desde el que llama. Nunca lo rellenes por tu cuenta.",
-                  "type": "string",
-                },
-              },
-              "required": [
-                "motivo",
-              ],
-              "type": "object",
-            },
-            "resultado": {
-              "description": "RESOLVED si el cliente consiguió lo que quería (reservar, consultar, cancelar); FRUSTRATED si se fue molesto o sin solución; NO_ANSWER si nadie habló o colgó enseguida; ESCALATED si hubo que remitirle al negocio; LEAD_CAPTURED si dejó recado o pidió que le llamen.",
-              "enum": [
-                "RESOLVED",
-                "FRUSTRATED",
-                "NO_ANSWER",
-                "ESCALATED",
-                "LEAD_CAPTURED",
-              ],
-              "type": "string",
-            },
-            "servicio_pedido": {
-              "description": "Nombre del servicio que pidió el cliente, tal como aparece en el catálogo; vacío si no pidió ninguno.",
-              "type": "string",
-            },
-          },
-          "required": [
-            "resultado",
-          ],
-          "type": "object",
-        },
-        "description": "Informe final de la llamada para el negocio. Llámala UNA sola vez, solo cuando la llamada ya ha terminado (post-conversación), nunca durante la conversación. Resume cómo acabó y, si el cliente dejó un recado o pidió que le llamen, inclúyelo en recado.",
-        "headers": [
-          {
-            "name": "X-Alhabla-Call-Control-Id",
-            "value": "{{call_control_id}}",
-          },
-        ],
-        "method": "POST",
-        "name": "informar_al_negocio",
-        "url": "https://api.alhabla.test/webhooks/telnyx/tools/informar_al_negocio",
       },
     },
     {
@@ -855,7 +752,7 @@ exports[`payloads de asistentes (instantáneas) > assistant de la recepcionista,
     },
     {
       "hangup": {
-        "description": "Cuelga la llamada. Llámala en el mismo turno en que te despides, justo después de tu frase de despedida: si no, la llamada se queda abierta y el cliente espera en silencio. También cuando te pidan colgar con claridad. Nunca en el chat de WhatsApp.",
+        "description": "Cuelga la llamada. Llámala en el mismo turno en que te despides, justo después de tu frase de despedida: si no, la llamada se queda abierta y el cliente espera en silencio. También cuando te pidan colgar con claridad.",
       },
       "type": "hangup",
     },
@@ -930,7 +827,7 @@ exports[`payloads de asistentes (instantáneas) > assistant de la recepcionista,
   "model": "zai-org/GLM-5.3-Flash",
   "name": "alhabla-neg_2-ag_2",
   "postConversationSettings": {
-    "enabled": true,
+    "enabled": false,
   },
   "privacySettings": {
     "data_retention": true,
@@ -1308,10 +1205,32 @@ Si te escriben en catalán, gallego, euskera o inglés, responde en ese idioma; 
 }
 `;
 
+exports[`payloads de asistentes (instantáneas) > assistant del chat de clientes de la recepcionista 1`] = `
+{
+  "conversationFlow": null,
+  "enabledFeatures": [],
+  "fallbackConfig": {
+    "model": "moonshotai/Kimi-K2.6",
+  },
+  "insightGroupId": "grupo-vacio",
+  "instructions": "Hola Peluquería Ana (Europe/Madrid).",
+  "model": "zai-org/GLM-5.3-Flash",
+  "name": "alhabla-chat-neg_1-ag_1",
+  "privacySettings": {
+    "data_retention": true,
+  },
+  "toolIds": [
+    "tool-get_catalog",
+    "tool-informar_al_negocio",
+  ],
+  "tools": [],
+}
+`;
+
 exports[`payloads de asistentes (instantáneas) > el JSON enviado es idéntico byte a byte (hash) 1`] = `
 {
   "gestor": "e98c3bfa972a5bd367381ff26a58c6d2b9ee626c5ac52e24ac7c18fe833f1d96",
-  "recepcionista": "f8d2b207709a8ae70fab27c0aec9dfb2275ae2a31cee8ebfc27ab7c15da338a9",
+  "recepcionista": "ece973af2e7e77cf0bcb97ef91e98e7880e485db23b0869079a234c10c7963c8",
 }
 `;
 
@@ -1547,7 +1466,7 @@ exports[`payloads de asistentes (instantáneas) > tools de voz de la recepcionis
     "url": "https://api.alhabla.test/webhooks/telnyx/tools/notify_when_available",
   },
   {
-    "description": "Guarda lo que contesta quien llama sobre grabar sus llamadas (el audio es solo para que el negocio las revise). Con acepta true se empieza a grabar y se recuerda para sus próximas llamadas; con false no se graba (o se deja de grabar) y no se guarda el audio; la transcripción sí. Úsala solo en dos casos: cuando conteste con claridad a la pregunta_de_grabacion que te dio check_availability, o cuando pida con sus palabras que no se grabe. Nunca en otro momento, ni con lo que conteste a otras preguntas (su nombre, la hora, el WhatsApp). No la uses en el chat de WhatsApp.",
+    "description": "Guarda lo que contesta quien llama sobre grabar sus llamadas (el audio es solo para que el negocio las revise). Con acepta true se empieza a grabar y se recuerda para sus próximas llamadas; con false no se graba (o se deja de grabar) y no se guarda el audio; la transcripción sí. Úsala solo en dos casos: cuando conteste con claridad a la pregunta_de_grabacion que te dio check_availability, o cuando pida con sus palabras que no se grabe. Nunca en otro momento, ni con lo que conteste a otras preguntas (su nombre, la hora, el WhatsApp).",
     "headers": [
       {
         "name": "X-Alhabla-Call-Control-Id",
@@ -1567,103 +1486,6 @@ exports[`payloads de asistentes (instantáneas) > tools de voz de la recepcionis
     ],
     "timeoutMs": 20000,
     "url": "https://api.alhabla.test/webhooks/telnyx/tools/preferencia_de_grabacion",
-  },
-  {
-    "description": "Informe final de la llamada para el negocio. Llámala UNA sola vez, solo cuando la llamada ya ha terminado (post-conversación), nunca durante la conversación. Resume cómo acabó y, si el cliente dejó un recado o pidió que le llamen, inclúyelo en recado.",
-    "headers": [
-      {
-        "name": "X-Alhabla-Call-Control-Id",
-        "value": "{{call_control_id}}",
-      },
-    ],
-    "method": "POST",
-    "name": "informar_al_negocio",
-    "properties": {
-      "dudas_sin_respuesta": {
-        "description": "Preguntas del cliente que no pudiste responder porque no tenías esa información (formas de pago, aparcamiento, si hacéis algo…), una por elemento y con sus palabras. No incluyas lo que sí respondiste ni lo que era para el negocio (recados, quejas). Si respondiste a todo, no lo envíes.",
-        "items": {
-          "type": "string",
-        },
-        "type": "array",
-      },
-      "fallo_de_tool": {
-        "description": "true si alguna herramienta (disponibilidad, reserva, cancelación) falló o devolvió error durante la llamada.",
-        "type": "boolean",
-      },
-      "idioma_del_cliente": {
-        "description": "El idioma en que habló quien llama la mayor parte de la llamada: es-ES español de España, en-GB inglés, fr-FR francés, ca-ES catalán, eu-ES euskera, gl-ES gallego, de-DE alemán, it-IT italiano, pt-PT portugués, nl-NL neerlandés, ru-RU ruso. Si no llegó a hablar, no lo envíes.",
-        "enum": [
-          "es-ES",
-          "en-GB",
-          "fr-FR",
-          "ca-ES",
-          "eu-ES",
-          "gl-ES",
-          "de-DE",
-          "it-IT",
-          "pt-PT",
-          "nl-NL",
-          "ru-RU",
-        ],
-        "type": "string",
-      },
-      "motivo_escalada": {
-        "description": "Por qué no se resolvió en la llamada. NO_APLICA si se resolvió.",
-        "enum": [
-          "CLIENTE_LO_PIDIO",
-          "FALLO_TECNICO",
-          "FUERA_DE_HORARIO",
-          "CONSULTA_COMPLEJA",
-          "NO_APLICA",
-        ],
-        "type": "string",
-      },
-      "recado": {
-        "description": "Solo si el cliente dejó un recado explícito o pidió que el negocio le llame. Si no, no lo envíes.",
-        "properties": {
-          "motivo": {
-            "description": "Qué quiere o qué pregunta, en una o dos frases, con sus palabras.",
-            "type": "string",
-          },
-          "nombre": {
-            "description": "Nombre que dio el cliente; vacío si no lo dijo.",
-            "type": "string",
-          },
-          "quiere_que_le_llamen": {
-            "description": "true si pidió que el negocio le devuelva la llamada.",
-            "type": "boolean",
-          },
-          "telefono": {
-            "description": "Teléfono al que quiere que le llamen, SOLO si el cliente lo dictó o confirmó que le llamen al número desde el que llama. Nunca lo rellenes por tu cuenta.",
-            "type": "string",
-          },
-        },
-        "required": [
-          "motivo",
-        ],
-        "type": "object",
-      },
-      "resultado": {
-        "description": "RESOLVED si el cliente consiguió lo que quería (reservar, consultar, cancelar); FRUSTRATED si se fue molesto o sin solución; NO_ANSWER si nadie habló o colgó enseguida; ESCALATED si hubo que remitirle al negocio; LEAD_CAPTURED si dejó recado o pidió que le llamen.",
-        "enum": [
-          "RESOLVED",
-          "FRUSTRATED",
-          "NO_ANSWER",
-          "ESCALATED",
-          "LEAD_CAPTURED",
-        ],
-        "type": "string",
-      },
-      "servicio_pedido": {
-        "description": "Nombre del servicio que pidió el cliente, tal como aparece en el catálogo; vacío si no pidió ninguno.",
-        "type": "string",
-      },
-    },
-    "required": [
-      "resultado",
-    ],
-    "timeoutMs": 20000,
-    "url": "https://api.alhabla.test/webhooks/telnyx/tools/informar_al_negocio",
   },
 ]
 `;
@@ -1862,6 +1684,337 @@ exports[`payloads de asistentes (instantáneas) > tools del Gestor 1`] = `
     ],
     "timeoutMs": 20000,
     "url": "https://api.alhabla.test/webhooks/telnyx/gestor/proponer_accion",
+  },
+]
+`;
+
+exports[`payloads de asistentes (instantáneas) > tools del chat de clientes de la recepcionista 1`] = `
+[
+  {
+    "description": "Única fuente de lo que ofrece el negocio: los servicios activos con sus IDs, duraciones y precios (si el negocio los da; en precios, cuándo decirlos), los profesionales y el horario. Llámala antes de confirmar o negar un servicio, un profesional o el horario, también ante una pregunta de sí o no, antes de decir un precio y antes de comprobar o reservar si necesitas un ID o una duración.",
+    "headers": [
+      {
+        "name": "X-Alhabla-Call-Control-Id",
+        "value": "{{call_control_id}}",
+      },
+    ],
+    "method": "POST",
+    "name": "get_catalog",
+    "properties": {},
+    "timeoutMs": 20000,
+    "url": "https://api.alhabla.test/webhooks/telnyx/tools/get_catalog",
+  },
+  {
+    "description": "Comprueba una cita en una fecha y hora concretas: valida horario, restricciones, capacidad, profesionales y calendario real. Úsala antes de book_appointment y conserva el availabilityToken que devuelve. Si el cliente no pide a nadie, no envíes professionalId: el sistema asigna a quien mejor hace el servicio y lo devuelve en assignedProfessional.",
+    "headers": [
+      {
+        "name": "X-Alhabla-Call-Control-Id",
+        "value": "{{call_control_id}}",
+      },
+    ],
+    "method": "POST",
+    "name": "check_availability",
+    "properties": {
+      "durationMinutes": {
+        "description": "Duración total de la cita en minutos.",
+        "type": "number",
+      },
+      "idioma": {
+        "description": "El idioma en que te habla quien llama ahora (por ejemplo, en-GB si te habla en inglés). Con él, cuando llega ya en ese idioma.",
+        "enum": [
+          "es-ES",
+          "en-GB",
+          "fr-FR",
+          "ca-ES",
+          "eu-ES",
+          "gl-ES",
+          "de-DE",
+          "it-IT",
+          "pt-PT",
+          "nl-NL",
+          "ru-RU",
+        ],
+        "type": "string",
+      },
+      "professionalConfirmed": {
+        "description": "true SOLO si check_availability te devolvió una recommendation, la propusiste y el cliente prefiere a la persona que pidió por su nombre: entonces te da su hueco. Nunca en la primera comprobación.",
+        "type": "boolean",
+      },
+      "professionalId": {
+        "description": "ID exacto copiado tal cual de get_catalog, solo si el cliente pidió a un profesional concreto por su nombre (opcional). Déjalo vacío si no lo nombró: nunca elijas tú a nadie.",
+        "type": "string",
+      },
+      "replacesBookingId": {
+        "description": "Solo para cambiar una cita que ya tiene: el bookingId que devolvió find_my_appointment, o el que devolvió book_appointment si es la cita reservada en esta misma llamada. Su hora no cuenta como ocupada y, al reservar con el token de esta comprobación, el sistema anula la cita antigua (solo si la nueva queda reservada).",
+        "type": "string",
+      },
+      "serviceIds": {
+        "description": "IDs de los servicios pedidos, copiados exactamente de get_catalog carácter a carácter (opcional; puede ser más de uno si el cliente pide varios servicios en la misma cita, ej. corte y mechas). Se prioriza al profesional que domine todos esos servicios.",
+        "items": {
+          "type": "string",
+        },
+        "type": "array",
+      },
+      "startDateTime": {
+        "description": "Inicio solicitado en formato ISO 8601, en HORA LOCAL del negocio con su offset explícito (ej. 2026-09-18T16:00:00+02:00). Nunca en UTC (+00:00/Z): las cuatro de la tarde son 16:00 con el offset local.",
+        "type": "string",
+      },
+    },
+    "required": [
+      "startDateTime",
+      "durationMinutes",
+    ],
+    "timeoutMs": 20000,
+    "url": "https://api.alhabla.test/webhooks/telnyx/tools/check_availability",
+  },
+  {
+    "description": "Agenda una cita en el calendario activo. Úsala solo tras confirmación explícita y con el availabilityToken de check_availability. Si la comprobación se hizo con replacesBookingId, la cita antigua se anula al reservar la nueva. Solo se puede reservar una cita por llamada: devuelve su bookingId, y si después el cliente quiere cambiarle la hora o el servicio, comprueba con check_availability pasando ese bookingId en replacesBookingId. Una segunda cita (otra persona u otro servicio) responde YA_HAY_CITA_EN_ESTA_LLAMADA y no se reserva.",
+    "headers": [
+      {
+        "name": "X-Alhabla-Call-Control-Id",
+        "value": "{{call_control_id}}",
+      },
+    ],
+    "method": "POST",
+    "name": "book_appointment",
+    "properties": {
+      "availabilityToken": {
+        "description": "Token exacto devuelto por check_availability para la opción confirmada.",
+        "type": "string",
+      },
+      "clientName": {
+        "description": "El nombre del cliente que hace la reserva",
+        "type": "string",
+      },
+      "clientPhone": {
+        "description": "Teléfono de contacto solo si el cliente da uno distinto al número desde el que llama o book_appointment te lo pidió (opcional). Pásalo en cuanto lo dicte: si hay que confirmarlo, la respuesta te dice cómo repetírselo.",
+        "type": "string",
+      },
+      "idioma": {
+        "description": "El idioma en que te habla quien llama ahora (por ejemplo, en-GB si te habla en inglés). Con él, cuando llega ya en ese idioma.",
+        "enum": [
+          "es-ES",
+          "en-GB",
+          "fr-FR",
+          "ca-ES",
+          "eu-ES",
+          "gl-ES",
+          "de-DE",
+          "it-IT",
+          "pt-PT",
+          "nl-NL",
+          "ru-RU",
+        ],
+        "type": "string",
+      },
+      "phoneConfirmed": {
+        "description": "true SOLO si book_appointment respondió CLIENT_PHONE_CONFIRMATION_REQUIRED, le repetiste ese teléfono tal como venía y el cliente dijo que sí.",
+        "type": "boolean",
+      },
+      "smsConsent": {
+        "description": "true si el cliente dijo que sí a recibir la confirmación y un recordatorio por WhatsApp en este número; false si dijo que no, dudó o no se le preguntó.",
+        "type": "boolean",
+      },
+    },
+    "required": [
+      "clientName",
+      "availabilityToken",
+    ],
+    "timeoutMs": 20000,
+    "url": "https://api.alhabla.test/webhooks/telnyx/tools/book_appointment",
+  },
+  {
+    "description": "Busca la próxima cita del negocio asociada al número desde el que llama. Devuelve su bookingId (para cancelarla, o para cambiarla con replacesBookingId en check_availability) y clientName (el nombre con el que se reservó; puede venir vacío en citas antiguas): úsalo si el cliente quiere la cita nueva al mismo nombre. Úsala solo si quien llama pide cambiar o cancelar una cita existente y no te ha dado datos concretos.",
+    "headers": [
+      {
+        "name": "X-Alhabla-Call-Control-Id",
+        "value": "{{call_control_id}}",
+      },
+    ],
+    "method": "POST",
+    "name": "find_my_appointment",
+    "properties": {
+      "idioma": {
+        "description": "El idioma en que te habla quien llama ahora (por ejemplo, en-GB si te habla en inglés). Con él, cuando llega ya en ese idioma.",
+        "enum": [
+          "es-ES",
+          "en-GB",
+          "fr-FR",
+          "ca-ES",
+          "eu-ES",
+          "gl-ES",
+          "de-DE",
+          "it-IT",
+          "pt-PT",
+          "nl-NL",
+          "ru-RU",
+        ],
+        "type": "string",
+      },
+    },
+    "timeoutMs": 20000,
+    "url": "https://api.alhabla.test/webhooks/telnyx/tools/find_my_appointment",
+  },
+  {
+    "description": "Cancela la cita cuyo id devolvió find_my_appointment. Úsala solo si el cliente quiere anularla, tras su confirmación explícita. Para cambiarla no la uses: comprueba la hora nueva con check_availability y replacesBookingId, y la antigua se anula al reservar la nueva.",
+    "headers": [
+      {
+        "name": "X-Alhabla-Call-Control-Id",
+        "value": "{{call_control_id}}",
+      },
+    ],
+    "method": "POST",
+    "name": "cancel_appointment",
+    "properties": {
+      "bookingId": {
+        "description": "El id de la cita devuelto por find_my_appointment.",
+        "type": "string",
+      },
+    },
+    "required": [
+      "bookingId",
+    ],
+    "timeoutMs": 20000,
+    "url": "https://api.alhabla.test/webhooks/telnyx/tools/cancel_appointment",
+  },
+  {
+    "description": "Guarda el aviso de que el cliente quiere que le escribamos por WhatsApp si se libera la hora que pidió y no estaba disponible. Válido tanto si el cliente se va sin reservar nada más como si reserva otra hora igualmente. Úsala solo cuando lo pida explícitamente y haya dado consentimiento para WhatsApp a este número.",
+    "headers": [
+      {
+        "name": "X-Alhabla-Call-Control-Id",
+        "value": "{{call_control_id}}",
+      },
+    ],
+    "method": "POST",
+    "name": "notify_when_available",
+    "properties": {
+      "clientName": {
+        "description": "Nombre del cliente si ya lo sabes, para reservar a su nombre si se libera la hora.",
+        "type": "string",
+      },
+      "durationMinutes": {
+        "description": "Duración en minutos de la cita que quería.",
+        "type": "number",
+      },
+      "professionalId": {
+        "description": "ID del profesional concreto que pidió, si lo mencionó (opcional).",
+        "type": "string",
+      },
+      "serviceIds": {
+        "description": "IDs de los servicios que pidió, si los mencionó (opcional).",
+        "items": {
+          "type": "string",
+        },
+        "type": "array",
+      },
+      "startDateTime": {
+        "description": "La hora exacta que el cliente quería y no estaba disponible, en formato ISO 8601 en hora local del negocio con su offset explícito (nunca UTC).",
+        "type": "string",
+      },
+    },
+    "required": [
+      "startDateTime",
+      "durationMinutes",
+    ],
+    "timeoutMs": 20000,
+    "url": "https://api.alhabla.test/webhooks/telnyx/tools/notify_when_available",
+  },
+  {
+    "description": "Informe final de la conversación para el negocio. Llámala UNA sola vez, cuando el cliente se despida o ya no quede nada pendiente. Resume cómo acabó y, si el cliente dejó un recado o pidió que le llamen, inclúyelo en recado.",
+    "headers": [
+      {
+        "name": "X-Alhabla-Call-Control-Id",
+        "value": "{{call_control_id}}",
+      },
+    ],
+    "method": "POST",
+    "name": "informar_al_negocio",
+    "properties": {
+      "dudas_sin_respuesta": {
+        "description": "Preguntas del cliente que no pudiste responder porque no tenías esa información (formas de pago, aparcamiento, si hacéis algo…), una por elemento y con sus palabras. No incluyas lo que sí respondiste ni lo que era para el negocio (recados, quejas). Si respondiste a todo, no lo envíes.",
+        "items": {
+          "type": "string",
+        },
+        "type": "array",
+      },
+      "fallo_de_tool": {
+        "description": "true si alguna herramienta (disponibilidad, reserva, cancelación) falló o devolvió error durante la llamada.",
+        "type": "boolean",
+      },
+      "idioma_del_cliente": {
+        "description": "El idioma en que habló quien llama la mayor parte de la llamada: es-ES español de España, en-GB inglés, fr-FR francés, ca-ES catalán, eu-ES euskera, gl-ES gallego, de-DE alemán, it-IT italiano, pt-PT portugués, nl-NL neerlandés, ru-RU ruso. Si no llegó a hablar, no lo envíes.",
+        "enum": [
+          "es-ES",
+          "en-GB",
+          "fr-FR",
+          "ca-ES",
+          "eu-ES",
+          "gl-ES",
+          "de-DE",
+          "it-IT",
+          "pt-PT",
+          "nl-NL",
+          "ru-RU",
+        ],
+        "type": "string",
+      },
+      "motivo_escalada": {
+        "description": "Por qué no se resolvió en la llamada. NO_APLICA si se resolvió.",
+        "enum": [
+          "CLIENTE_LO_PIDIO",
+          "FALLO_TECNICO",
+          "FUERA_DE_HORARIO",
+          "CONSULTA_COMPLEJA",
+          "NO_APLICA",
+        ],
+        "type": "string",
+      },
+      "recado": {
+        "description": "Solo si el cliente dejó un recado explícito o pidió que el negocio le llame. Si no, no lo envíes.",
+        "properties": {
+          "motivo": {
+            "description": "Qué quiere o qué pregunta, en una o dos frases, con sus palabras.",
+            "type": "string",
+          },
+          "nombre": {
+            "description": "Nombre que dio el cliente; vacío si no lo dijo.",
+            "type": "string",
+          },
+          "quiere_que_le_llamen": {
+            "description": "true si pidió que el negocio le devuelva la llamada.",
+            "type": "boolean",
+          },
+          "telefono": {
+            "description": "Teléfono al que quiere que le llamen, SOLO si el cliente lo dictó o confirmó que le llamen al número desde el que llama. Nunca lo rellenes por tu cuenta.",
+            "type": "string",
+          },
+        },
+        "required": [
+          "motivo",
+        ],
+        "type": "object",
+      },
+      "resultado": {
+        "description": "RESOLVED si el cliente consiguió lo que quería (reservar, consultar, cancelar); FRUSTRATED si se fue molesto o sin solución; NO_ANSWER si nadie habló o colgó enseguida; ESCALATED si hubo que remitirle al negocio; LEAD_CAPTURED si dejó recado o pidió que le llamen.",
+        "enum": [
+          "RESOLVED",
+          "FRUSTRATED",
+          "NO_ANSWER",
+          "ESCALATED",
+          "LEAD_CAPTURED",
+        ],
+        "type": "string",
+      },
+      "servicio_pedido": {
+        "description": "Nombre del servicio que pidió el cliente, tal como aparece en el catálogo; vacío si no pidió ninguno.",
+        "type": "string",
+      },
+    },
+    "required": [
+      "resultado",
+    ],
+    "timeoutMs": 20000,
+    "url": "https://api.alhabla.test/webhooks/telnyx/tools/informar_al_negocio",
   },
 ]
 `;
