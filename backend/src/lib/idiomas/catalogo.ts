@@ -134,6 +134,11 @@ export interface IdiomaDelCatalogo {
   /** Lo que dice si una tool lenta (reservar, cancelar) aún no ha
    * respondido: la frase de espera de Telnyx (telnyxAssistantPayload.ts). */
   fraseDeEspera: string;
+  /** Solo las cooficiales: con lo que empieza la recepcionista al pasar a
+   * esta lengua en mitad de una llamada, ya con su voz (el nodo
+   * «cooficial» de flujoDeLaCooficial). Sin ella, el cambio era un silencio
+   * de 3 a 4 s (8 s el 04-11) que el cliente no sabía leer. */
+  fraseAlCambiar?: string;
   /** Pista de cada motor de transcripción de Telnyx, o null si no lo
    * entiende. flux es el rápido (fin de turno anticipado); Soniox entiende
    * todos. */
@@ -320,6 +325,7 @@ export const IDIOMAS: Record<CodigoDeIdioma, IdiomaDelCatalogo> = {
       },
     },
     fraseDeEspera: "Un moment, si us plau.",
+    fraseAlCambiar: "Cap problema, et parlo en català.",
     transcripcion: { flux: null, soniox: "ca" },
     cooficial: true,
     // Las nativas de Azure y las de MiniMax se ofrecieron del 03 al 05-10 y
@@ -353,6 +359,7 @@ export const IDIOMAS: Record<CodigoDeIdioma, IdiomaDelCatalogo> = {
       },
     },
     fraseDeEspera: "Une bat, mesedez.",
+    fraseAlCambiar: "Ados, euskaraz hitz egingo dizut.",
     transcripcion: { flux: null, soniox: "eu" },
     cooficial: true,
     voces: [MARTA, SERGIO],
@@ -379,6 +386,7 @@ export const IDIOMAS: Record<CodigoDeIdioma, IdiomaDelCatalogo> = {
       },
     },
     fraseDeEspera: "Un momento, por favor.",
+    fraseAlCambiar: "Moi ben, seguimos en galego.",
     transcripcion: { flux: null, soniox: "gl" },
     cooficial: true,
     voces: [MARTA, SERGIO],

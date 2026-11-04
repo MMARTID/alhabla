@@ -279,7 +279,7 @@ exports[`payloads de asistentes (instantáneas) > assistant de la recepcionista 
       },
       {
         "condition": {
-          "prompt": "Quien llama habla inglés, francés, alemán, italiano, portugués, neerlandés o ruso.",
+          "prompt": "Quien llama habla castellano (una frase entera, no una palabra suelta como «vale»), inglés, francés, alemán, italiano, portugués, neerlandés o ruso.",
           "type": "llm",
         },
         "id": "a_inicial",
@@ -306,7 +306,7 @@ Si quien llama habla en catalán (aunque sea una sola frase o un saludo, mezclad
         "id": "cooficial",
         "instructions": "## Idioma en este paso
 
-Desde ahora habla en catalán con naturalidad; no repitas el saludo ni el aviso de IA ya dados, pero si aún no se ha dicho en catalán que eres una inteligencia artificial (el saludo puede haberlo dicho ya en catalán), dilo brevemente en tu primera frase. Si quien llama vuelve a hablarte en castellano, contéstale en castellano. Si habla en inglés, francés, alemán, italiano, portugués, neerlandés o ruso, llama a la herramienta transition__a_inicial en ese mismo turno, sin decir nada antes, y contéstale después solo en su idioma. Usa transition__a_inicial solo para eso.",
+Desde ahora habla en catalán con naturalidad. Empieza tu primera respuesta en catalán con «Cap problema, et parlo en català.» y, en ese mismo turno, contesta a lo que ha pedido; si el saludo ya fue en catalán, sáltate esa frase, y no la repitas después. No repitas el saludo ni el aviso de IA ya dados, pero si aún no se ha dicho en catalán que eres una inteligencia artificial (el saludo puede haberlo dicho ya en catalán), dilo brevemente en tu primera frase. Fíjate en el idioma de su última frase: si habla en castellano (una frase entera, no una palabra suelta como «vale»), inglés, francés, alemán, italiano, portugués, neerlandés o ruso, llama a la herramienta transition__a_inicial en ese mismo turno, sin decir nada antes, y contéstale después solo en su idioma. Usa transition__a_inicial solo para eso.",
         "instructions_mode": "append",
         "name": "En catalán",
         "shared_tool_ids": [],
