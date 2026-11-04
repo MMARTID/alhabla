@@ -182,6 +182,7 @@ export async function deleteAccount(input: {
       agents: {
         select: {
           telnyxAssistantId: true,
+          telnyxChatAssistantId: true,
         },
       },
       calls: {
@@ -226,6 +227,12 @@ export async function deleteAccount(input: {
       // También cuando el assistant ya daba 404: un intento anterior pudo
       // borrarlo y fallar antes de retirar su app.
       await removeTexmlAppOfAssistant(business.id, agent.telnyxAssistantId);
+    }
+    // El de chat no tiene número ni app TeXML.
+    if (agent.telnyxChatAssistantId) {
+      await removeExternalResource("el agente de chat de Telnyx", () =>
+        telnyxAiAdapter.deleteAssistant(agent.telnyxChatAssistantId!),
+      );
     }
   }
 

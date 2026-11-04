@@ -1,5 +1,5 @@
 import { CloudTasksClient } from "@google-cloud/tasks";
-import { ProcessRecordingJob, RecordarRecadoJob, RecuperarTranscripcionJob, ReportUsageJob, RetryFailedBookingJob, RevisarEscaladaJob, SendEmailJob, SendSmsJob, SendWhatsappJob } from "./jobTypes.js";
+import { InformeDeLlamadaJob, ProcessRecordingJob, RecordarRecadoJob, RecuperarTranscripcionJob, ReportUsageJob, RetryFailedBookingJob, RevisarEscaladaJob, SendEmailJob, SendSmsJob, SendWhatsappJob } from "./jobTypes.js";
 import { processRecordingJob } from "../jobs/processRecording.js";
 import { processRetryFailedBookingJob } from "../jobs/retryFailedBooking.js";
 import { processSendEmailJob } from "../jobs/sendEmail.js";
@@ -292,6 +292,46 @@ export async function enqueueRecuperarTranscripcionJob(
       payload: { ...payload, intento },
       taskId: `transcripcion-${payload.callId}-${intento}`,
       scheduleTime,
+    });
+  } catch (error) {
+    if ((error as { code?: unknown })?.code === 6) return;
+    throw error;
+  }
+}
+
+/**
+ * El informe de una llamada a partir de su transcripción
+ * (jobs/informeDeLlamada.ts), en cuanto se guarda: por la cola
+ * `process-recording`, como la recuperación de la transcripción, con una
+ * tarea por llamada (un evento repetido pide la misma y Cloud Tasks descarta
+ * la segunda).
+ */
+export async function enqueueInformeDeLlamadaJob(
+  payload: InformeDeLlamadaJob
+): Promise<void> {
+  if (!IS_PRODUCTION) {
+    // Sin Cloud Tasks en dev, en este proceso y sin esperar: el webhook
+    // contesta a Telnyx antes. Import dinámico: el job importa este módulo.
+    setImmediate(() => {
+      void import("../jobs/informeDeLlamada.js")
+        .then(({ processInformeDeLlamadaJob }) =>
+          processInformeDeLlamadaJob(payload)
+        )
+        .catch((error) =>
+          console.error(
+            `[Job] Falló el informe de la llamada ${payload.callId}:`,
+            error
+          )
+        );
+    });
+    return;
+  }
+  try {
+    await enqueueCloudTask({
+      queue: "process-recording",
+      path: "/internal/jobs/informe-de-llamada",
+      payload,
+      taskId: `informe-${payload.callId}`,
     });
   } catch (error) {
     if ((error as { code?: unknown })?.code === 6) return;

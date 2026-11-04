@@ -28,6 +28,7 @@ import {
   guardarTranscripcionDeTelnyx,
 } from "./transcripcion.js";
 import { programarRecuperacionDeTranscripcion } from "../../jobs/recuperarTranscripcion.js";
+import { pedirInformeDeLlamada } from "../../jobs/informeDeLlamada.js";
 
 /**
  * Envoltorio real verificado en vivo el 2026-09-11 y contra los tipos de
@@ -670,6 +671,13 @@ export async function handleCallConversationEnded(
           timestamp: mensaje.timestamp,
         }))
       );
+      // El informe para el negocio sale de esta transcripción, la que no
+      // va redactada (jobs/informeDeLlamada.ts).
+      await pedirInformeDeLlamada({
+        callRowId: dbCall.id,
+        businessId: dbCall.businessId,
+        origen: "el fin de la conversación",
+      });
     } else if (conversation_id) {
       // Respaldo: la copia de Telnyx, que sale con marcas <PII:…/> en vez
       // del nombre y el teléfono del cliente. Telnyx puede avisar del fin
@@ -691,7 +699,13 @@ export async function handleCallConversationEnded(
       } catch (err) {
         fallo = errorMessage(err);
       }
-      if (guardados === 0) {
+      if (guardados > 0) {
+        await pedirInformeDeLlamada({
+          callRowId: dbCall.id,
+          businessId: dbCall.businessId,
+          origen: "la copia redactada de la transcripción",
+        });
+      } else {
         console.warn(
           `[Telnyx] ${callLabel(call_control_id)} terminó sin transcripción (${fallo ? `la descarga falló: ${fallo}` : "Telnyx aún no tiene mensajes"}); se reintenta en unos minutos (${contexto})`
         );

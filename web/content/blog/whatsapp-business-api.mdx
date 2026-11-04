@@ -1,0 +1,107 @@
+---
+titulo: "WhatsApp Business API: qué es, precio y si la necesitas"
+resumen: "Qué es la API de WhatsApp Business, qué hace falta para tenerla, cuánto cuesta por mensaje en España y cuándo te basta la app gratuita. Con fuentes de Meta."
+fecha: "2026-11-04"
+autor: "Miguel Martín Delgado"
+sector: ""
+imagen: "https://images.unsplash.com/photo-1565630916779-e303be97b6f5?auto=format&fit=crop&w=1600&h=1000&q=80"
+imagenAlt: "Portátil abierto sobre un mostrador de madera clara, con un taburete delante"
+idioma: "es"
+borrador: false
+---
+
+**La API de WhatsApp Business no es una app: es la puerta para que un programa envíe y reciba mensajes por tu número.** No trae bandeja de entrada ni botones; necesita un desarrollador o un proveedor encima. Meta no cobra por acceder a ella, pero sí **por cada mensaje de plantilla** (en España, 0,0585 € el de marketing y 0,0166 € el de utilidad), y el proveedor cobra aparte. Para un negocio pequeño donde contestan una o dos personas, la app gratuita casi siempre basta.
+
+Aquí tienes qué es, qué hace falta, cuánto cuesta con números reales y cuándo compensa. Todo sale de la documentación oficial de Meta y de las webs de los proveedores, consultadas el 4 de noviembre de 2026.
+
+<Indice apartados={[{ texto: "La API de WhatsApp Business, en 30 segundos" }, { texto: "Qué necesitas para tenerla" }, { texto: "Cuánto cuesta en España" }, { texto: "Quién te la da y qué cobra" }, { texto: "Límites, plantillas y consentimiento" }, { texto: "¿Puedo seguir usando mi número de siempre?" }, { texto: "¿Cuándo te basta la app y cuándo necesitas la API?" }, { texto: "Reglas que conviene saber: IA y protección de datos" }, { texto: "La tercera vía: que ya venga montado" }, { texto: "Preguntas frecuentes" }]} />
+
+## La API de WhatsApp Business, en 30 segundos
+
+Su nombre oficial es **WhatsApp Business Platform** (a veces «Cloud API»). Según la [documentación de Meta](https://developers.facebook.com/documentation/business-messaging/whatsapp/about-the-platform), es un conjunto de interfaces para enviar mensajes y llamar, con otra para gestionar cuentas y plantillas, pensado para integrarse con un CRM o con otros sistemas. Meta dice que requiere «recursos de desarrollo» o un partner.
+
+Es decir: **tus clientes siguen escribiendo a WhatsApp como siempre, pero quien contesta es un programa** (o una persona desde un software que lo usa por debajo). La única herramienta web que Meta describe es el WhatsApp Manager, para cuentas, números, plantillas y analítica; no una bandeja para atender chats.
+
+<Tabla titulo="App WhatsApp Business frente a la API" columnas={["", "App WhatsApp Business", "API (Business Platform)"]} filas={[{ celdas: ["Qué es", "Una app para el móvil, con versión para ordenador", "Un conjunto de interfaces para programas"] }, { celdas: ["Para quién la pensó Meta", "Pequeñas empresas", "Empresas medianas y grandes, o quien necesita integrarla con otros sistemas"] }, { celdas: ["Cómo contestas", "Tú, desde el móvil o el ordenador", "Un programa, o un software de un proveedor"] }, { celdas: ["Dispositivos", "Un teléfono y hasta 4 dispositivos vinculados", "Los que permita el software que uses"] }, { celdas: ["Coste de usarla", "Gratis", "Por mensaje de plantilla, más lo que cobre el proveedor"] }, { celdas: ["Mensajes automáticos", "Bienvenida, ausencia y respuestas rápidas (textos fijos)", "Lo que se programe"] }]} nota="Fuentes: documentación de Meta para desarrolladores, FAQ de WhatsApp Business y ayuda de WhatsApp (faq.whatsapp.com/647349420360876), consultadas el 4 de noviembre de 2026." />
+
+Si no tienes claro qué cambia entre la app Business y la normal, está explicado en [WhatsApp Business o WhatsApp normal](/blog/whatsapp-business-o-whatsapp-normal).
+
+## Qué necesitas para tenerla
+
+Según la [documentación de Meta](https://developers.facebook.com/documentation/business-messaging/whatsapp/about-the-platform), estas son las piezas. Meta ya no habla de «WABA»: ahora distingue una cuenta de WhatsApp (números y nombre visible) y una cuenta de mensajería (plantillas y facturación).
+
+<Pasos pasos={[{ titulo: "Un portfolio empresarial de Meta", texto: "La cuenta de empresa de la que cuelga todo lo demás." }, { titulo: "Una cuenta de WhatsApp y una cuenta de mensajería", texto: "En la primera van los números y el nombre visible; en la segunda, las plantillas, la facturación y el método de pago." }, { titulo: "Un número de teléfono propio", texto: "Con prefijo de país, capaz de recibir una llamada o un SMS de verificación. No vale un número corto. Un número que ya está en WhatsApp no se puede registrar «a menos que se elimine primero»: para usar el mismo sin borrarlo, hay una vía llamada coexistencia (más abajo)." }, { titulo: "Un nombre visible", texto: "Es obligatorio al registrar el número y se puede cambiar 10 veces cada 30 días." }, { titulo: "Una app de Meta con claves", texto: "Una app asociada, con tokens y permisos de acceso." }, { titulo: "Un programa o un proveedor que la use", texto: "Sin esto, la API no hace nada: no hay pantalla donde contestar." }]} />
+
+¿Y la verificación del negocio? **No figura en la documentación como requisito para empezar**, pero sí cambia tus límites: sin verificar, el tope es de 250 plantillas por cuenta de mensajería; verificado, de 6.000. Es una de las tres vías para subir el límite de envío de 250 a 2.000 destinatarios. Meta pide nombre legal, dirección, teléfono y web, puede pedir documentos oficiales y tarda **hasta 14 días laborables** ([ayuda de Meta](https://www.facebook.com/business/help/2058515294227817)).
+
+## Cuánto cuesta en España
+
+Meta cobra **por mensaje entregado** desde el 1 de julio de 2025, solo del negocio al cliente: lo que te escribe el cliente a ti no cuesta nada. La tarifa depende de la categoría del mensaje y del prefijo del destinatario, y **España tiene tarifa propia** (prefijo +34) ([tarifas de Meta](https://developers.facebook.com/documentation/business-messaging/whatsapp/pricing)).
+
+<Tabla titulo="Lo que cobra Meta por mensaje en España, en euros" columnas={["Tipo de mensaje", "Qué es", "Precio por mensaje"]} filas={[{ celdas: ["Servicio", "Contestas dentro de las 24 horas desde el último mensaje del cliente", "Gratis los primeros 1.000 al mes por número; después, 0,0166 €"] }, { celdas: ["Utilidad", "Plantilla no promocional y concreta, fuera de esas 24 horas", "0,0166 €"] }, { celdas: ["Autenticación", "Códigos de verificación", "0,0166 €"] }, { celdas: ["Marketing", "Promociones, novedades, ofertas", "0,0585 €"] }, { celdas: ["Mensajes del cliente a ti", "Cualquier mensaje que recibes", "Gratis"] }]} nota="Tarifa de Meta vigente desde el 1 de octubre de 2026, en euros. La de marketing de España subió el 1 de julio de 2026. Meta solo cambia tarifas el 1 de enero, abril, julio y octubre, con al menos un mes de aviso: no hay ningún cambio publicado para 2027." />
+
+Tres cosas que despistan:
+
+- **El 1 de octubre de 2026 cambió lo gratis.** Hasta entonces, los mensajes de servicio y los de utilidad dentro de la ventana de 24 horas no costaban. Ahora los de servicio son gratis solo hasta 1.000 al mes por número (no se acumulan), y los de utilidad dentro de la ventana también se cobran. Si ves una página que dice lo contrario, es antigua: incluso la web comercial de Meta sigue sin actualizar ese punto.
+- **Si no hay método de pago en tu cuenta de mensajería, Meta deja de entregar los mensajes de servicio** cuando agotas los 1.000 gratuitos.
+- **La categoría la decide Meta**, no tú. Una plantilla de «utilidad» debe ser no promocional y específica; si Meta entiende que es marketing, la aprueba como marketing ([categorización de plantillas](https://developers.facebook.com/documentation/business-messaging/whatsapp/templates/template-categorization)). Un recordatorio de cita cumple esa definición, pero la guía de Meta no lo cita como ejemplo; y si le añades una oferta, ya no.
+
+Los mensajes que llegan por un anuncio «Click to WhatsApp» tienen su propia ventana gratuita, de hasta 7 días según la documentación para desarrolladores.
+
+<Dato cifra="0,0585 €" texto="cuesta en España cada mensaje de marketing por la API, frente a 0,0166 € los de utilidad. Una promoción a 100 clientes son 5,85 €; cien avisos de utilidad, 1,66 €." fuente="Tarifas de Meta, vigentes desde el 1 de octubre de 2026" fuenteUrl="https://developers.facebook.com/documentation/business-messaging/whatsapp/pricing" />
+
+<Cuenta titulo="Un mes de ejemplo: una peluquería con la API" lineas={[{ concepto: "Recordatorios de cita", importe: "4,98 €", detalle: "300 mensajes de utilidad × 0,0166 €" }, { concepto: "Una promoción", importe: "2,93 €", detalle: "50 mensajes de marketing × 0,0585 €" }, { concepto: "Respuestas dentro de las 24 horas", importe: "0,00 €", detalle: "Menos de 1.000 al mes" }, { concepto: "Cuota del proveedor", importe: "49,00 €", detalle: "Ejemplo: el plan Regular de 360dialog" }]} totalConcepto="Total al mes, sin impuestos" total="56,91 €" nota="Ejemplo inventado, con los precios de Meta y del proveedor del 4 de noviembre de 2026. Lo que ves es que lo caro no suele ser Meta, sino la herramienta y quien la monta." />
+
+## Quién te la da y qué cobra
+
+Hay dos caminos. El **directo**, para quien tiene un desarrollador. Y el de un **partner**: Meta distingue Solution Partners (pueden facturarte el uso de la API), Tech Providers (tú pones tu propio método de pago y Meta te factura) y Tech Partners ([documentación de Meta](https://developers.facebook.com/documentation/business-messaging/whatsapp/solution-providers/overview)). Meta no cobra por acceder, pero reconoce que los partners **«pueden cobrar tarifas adicionales»**.
+
+<Tabla titulo="Qué cobran tres proveedores que publican precios" columnas={["Proveedor", "Cuota", "Recargo por mensaje", "Aparte"]} filas={[{ celdas: ["360dialog", "49 € (Regular), 99 € (Premium) o 500 € (Scale) por número y mes", "Ninguno, según su web", "Las tarifas de Meta"] }, { celdas: ["Twilio", "Ninguna en su página de precios", "0,005 USD por mensaje, entrante o saliente", "Las tarifas de Meta"] }, { celdas: ["Wati", "Desde 59 € al mes con facturación anual (3 usuarios); número adicional, 29 € al mes", "No lo dice", "Cargos adicionales por mensajes de plantilla"] }]} nota="Precios publicados en sus webs el 4 de noviembre de 2026 (360dialog, Twilio, Wati). Cambian: confirma el tuyo antes de contratar. Hay muchos más proveedores; estos son los que muestran sus tarifas." />
+
+Algo que casi nadie cuenta: con la API **hay que elegir un software de bandeja de entrada** (el que usarás para contestar) o encargar uno a medida. Es lo que incluye, por ejemplo, el precio de Wati: la pantalla.
+
+## Límites, plantillas y consentimiento
+
+La API se rige por reglas distintas a las de la app:
+
+- **Ventana de 24 horas.** Se abre cuando el cliente te escribe o te llama y se renueva con cada mensaje suyo. Dentro, contestas con texto libre. Fuera, solo con **plantillas aprobadas por Meta** ([documentación](https://developers.facebook.com/documentation/business-messaging/whatsapp/messages/send-messages)).
+- **Aprobación de plantillas.** La revisión es automática y puede tardar hasta 24 horas ([documentación](https://developers.facebook.com/documentation/business-messaging/whatsapp/templates/template-review)).
+- **Consentimiento.** Solo puedes escribir a quien te dio su número y aceptó recibir mensajes, y tienes que poder demostrarlo. Vale por SMS, web, en persona o en papel ([documentación](https://developers.facebook.com/documentation/business-messaging/whatsapp/getting-opt-in)). La política de mensajería, actualizada el 23 de septiembre de 2026, añade que debes respetar toda petición de baja.
+- **Límite de envío.** Un portfolio nuevo puede escribir, fuera de las 24 horas, a **250 destinatarios distintos cada 24 horas**. Sube a 2.000 (verificando el negocio, o enviando 2.000 mensajes con plantillas de calidad alta en 30 días) y después a 10.000, 100.000 e ilimitado, de forma automática si usas al menos la mitad del límite con buena calidad. El límite no afecta a lo que contestas dentro de la ventana ([documentación](https://developers.facebook.com/documentation/business-messaging/whatsapp/messaging-limits)).
+- **Calidad del número.** Verde, amarillo o rojo, según cómo reaccionen tus clientes (bloqueos y denuncias) en los últimos 7 días.
+
+## ¿Puedo seguir usando mi número de siempre?
+
+Sí, con la **coexistencia**: Meta permite usar el mismo número en la app y en la API. Está disponible en la UE desde el 23 de octubre de 2025 (España incluida: la documentación no lista excepciones), exige la versión 2.24.17 de la app o superior y que el alta la haga un partner de Meta ([documentación](https://developers.facebook.com/documentation/business-messaging/whatsapp/embedded-signup/onboarding-business-app-users)).
+
+<Tabla titulo="Con la coexistencia, qué se mantiene y qué cambia" columnas={["Qué", "Qué pasa"]} filas={[{ celdas: ["Tus chats", "Se sincronizan los chats uno a uno de los últimos 6 meses y los contactos. Los grupos no."] }, { celdas: ["Mensajes temporales, «ver una vez» y ubicación en tiempo real", "Se desactivan en los chats uno a uno."] }, { celdas: ["Listas de difusión", "No puedes crear nuevas y las que tenías quedan de solo lectura."] }, { celdas: ["Dispositivos vinculados", "Se desvinculan al activarla. Los puedes volver a vincular, salvo WhatsApp para Windows y WearOS."] }, { celdas: ["Lo que sigue en la app", "Llamadas, catálogo, estados, bienvenida y ausencia, respuestas rápidas, etiquetas y perfil."] }, { celdas: ["Lo que envías desde la app", "Sigue siendo gratis y no abre ni alarga la ventana de la API."] }, { celdas: ["Si no abres la app", "Meta documenta una desconexión tras unos 14 días de inactividad del móvil principal."] }]} nota="Fuente: documentación de Meta (onboarding de usuarios de la app, y referencia del evento account_update), consultada el 4 de noviembre de 2026." />
+
+Si quieres saber cómo van los mensajes automáticos de la app antes de plantearte esto, empieza por [mensajes automáticos en WhatsApp Business](/blog/mensajes-automaticos-whatsapp-business).
+
+## ¿Cuándo te basta la app y cuándo necesitas la API?
+
+**Meta no publica ningún umbral numérico.** Lo que dice es cualitativo: la app es «para pequeñas empresas», con un teléfono y hasta cuatro dispositivos vinculados, y la plataforma es para empresas medianas y grandes, con acceso programático e integración con CRM o sistemas de gestión ([FAQ de WhatsApp Business](https://whatsappbusiness.com/resources/faq/)). Lo siguiente son **criterios nuestros**, para un negocio con citas:
+
+<Checklist items={[{ texto: "Te basta la app si contestáis una o dos personas, desde el móvil o el ordenador, y las preguntas son las de siempre: horario, precio, hueco." }, { texto: "Te basta la app si la bienvenida, la ausencia y las respuestas rápidas (textos fijos) cubren lo que escribe la gente." }, { texto: "Te basta la app si no necesitas que un programa lea tus mensajes ni los pase a otro sistema." }, { texto: "Mira la API si quieres que un programa reserve o cambie citas leyendo tu calendario." }, { texto: "Mira la API si tienes varias personas contestando desde una bandeja compartida." }, { texto: "Mira la API si necesitas enviar recordatorios automáticos con plantilla, o un bot que conteste a cualquier hora." }]} />
+
+Y una advertencia práctica: pasar a la API es una decisión que cuesta cambiar de vuelta (el número, las listas de difusión, los dispositivos). Decídelo con la lista delante, no por el titular de un proveedor.
+
+## Reglas que conviene saber: IA y protección de datos
+
+- **Bots de IA.** Desde el 15 de enero de 2026, los términos de Meta prohíben a los proveedores de IA ofrecer asistentes de uso general por la plataforma, salvo donde Meta esté legalmente obligada a permitirlo. Afecta a quienes venden la IA, no al negocio que la usa para atender a sus clientes. Un bot que solo reserva citas no es de propósito general; es nuestra lectura, porque ninguna página oficial lo dice expresamente. Si contratas a un proveedor de IA, los términos tampoco permiten que los datos de la plataforma se usen para entrenar modelos que mejoren otros. Más en [chatbot e IA para WhatsApp Business](/blog/chatbot-ia-whatsapp-business).
+- **Protección de datos.** Con la API, Meta actúa como encargado del tratamiento y tú sigues siendo responsable frente a tus clientes: tienes que informarles y tener una política de privacidad. Meta conserva los mensajes un máximo de 30 días para que el servicio funcione. Para una clínica, la política de Meta restringe el uso de WhatsApp para información de salud donde la norma lo veta: consúltalo con tu asesor.
+- **Mensajes comerciales.** El artículo 21 de la LSSI prohíbe las comunicaciones comerciales no solicitadas ni autorizadas por medios electrónicos equivalentes, y la AEPD la aplica también a WhatsApp ([BOE](https://www.boe.es/buscar/act.php?id=BOE-A-2002-13758)). Los recordatorios de una cita que el cliente ha pedido no son lo mismo que una promoción: pregunta a tu gestor por las segundas.
+
+No es asesoramiento jurídico. Para el resto de reglas de la IA, [la ley y la recepcionista de IA](/guias/ley-y-recepcionista-de-ia).
+
+## La tercera vía: que ya venga montado
+
+Todo lo de arriba (cuentas, plantillas, claves, un programa que escuche) es lo que **no tienes que hacer** con un servicio ya montado. Alhabla **contesta tus llamadas** con una recepcionista de IA que avisa de que es una IA, reserva en tu calendario (Google, Outlook, iCloud o la agenda de Alhabla) y **confirma la cita al cliente por WhatsApp**, donde puede cambiarla o anularla contestando. Y tú, desde [tu asistente por WhatsApp](/agenda-por-whatsapp), cambias citas y horarios sin tocar el calendario, y nada se aplica hasta que pulsas «Confirmar».
+
+Tu WhatsApp Business sigue siendo tuyo: Alhabla no lo toca, y sus mensajes salen de su propio número con el nombre de tu negocio. El detalle, en [citas por WhatsApp](/integraciones/whatsapp). Y si prefieres ver cómo conectar la app a un calendario sin esto, está en [WhatsApp Business y Google Calendar](/blog/whatsapp-business-google-calendar).
+
+## Preguntas frecuentes
+
+<Faq preguntas={[{ pregunta: "¿Qué es la API de WhatsApp Business?", respuesta: "Es la WhatsApp Business Platform: un conjunto de interfaces para que un programa envíe y reciba mensajes de WhatsApp, con otra interfaz para gestionar cuentas y plantillas. No es una app ni trae bandeja de entrada: hace falta un desarrollador o un proveedor." }, { pregunta: "¿La API de WhatsApp Business es gratis?", respuesta: "Meta no cobra por acceder, pero sí por cada mensaje de plantilla que envías, y los proveedores pueden cobrar cuotas y recargos aparte. Lo que te escriben tus clientes no cuesta nada, y los primeros 1.000 mensajes de servicio al mes por número tampoco." }, { pregunta: "¿Cuánto cuesta un mensaje de WhatsApp Business en España?", respuesta: "Según la tarifa de Meta vigente desde el 1 de octubre de 2026: 0,0585 € el de marketing, 0,0166 € el de utilidad, 0,0166 € el de autenticación y 0,0166 € el de servicio a partir de los 1.000 gratuitos al mes. Es solo la parte de Meta: el proveedor cobra aparte." }, { pregunta: "¿Necesito verificar mi negocio?", respuesta: "La documentación no la exige para empezar, pero sin verificar el límite de plantillas es de 250 y la verificación es una de las vías para subir el límite de envío de 250 a 2.000 destinatarios cada 24 horas. Meta puede tardar hasta 14 días laborables en decidir." }, { pregunta: "¿Puedo usar la API y la app con el mismo número?", respuesta: "Sí, con la coexistencia de Meta, disponible en la UE desde el 23 de octubre de 2025. Exige la versión 2.24.17 de la app o superior y un partner de Meta, sincroniza seis meses de chats uno a uno y desactiva o cambia algunas funciones, como las listas de difusión nuevas o WhatsApp para Windows." }, { pregunta: "¿Cuándo me basta la app de WhatsApp Business?", respuesta: "Meta no da un número exacto. La app está pensada para pequeñas empresas, con un teléfono y hasta 4 dispositivos vinculados. Si contestáis una o dos personas y no necesitas que un programa lea o gestione los mensajes, suele ser suficiente." }, { pregunta: "¿Puedo poner un chatbot de IA con la API?", respuesta: "Sí, para atender a tus clientes: lo que Meta prohíbe desde el 15 de enero de 2026 son los asistentes de IA de uso general ofrecidos por proveedores de IA. Un bot que solo reserva citas no lo es, según nuestra lectura de los términos." }]} />
+
+<Cta titulo="Que contesten tus llamadas, y la cita llegue a tu agenda" texto="Una recepcionista de IA que reserva en tu calendario y confirma por WhatsApp, sin cuentas, claves ni plantillas. 7 días de prueba, sin permanencia." destino="planes" />

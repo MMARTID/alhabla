@@ -59,8 +59,8 @@ async function cerrarLlamadasZombi(): Promise<void> {
   console.log("[Reaper] Limpieza completada.");
 }
 
-/** Margen que tienen los insights de la conversación para llegar tras colgar
- * (el mismo que `sin_resultado` en mcp/saludDeLlamadas.ts). */
+/** Margen que tiene el informe de la llamada para llegar tras colgar (el
+ * mismo que `sin_resultado` en mcp/saludDeLlamadas.ts). */
 const MARGEN_PARA_EL_RESULTADO_MS = 10 * 60 * 1000;
 /** La cadencia del barrido: cada llamada cae en una sola ventana y se avisa
  * una vez. */
@@ -68,8 +68,9 @@ const VENTANA_DEL_BARRIDO_MS = 15 * 60 * 1000;
 
 /**
  * Llamadas de Telnyx que acabaron sin resultado (`outcome`), es decir, sin
- * que llegaran los insights de la conversación: el informe al dueño, el
- * resultado del panel y el cobro por resultado dependen de ellos. Las de
+ * que llegara su informe (jobs/informeDeLlamada.ts; hasta el 2026-11-04,
+ * los insights de Telnyx): el aviso al dueño, el resultado del panel y el
+ * cobro por resultado dependen de él. Las de
  * coste 0 colgaron antes de que contestara el assistant y no cuentan. Deja
  * un `console.error` con «[Salud]», que vigila la alerta «llamadas de voz con
  * fallos» (AGENTS.md § Alertas; docs/historico/PLAN-RETIRAR-RETELL.md, PR 5). Nunca lanza:
@@ -96,7 +97,7 @@ export async function avisarDeLlamadasSinResultado(
     });
     if (sinResultado.length === 0) return;
     console.error(
-      `[Salud] ${sinResultado.length} ${sinResultado.length === 1 ? "llamada de Telnyx acabó" : "llamadas de Telnyx acabaron"} hace más de 10 min sin resultado (no llegaron los insights de la conversación): ${sinResultado.map((call) => `${call.id} (negocio ${call.businessId})`).join(", ")}`
+      `[Salud] ${sinResultado.length} ${sinResultado.length === 1 ? "llamada de Telnyx acabó" : "llamadas de Telnyx acabaron"} hace más de 10 min sin resultado (no llegó el informe de la llamada): ${sinResultado.map((call) => `${call.id} (negocio ${call.businessId})`).join(", ")}`
     );
   } catch (error) {
     console.error(

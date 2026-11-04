@@ -1301,12 +1301,13 @@ export const ESCENARIOS: Escenario[] = [
             turno: 1,
             descripcion: "No informa durante la conversación",
           },
-          // Por chat no hay post-conversación: el modelo informa al
-          // despedirse (a veces dos veces, y Telnyx contesta a la segunda con
-          // su texto fijo en inglés). Eso es del laboratorio, no del prompt de
-          // voz, así que el turno de la despedida no cuenta. Falta medirlo
-          // con el mensaje de fin de Telnyx (informe del bucle del 30-10,
-          // pieza 3) cuando se confirme cómo llega por chat.
+          // Desde el 04-11 el assistant de voz no tiene informar_al_negocio
+          // (el informe lo escribe el backend al colgar): «antes de informar»
+          // es la llamada entera y estas dos pasan sin llamarla. Con el
+          // prompt de antes, por chat no había post-conversación y el modelo
+          // informaba al despedirse (a veces dos veces, y Telnyx contestaba a
+          // la segunda con su texto fijo en inglés), así que el turno de la
+          // despedida no cuenta.
           {
             tipo: "llama",
             herramientas: ["informar_al_negocio"],

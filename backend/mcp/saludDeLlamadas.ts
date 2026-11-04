@@ -17,8 +17,9 @@ import { momentoDesde } from "./tiempo.js";
  * llamadas simuladas por el MCP (`sim-mcp-…`).
  */
 
-/** Cuánto se espera a que lleguen el coste, la grabación y los insights
- * después de colgar antes de contarlo como que falta. */
+/** Cuánto se espera a que lleguen el coste, la grabación y el informe
+ * (jobs/informeDeLlamada.ts) después de colgar antes de contarlo como que
+ * falta. */
 const MARGEN_TRAS_COLGAR = "interval '10 minutes'";
 
 /** Una llamada que lleva esto «en curso» sin moverse es un zombi
@@ -32,7 +33,7 @@ const RETENCION_DEL_TEXTO = "interval '90 days'";
 
 /** Telnyx cobró 0: quien llamó colgó antes de que contestara el assistant
  * (originator_cancel mientras sonaba). Esas llamadas no tienen conversación,
- * transcripción ni insights, y no es un fallo. IS NOT DISTINCT FROM y no
+ * transcripción ni informe, y no es un fallo. IS NOT DISTINCT FROM y no
  * «= 0»: con el coste aún sin llegar (NULL), `NOT (… = 0)` daría NULL y la
  * llamada dejaría de contar como rota. */
 const NO_SE_CONTESTO = `c."voiceProvider" = 'telnyx' AND c."providerCostCents" IS NOT DISTINCT FROM 0`;
@@ -209,7 +210,7 @@ export async function saludDeLlamadas(
       sin_grabacion: "con permiso para grabar, 10 s o más y sin fila en recordings",
       grabacion_sin_copiar: "la grabación no está en R2 10 min después (processRecording)",
       grabacion_fallida: "processRecording se rindió (processingFailedAt)",
-      sin_resultado: "COMPLETED sin outcome 10 min después (no llegaron los insights)",
+      sin_resultado: "COMPLETED sin outcome 10 min después (no llegó el informe de la llamada)",
     },
     dias: agruparPorDia(
       porDia.filas as { dia: string; tipo: string; clave: string; n: string }[]

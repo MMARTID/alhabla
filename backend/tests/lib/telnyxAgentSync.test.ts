@@ -27,6 +27,17 @@ vi.mock("../../src/adapters/telnyx/TelnyxAiAdapter.js", () => ({
   },
 }));
 
+// La biblioteca de tools y el grupo de insights de Telnyx: un id por tool
+// (su nombre) y un grupo fijo, sin llamar a Telnyx.
+vi.mock("../../src/lib/toolsCompartidas.js", () => ({
+  idsDeToolsCompartidas: vi.fn(async (tools: Array<{ webhook: { name: string } }>) =>
+    tools.map((tool) => `tool-${tool.webhook.name}`)
+  ),
+}));
+vi.mock("../../src/lib/insightsDeTelnyx.js", () => ({
+  grupoDeInsightsDeLaRecepcionista: vi.fn().mockResolvedValue("grupo-vacio"),
+}));
+
 // Gate de la frase de la lista de espera en el prompt (PR 4): por defecto
 // aprobada, para que la salida de estos tests no cambie.
 vi.mock("../../src/modules/whatsapp/service.js", () => ({
@@ -98,6 +109,14 @@ function agenteSincronizable() {
 
 const mockedListaDeEspera = vi.mocked(listaDeEsperaDisponible);
 
+/** Los payloads de los assistants de llamadas creados, sin los de chat
+ * (cada creación crea los dos). */
+function payloadsDeVozCreados() {
+  return mockedCreateAssistant.mock.calls
+    .map((llamada) => llamada[0])
+    .filter((payload) => !payload.name.startsWith("alhabla-chat-"));
+}
+
 const AGENTE_NUEVO = {
   id: "agent1",
   systemPrompt: "prompt guardado",
@@ -134,7 +153,7 @@ describe("createTelnyxAssistantForAgent", () => {
       agentId: "agent1",
       businessId: "biz1",
     });
-    const sinOferta = mockedCreateAssistant.mock.calls[1][0].instructions;
+    const sinOferta = payloadsDeVozCreados()[1]!.instructions;
     expect(sinOferta).not.toContain("te aviso por WhatsApp");
     expect(sinOferta).toContain("no uses notify_when_available");
     expect(mockedListaDeEspera).toHaveBeenCalledTimes(2);
@@ -165,7 +184,7 @@ describe("createTelnyxAssistantForAgent", () => {
       stripePriceId: null,
     } as any);
     await createTelnyxAssistantForAgent({ agentId: "agent1", businessId: "biz1" });
-    const enInicio = mockedCreateAssistant.mock.calls[1][0].instructions;
+    const enInicio = payloadsDeVozCreados()[1]!.instructions;
     expect(enInicio).toContain("le envías la confirmación por WhatsApp");
     expect(enInicio).not.toContain("un recordatorio por WhatsApp");
     expect(mockedBusinessFindUnique).toHaveBeenCalledWith(
@@ -207,13 +226,21 @@ describe("createTelnyxAssistantForAgent", () => {
     });
 
     expect(result).toEqual({ eligible: true, reason: null });
-    expect(mockedCreateAssistant).toHaveBeenCalledTimes(1);
+    // El de llamadas y el de chat de clientes.
+    expect(mockedCreateAssistant).toHaveBeenCalledTimes(2);
     expect(mockedAgentUpdate).toHaveBeenCalledWith({
       where: { id: "agent1" },
       data: expect.objectContaining({
         telnyxAssistantId: "assistant_1",
         telnyxSyncError: null,
       }),
+    });
+    expect(mockedAgentUpdate).toHaveBeenCalledWith({
+      where: { id: "agent1" },
+      data: {
+        telnyxChatAssistantId: "assistant_1",
+        telnyxChatConfigHash: expect.any(String),
+      },
     });
   });
 
@@ -515,19 +542,20 @@ describe("createTelnyxAssistantForAgent", () => {
     });
 
     const payload = mockedCreateAssistant.mock.calls[0][0];
-    const nombres = payload.tools!.map((tool) =>
-      tool.type === "webhook" ? tool.webhook.name : tool.type
-    );
-    expect(nombres).toEqual(
+    // Las de webhook, de la biblioteca de Telnyx; inline solo hangup.
+    expect(payload.toolIds).toEqual(
       expect.arrayContaining([
-        "get_catalog",
-        "check_availability",
-        "book_appointment",
-        "find_my_appointment",
-        "cancel_appointment",
-        "hangup",
+        "tool-get_catalog",
+        "tool-check_availability",
+        "tool-book_appointment",
+        "tool-find_my_appointment",
+        "tool-cancel_appointment",
+        "tool-preferencia_de_grabacion",
       ])
     );
+    expect(payload.toolIds).not.toContain("tool-informar_al_negocio");
+    expect(payload.tools!.map((tool) => tool.type)).toEqual(["hangup"]);
+    expect(payload.insightGroupId).toBe("grupo-vacio");
     expect(payload.transcription?.settings).toMatchObject({
       keyterm: "Corte,Montse",
     });
@@ -649,7 +677,7 @@ describe("crearAssistantDelNegocio", () => {
     });
 
     expect(result).toEqual({ eligible: true, reason: null });
-    expect(mockedCreateAssistant).toHaveBeenCalledTimes(1);
+    expect(mockedCreateAssistant).toHaveBeenCalledTimes(2);
     expect(mockedBusinessUpdate).toHaveBeenCalledWith({
       where: { id: "biz1" },
       data: {
@@ -841,11 +869,12 @@ describe("transferencia al dueño (fase 4)", () => {
     const transfer = payload.tools!.filter((tool) => tool.type === "transfer");
     expect(transfer).toHaveLength(1);
     expect(transfer[0]).toEqual(TOOL_TRANSFER_ESPERADA);
-    // Las tools de voz y hangup siguen ahí: la de transferencia se añade,
-    // no sustituye.
+    // Las tools de voz (de la biblioteca) y hangup siguen ahí: la de
+    // transferencia se añade, no sustituye.
     expect(payload.tools!.map((tool) => tool.type)).toEqual(
-      expect.arrayContaining(["webhook", "hangup", "transfer"])
+      expect.arrayContaining(["hangup", "transfer"])
     );
+    expect(payload.toolIds).toContain("tool-get_catalog");
     expect(JSON.parse(payload.instructions)).toHaveProperty("Pasar la llamada");
     expect(payload.instructions).toContain("Pásala solo si el cliente pide");
     // Si la IA falla a mitad de llamada, Telnyx la pasa al mismo móvil
@@ -1068,5 +1097,109 @@ describe("transferencia al dueño — prompts editados a mano y copia del panel"
     // buildTelnyxAssistantPayload ({{telnyx_current_time_…}}).
     expect(data.systemPrompt).toContain("{{current_time_Europe/Madrid}}");
     expect(data.systemPrompt).not.toContain("{{telnyx_");
+  });
+});
+
+describe("assistant de chat de clientes (separado del de llamadas)", () => {
+  it("un agente de antes, sin assistant de chat, lo recibe en su sincronización con su prompt y sus tools", async () => {
+    mockedBusinessFindUnique.mockResolvedValue(BASE_BUSINESS as any);
+    mockedAgentFindMany.mockResolvedValue(agenteSincronizable());
+    mockedUpdateAssistant.mockResolvedValue({} as any);
+    mockedCreateAssistant.mockResolvedValue({
+      id: "assistant_chat_1",
+      name: "alhabla-chat-biz1-agent1",
+      instructions: "i",
+    });
+
+    await syncAgentToTelnyx("biz1");
+
+    expect(mockedUpdateAssistant).toHaveBeenCalledTimes(1);
+    expect(mockedUpdateAssistant.mock.calls[0][0]).toBe("assistant_1");
+    expect(mockedCreateAssistant).toHaveBeenCalledTimes(1);
+    const chat = mockedCreateAssistant.mock.calls[0][0];
+    expect(chat.name).toBe("alhabla-chat-biz1-agent1");
+    expect(chat.enabledFeatures).toEqual([]);
+    expect(chat.voiceSettings).toBeUndefined();
+    expect(chat.telephonySettings).toBeUndefined();
+    expect(chat.tools).toEqual([]);
+    expect(chat.toolIds).toContain("tool-informar_al_negocio");
+    expect(chat.toolIds).not.toContain("tool-preferencia_de_grabacion");
+    expect(chat.insightGroupId).toBe("grupo-vacio");
+    const secciones = Object.keys(JSON.parse(chat.instructions));
+    expect(secciones).toContain("Chat por WhatsApp");
+    expect(secciones).not.toContain("Grabación");
+    expect(secciones).not.toContain("Cierre");
+
+    const voz = mockedUpdateAssistant.mock.calls[0][1];
+    const deVoz = Object.keys(JSON.parse(voz.instructions!));
+    expect(deVoz).not.toContain("Chat por WhatsApp");
+    expect(deVoz).toContain("Datos de esta llamada");
+    // Sin post-conversación: el informe lo escribe el backend.
+    expect(voz.postConversationSettings).toEqual({ enabled: false });
+
+    expect(mockedAgentUpdate).toHaveBeenCalledWith({
+      where: { id: "agent1" },
+      data: expect.objectContaining({
+        telnyxChatAssistantId: "assistant_chat_1",
+        telnyxChatConfigHash: expect.any(String),
+        telnyxSyncError: null,
+      }),
+    });
+  });
+
+  it("con el assistant de chat al día no lo vuelve a mandar", async () => {
+    mockedBusinessFindUnique.mockResolvedValue(BASE_BUSINESS as any);
+    mockedAgentFindMany.mockResolvedValue(agenteSincronizable());
+    mockedCreateAssistant.mockResolvedValue({
+      id: "assistant_chat_1",
+      name: "alhabla-chat-biz1-agent1",
+      instructions: "i",
+    });
+    await syncAgentToTelnyx("biz1");
+    const datos = (mockedAgentUpdate.mock.calls[0][0] as any).data;
+
+    vi.clearAllMocks();
+    mockedBusinessFindUnique.mockResolvedValue(BASE_BUSINESS as any);
+    mockedServiceFindMany.mockResolvedValue([]);
+    mockedProfessionalFindMany.mockResolvedValue([]);
+    mockedListVoices.mockResolvedValue(ELIGIBLE_VOICES);
+    mockedAgentFindMany.mockResolvedValue([
+      {
+        ...agenteSincronizable()[0],
+        telnyxConfigHash: datos.telnyxConfigHash,
+        telnyxChatAssistantId: "assistant_chat_1",
+        telnyxChatConfigHash: datos.telnyxChatConfigHash,
+      },
+    ] as any);
+    await syncAgentToTelnyx("biz1");
+
+    expect(mockedUpdateAssistant).not.toHaveBeenCalled();
+    expect(mockedCreateAssistant).not.toHaveBeenCalled();
+  });
+
+  it("si el de chat falla, el de llamadas se queda al día y el error queda guardado", async () => {
+    mockedBusinessFindUnique.mockResolvedValue(BASE_BUSINESS as any);
+    mockedAgentFindMany.mockResolvedValue([
+      {
+        ...agenteSincronizable()[0],
+        telnyxChatAssistantId: "assistant_chat_1",
+        telnyxChatConfigHash: "hash-vieja-del-chat",
+      },
+    ] as any);
+    mockedUpdateAssistant.mockImplementation(async (id) => {
+      if (id === "assistant_chat_1") throw new Error("Telnyx 500");
+      return {} as any;
+    });
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    await syncAgentToTelnyx("biz1");
+
+    expect(mockedUpdateAssistant).toHaveBeenCalledTimes(2);
+    const data = (mockedAgentUpdate.mock.calls[0][0] as any).data;
+    expect(data.telnyxConfigHash).toEqual(expect.any(String));
+    expect(data.telnyxConfigHash).not.toBe("hash-vieja");
+    // El hash del chat no avanza: la próxima sincronización lo reintenta.
+    expect(data.telnyxChatConfigHash).toBe("hash-vieja-del-chat");
+    expect(data.telnyxSyncError).toMatch(/Assistant de chat: Telnyx 500/);
   });
 });

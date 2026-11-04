@@ -3838,8 +3838,10 @@ export async function executeVoiceTool(
     case "no_grabar":
       return executePreferenciaDeGrabacion(business, false, callLabel, callId);
     case "informar_al_negocio": {
-      // Post-conversación (PLAN-CANAL-DUENO.md § 10): siempre 200, para que
-      // el assistant no reintente y duplique el recado.
+      // El chat de WhatsApp al despedirse (las llamadas, desde el 04-11, en
+      // jobs/informeDeLlamada.ts; los assistants de voz de antes la siguen
+      // teniendo hasta que se sincronizan). Siempre 200, para que el
+      // assistant no reintente y duplique el recado.
       if (!callId) {
         console.error(`[VoiceTools] ${callLabel} informar_al_negocio sin callId`);
         return { success: true, result: { success: false } };

@@ -217,8 +217,12 @@ each page's image explicitly from its `openGraph`/`twitter` metadata.
   WhatsApp on the iPhone render plus the panel on the same 3D laptop, reacting to each change; a
   timed simulation, not scroll-driven, that cycles through three real assistant actions —
   `marcar_ausencia` + `mover_cita` + `avisar_cliente`, `cerrar_dia`, `editar_servicio`. The
-  laptop helpers shared by both scenes live in `web/src/lib/portatil-3d.ts`; on phones only the
-  iPhone is shown), `PuntosFuertesSection`, `WhatsAppClientesSection`, `EnMarchaSection`,
+  laptop helpers shared by both scenes live in `web/src/lib/portatil-3d.ts`, which imports three:
+  components must NOT import it (they take the credit from `portatil-3d-credito.ts`, no three), or
+  ~170 KB of three.js land in the home's initial JS; `web/tests/lib/js-inicial.test.ts` guards it,
+  as well as the on-demand `DemoVoiceCallDiferida` and the home hero's CSS entrance `.entrada-hero`
+  — never wrap the hero's H1 in `Reveal`, whose HTML ships with opacity 0 until hydration and made
+  the LCP wait for all the JS; on phones only the iPhone is shown), `PuntosFuertesSection`, `WhatsAppClientesSection`, `EnMarchaSection`,
   `EscenasDeOficio` (`#sectores`, «Elige tu oficio y mira la llamada que entra.»: since
   2026-10-30 the eight sectors are drawn scenes, not the stock-photo accordion. One card per sector
   in menu order, data in `web/src/lib/escenas-de-oficio.ts`: the ringing tile, «Suena y estás…»,
@@ -1022,7 +1026,11 @@ handler**: todo pasa por
   mensaje del día 1 sobre el desvío — con el instante del intento, para que el job pueda
   reintentar si no salió por ninguna vía).
 
-**Código (fase 1, PR 5 — recado por post-conversación, 2026-09-20).**
+**Código (fase 1, PR 5 — recado por post-conversación, 2026-09-20).** Desde el 2026-11-04 la
+post-conversación ya no existe: el informe de una llamada lo escribe el backend al colgar con la
+transcripción (`jobs/informeDeLlamada.ts`, ver § Telnyx › Classification and the call report) y
+la tool `informar_al_negocio` solo la tiene el assistant de chat, que la llama al despedirse. Lo
+de abajo (`procesarInformeFinal`, combinar informes, la revisión de escaladas) sigue igual.
 - Tool `informar_al_negocio` (`buildInformarAlNegocioTool` en `lib/telnyxAssistantPayload.ts`,
   inline como las demás — la migración a *shared tools* es #102) y
   `post_conversation_settings.enabled: true` en el payload del assistant (adaptador: create y
@@ -2380,9 +2388,16 @@ Telnyx assistant itself (MCP `ver_assistant_telnyx`), not only the DB.
   `call.recording.saved`, `call.conversation_insights.generated` and `call.cost`.
 - **Tools.** `buildTelnyxVoiceTools(baseUrl)` (`lib/telnyxAssistantPayload.ts`) registers
   `get_catalog`, `check_availability`, `book_appointment`, `find_my_appointment`,
-  `cancel_appointment`, `notify_when_available`, `preferencia_de_grabacion` and the
-  post-conversation `informar_al_negocio`; the payload adds the native `hangup` and, when it
-  applies, `transfer` (§ Telefonía, fase 4). They call `POST /webhooks/telnyx/tools/:toolName`,
+  `cancel_appointment`, `notify_when_available` and `preferencia_de_grabacion`; the payload adds
+  the native `hangup` and, when it applies, `transfer` (§ Telefonía, fase 4). The chat assistant
+  (`buildTelnyxChatTools`) has the same booking tools plus `informar_al_negocio`, without
+  `preferencia_de_grabacion` or `hangup`. Since 2026-11-04 the webhook tools live in Telnyx's
+  **tools library** (`lib/toolsCompartidas.ts`): created once per environment and definition
+  (the `display_name` carries the backend host and a hash of the definition, so dev and prod get
+  their own set in the shared account and a changed definition is a new tool) and attached with
+  `tool_ids`; only `hangup` and `transfer` stay inline. Telnyx returns the shared ones with
+  `shared: true` and they must not be re-sent in `tools`. A tool used by an assistant (even a
+  soft-deleted one) can't be deleted, so old ones stay in the library. They call `POST /webhooks/telnyx/tools/:toolName`,
   and the business comes **only** from the `X-Alhabla-Call-Control-Id` header (templated from
   `{{call_control_id}}`, `CANAL_DE_TOOLS_DE_VOZ`) → `Call.callId` → `executeVoiceTool`
   (`modules/voiceTools/service.ts`; Google, Outlook and Apple/CalDAV). The timeout (20 s) goes at
@@ -2402,14 +2417,25 @@ Telnyx assistant itself (MCP `ver_assistant_telnyx`), not only the DB.
   `lib/telnyxAssistantPayload.ts`) en el idioma principal (`fraseDeEspera` en `lib/idiomas/catalogo.ts`):
   en producción tardaban 2,0 s y 1,1 s de mediana. Es fija y no por llamada porque no está comprobado que
   Telnyx sustituya `{{variables}}` en estas frases. En el chat de WhatsApp no salen (comprobado en dev).
-- **Classification.** The three custom insights (`call_outcome`, `escalation_reason`,
-  `tool_failure_detected`; ids in `TELNYX_INSIGHT_*_ID`, created by
-  `scripts/createTelnyxCallInsights.ts`) arrive as `call.conversation_insights.generated` and
-  fill `Call.outcome`, `escalationReason` and `toolFailureDetected`; the final report of
-  `informar_al_negocio` fills what they leave empty, plus `requestedService`.
+- **Classification and the call report (2026-11-04).** The receptionist's assistants use the
+  empty insight group «alhabla-recepcionista (sin insights)» (`lib/insightsDeTelnyx.ts`, found
+  by name or created): without it Telnyx attaches «Default» (6 insights run with the model after
+  every call, billed as inference, and they marked NO_ANSWER wrongly), also with `null`. The call
+  report is no longer a post-conversation pass of the assistant (`post_conversation_settings` is
+  `false`): when `call.conversation.ended` saves the unredacted transcript,
+  `pedirInformeDeLlamada` enqueues `jobs/informeDeLlamada.ts` (`/internal/jobs/informe-de-llamada`,
+  queue `process-recording`, inline in dev), which asks GLM-5.3-Flash (Telnyx inference,
+  `response_format: json_schema`, EU region preferred, no thinking) for the same fields as
+  `informar_al_negocio` and runs `procesarInformeFinal` + `guardarIdiomaDelCliente`. It does not
+  use Telnyx insights: with `pii_redaction` they see `<PII:name/>`. A call where the caller never
+  spoke is NO_ANSWER without calling the model. `procesarInformeFinal` fills `Call.outcome`,
+  `escalationReason`, `toolFailureDetected` and `requestedService`. The handler of
+  `call.conversation_insights.generated` stays for old assistants.
 - **Sync.** `syncAgentToTelnyx(businessId)` (`lib/telnyxAgentSync.ts`) rebuilds the managed
-  prompt and the whole payload, pushes it only when its hash changes and **never throws** (the
-  state is in `Agent.telnyxSyncError`). Called from `PATCH /business/me`,
+  prompts and the whole payloads of the agent's two assistants (calls in `telnyxAssistantId` /
+  `telnyxConfigHash`, WhatsApp client chat in `telnyxChatAssistantId` / `telnyxChatConfigHash`,
+  created here when missing), pushes each only when its hash changes and **never throws** (the
+  state is in `Agent.telnyxSyncError`; a chat failure doesn't undo the voice update). Called from `PATCH /business/me`,
   `syncBookingConfiguration` (services/professionals), `guardarHorarioDelNegocio`,
   `guardarInformacionDelNegocio`, `calendarService.syncCalendarToolsToAgents`, `PATCH /agents/:id`
   (only when `systemPrompt` changes), `provisionPhoneNumber`, the Stripe subscription webhook
@@ -2539,11 +2565,14 @@ otra vez**; lo que no hay que hacer es dejar las copias vivas apropiándose de l
 ### Tipos de asistente y cómo añadir uno nuevo
 
 El mapa de todos los asistentes vive en `backend/src/lib/tiposDeAsistente.ts`
-(`TIPOS_DE_ASISTENTE`). Hoy hay tres tipos:
+(`TIPOS_DE_ASISTENTE`). Hoy hay cuatro tipos (desde el 2026-11-04 la recepcionista son dos
+assistants por agente: hasta entonces uno solo atendía llamadas y chat, y cada pasada del modelo
+releía las reglas del otro canal):
 
 | Tipo | Ámbito | Prompt / payload | Tools (canal) | Sincronización | En ejecución |
 |------|--------|------------------|---------------|----------------|--------------|
-| `recepcionista` | un assistant por `Agent` (`alhabla-<negocio>-<agente>`); también atiende el chat de clientes por WhatsApp | `managedAgentPrompt.ts` → `buildTelnyxAssistantPayload` | `buildTelnyxVoiceTools` → `/webhooks/telnyx/tools/:toolName`, negocio por `X-Alhabla-Call-Control-Id` | `telnyxAgentSync.ts` (hash del payload) | `adapters/telnyx/webhookHandlers.ts`, `voiceTools/service.ts`, `whatsapp/chatCliente.ts` |
+| `recepcionista` | un assistant por `Agent` (`alhabla-<negocio>-<agente>`, `Agent.telnyxAssistantId`): las llamadas, el del número | `managedAgentPrompt.ts` (`canal: "voz"`) → `buildTelnyxAssistantPayload` | `buildTelnyxVoiceTools` (biblioteca, `tool_ids`) → `/webhooks/telnyx/tools/:toolName`, negocio por `X-Alhabla-Call-Control-Id` | `telnyxAgentSync.ts` (hash del payload) | `adapters/telnyx/webhookHandlers.ts`, `voiceTools/service.ts`; informe en `jobs/informeDeLlamada.ts` |
+| `recepcionista_chat` | otro por `Agent` (`alhabla-chat-<negocio>-<agente>`, `Agent.telnyxChatAssistantId`): el chat de clientes por WhatsApp; sin voz, telefonía ni `enabled_features` | `managedAgentPrompt.ts` (`canal: "chat"`) → `buildTelnyxChatAssistantPayload` | `buildTelnyxChatTools` (las mismas de la biblioteca + `informar_al_negocio`), mismo canal | `telnyxAgentSync.ts`, junto al de voz | `whatsapp/chatCliente.ts` (sin el de chat todavía, contesta el de voz) |
 | `demo` | assistants aislados por nicho (`alhabla-demo-*`, ids en `TELNYX_DEMO_*_ASSISTANT_ID`) | los crea `scripts/crearAssistantsDemoAislados.ts` | las de la recepcionista | a mano; `demo/routes.ts` solo reafirma las llamadas web sin autenticar | `demo/routes.ts` |
 | `gestor` | uno por entorno (`alhabla-gestor`, `TELNYX_GESTOR_ASSISTANT_ID`) | `gestorPayload.ts` | `buildGestorTools` → `/webhooks/telnyx/gestor/:toolName`, negocio por `X-Alhabla-Business` + `X-Alhabla-Role` (metadata de la conversación) | `gestorSync.ts` (compara firma, reconciliador diario) | `whatsapp/chatDueno.ts`, `gestor/tools.ts` |
 
