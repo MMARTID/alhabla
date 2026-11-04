@@ -4,7 +4,9 @@ import {
   instruccionesDelInforme,
   MODELO_DEL_INFORME,
   pedirInformeDeLlamada,
+  informeParaProcesar,
   processInformeDeLlamadaJob,
+  sinCadenasVacias,
   transcripcionParaElInforme,
 } from "../../src/jobs/informeDeLlamada.js";
 import { prisma } from "../../src/lib/prisma.js";
@@ -99,6 +101,9 @@ describe("esquemaDelInforme", () => {
     expect(esquema.properties.idioma_del_cliente!.anyOf).toContainEqual({
       type: "null",
     });
+    expect(esquema.properties.servicio_pedido!.anyOf).toContainEqual({
+      type: "null",
+    });
   });
 
   it("lo que devuelve con «nada» explícito lo acepta el informe de siempre como sin recado", () => {
@@ -114,6 +119,45 @@ describe("esquemaDelInforme", () => {
     });
     expect(leido.recado).toBeNull();
     expect(leido.dudas_sin_respuesta).toEqual([]);
+  });
+});
+
+describe("sinCadenasVacias", () => {
+  it("lo que el modelo escribe por «nada» pasa a null, y en las listas se quita", () => {
+    expect(
+      sinCadenasVacias({
+        servicio_pedido: ":null",
+        otro: " : null ",
+        vacio: "",
+        na: "N/A",
+        bueno: "Corte de pelo",
+        recado: { nombre: "null", motivo: "Que la llamen" },
+        dudas_sin_respuesta: ["null", "¿Hay parking?"],
+        fallo_de_tool: false,
+      })
+    ).toEqual({
+      servicio_pedido: null,
+      otro: null,
+      vacio: null,
+      na: null,
+      bueno: "Corte de pelo",
+      recado: { nombre: null, motivo: "Que la llamen" },
+      dudas_sin_respuesta: ["¿Hay parking?"],
+      fallo_de_tool: false,
+    });
+  });
+});
+
+describe("informeParaProcesar", () => {
+  it("un recado sin motivo es «sin recado», y el informe sigue valiendo", () => {
+    const informe = informeParaProcesar({
+      resultado: "RESOLVED",
+      recado: { nombre: "", telefono: "", motivo: "" },
+      dudas_sin_respuesta: [],
+    });
+    expect(informe.recado).toBeNull();
+    // Sin esto, el esquema del informe lo descartaría entero.
+    expect(InformeFinalSchema.safeParse(informe).success).toBe(true);
   });
 });
 
@@ -139,7 +183,7 @@ describe("processInformeDeLlamadaJob", () => {
         resultado: "LEAD_CAPTURED",
         motivo_escalada: "NO_APLICA",
         fallo_de_tool: false,
-        servicio_pedido: "",
+        servicio_pedido: ":null",
         recado: {
           nombre: "Lucía",
           telefono: "+34612345678",
@@ -166,6 +210,8 @@ describe("processInformeDeLlamadaJob", () => {
       callControlId: "v3:control",
       params: expect.objectContaining({
         resultado: "LEAD_CAPTURED",
+        // «:null» del modelo: sin servicio, no la cadena.
+        servicio_pedido: null,
         recado: expect.objectContaining({ nombre: "Lucía" }),
       }),
     });

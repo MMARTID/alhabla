@@ -136,9 +136,11 @@ export function esquemaDelInforme(): Record<string, unknown> {
         "En una frase corta: qué quería el cliente y cómo acabó la llamada.",
     },
     ...resto,
+    // Anulable: con solo `string`, GLM escribía «:null» cuando no había
+    // servicio y llegaba tal cual al panel (dev, 04-11).
     servicio_pedido: {
-      ...resto.servicio_pedido,
-      description: `${String(resto.servicio_pedido?.description ?? "")} Cadena vacía si no pidió ninguno.`,
+      anyOf: [resto.servicio_pedido, { type: "null" }],
+      description: `${String(resto.servicio_pedido?.description ?? "")} null si no pidió ninguno.`,
     },
     recado: {
       anyOf: [recado, { type: "null" }],
@@ -154,6 +156,46 @@ export function esquemaDelInforme(): Record<string, unknown> {
     properties: conNada,
     required: Object.keys(conNada),
   };
+}
+
+/** Cadenas con las que el modelo quiere decir «nada» («null», «:null»,
+ * «N/A»…). */
+const NADA = /^[\s:"'`]*(?:null|none|undefined|n\/a|ninguno)?[\s"'`.]*$/i;
+
+/**
+ * El informe sin las cadenas que significan «nada»: en el informe
+ * pasan a null, y en las listas (las dudas) se quitan. Aunque el esquema ya
+ * deja null, el modelo a veces escribe «:null» en una cadena.
+ */
+export function sinCadenasVacias(valor: unknown): unknown {
+  if (typeof valor === "string") return NADA.test(valor) ? null : valor;
+  if (Array.isArray(valor)) {
+    return valor
+      .map(sinCadenasVacias)
+      .filter((elemento) => elemento !== null);
+  }
+  if (valor && typeof valor === "object") {
+    return Object.fromEntries(
+      Object.entries(valor).map(([clave, v]) => [clave, sinCadenasVacias(v)])
+    );
+  }
+  return valor;
+}
+
+/**
+ * El informe del modelo listo para `procesarInformeFinal`: sin las cadenas
+ * que significan «nada» y, si el recado viene sin motivo, sin recado (con un
+ * recado sin motivo, el esquema del informe descartaría el informe entero).
+ */
+export function informeParaProcesar(
+  leido: Record<string, unknown>
+): Record<string, unknown> {
+  const limpio = sinCadenasVacias(leido) as Record<string, unknown>;
+  const recado = limpio.recado as { motivo?: unknown } | null | undefined;
+  if (recado && typeof recado === "object" && !recado.motivo) {
+    limpio.recado = null;
+  }
+  return limpio;
 }
 
 /** El JSON del modelo, o null si no es un objeto. */
@@ -243,7 +285,7 @@ export async function processInformeDeLlamadaJob(
       );
       return;
     }
-    informe = leido;
+    informe = informeParaProcesar(leido);
     console.log(
       `[Job] Informe de la ${contexto} en ${Date.now() - t0} ms (${respuesta.tokens.entrada ?? "?"} tokens de entrada, ${respuesta.tokens.salida ?? "?"} de salida)`
     );
