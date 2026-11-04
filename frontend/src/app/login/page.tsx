@@ -4,7 +4,6 @@ import { useState } from "react";
 import { api } from "@/lib/api";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
-import { GoogleAuthButton } from "@/components/google-auth-button";
 import { FacebookAuthButton } from "@/components/facebook-auth-button";
 import { BrandMark } from "@/components/brand-mark";
 import { ParticleField } from "@/components/particle-field";
@@ -66,7 +65,6 @@ export default function LoginPage() {
 
         <div className="mt-8">
           <div className="space-y-3">
-            <GoogleAuthButton onError={setError} intent="login" />
             <FacebookAuthButton onError={setError} intent="login" />
           </div>
           <div className="my-6 flex items-center gap-4" aria-hidden="true">

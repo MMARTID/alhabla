@@ -3,11 +3,6 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import LoginPage from "@/app/login/page";
 import { api } from "@/lib/api";
-import { GoogleAuthButton } from "@/components/google-auth-button";
-
-vi.mock("@/components/google-auth-button", () => ({
-  GoogleAuthButton: vi.fn(() => <button type="button">Continuar con Google</button>),
-}));
 
 function mockLocationHref() {
   const original = window.location;
@@ -35,12 +30,11 @@ describe("LoginPage", () => {
     mockLocationHref();
   });
 
-  it("pasa intent=login al botón de Google, sin forzar acceptedTerms (bug corregido: /login ya no registra)", () => {
+  it("ofrece Facebook y no ofrece Google (oculto hasta que Google publique la app)", () => {
     render(<LoginPage />);
 
-    const [props] = vi.mocked(GoogleAuthButton).mock.calls[0];
-    expect(props).toMatchObject({ intent: "login" });
-    expect(props).not.toHaveProperty("acceptedTerms");
+    expect(screen.getByRole("button", { name: /continuar con facebook/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /continuar con google/i })).not.toBeInTheDocument();
   });
 
   it("inicia sesión y redirige al panel", async () => {

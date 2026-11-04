@@ -5,7 +5,6 @@ import { Check } from "lucide-react";
 import Link from "next/link";
 import { registerAccount } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
-import { GoogleAuthButton } from "@/components/google-auth-button";
 import { FacebookAuthButton } from "@/components/facebook-auth-button";
 import { BrandMark } from "@/components/brand-mark";
 import { ParticleField } from "@/components/particle-field";
@@ -113,15 +112,10 @@ export default function RegisterPage() {
 
         <div className="mt-8">
           <div className="space-y-3">
-            {/* Sin bloqueo: los dos se pueden pulsar siempre, pero sin la
-                casilla de Términos marcada avisan aquí en vez de ir a Google
-                o Facebook (el backend rechazaría el alta con terms_required). */}
-            <GoogleAuthButton
-              onError={avisarDesdeBotonSocial}
-              acceptedTerms={acceptedTerms}
-              intent="register"
-              avisoAntesDeEmpezar={acceptedTerms ? undefined : TERMINOS_PENDIENTES}
-            />
+            {/* Sin bloqueo: se puede pulsar siempre, pero sin la casilla de
+                Términos marcada avisa aquí en vez de ir a Facebook (el
+                backend rechazaría el alta con terms_required). Google está
+                oculto hasta que Google publique la app. */}
             <FacebookAuthButton
               onError={avisarDesdeBotonSocial}
               acceptedTerms={acceptedTerms}
