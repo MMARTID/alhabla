@@ -8,6 +8,7 @@ import {
   Plantilla,
   Tabla,
   idDeApartado,
+  respuestaSinEnlaces,
   textoPlano,
 } from "@/components/blog/bloques";
 
@@ -111,5 +112,23 @@ describe("bloques del blog", () => {
   it("sin preguntas, el bloque no emite JSON-LD", () => {
     const { container } = render(<Faq preguntas={[]} />);
     expect(container.querySelector("script")).toBeNull();
+  });
+
+  it("una respuesta puede llevar enlaces: el lector los ve, Google recibe el texto plano", () => {
+    const respuesta =
+      "Lo dice el [BOE](https://www.boe.es/buscar/act.php?id=BOE-A-2002-13758) y lo explicamos en [la guía](/guias/ley-y-recepcionista-de-ia).";
+    expect(respuestaSinEnlaces(respuesta)).toBe(
+      "Lo dice el BOE y lo explicamos en la guía."
+    );
+    const { container } = render(
+      <Faq preguntas={[{ pregunta: "¿Es legal?", respuesta }]} />
+    );
+    const boe = screen.getByRole("link", { name: "BOE" });
+    expect(boe.getAttribute("href")).toBe("https://www.boe.es/buscar/act.php?id=BOE-A-2002-13758");
+    expect(screen.getByRole("link", { name: "la guía" }).getAttribute("href")).toBe(
+      "/guias/ley-y-recepcionista-de-ia"
+    );
+    const datos = JSON.parse(container.querySelector("script")!.innerHTML);
+    expect(datos.mainEntity[0].acceptedAnswer.text).toBe("Lo dice el BOE y lo explicamos en la guía.");
   });
 });

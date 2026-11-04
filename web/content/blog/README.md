@@ -99,7 +99,11 @@ también se pueden escribir a mano:
 - **Cuenta**: una cuenta paso a paso con el total destacado, para enseñar de dónde sale una cifra.
 - **Plantilla**: un mensaje listo para copiar, con botón «Copiar»; `\n` es un salto de línea.
 - **Faq**: además de verse como acordeón, cada bloque se declara a Google como `FAQPage` (JSON-LD con las
-  mismas preguntas y respuestas): escribe las respuestas completas, en texto plano y sin enlaces.
+  mismas preguntas y respuestas): escribe las respuestas completas, en texto plano. Admiten enlaces
+  `[texto](/ruta-del-sitio)` o `[texto](https://…)`, útiles para la fuente oficial o para otro artículo; Google
+  recibe el texto sin ellos.
+  Todo artículo publicado lleva uno, con su título `## Preguntas frecuentes` y al menos cuatro preguntas
+  sacadas de lo que dice el propio texto (`tests/lib/blog-faq.test.ts` lo exige).
 
 `destino` de la Cta: `planes`, `demo`, `como_funciona`, `desvio-de-llamadas`, `agenda-por-whatsapp` o el
 slug de un sector (`barberia`…).
