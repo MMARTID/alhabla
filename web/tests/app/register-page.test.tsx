@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import RegisterPage from "@/app/register/page";
+import * as apiModule from "@/lib/api";
 import { api } from "@/lib/api";
 
 function mockLocation(search = "") {
@@ -51,29 +52,30 @@ describe("RegisterPage", () => {
     expect(screen.queryByRole("button", { name: /continuar con google/i })).not.toBeInTheDocument();
   });
 
-  it("Facebook sin la casilla de términos avisa y lleva el foco a la casilla en vez de ir a Facebook", async () => {
-    const user = userEvent.setup();
+  it("Facebook no exige la casilla: debajo del botón avisa de que continuar acepta los términos, con sus enlaces", () => {
     render(<RegisterPage />);
 
-    await user.click(screen.getByRole("button", { name: /continuar con facebook/i }));
-
-    expect(
-      screen.getByText("Debes aceptar los Términos y Condiciones y la Política de privacidad.")
-    ).toBeInTheDocument();
-    expect(screen.getByRole("checkbox")).toHaveFocus();
+    expect(screen.getByText(/al continuar con facebook aceptas los/i)).toBeInTheDocument();
+    const enlaces = screen
+      .getAllByRole("link", { name: /términos y condiciones|política de privacidad/i })
+      .map((enlace) => enlace.getAttribute("href"));
+    expect(enlaces).toEqual(
+      expect.arrayContaining(["/legal/aviso-legal", "/legal/privacidad"])
+    );
   });
 
-  it("al marcar la casilla de términos se habilita el registro y Facebook ya no avisa", async () => {
+  it("al pulsar Facebook sin marcar la casilla pide la URL con acceptedTerms=true y no avisa", async () => {
     const user = userEvent.setup();
+    const pedirUrl = vi.spyOn(apiModule, "getFacebookAuthUrl").mockResolvedValue("https://facebook.test/dialog");
     render(<RegisterPage />);
 
-    await user.click(screen.getByRole("checkbox"));
     await user.click(screen.getByRole("button", { name: /continuar con facebook/i }));
 
-    expect(screen.getByRole("button", { name: /registrarse/i })).toBeEnabled();
+    await waitFor(() => expect(pedirUrl).toHaveBeenCalledWith(true, "register"));
     expect(
       screen.queryByText("Debes aceptar los Términos y Condiciones y la Política de privacidad.")
     ).not.toBeInTheDocument();
+    expect(location.getHref()).toBe("https://facebook.test/dialog");
   });
 
   it("no llama a la API si se envía el formulario sin aceptar los términos", async () => {

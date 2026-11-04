@@ -112,16 +112,26 @@ export default function RegisterPage() {
 
         <div className="mt-8">
           <div className="space-y-3">
-            {/* Sin bloqueo: se puede pulsar siempre, pero sin la casilla de
-                Términos marcada avisa aquí en vez de ir a Facebook (el
-                backend rechazaría el alta con terms_required). Google está
-                oculto hasta que Google publique la app. */}
+            {/* Facebook no usa la casilla: la aceptación va en el aviso de
+                debajo («Al continuar…») y el backend la guarda igual
+                (`acceptedTerms` + `termsAcceptedAt`). Google está oculto hasta
+                que Google publique la app. */}
             <FacebookAuthButton
               onError={avisarDesdeBotonSocial}
-              acceptedTerms={acceptedTerms}
+              acceptedTerms
               intent="register"
-              avisoAntesDeEmpezar={acceptedTerms ? undefined : TERMINOS_PENDIENTES}
             />
+            <p className="text-center text-xs leading-5 text-muted">
+              Al continuar con Facebook aceptas los{" "}
+              <Link href="/legal/aviso-legal" target="_blank" className="rounded font-semibold text-morado-tinta underline underline-offset-2 transition hover:text-morado-tinta focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-morado focus-visible:ring-offset-2">
+                Términos y Condiciones
+              </Link>{" "}
+              y la{" "}
+              <Link href="/legal/privacidad" target="_blank" className="rounded font-semibold text-morado-tinta underline underline-offset-2 transition hover:text-morado-tinta focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-morado focus-visible:ring-offset-2">
+                Política de privacidad
+              </Link>
+              .
+            </p>
           </div>
           <div className="my-6 flex items-center gap-4" aria-hidden="true">
             <div className="h-px flex-1 bg-linea" />
