@@ -58,10 +58,18 @@ describe("enlaces internos del blog", () => {
     }
   });
 
-  it("entre las landings salen todos los artículos de la lista salvo el de precios", () => {
+  it("entre las landings salen todos los artículos de la lista salvo los que no son de un oficio", () => {
     const enLandings = new Set(Object.values(GUIAS_POR_SECTOR).flat());
+    // Ocho landings × tres guías son 24 huecos. El de precios y los dos de
+    // la plataforma de WhatsApp (la web y el PC, la API) valen para todos los
+    // oficios y no tienen landing propia; se enlazan desde otros artículos.
+    const SIN_LANDING = new Set([
+      "cuanto-cuesta-una-recepcionista-de-ia",
+      "whatsapp-business-web-y-pc",
+      "whatsapp-business-api",
+    ]);
     for (const slug of Object.keys(SIGUE_LEYENDO)) {
-      if (slug === "cuanto-cuesta-una-recepcionista-de-ia") continue;
+      if (SIN_LANDING.has(slug)) continue;
       expect(enLandings.has(slug), `${slug} no sale en ninguna landing`).toBe(
         true
       );

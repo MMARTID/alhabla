@@ -3,6 +3,7 @@ import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import {
   Apartado,
   Cuenta,
+  Faq,
   Indice,
   Plantilla,
   Tabla,
@@ -84,5 +85,31 @@ describe("bloques del blog", () => {
 
     expect(writeText).toHaveBeenCalledWith(texto);
     expect(screen.getByRole("button", { name: /Copiado/ })).toBeInTheDocument();
+  });
+
+  it("las preguntas frecuentes se declaran también a Google como FAQPage, con el mismo texto que ve el lector", () => {
+    const { container } = render(
+      <Faq
+        preguntas={[
+          { pregunta: "¿Se puede usar en el ordenador?", respuesta: "Sí, vinculando el dispositivo." },
+          { pregunta: "¿Y con </script> dentro?", respuesta: "Se escapa el signo menor." },
+        ]}
+      />
+    );
+    const script = container.querySelector('script[type="application/ld+json"]');
+    expect(script).not.toBeNull();
+    const crudo = script!.innerHTML;
+    expect(crudo).not.toContain("</script>");
+    const datos = JSON.parse(crudo);
+    expect(datos["@type"]).toBe("FAQPage");
+    expect(datos.mainEntity).toHaveLength(2);
+    expect(datos.mainEntity[0].name).toBe("¿Se puede usar en el ordenador?");
+    expect(datos.mainEntity[0].acceptedAnswer.text).toBe("Sí, vinculando el dispositivo.");
+    expect(screen.getByText("Sí, vinculando el dispositivo.")).toBeInTheDocument();
+  });
+
+  it("sin preguntas, el bloque no emite JSON-LD", () => {
+    const { container } = render(<Faq preguntas={[]} />);
+    expect(container.querySelector("script")).toBeNull();
   });
 });

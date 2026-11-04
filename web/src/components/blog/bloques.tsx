@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { BotonCopiar } from "@/components/blog/boton-copiar";
 import { nicheLandings, type NicheSlug } from "@/lib/niche-landings";
+import { buildFaqPageStructuredData } from "@/lib/seo";
 
 /**
  * Bloques de marca que se insertan desde el editor del blog (keystatic.config
@@ -207,6 +208,22 @@ export function Faq({
 }) {
   return (
     <div className="not-prose my-8 divide-y divide-[#e5e5e5] overflow-hidden rounded-3xl border border-[#e5e5e5]">
+      {/* Las mismas preguntas, declaradas a Google como FAQPage: el texto de
+          cada respuesta es el que ve el lector (sin marcado oculto). El `<`
+          va escapado para que ninguna respuesta pueda cerrar el script. */}
+      {preguntas.length > 0 ? (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              ...buildFaqPageStructuredData(
+                preguntas.map((p) => ({ question: p.pregunta, answer: p.respuesta }))
+              ),
+            }).replace(/</g, "\\u003c"),
+          }}
+        />
+      ) : null}
       {preguntas.map((p, i) => (
         <details key={i} className="group p-5 open:bg-[#fafafa]">
           <summary className="flex cursor-pointer list-none items-center justify-between gap-4 font-semibold text-[#0a0a0a]">
