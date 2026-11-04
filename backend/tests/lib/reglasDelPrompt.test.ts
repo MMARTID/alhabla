@@ -1877,7 +1877,7 @@ const REGLAS: readonly Regla[] = [
         en: "prompt",
         canal: "chat",
         seccion: "Reserva",
-        texto: "pídelo antes si te falta, aunque veas el de su perfil",
+        texto: "pídelo antes y solo eso, aunque veas el de su perfil",
       },
     ],
   },

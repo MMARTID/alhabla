@@ -451,6 +451,9 @@ describe("check_availability: siguiente_paso según el caso", () => {
     expect(result!.available).toBe(true);
     expect(result!.availabilityToken).toEqual(expect.any(String));
     expect(result!.siguiente_paso).toContain("Guarda el availabilityToken.");
+    expect(result!.siguiente_paso).toContain(
+      "Si no sabes su nombre, di lo comprobado y pregunta solo cómo se llama."
+    );
     expect(result!.siguiente_paso).toContain("en un solo turno");
     expect(result!.siguiente_paso).toContain(
       "la pregunta del paso 3 de Reserva"

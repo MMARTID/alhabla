@@ -5,8 +5,8 @@ import { block, wrapper } from "@keystatic/core/content-components";
  * Bloques de marca disponibles en el editor del blog. Cada uno tiene su
  * formulario (schema) y una vista dentro del editor (ContentView) que imita
  * el bloque real; en la web los pinta components/blog/bloques.tsx. Los
- * nombres (Cta, Dato, Aviso, Pasos, Faq, ChatWhatsApp, Checklist) son las
- * etiquetas JSX que quedan en el .mdx.
+ * nombres (Cta, Dato, Aviso, Pasos, Faq, ChatWhatsApp, Checklist, Tabla,
+ * Cuenta, Plantilla, Indice) son las etiquetas JSX que quedan en el .mdx.
  */
 const DESTINOS = [
   { label: "Planes y precios", value: "planes" },
@@ -17,6 +17,8 @@ const DESTINOS = [
   { label: "Landing de centros de estética", value: "centro-de-estetica" },
   { label: "Landing de salones de uñas", value: "salon-de-unas" },
   { label: "Landing de fisioterapia", value: "fisioterapia" },
+  { label: "Desvío de llamadas por operador", value: "desvio-de-llamadas" },
+  { label: "Tu asistente por WhatsApp", value: "agenda-por-whatsapp" },
 ] as const;
 
 const TIPOS_DE_AVISO = {
@@ -452,6 +454,185 @@ export const bloquesDelEditor = {
             <div style={{ fontSize: 13 }}>{p.texto}</div>
           </div>
         ))}
+      </div>
+    ),
+  }),
+  Indice: block({
+    label: "Índice del artículo",
+    description:
+      "«En este artículo»: los títulos de los apartados (##), escritos igual que en el texto. Cada uno salta a su apartado.",
+    schema: {
+      apartados: fields.array(
+        fields.object({
+          texto: fields.text({
+            label: "Título del apartado (igual que el ##)",
+            validation: { isRequired: true, length: { max: 90 } },
+          }),
+        }),
+        { label: "Apartados", itemLabel: (p) => p.fields.texto.value || "Apartado" }
+      ),
+    },
+    ContentView: (props) => (
+      <div style={{ ...tarjeta, background: "#fafafa", borderColor: "#e5e5e5" }}>
+        <div style={{ ...etiqueta, color: "#6d28d9" }}>En este artículo</div>
+        <ol style={{ margin: "8px 0 0", paddingLeft: 18, fontSize: 13 }}>
+          {props.value.apartados.map((a, i) => (
+            <li key={i}>{a.texto}</li>
+          ))}
+        </ol>
+      </div>
+    ),
+  }),
+  Tabla: block({
+    label: "Tabla",
+    description:
+      "Tabla de datos (operadores, precios, comparaciones). La primera columna va en negrita; un código entre comillas invertidas (`##002#`) sale en monoespaciado.",
+    schema: {
+      titulo: fields.text({
+        label: "Título (opcional)",
+        validation: { length: { max: 80 } },
+      }),
+      columnas: fields.array(
+        fields.text({ label: "Columna", validation: { isRequired: true } }),
+        { label: "Columnas", itemLabel: (c) => c.value || "Columna" }
+      ),
+      filas: fields.array(
+        fields.object({
+          celdas: fields.array(fields.text({ label: "Celda" }), {
+            label: "Celdas (una por columna, en orden)",
+            itemLabel: (c) => c.value || "Celda",
+          }),
+        }),
+        {
+          label: "Filas",
+          itemLabel: (f) => f.fields.celdas.elements[0]?.value || "Fila",
+        }
+      ),
+      nota: fields.text({
+        label: "Nota o fuente (opcional)",
+        multiline: true,
+        validation: { length: { max: 300 } },
+      }),
+    },
+    ContentView: (props) => (
+      <div style={{ ...tarjeta, background: "#fff", borderColor: "#e5e5e5", overflowX: "auto" }}>
+        {props.value.titulo ? (
+          <div style={{ ...etiqueta, color: "#6d28d9", marginBottom: 8 }}>
+            {props.value.titulo}
+          </div>
+        ) : null}
+        <table style={{ fontSize: 12, borderCollapse: "collapse", width: "100%" }}>
+          <thead>
+            <tr>
+              {props.value.columnas.map((c, i) => (
+                <th key={i} style={{ textAlign: "left", padding: 4, borderBottom: "1px solid #e5e5e5" }}>
+                  {c}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {props.value.filas.map((f, i) => (
+              <tr key={i}>
+                {f.celdas.map((c, j) => (
+                  <td key={j} style={{ padding: 4, borderBottom: "1px solid #f0f0f0" }}>
+                    {c}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    ),
+  }),
+  Cuenta: block({
+    label: "Cuenta paso a paso",
+    description:
+      "Conceptos con su importe y un total destacado: para enseñar de dónde sale una cifra.",
+    schema: {
+      titulo: fields.text({
+        label: "Título (opcional)",
+        validation: { length: { max: 80 } },
+      }),
+      lineas: fields.array(
+        fields.object({
+          concepto: fields.text({
+            label: "Concepto",
+            validation: { isRequired: true, length: { max: 90 } },
+          }),
+          importe: fields.text({
+            label: "Importe",
+            validation: { isRequired: true, length: { max: 30 } },
+          }),
+          detalle: fields.text({
+            label: "Detalle (opcional)",
+            validation: { length: { max: 160 } },
+          }),
+        }),
+        { label: "Líneas", itemLabel: (l) => l.fields.concepto.value || "Línea" }
+      ),
+      totalConcepto: fields.text({ label: "Texto del total", defaultValue: "Total" }),
+      total: fields.text({
+        label: "Total",
+        validation: { isRequired: true, length: { max: 30 } },
+      }),
+      nota: fields.text({
+        label: "Nota (opcional)",
+        multiline: true,
+        validation: { length: { max: 300 } },
+      }),
+    },
+    ContentView: (props) => (
+      <div style={{ ...tarjeta, background: "#fff", borderColor: "#e5e5e5", padding: 0, overflow: "hidden" }}>
+        {props.value.lineas.map((l, i) => (
+          <div
+            key={i}
+            style={{ display: "flex", justifyContent: "space-between", padding: "8px 16px", fontSize: 13, borderTop: i ? "1px solid #f0f0f0" : "none" }}
+          >
+            <span>{l.concepto}</span>
+            <strong>{l.importe}</strong>
+          </div>
+        ))}
+        <div
+          style={{ display: "flex", justifyContent: "space-between", padding: "10px 16px", background: "#0a0a0a", color: "#fff", fontWeight: 700 }}
+        >
+          <span>{props.value.totalConcepto || "Total"}</span>
+          <span>{props.value.total}</span>
+        </div>
+      </div>
+    ),
+  }),
+  Plantilla: block({
+    label: "Plantilla para copiar",
+    description:
+      "Un mensaje listo para pegar (WhatsApp, contestador…) con botón «Copiar». Los saltos de línea se respetan.",
+    schema: {
+      titulo: fields.text({
+        label: "Para qué es",
+        validation: { isRequired: true, length: { max: 80 } },
+      }),
+      cuando: fields.text({
+        label: "Cuándo usarla (opcional)",
+        validation: { length: { max: 160 } },
+      }),
+      texto: fields.text({
+        label: "Texto del mensaje",
+        multiline: true,
+        validation: { isRequired: true, length: { max: 700 } },
+      }),
+    },
+    ContentView: (props) => (
+      <div style={{ ...tarjeta, background: "#fff", borderColor: "#e5e5e5" }}>
+        <div style={{ fontWeight: 600 }}>{props.value.titulo}</div>
+        {props.value.cuando ? (
+          <div style={{ fontSize: 13, color: "#52525b" }}>{props.value.cuando}</div>
+        ) : null}
+        <div
+          style={{ marginTop: 10, whiteSpace: "pre-line", fontSize: 13, background: "#f3eeff", border: "1px solid #ddd6fe", borderRadius: 14, padding: "8px 12px" }}
+        >
+          {props.value.texto}
+        </div>
       </div>
     ),
   }),

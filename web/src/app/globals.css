@@ -496,8 +496,9 @@ body {
 .articulo ol {
   @apply list-decimal space-y-2 pl-6;
 }
-/* Los botones de los bloques (Cta) no son enlaces de texto. */
-.articulo a:not([class*="btn-"]) {
+/* Los botones de los bloques (Cta) no son enlaces de texto, y los bloques
+   (`not-prose`: índice, tablas…) llevan su propio estilo de enlace. */
+.articulo a:not([class*="btn-"]):not(.not-prose a) {
   @apply font-semibold text-[#6d28d9] underline underline-offset-2;
 }
 .articulo strong {
@@ -513,7 +514,9 @@ body {
 .articulo img {
   @apply h-auto w-full rounded-2xl border border-[#e5e5e5];
 }
-.articulo figure figcaption,
+/* Solo el pie de las fotos: los bloques (`not-prose`) usan figcaption como
+   cabecera con su propio estilo. */
+.articulo figure:not(.not-prose) figcaption,
 .articulo img + em {
   @apply mt-2 block text-sm text-muted;
 }
