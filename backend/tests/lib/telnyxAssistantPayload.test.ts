@@ -702,7 +702,9 @@ describe("buildTelnyxAssistantPayload", () => {
     expect(payload.tools?.[1]).toEqual({
       type: "hangup",
       hangup: {
-        description: "Cuelga la llamada cuando la conversación haya terminado.",
+        description: expect.stringMatching(
+          /^Cuelga la llamada\. Llámala en el mismo turno en que te despides/
+        ),
       },
     });
   });

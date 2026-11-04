@@ -407,7 +407,7 @@ export class CalendarService {
   }
 
   /**
-   * `end_call` no hace falta aquí: `buildTelnyxAssistantPayload` ya añade
+   * Una tool de colgar no hace falta aquí: `buildTelnyxAssistantPayload` ya añade
    * la tool `hangup` nativa de Telnyx a todos los assistants por defecto
    * (ver telnyxAssistantPayload.ts).
    *

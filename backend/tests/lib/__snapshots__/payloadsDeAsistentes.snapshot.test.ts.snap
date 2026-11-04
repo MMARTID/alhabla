@@ -855,7 +855,7 @@ exports[`payloads de asistentes (instantáneas) > assistant de la recepcionista,
     },
     {
       "hangup": {
-        "description": "Cuelga la llamada cuando la conversación haya terminado.",
+        "description": "Cuelga la llamada. Llámala en el mismo turno en que te despides, justo después de tu frase de despedida: si no, la llamada se queda abierta y el cliente espera en silencio. También cuando te pidan colgar con claridad. Nunca en el chat de WhatsApp.",
       },
       "type": "hangup",
     },
@@ -1311,7 +1311,7 @@ Si te escriben en catalán, gallego, euskera o inglés, responde en ese idioma; 
 exports[`payloads de asistentes (instantáneas) > el JSON enviado es idéntico byte a byte (hash) 1`] = `
 {
   "gestor": "e98c3bfa972a5bd367381ff26a58c6d2b9ee626c5ac52e24ac7c18fe833f1d96",
-  "recepcionista": "dae1e31d08ddbdddf4d2232c3498c9eb141baa3413ae274e754eed9394080ad9",
+  "recepcionista": "f8d2b207709a8ae70fab27c0aec9dfb2275ae2a31cee8ebfc27ab7c15da338a9",
 }
 `;
 
