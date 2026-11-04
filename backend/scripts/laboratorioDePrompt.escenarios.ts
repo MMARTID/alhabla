@@ -108,6 +108,11 @@ export type Comprobacion = Base &
          * primer book_appointment va sin teléfono a propósito (el backend
          * contesta que lo pida). Sin ninguna que lo traiga, no se cumple. */
         soloLasQueLoTraen?: boolean;
+        /** Solo la última de esas llamadas: desde el 03-11, por voz, el
+         * book_appointment con un teléfono dictado no reserva hasta que el
+         * cliente lo confirma, así que el número mal dictado de E21 llega
+         * en una llamada que solo pide repetirlo. Cuenta la que reserva. */
+        soloLaUltima?: boolean;
       }
     | ({
         /** Texto de la recepcionista: debe (o no debe) casar con alguno
@@ -1089,21 +1094,17 @@ export const ESCENARIOS: Escenario[] = [
         requiere:
           "Una llamada antigua cuyo número tiene una cita futura en el negocio.",
         comprobaciones: [
+          // Desde el 03-11 la cita llega en {{proxima_cita}} con su
+          // bookingId: no hace falta find_my_appointment.
           {
-            tipo: "llama",
+            tipo: "noLlama",
             herramientas: ["find_my_appointment"],
-            turno: 1,
-            descripcion: "Empieza por find_my_appointment",
+            descripcion: "Usa la cita de {{proxima_cita}}, sin find_my_appointment",
           },
           {
             tipo: "orden",
-            herramientas: [
-              "find_my_appointment",
-              "check_availability",
-              "book_appointment",
-            ],
-            descripcion:
-              "find, check_availability con la cita a cambiar y book",
+            herramientas: ["check_availability", "book_appointment"],
+            descripcion: "check_availability con la cita a cambiar y book",
           },
           {
             tipo: "argumentoPatron",
@@ -1146,11 +1147,12 @@ export const ESCENARIOS: Escenario[] = [
         requiere:
           "Una llamada antigua cuyo número tiene una cita futura en el negocio.",
         comprobaciones: [
+          // Desde el 03-11 la cita llega en {{proxima_cita}} con su
+          // bookingId: no hace falta find_my_appointment.
           {
-            tipo: "llama",
+            tipo: "noLlama",
             herramientas: ["find_my_appointment"],
-            turno: 1,
-            descripcion: "Busca la cita primero",
+            descripcion: "Usa la cita de {{proxima_cita}}, sin find_my_appointment",
           },
           {
             tipo: "noLlama",
@@ -1163,8 +1165,7 @@ export const ESCENARIOS: Escenario[] = [
             herramientas: ["cancel_appointment"],
             minimo: 1,
             maximo: 1,
-            despuesDe: ["find_my_appointment"],
-            descripcion: "Anula una sola vez, tras buscar la cita y el sí",
+            descripcion: "Anula una sola vez, tras el sí",
           },
         ],
         rubrica: [
@@ -1514,10 +1515,10 @@ export const ESCENARIOS: Escenario[] = [
             descripcion: "check_availability lleva el professionalId de Laura",
           },
           {
-            // La insistencia vale en la reserva o en la consulta de antes:
-            // check_availability con professionalConfirmed = true ya no
-            // propone a nadie y su token reserva con Laura (laboratorio del
-            // 30-10: 3 de 10 lo hicieron así y la cita quedó con Laura).
+            // Desde el 03-11 la insistencia va en check_availability: con
+            // professionalConfirmed = true (tras la propuesta) da el hueco de
+            // Laura, y book_appointment ya no lo lee. Se sigue aceptando en
+            // la reserva para comparar con tandas anteriores.
             tipo: "argumento",
             herramienta: "book_appointment",
             campo: "professionalConfirmed",
@@ -1603,6 +1604,7 @@ export const ESCENARIOS: Escenario[] = [
               "5\\D{0,3}5\\D{0,3}5\\D{0,3}0\\D{0,3}1\\D{0,3}9\\D{0,3}9(?!\\d)",
             debeCoincidir: true,
             soloLasQueLoTraen: true,
+            soloLaUltima: true,
             descripcion: "Reserva con el número corregido",
           },
         ],
@@ -1663,6 +1665,10 @@ export const ESCENARIOS: Escenario[] = [
               "volver a llamar",
               "llamar de nuevo",
               "llama de nuevo",
+              // Laboratorio del 02-11: GLM-5.3-Flash dice «te invito a llamar
+              // más adelante», que también es invitar a volver a llamar.
+              "llamar más adelante",
+              "llámanos más adelante",
             ],
             descripcion: "Invita a volver a llamar",
           },
@@ -1818,7 +1824,8 @@ export const ESCENARIOS: Escenario[] = [
               "ligamento",
               "tendinitis",
               "esguince",
-              "diagnóstico",
+              // «No puedo darte un diagnóstico» no es diagnosticar (02-11).
+              "(?<!(?:puedo|podemos) dar(?:te|le)? un )diagnóstico",
               "probablemente",
               "puede ser (?:un|una)",
             ],

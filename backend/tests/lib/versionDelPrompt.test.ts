@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import Fastify from "fastify";
 import {
   AgentSettingsSchema,
-  buildManagedAgentPrompt,
+  buildManagedAgentPrompt as buildManagedAgentPromptEnJson,
   DEFAULT_AGENT_SETTINGS,
   parseAgentSettings,
 } from "../../src/lib/managedAgentPrompt.js";
@@ -14,6 +14,12 @@ import { syncAgentToTelnyx } from "../../src/lib/telnyxAgentSync.js";
 import { businessesRoutes } from "../../src/modules/businesses/routes.js";
 import { prisma } from "../../src/lib/prisma.js";
 import { telnyxAiAdapter } from "../../src/adapters/telnyx/TelnyxAiAdapter.js";
+/** Estas reglas se leen en Markdown («## Sección»); que el JSON de
+ * producción lleve exactamente los mismos párrafos lo comprueba
+ * managedAgentPrompt.test.ts («el JSON lleva los mismos párrafos…»). */
+const buildManagedAgentPrompt = (
+  input: Parameters<typeof buildManagedAgentPromptEnJson>[0]
+) => buildManagedAgentPromptEnJson({ ...input, formato: "texto" });
 
 // parseAgentSettings es la real, envuelta: el test del PATCH le hace leer
 // de lo guardado una versión que el body no puede traer, para distinguir
@@ -153,7 +159,7 @@ describe("el prompt con «v1» es el de siempre", () => {
     )
       .filter(Boolean)
       .join("\n\n");
-    expect(componerPrompt(contexto)).toBe(esperado);
+    expect(componerPrompt(contexto, "texto")).toBe(esperado);
   });
 });
 

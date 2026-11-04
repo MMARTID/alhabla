@@ -189,7 +189,7 @@ describe("createTelnyxAssistantForAgent", () => {
     await createTelnyxAssistantForAgent({ agentId: "agent1", businessId: "biz1" });
 
     const instrucciones = mockedCreateAssistant.mock.calls[0][0].instructions;
-    expect(instrucciones).toContain("## Precios");
+    expect(JSON.parse(instrucciones)).toHaveProperty("Precios");
     expect(instrucciones).toContain("No des precios");
   });
 
@@ -846,7 +846,7 @@ describe("transferencia al dueño (fase 4)", () => {
     expect(payload.tools!.map((tool) => tool.type)).toEqual(
       expect.arrayContaining(["webhook", "hangup", "transfer"])
     );
-    expect(payload.instructions).toContain("## Pasar la llamada");
+    expect(JSON.parse(payload.instructions)).toHaveProperty("Pasar la llamada");
     expect(payload.instructions).toContain("Pásala solo si el cliente pide");
     // Si la IA falla a mitad de llamada, Telnyx la pasa al mismo móvil
     // (fallback_destination, regla (a) de la PR 6).
@@ -866,7 +866,9 @@ describe("transferencia al dueño (fase 4)", () => {
 
     const payload = mockedUpdateAssistant.mock.calls[0][1];
     expect(payload.tools!.some((tool) => tool.type === "transfer")).toBe(false);
-    expect(payload.instructions).not.toContain("## Pasar la llamada");
+    expect(JSON.parse(payload.instructions)).not.toHaveProperty(
+      "Pasar la llamada"
+    );
     // `null` y no ausente: Telnyx mezcla telephony_settings y solo `null`
     // borra el destino de un dueño que antes aceptaba llamadas.
     expect(payload.telephonySettings).toHaveProperty(
@@ -887,7 +889,9 @@ describe("transferencia al dueño (fase 4)", () => {
 
     const payload = mockedUpdateAssistant.mock.calls[0][1];
     expect(payload.tools!.some((tool) => tool.type === "transfer")).toBe(false);
-    expect(payload.instructions).not.toContain("## Pasar la llamada");
+    expect(JSON.parse(payload.instructions)).not.toHaveProperty(
+      "Pasar la llamada"
+    );
     expect(payload.telephonySettings).toHaveProperty(
       "fallback_destination",
       null
@@ -975,7 +979,7 @@ describe("transferencia al dueño (fase 4)", () => {
     expect(payload.tools!.filter((tool) => tool.type === "transfer")).toEqual([
       TOOL_TRANSFER_ESPERADA,
     ]);
-    expect(payload.instructions).toContain("## Pasar la llamada");
+    expect(JSON.parse(payload.instructions)).toHaveProperty("Pasar la llamada");
     expect(payload.telephonySettings?.fallback_destination).toBe(
       MOVIL_DEL_DUENO
     );
@@ -1015,6 +1019,7 @@ describe("transferencia al dueño — prompts editados a mano y copia del panel"
     expect(
       payload.instructions.startsWith("Eres la recepcionista de Lola.")
     ).toBe(true);
+    // Un prompt editado a mano sigue en texto: el bloque va en Markdown.
     expect(payload.instructions).toContain("## Pasar la llamada");
     expect(payload.instructions).toContain("Pásala solo si el cliente pide");
     // La copia del panel de un prompt manual no se pisa.
@@ -1053,10 +1058,10 @@ describe("transferencia al dueño — prompts editados a mano y copia del panel"
     await syncAgentToTelnyx("biz1");
 
     const payload = mockedUpdateAssistant.mock.calls[0][1];
-    expect(payload.instructions).toContain("## Pasar la llamada");
+    expect(JSON.parse(payload.instructions)).toHaveProperty("Pasar la llamada");
     const data = (mockedAgentUpdate.mock.calls[0][0] as any).data;
     expect(data.telnyxSyncError).toBeNull();
-    expect(data.systemPrompt).toContain("## Pasar la llamada");
+    expect(JSON.parse(data.systemPrompt)).toHaveProperty("Pasar la llamada");
     expect(data.systemPrompt).toContain("Pásala solo si el cliente pide");
     // Es la copia del panel (variables genéricas, como escribe PATCH
     // /business/me), no la reescritura para Telnyx que hace

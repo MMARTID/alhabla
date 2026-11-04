@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import {
-  buildManagedAgentPrompt,
+  buildManagedAgentPrompt as buildManagedAgentPromptEnJson,
   DEFAULT_AGENT_SETTINGS,
 } from "../../src/lib/managedAgentPrompt.js";
 import {
@@ -23,6 +23,12 @@ import {
   normalizeVoiceToolDateTime,
 } from "../../src/lib/voiceDateTime.js";
 import type { TransferenciaAlDueno } from "../../src/lib/transferenciaAlDueno.js";
+/** Estas reglas se leen en Markdown («## Sección»); que el JSON de
+ * producción lleve exactamente los mismos párrafos lo comprueba
+ * managedAgentPrompt.test.ts («el JSON lleva los mismos párrafos…»). */
+const buildManagedAgentPrompt = (
+  input: Parameters<typeof buildManagedAgentPromptEnJson>[0]
+) => buildManagedAgentPromptEnJson({ ...input, formato: "texto" });
 
 /**
  * Censo de reglas del prompt de la recepcionista (F0 de
@@ -972,9 +978,9 @@ const REGLAS: readonly Regla[] = [
   {
     id: "proponer-recomendacion-una-vez",
     descripcion:
-      "Si check_availability recomienda a otra persona, la propone UNA sola vez; si el cliente insiste, reserva con professionalConfirmed true sin explicar nada.",
+      "Si check_availability recomienda a otra persona, la propone UNA sola vez; si el cliente insiste, vuelve a comprobar con professionalConfirmed true sin explicar nada.",
     origen:
-      "PR #65 (f7c6b31, 17-09): el backend frena la reserva con PROFESSIONAL_CONFIRMATION_REQUIRED si no se propuso.",
+      "PR #65 (f7c6b31, 17-09). Desde el 03-11 (E20) check_availability da solo la propuesta, sin el porqué ni el hueco de la persona pedida, que llega con professionalConfirmed y solo si la propuesta se hizo en esa llamada.",
     lugares: [
       {
         en: "prompt",
@@ -994,12 +1000,12 @@ const REGLAS: readonly Regla[] = [
       },
       {
         en: "descripcionDeTool",
-        tool: "book_appointment",
-        texto: "la propusiste una vez",
+        tool: "check_availability",
+        texto: "la propusiste y el cliente prefiere a la persona que pidió",
       },
       {
         en: "guardaDelBackend",
-        simbolo: "PROFESSIONAL_CONFIRMATION_REQUIRED",
+        simbolo: "claveDeRecomendacionPropuesta",
         fichero: SERVICIO_DE_VOZ,
       },
     ],
@@ -1023,9 +1029,11 @@ const REGLAS: readonly Regla[] = [
         texto:
           "Nunca menciones niveles, categorías ni recomendaciones del sistema.",
       },
+      // Desde el 03-11 la respuesta de la recomendación no lleva el porqué:
+      // sin él delante no lo puede decir.
       {
         en: "guardaDelBackend",
-        simbolo: "instruccionesDeRecomendacion",
+        simbolo: "siguientePasoConRecomendacion",
         fichero: SERVICIO_DE_VOZ,
       },
     ],
@@ -1103,6 +1111,13 @@ const REGLAS: readonly Regla[] = [
         tool: "preferencia_de_grabacion",
         texto:
           "cuando conteste con claridad a la pregunta_de_grabacion que te dio check_availability",
+      },
+      // 03-11 (E8): lo comprobado espera a la respuesta, y una respuesta en
+      // el mismo turno que la pregunta no se guarda.
+      {
+        en: "guardaDelBackend",
+        simbolo: "GRABACION_SIN_RESPUESTA",
+        fichero: SERVICIO_DE_VOZ,
       },
     ],
   },
@@ -1404,9 +1419,9 @@ const REGLAS: readonly Regla[] = [
   {
     id: "telefono-dictado-en-grupos-de-tres",
     descripcion:
-      "Un teléfono dictado se repite en grupos de tres cifras y se usa solo cuando el cliente lo confirma; si corrige una cifra, se repite el número entero.",
+      "Un teléfono dictado se repite en grupos de tres cifras y se usa solo cuando el cliente lo confirma; si corrige una cifra, se repite el número entero. El de la cita lo escribe el backend para decirlo y por voz no se reserva sin la confirmación.",
     origen:
-      "PR #312 (de12e69, auditoría del 16-10): se guardaba tal cual lo había entendido el modelo, sin que el cliente confirmara ninguna cifra.",
+      "PR #312 (de12e69, auditoría del 16-10): se guardaba tal cual lo había entendido el modelo, sin que el cliente confirmara ninguna cifra. Laboratorio del 03-11: GLM-5.3-Flash repitió de memoria «cero uno nueve» de un número acabado en 0199.",
     lugares: [
       {
         en: "prompt",
@@ -1416,12 +1431,70 @@ const REGLAS: readonly Regla[] = [
       {
         en: "prompt",
         seccion: "Conversación",
-        texto: "úsalo solo cuando lo confirme",
+        texto: "Úsalo solo cuando lo confirme",
+      },
+      {
+        en: "prompt",
+        seccion: "Conversación",
+        texto: "pásalo enseguida a book_appointment: te dirá cómo repetirlo",
       },
       {
         en: "descripcionDeTool",
         tool: "book_appointment",
-        texto: "tal como lo confirmó al repetírselo",
+        texto: "el cliente dijo que sí",
+      },
+      {
+        en: "respuestaDeTool",
+        tool: "book_appointment",
+        campo: "telefono_para_decir",
+      },
+      {
+        en: "guardaDelBackend",
+        simbolo: "CLIENT_PHONE_CONFIRMATION_REQUIRED",
+        fichero: "src/modules/voiceTools/service.ts",
+      },
+    ],
+  },
+  {
+    id: "proxima-cita-en-una-variable",
+    descripcion:
+      "La próxima cita de quien llama llega en {{proxima_cita}} con su bookingId: se nombra solo si pregunta por ella o quiere cambiarla o anularla, y entonces no hace falta find_my_appointment.",
+    origen:
+      "Variables del 03-11: la cita pendiente costaba una find_my_appointment antes de poder contestar.",
+    lugares: [
+      {
+        en: "prompt",
+        seccion: "Cliente",
+        texto: "Nómbrala solo si pregunta por ella o quiere cambiarla o anularla",
+      },
+      {
+        en: "prompt",
+        seccion: "Cita existente",
+        texto: "y no está en «Su próxima cita», usa find_my_appointment",
+      },
+      {
+        en: "guardaDelBackend",
+        simbolo: "describirProximaCita",
+        fichero: "src/lib/contextoDeLlamada.ts",
+      },
+    ],
+  },
+  {
+    id: "numero-de-quien-llama-para-decir",
+    descripcion:
+      "El número desde el que llama llega ya escrito para decirlo en {{telefono_para_decir}}: si lo dice, lo lee tal cual.",
+    origen:
+      "Variables del 03-11: recibía «+34…» y lo leía de memoria, el mismo fallo que E21.",
+    lugares: [
+      {
+        en: "prompt",
+        seccion: "Cliente",
+        texto: "Su número, para decirlo tal cual: {{telefono_para_decir}}.",
+      },
+      {
+        en: "guardaDelBackend",
+        simbolo: "telefonoParaDecir",
+        fichero: "src/lib/contextoDeLlamada.ts",
       },
     ],
   },

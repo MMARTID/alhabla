@@ -6,6 +6,7 @@ import { resetDb } from "../helpers/db.js";
 import {
   createTestBusiness,
   createTestCall,
+  createTestCallYaPreguntada,
   createTestProfessional,
   nextOpenSlot,
 } from "../helpers/fixtures.js";
@@ -177,7 +178,7 @@ describe("book_appointment — contratos del cerrojo y del token de disponibilid
   it("check_availability → book_appointment con el availabilityToken real reserva el hueco comprobado", async () => {
     const business = await createTestBusiness();
     const profesional = await createTestProfessional(business.id);
-    const llamada = await createTestCall(business.id);
+    const llamada = await createTestCallYaPreguntada(business.id);
     const slot = nextOpenSlot();
 
     const comprobacion = await executeVoiceTool({
@@ -214,7 +215,7 @@ describe("book_appointment — contratos del cerrojo y del token de disponibilid
   it("el availabilityToken solo vale en su llamada y un token inventado se da por caducado", async () => {
     const business = await createTestBusiness();
     await createTestProfessional(business.id);
-    const llamada = await createTestCall(business.id);
+    const llamada = await createTestCallYaPreguntada(business.id);
     const otraLlamada = await createTestCall(business.id);
     const slot = nextOpenSlot();
 
@@ -262,7 +263,7 @@ describe("book_appointment — contratos del cerrojo y del token de disponibilid
   it("el availabilityToken sigue valiendo segundos después de comprobar (caduca en minutos, no en milisegundos)", async () => {
     const business = await createTestBusiness();
     await createTestProfessional(business.id);
-    const llamada = await createTestCall(business.id);
+    const llamada = await createTestCallYaPreguntada(business.id);
     const slot = nextOpenSlot();
 
     const comprobacion = await executeVoiceTool({

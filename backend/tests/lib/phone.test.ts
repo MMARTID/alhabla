@@ -4,6 +4,7 @@ import {
   formatearTelefonoLegible,
   isValidE164Phone,
   normalizarTelefono,
+  telefonoParaDecir,
 } from "../../src/lib/phone.js";
 
 describe("formatearTelefonoLegible", () => {
@@ -73,5 +74,34 @@ describe("esLineaDeClientesEspanola", () => {
     expect(esLineaDeClientesEspanola("+346001234567")).toBe(false);
     expect(esLineaDeClientesEspanola("600123456")).toBe(false);
     expect(esLineaDeClientesEspanola("TEMP-abc")).toBe(false);
+  });
+});
+
+describe("telefonoParaDecir", () => {
+  it("un español, en grupos de tres y sin el prefijo", () => {
+    expect(telefonoParaDecir("+34612345678")).toBe(
+      "seis uno dos, tres cuatro cinco, seis siete ocho"
+    );
+    expect(telefonoParaDecir("+34930400199")).toBe(
+      "nueve tres cero, cuatro cero cero, uno nueve nueve"
+    );
+  });
+
+  it("uno de Norteamérica, 1-3-3-4; cualquier otro, con su prefijo en grupos de tres", () => {
+    expect(telefonoParaDecir("+12025550199")).toBe(
+      "más uno, dos cero dos, cinco cinco cinco, cero uno nueve nueve"
+    );
+    expect(telefonoParaDecir("+33612345678")).toBe(
+      "más tres tres seis, uno dos tres, cuatro cinco seis, siete ocho"
+    );
+    // Si sobra una cifra, va con el grupo anterior.
+    expect(telefonoParaDecir("+4412345678")).toBe(
+      "más cuatro cuatro uno, dos tres cuatro, cinco seis siete ocho"
+    );
+  });
+
+  it("lo que no es E.164 devuelve null", () => {
+    expect(telefonoParaDecir("612 345 678")).toBeNull();
+    expect(telefonoParaDecir("anonymous")).toBeNull();
   });
 });

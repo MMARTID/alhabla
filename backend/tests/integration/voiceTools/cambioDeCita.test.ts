@@ -6,6 +6,7 @@ import { resetDb } from "../helpers/db.js";
 import {
   createTestBusiness,
   createTestCall,
+  createTestCallYaPreguntada,
   createTestProfessional,
   nextOpenSlot,
 } from "../helpers/fixtures.js";
@@ -73,7 +74,9 @@ describe("cambio de cita por la recepcionista (integración)", () => {
       ],
       calendarAvailabilityKnown: true,
     } as never);
-    const llamada = await createTestCall(business.id, { fromNumber: MOVIL });
+    const llamada = await createTestCallYaPreguntada(business.id, {
+      fromNumber: MOVIL,
+    });
     // Un cuarto de hora después: se solapa con la vieja (12:00-12:30 →
     // 12:15-12:45). En hora local con su offset, como la escribe el modelo.
     const nuevaHora = {

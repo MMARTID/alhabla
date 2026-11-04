@@ -1,6 +1,10 @@
 import { describe, it, expect, vi } from "vitest";
 import {
+  DOLARES_POR_CONVERSACION,
   ErrorDeUso,
+  PRESUPUESTO_POR_DEFECTO_EUR,
+  crearFrenoDelPresupuesto,
+  exigirPresupuesto,
   MODELO_DEL_CLIENTE,
   MODELO_DEL_ASSISTANT,
   MODELO_DEL_CLIENTE_ALTERNATIVO,
@@ -37,11 +41,13 @@ import {
   parsearArgumentos,
   pareceDespedida,
   planificar,
+  marcadorParcial,
   reconstruirConversacion,
   repartirLlamadas,
   restableceElNegocio,
   resumirCelda,
   siguienteMensajeDelCliente,
+  esModeloNoDisponible,
   tablaDeComparacion,
   tablaMarkdown,
   telefonosDelTexto,
@@ -154,7 +160,7 @@ function contextoFalso(
       name: nombreDelAssistant(fecha, variante, sufijo),
       instructions: "Eres la recepcionista.",
       greeting: "Hola, gracias por llamar.",
-      model: "openai/gpt-5.6-luna",
+      model: "zai-org/GLM-5.3-Flash",
       tools: [{ type: "webhook", webhook: { name: "get_catalog" } }] as never,
     };
   }
@@ -375,7 +381,7 @@ describe("parsearArgumentos", () => {
   it.each([
     [["--negocio", "b", "--raro"], /desconocida/],
     [["--cliente", "humano"], /reactivo o guion/],
-    [["--modelo-cliente", "openai/gpt-5.6-luna"], /el del assistant/],
+    [["--modelo-cliente", "zai-org/GLM-5.3-Flash"], /el del assistant/],
     [
       [
         "--modelo-del-assistant",
@@ -1064,6 +1070,34 @@ describe("evaluarComprobacion", () => {
     );
     // Sin ninguna con teléfono, no se cumple: nunca llegó a reservar con él.
     expect(evaluar(corregido, reserva([undefined]))).toBe(false);
+  });
+
+  it("argumentoPatron con soloLaUltima: el teléfono mal dictado que solo se confirmó no cuenta (E21)", () => {
+    const corregido: Comprobacion = {
+      tipo: "argumentoPatron",
+      herramienta: "book_appointment",
+      campo: "clientPhone",
+      patron: "0199$",
+      debeCoincidir: true,
+      soloLasQueLoTraen: true,
+      soloLaUltima: true,
+      descripcion: "x",
+    };
+    const reserva = (telefonos: string[]) =>
+      conversacion(
+        ["a"],
+        telefonos.map((clientPhone) => ({
+          nombre: "book_appointment",
+          turno: 1,
+          argumentos: { clientPhone },
+        }))
+      );
+    expect(
+      evaluar(corregido, reserva(["+12025550198", "+12025550199", "+12025550199"]))
+    ).toBe(true);
+    expect(evaluar(corregido, reserva(["+12025550199", "+12025550198"]))).toBe(
+      false
+    );
   });
 
   it("argumentoPatron: todas las llamadas, y sin llamadas se cumple", () => {
@@ -2337,7 +2371,7 @@ describe("siguienteMensajeDelCliente", () => {
       mensajes: Array<{ role: string; content: string }>;
     };
     expect(peticion.modelo).toBe(MODELO_DEL_CLIENTE);
-    expect(peticion.modelo).not.toBe("openai/gpt-5.6-luna");
+    expect(peticion.modelo).not.toBe(MODELO_DEL_ASSISTANT);
     const sistema = peticion.mensajes[0]!.content;
     expect(sistema).toContain(guion("E12a").objetivo);
     expect(sistema).toContain("Servicio que quieres: un corte de pelo");
@@ -3180,6 +3214,46 @@ describe("ejecutarLaboratorio con el cliente reactivo", () => {
     expect(repeticion.metricas.turnos).toBe(topeDeTurnos(guionDe("E1")));
   });
 
+  it("reintenta el cliente simulado cuando su modelo no está disponible (10027)", async () => {
+    const noDisponible = new Error(
+      '422 {"errors":[{"code":"10027","title":"Unprocessable Entity","detail":"The requested model is currently unavailable."}]}'
+    );
+    const completarChat = vi
+      .fn()
+      .mockRejectedValueOnce(noDisponible)
+      .mockRejectedValueOnce(noDisponible)
+      .mockResolvedValue('{"mensaje":"Vale, gracias","fin":true}');
+    const adaptador = adaptadorConChat(() => "No la tenemos.", {
+      completarChat,
+    });
+    const { deps } = dependencias(adaptador);
+
+    const resultado = await ejecutarLaboratorio(
+      parsearArgumentos([
+        "--negocio",
+        "biz_1",
+        "--escenarios",
+        "E1",
+        "--n",
+        "1",
+      ]),
+      deps
+    );
+
+    expect(deps.dormir).toHaveBeenNthCalledWith(1, 15_000);
+    expect(deps.dormir).toHaveBeenNthCalledWith(2, 30_000);
+    expect(resultado.informe!.resumen[0]!.errores).toBe(0);
+  });
+
+  it("esModeloNoDisponible reconoce el 10027 de Telnyx y nada más", () => {
+    expect(
+      esModeloNoDisponible(
+        new Error("The requested model is currently unavailable.")
+      )
+    ).toBe(true);
+    expect(esModeloNoDisponible(new Error("modelo caído"))).toBe(false);
+  });
+
   it("un fallo del LLM del cliente es un error de ejecución, no un fallo del prompt", async () => {
     const adaptador = adaptadorConChat(() => "No la tenemos.", {
       completarChat: vi.fn(async () => {
@@ -3654,6 +3728,16 @@ describe("variablesComunes", () => {
     expect(variablesComunes([])).toBeUndefined();
     expect(variablesComunes([con("Marta"), con("")])).toBe("distintas");
   });
+
+  it("el número de cada llamada no las hace distintas ni va en las comunes", () => {
+    const desde = (telefono: string) => ({
+      saludo: "s",
+      variables: { ...con("Marta").variables, telefono_para_decir: telefono },
+    });
+    expect(
+      variablesComunes([desde("seis uno dos"), desde("seis uno tres")])
+    ).toEqual({ nombre_cliente: "Marta", ultimo_servicio: "Corte" });
+  });
 });
 
 describe("crearCerrojosPorNegocio", () => {
@@ -3989,5 +4073,167 @@ describe("resultadoSinAssistant", () => {
       ok: false,
       error: "400 10015",
     });
+  });
+});
+
+describe("marcadorParcial", () => {
+  it("cuenta aciertos por variante y deja aparte los errores de ejecución", () => {
+    const marcador = marcadorParcial([
+      { tarea: { variante: "control" }, resultado: { ok: true } },
+      { tarea: { variante: "control" }, resultado: { ok: false } },
+      { tarea: { variante: "json" }, resultado: { ok: true } },
+      {
+        tarea: { variante: "json" },
+        resultado: { ok: false, error: "Request timed out." },
+      },
+    ]);
+
+    expect(marcador).toBe("control 1/2 (50 %) · json 1/1 (100 %) · 1 error");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Presupuesto (03-11: ninguna tanda puede costar más de 4 € en Telnyx)
+// ---------------------------------------------------------------------------
+
+describe("presupuesto de la tanda", () => {
+  it("--presupuesto: 4 € por defecto, admite la coma y rechaza lo que no es un importe", () => {
+    expect(opciones().presupuestoEur).toBe(PRESUPUESTO_POR_DEFECTO_EUR);
+    expect(opciones(["--presupuesto", "2,5"]).presupuestoEur).toBe(2.5);
+    for (const malo of ["0", "-1", "abc", "60"]) {
+      expect(() => opciones(["--presupuesto", malo])).toThrow(ErrorDeUso);
+    }
+  });
+
+  it("no deja empezar una tanda cuya estimación pasa del presupuesto", () => {
+    const caben = Math.floor(4 / DOLARES_POR_CONVERSACION);
+    expect(() => exigirPresupuesto(caben, 4)).not.toThrow();
+    expect(() => exigirPresupuesto(caben + 1, 4)).toThrow(/--presupuesto/);
+  });
+
+  it("una tanda que no cabe falla antes de crear ningún assistant", async () => {
+    const adaptador = adaptadorFalso();
+    const { deps } = dependencias(adaptador);
+
+    await expect(
+      ejecutarLaboratorio(
+        opciones(["--escenarios", "E1", "--n", "5", "--presupuesto", "0,1"]),
+        deps
+      )
+    ).rejects.toThrow(/presupuesto es 0,10 €/);
+    expect(adaptador.createAssistant).not.toHaveBeenCalled();
+  });
+
+  it("el freno lee el gasto como mucho una vez por minuto, desde la hora en punto, y para al llegar al tope", async () => {
+    let ms = Date.parse("2026-11-03T15:20:00Z");
+    const gastos = [10, 12, 14.5];
+    const gastoDesde = vi.fn(async (hora: Date) => {
+      expect(hora.toISOString()).toBe("2026-11-03T15:00:00.000Z");
+      return gastos.shift()!;
+    });
+    const avisos: string[] = [];
+    const freno = await crearFrenoDelPresupuesto({
+      presupuestoEur: 4,
+      inicio: new Date(ms),
+      ahora: () => new Date(ms),
+      gastoDesde,
+      log: () => {},
+      avisos,
+    });
+
+    expect(await freno.puedeSeguir()).toBe(true);
+    expect(gastoDesde).toHaveBeenCalledTimes(1);
+    ms += 61_000;
+    expect(await freno.puedeSeguir()).toBe(true); // lleva 2 $
+    ms += 30_000;
+    expect(await freno.puedeSeguir()).toBe(true); // no vuelve a leer
+    expect(gastoDesde).toHaveBeenCalledTimes(2);
+    ms += 31_000;
+    expect(await freno.puedeSeguir()).toBe(false); // lleva 4,5 $
+    expect(freno.parado).toBe(true);
+    expect(avisos.join("\n")).toMatch(/Presupuesto agotado: Telnyx lleva 4,50 €/);
+  });
+
+  it("si no se puede leer el gasto, sigue con la estimación previa y lo avisa", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const avisos: string[] = [];
+    const freno = await crearFrenoDelPresupuesto({
+      presupuestoEur: 4,
+      inicio: new Date(),
+      ahora: () => new Date(),
+      gastoDesde: async () => {
+        throw new Error("Telnyx 401");
+      },
+      log: () => {},
+      avisos,
+    });
+
+    expect(await freno.puedeSeguir()).toBe(true);
+    expect(await freno.gastado()).toBeNull();
+    expect(avisos.join("\n")).toMatch(/solo se controla con la estimación previa/);
+  });
+
+  it("en la tanda, al agotarse no empieza más conversaciones y el informe dice cuántas quedaron", async () => {
+    let ms = Date.parse("2026-11-03T15:20:00Z");
+    let gasto = 0;
+    const adaptador = adaptadorFalso();
+    const { deps, escritos } = dependencias(adaptador, {
+      // Cada vez que se pregunta la hora ha pasado un minuto, y cada lectura
+      // del gasto suma 1,5 $.
+      ahora: () => new Date((ms += 61_000)),
+      gastoEnTelnyxDesde: vi.fn(async () => (gasto += 1.5)),
+    });
+
+    const resultado = await ejecutarLaboratorio(
+      opciones(["--escenarios", "E1", "--n", "6", "--paralelo", "1"]),
+      deps
+    );
+
+    const meta = resultado.informe!.meta;
+    expect(meta.coste).toMatchObject({
+      presupuestoEur: 4,
+      sinCorrerPorPresupuesto: 4,
+      realUsd: expect.any(Number),
+    });
+    expect(meta.avisos.join("\n")).toMatch(
+      /4 conversaciones sin correr por el presupuesto/
+    );
+    const markdown = escritos.find((e) => e.ruta.endsWith("informe.md"))!;
+    expect(markdown.contenido).toMatch(/Coste: .* según Telnyx .*4 sin correr por el presupuesto/);
+  });
+
+  it("crea los assistants con el grupo de insights vacío del laboratorio", async () => {
+    const adaptador = adaptadorFalso();
+    const { deps } = dependencias(adaptador, {
+      grupoDeInsightsDelLaboratorio: vi.fn(async () => "grupo-lab"),
+    });
+
+    await ejecutarLaboratorio(opciones(["--escenarios", "E1", "--n", "1"]), deps);
+
+    expect(adaptador.createAssistant).toHaveBeenCalledWith(
+      expect.objectContaining({ insightGroupId: "grupo-lab" })
+    );
+  });
+
+  it("si no hay grupo de insights, crea los assistants igual y lo avisa", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const adaptador = adaptadorFalso();
+    const { deps } = dependencias(adaptador, {
+      grupoDeInsightsDelLaboratorio: vi.fn(async () => {
+        throw new Error("Telnyx 500");
+      }),
+    });
+
+    const resultado = await ejecutarLaboratorio(
+      opciones(["--escenarios", "E1", "--n", "1"]),
+      deps
+    );
+
+    expect(adaptador.createAssistant).toHaveBeenCalledWith(
+      expect.not.objectContaining({ insightGroupId: expect.anything() })
+    );
+    expect(resultado.informe!.meta.avisos.join("\n")).toMatch(
+      /grupo de insights/
+    );
   });
 });

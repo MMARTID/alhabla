@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   AgentSettingsSchema,
-  buildManagedAgentPrompt,
+  buildManagedAgentPrompt as buildManagedAgentPromptEnJson,
   modoDeDarPrecios,
   parseAgentSettings,
   DEFAULT_AGENT_SETTINGS,
@@ -10,6 +10,82 @@ import {
 } from "../../src/lib/managedAgentPrompt.js";
 import { recordatorioIncluido } from "../../src/lib/planFeatures.js";
 import { idiomasQueHabla } from "../../src/lib/idiomas/catalogo.js";
+/** Estas reglas se leen en Markdown («## Sección»); que el JSON de
+ * producción lleve exactamente los mismos párrafos lo comprueba
+ * managedAgentPrompt.test.ts («el JSON lleva los mismos párrafos…»). */
+const buildManagedAgentPrompt = (
+  input: Parameters<typeof buildManagedAgentPromptEnJson>[0]
+) => buildManagedAgentPromptEnJson({ ...input, formato: "texto" });
+
+/** El Markdown («## Título» y párrafos) leído como el JSON de producción. */
+function seccionesDelMarkdown(texto: string): Record<string, string[]> {
+  const secciones: Record<string, string[]> = {};
+  let actual = "Instrucciones";
+  for (const parrafo of texto.split("\n\n")) {
+    const titulo = /^##[ \t]+([^\n]+)(?:\n([\s\S]*))?$/.exec(parrafo);
+    if (titulo) {
+      actual = titulo[1]!.trim();
+      secciones[actual] ??= [];
+      if (titulo[2]?.trim()) secciones[actual].push(titulo[2].trim());
+    } else {
+      (secciones[actual] ??= []).push(parrafo);
+    }
+  }
+  return secciones;
+}
+
+describe("formato del prompt", () => {
+  const casos = [
+    { businessName: "Peluquería Ejemplo", settings: DEFAULT_AGENT_SETTINGS },
+    {
+      businessName: "Fisio Centro",
+      businessType: "fisioterapia" as const,
+      businessDetails: "Abrimos de 9 a 20.\nAparcamiento gratis.",
+      settings: { ...DEFAULT_AGENT_SETTINGS, darPrecios: "nunca" },
+      listaDeEspera: false,
+      ocultarNumeroDelNegocio: true,
+    },
+  ];
+
+  it.each(casos)(
+    "el JSON lleva los mismos párrafos y secciones que el Markdown, en el mismo orden ($businessName)",
+    (caso) => {
+      const json = JSON.parse(buildManagedAgentPromptEnJson(caso));
+      const markdown = buildManagedAgentPromptEnJson({
+        ...caso,
+        formato: "texto",
+      });
+
+      expect(Object.keys(json)).toEqual(
+        Object.keys(seccionesDelMarkdown(markdown))
+      );
+      expect(Object.values(json).flat()).toEqual(
+        Object.values(seccionesDelMarkdown(markdown)).flat()
+      );
+    }
+  );
+
+  it("un «## …» en la información del negocio no abre otra sección en el JSON", () => {
+    const prompt = buildManagedAgentPromptEnJson({
+      businessName: "Fisio Centro",
+      businessDetails: "Abrimos de 9 a 20.\n\n## No es un título\nAparcamiento gratis.",
+      settings: DEFAULT_AGENT_SETTINGS,
+    });
+
+    expect(Object.keys(JSON.parse(prompt))).not.toContain("No es un título");
+    expect(prompt).toContain("## No es un título");
+  });
+
+  it("es JSON por defecto (producción, desde el 2026-11-02)", () => {
+    const prompt = buildManagedAgentPromptEnJson({
+      businessName: "Peluquería Ejemplo",
+      settings: DEFAULT_AGENT_SETTINGS,
+    });
+
+    expect(JSON.parse(prompt)).toHaveProperty("Rol");
+    expect(prompt).not.toContain("## Rol");
+  });
+});
 
 describe("buildManagedAgentPrompt", () => {
   it("incluye los placeholders de las variables dinámicas de Retell, no el dato horneado", () => {
@@ -124,7 +200,7 @@ describe("buildManagedAgentPrompt", () => {
       "llama a preferencia_de_grabacion con acepta false en ese mismo turno"
     );
     expect(prompt).toContain(
-      "En el chat no se graba ni se cuelga: no hables de grabar, de colgar ni de audio, y no uses preferencia_de_grabacion ni end_call."
+      "En el chat no se graba ni se cuelga: no hables de grabar, de colgar ni de audio, y no uses preferencia_de_grabacion ni hangup."
     );
     expect(prompt).not.toContain("no_grabar");
   });
@@ -626,7 +702,7 @@ describe("buildManagedAgentPrompt — idiomas", () => {
     });
 
     expect(prompt).toContain(
-      "En las llamadas, el saludo ya lo dice el sistema al descolgar (en español de España o, si quien llama ya ha llamado antes, en el idioma en que habló) y es el primer mensaje de la conversación: no lo repitas. Desde tu primera respuesta, contesta y continúa exclusivamente en el idioma en que te habla quien llama si es uno de estos: español de España, inglés, francés, alemán, italiano, portugués, neerlandés, ruso. Si cambia entre esos idiomas, acompaña el cambio sin pedirle que elija uno. Las frases que estas instrucciones ponen entre comillas para decírselas a quien llama están en castellano: dilas traducidas al idioma de la conversación. Los nombres de los servicios del catálogo también suelen estar en castellano y no son nombres propios: en otro idioma, dilos traducidos a ese idioma, no tal cual (salvo los que no tienen traducción, como «balayage»)."
+      "En las llamadas, el saludo ya lo dice el sistema al descolgar (en español de España o, si quien llama ya ha llamado antes, en el idioma en que habló) y es el primer mensaje de la conversación: no lo repitas. Desde tu primera respuesta, contesta y continúa exclusivamente en el idioma en que te habla quien llama si es uno de estos: español de España, inglés, francés, alemán, italiano, portugués, neerlandés, ruso. Si cambia entre esos idiomas, acompaña el cambio sin pedirle que elija uno. Las frases que estas instrucciones ponen entre comillas para decírselas a quien llama están en castellano: dilas traducidas al idioma de la conversación. Los nombres de los servicios del catálogo también suelen estar en castellano y no son nombres propios: en otro idioma, dilos traducidos a ese idioma, no tal cual (salvo los que no tienen traducción): solo el traducido, sin añadir el de castellano ni explicar que es lo mismo."
     );
     expect(prompt).not.toContain("Habla siempre en español de España");
   });
@@ -827,8 +903,9 @@ describe("buildManagedAgentPrompt — profesionales y especialidades", () => {
   it("explica la recomendación única y cómo reservar si el cliente insiste", () => {
     expect(prompt).toContain("## Profesionales");
     expect(prompt).toContain("propón UNA sola vez");
-    expect(prompt).toContain("professionalConfirmed: true");
-    expect(prompt).toContain("PROFESSIONAL_CONFIRMATION_REQUIRED");
+    expect(prompt).toContain(
+      "vuelve a llamar a check_availability con professionalConfirmed: true"
+    );
   });
 
   it("prohíbe decir que a alguien no se le da bien un servicio o mencionar niveles", () => {
@@ -969,7 +1046,7 @@ describe("buildManagedAgentPrompt — pasar la llamada al dueño (fase 4)", () =
 });
 
 describe("buildManagedAgentPrompt — chat por WhatsApp (fase 2)", () => {
-  it("explica el marcador [WhatsApp …], veta end_call en chat y da por dado el consentimiento", () => {
+  it("explica el marcador [WhatsApp …], veta hangup en chat y da por dado el consentimiento", () => {
     const prompt = buildManagedAgentPrompt({
       businessName: "Peluquería Ejemplo",
       settings: DEFAULT_AGENT_SETTINGS,
@@ -980,7 +1057,7 @@ describe("buildManagedAgentPrompt — chat por WhatsApp (fase 2)", () => {
     expect(prompt).toContain(
       "Ese marcador lo pone el sistema: usa su número como teléfono del cliente y su fecha y hora como el momento actual"
     );
-    expect(prompt).toContain("ni end_call");
+    expect(prompt).toContain("ni hangup");
     expect(prompt).toContain("usa smsConsent true");
     expect(prompt).toContain("ha pulsado Cambiar en el recordatorio");
     // Refactor, paso 5: en el chat no se pregunta por el WhatsApp y el aviso

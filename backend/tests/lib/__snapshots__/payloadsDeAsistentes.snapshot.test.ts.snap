@@ -379,7 +379,9 @@ exports[`payloads de asistentes (instantáneas) > assistant de la recepcionista,
   "conversationFlow": null,
   "dynamicVariables": {
     "nombre_cliente": "",
+    "proxima_cita": "",
     "proximos_dias": "",
+    "telefono_para_decir": "",
     "ultimo_servicio": "",
   },
   "fallbackConfig": {
@@ -395,7 +397,7 @@ exports[`payloads de asistentes (instantáneas) > assistant de la recepcionista,
       "wait_seconds": 0.1,
     },
   },
-  "model": "openai/gpt-5.6-luna",
+  "model": "zai-org/GLM-5.3-Flash",
   "name": "alhabla-neg_1-ag_1",
   "postConversationSettings": {
     "enabled": true,
@@ -451,8 +453,25 @@ exports[`payloads de asistentes (instantáneas) > assistant de la recepcionista,
               "description": "Duración total de la cita en minutos.",
               "type": "number",
             },
+            "idioma": {
+              "description": "El idioma en que te habla quien llama ahora (por ejemplo, en-GB si te habla en inglés). Con él, cuando llega ya en ese idioma.",
+              "enum": [
+                "es-ES",
+                "en-GB",
+                "fr-FR",
+                "ca-ES",
+                "eu-ES",
+                "gl-ES",
+                "de-DE",
+                "it-IT",
+                "pt-PT",
+                "nl-NL",
+                "ru-RU",
+              ],
+              "type": "string",
+            },
             "professionalConfirmed": {
-              "description": "true SOLO si ya propusiste una vez a la persona que recomendó la herramienta y el cliente insistió en la que pidió por su nombre. Nunca lo envíes en la primera comprobación.",
+              "description": "true SOLO si check_availability te devolvió una recommendation, la propusiste y el cliente prefiere a la persona que pidió por su nombre: entonces te da su hueco. Nunca en la primera comprobación.",
               "type": "boolean",
             },
             "professionalId": {
@@ -508,11 +527,28 @@ exports[`payloads de asistentes (instantáneas) > assistant de la recepcionista,
               "type": "string",
             },
             "clientPhone": {
-              "description": "Teléfono de contacto solo si el cliente da uno distinto al número desde el que llama o book_appointment te lo pidió, tal como lo confirmó al repetírselo (opcional).",
+              "description": "Teléfono de contacto solo si el cliente da uno distinto al número desde el que llama o book_appointment te lo pidió (opcional). Pásalo en cuanto lo dicte: si hay que confirmarlo, la respuesta te dice cómo repetírselo.",
               "type": "string",
             },
-            "professionalConfirmed": {
-              "description": "true SOLO si check_availability devolvió una recomendación, la propusiste una vez y el cliente insistió en la persona que pidió. Sin esto, la reserva se frena hasta que lo hayas propuesto.",
+            "idioma": {
+              "description": "El idioma en que te habla quien llama ahora (por ejemplo, en-GB si te habla en inglés). Con él, cuando llega ya en ese idioma.",
+              "enum": [
+                "es-ES",
+                "en-GB",
+                "fr-FR",
+                "ca-ES",
+                "eu-ES",
+                "gl-ES",
+                "de-DE",
+                "it-IT",
+                "pt-PT",
+                "nl-NL",
+                "ru-RU",
+              ],
+              "type": "string",
+            },
+            "phoneConfirmed": {
+              "description": "true SOLO si book_appointment respondió CLIENT_PHONE_CONFIRMATION_REQUIRED, le repetiste ese teléfono tal como venía y el cliente dijo que sí.",
               "type": "boolean",
             },
             "smsConsent": {
@@ -550,7 +586,25 @@ exports[`payloads de asistentes (instantáneas) > assistant de la recepcionista,
       "type": "webhook",
       "webhook": {
         "body_parameters": {
-          "properties": {},
+          "properties": {
+            "idioma": {
+              "description": "El idioma en que te habla quien llama ahora (por ejemplo, en-GB si te habla en inglés). Con él, cuando llega ya en ese idioma.",
+              "enum": [
+                "es-ES",
+                "en-GB",
+                "fr-FR",
+                "ca-ES",
+                "eu-ES",
+                "gl-ES",
+                "de-DE",
+                "it-IT",
+                "pt-PT",
+                "nl-NL",
+                "ru-RU",
+              ],
+              "type": "string",
+            },
+          },
           "required": undefined,
           "type": "object",
         },
@@ -801,7 +855,7 @@ exports[`payloads de asistentes (instantáneas) > assistant de la recepcionista,
     },
     {
       "hangup": {
-        "description": "Cuelga la llamada cuando la conversación haya terminado.",
+        "description": "Cuelga la llamada. Llámala en el mismo turno en que te despides, justo después de tu frase de despedida: si no, la llamada se queda abierta y el cliente espera en silencio. También cuando te pidan colgar con claridad. Nunca en el chat de WhatsApp.",
       },
       "type": "hangup",
     },
@@ -855,7 +909,9 @@ exports[`payloads de asistentes (instantáneas) > assistant de la recepcionista,
   "conversationFlow": null,
   "dynamicVariables": {
     "nombre_cliente": "",
+    "proxima_cita": "",
     "proximos_dias": "",
+    "telefono_para_decir": "",
     "ultimo_servicio": "",
   },
   "fallbackConfig": {
@@ -871,7 +927,7 @@ exports[`payloads de asistentes (instantáneas) > assistant de la recepcionista,
       "wait_seconds": 0.1,
     },
   },
-  "model": "openai/gpt-5.6-luna",
+  "model": "zai-org/GLM-5.3-Flash",
   "name": "alhabla-neg_2-ag_2",
   "postConversationSettings": {
     "enabled": true,
@@ -1255,7 +1311,7 @@ Si te escriben en catalán, gallego, euskera o inglés, responde en ese idioma; 
 exports[`payloads de asistentes (instantáneas) > el JSON enviado es idéntico byte a byte (hash) 1`] = `
 {
   "gestor": "e98c3bfa972a5bd367381ff26a58c6d2b9ee626c5ac52e24ac7c18fe833f1d96",
-  "recepcionista": "bcdf0963b7ebfc647df91a1088b5378d2f22accf42f8de761aff5502d696a477",
+  "recepcionista": "f8d2b207709a8ae70fab27c0aec9dfb2275ae2a31cee8ebfc27ab7c15da338a9",
 }
 `;
 
@@ -1290,8 +1346,25 @@ exports[`payloads de asistentes (instantáneas) > tools de voz de la recepcionis
         "description": "Duración total de la cita en minutos.",
         "type": "number",
       },
+      "idioma": {
+        "description": "El idioma en que te habla quien llama ahora (por ejemplo, en-GB si te habla en inglés). Con él, cuando llega ya en ese idioma.",
+        "enum": [
+          "es-ES",
+          "en-GB",
+          "fr-FR",
+          "ca-ES",
+          "eu-ES",
+          "gl-ES",
+          "de-DE",
+          "it-IT",
+          "pt-PT",
+          "nl-NL",
+          "ru-RU",
+        ],
+        "type": "string",
+      },
       "professionalConfirmed": {
-        "description": "true SOLO si ya propusiste una vez a la persona que recomendó la herramienta y el cliente insistió en la que pidió por su nombre. Nunca lo envíes en la primera comprobación.",
+        "description": "true SOLO si check_availability te devolvió una recommendation, la propusiste y el cliente prefiere a la persona que pidió por su nombre: entonces te da su hueco. Nunca en la primera comprobación.",
         "type": "boolean",
       },
       "professionalId": {
@@ -1341,11 +1414,28 @@ exports[`payloads de asistentes (instantáneas) > tools de voz de la recepcionis
         "type": "string",
       },
       "clientPhone": {
-        "description": "Teléfono de contacto solo si el cliente da uno distinto al número desde el que llama o book_appointment te lo pidió, tal como lo confirmó al repetírselo (opcional).",
+        "description": "Teléfono de contacto solo si el cliente da uno distinto al número desde el que llama o book_appointment te lo pidió (opcional). Pásalo en cuanto lo dicte: si hay que confirmarlo, la respuesta te dice cómo repetírselo.",
         "type": "string",
       },
-      "professionalConfirmed": {
-        "description": "true SOLO si check_availability devolvió una recomendación, la propusiste una vez y el cliente insistió en la persona que pidió. Sin esto, la reserva se frena hasta que lo hayas propuesto.",
+      "idioma": {
+        "description": "El idioma en que te habla quien llama ahora (por ejemplo, en-GB si te habla en inglés). Con él, cuando llega ya en ese idioma.",
+        "enum": [
+          "es-ES",
+          "en-GB",
+          "fr-FR",
+          "ca-ES",
+          "eu-ES",
+          "gl-ES",
+          "de-DE",
+          "it-IT",
+          "pt-PT",
+          "nl-NL",
+          "ru-RU",
+        ],
+        "type": "string",
+      },
+      "phoneConfirmed": {
+        "description": "true SOLO si book_appointment respondió CLIENT_PHONE_CONFIRMATION_REQUIRED, le repetiste ese teléfono tal como venía y el cliente dijo que sí.",
         "type": "boolean",
       },
       "smsConsent": {
@@ -1370,7 +1460,25 @@ exports[`payloads de asistentes (instantáneas) > tools de voz de la recepcionis
     ],
     "method": "POST",
     "name": "find_my_appointment",
-    "properties": {},
+    "properties": {
+      "idioma": {
+        "description": "El idioma en que te habla quien llama ahora (por ejemplo, en-GB si te habla en inglés). Con él, cuando llega ya en ese idioma.",
+        "enum": [
+          "es-ES",
+          "en-GB",
+          "fr-FR",
+          "ca-ES",
+          "eu-ES",
+          "gl-ES",
+          "de-DE",
+          "it-IT",
+          "pt-PT",
+          "nl-NL",
+          "ru-RU",
+        ],
+        "type": "string",
+      },
+    },
     "timeoutMs": 20000,
     "url": "https://api.alhabla.test/webhooks/telnyx/tools/find_my_appointment",
   },

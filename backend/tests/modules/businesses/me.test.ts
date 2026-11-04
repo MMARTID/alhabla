@@ -456,7 +456,7 @@ describe("PATCH /business/me (móvil del dueño para WhatsApp)", () => {
       hideOwnerNumberFromClients: true,
     });
     // La privacidad es una regla del prompt: se resincroniza con ella.
-    expect(updateData.systemPrompt).toContain("## Privacidad");
+    expect(JSON.parse(updateData.systemPrompt)).toHaveProperty("Privacidad");
     expect(mockedAgentUpdate).toHaveBeenCalled();
 
     mockedBusinessUpdate.mockClear();
@@ -511,7 +511,7 @@ describe("PATCH /business/me (móvil del dueño para WhatsApp)", () => {
       unknown
     >;
     expect(updateData.hideOwnerNumberFromClients).toBe(false);
-    expect(updateData.systemPrompt).not.toContain("## Privacidad");
+    expect(JSON.parse(updateData.systemPrompt)).not.toHaveProperty("Privacidad");
   });
 
   it("«Cuándo pasarme llamadas» (fase 4) se guarda en agentSettings, pone el bloque en el prompt y resincroniza; solo admite los tres modos", async () => {
@@ -538,7 +538,7 @@ describe("PATCH /business/me (móvil del dueño para WhatsApp)", () => {
       unknown
     >;
     expect(updateData.agentSettings).toMatchObject({ pasarLlamadas: "siempre" });
-    expect(updateData.systemPrompt).toContain("## Pasar la llamada");
+    expect(JSON.parse(updateData.systemPrompt)).toHaveProperty("Pasar la llamada");
     expect(updateData.systemPrompt).toContain("Solo dentro del horario de apertura");
     expect(mockedSyncTelnyx).toHaveBeenCalledWith("biz_1");
 
@@ -551,7 +551,7 @@ describe("PATCH /business/me (móvil del dueño para WhatsApp)", () => {
       string,
       unknown
     >;
-    expect(sinBloque.systemPrompt).not.toContain("## Pasar la llamada");
+    expect(JSON.parse(sinBloque.systemPrompt)).not.toHaveProperty("Pasar la llamada");
 
     const malo = await patch({
       agentSettings: { ...DEFAULT_AGENT_SETTINGS, pasarLlamadas: "a_veces" },
@@ -582,7 +582,7 @@ describe("PATCH /business/me (móvil del dueño para WhatsApp)", () => {
       unknown
     >;
     // Con lo que va a quedar guardado («alhabla»), no con lo que había.
-    expect(updateData.systemPrompt).toContain("## Pasar la llamada");
+    expect(JSON.parse(updateData.systemPrompt)).toHaveProperty("Pasar la llamada");
     expect(updateData.systemPrompt).toContain("Pásala solo si el cliente pide");
     expect(mockedSyncTelnyx).toHaveBeenCalledWith("biz_1");
 
@@ -605,7 +605,7 @@ describe("PATCH /business/me (móvil del dueño para WhatsApp)", () => {
       string,
       unknown
     >;
-    expect(sinBloque.systemPrompt).not.toContain("## Pasar la llamada");
+    expect(JSON.parse(sinBloque.systemPrompt)).not.toHaveProperty("Pasar la llamada");
     expect(mockedSyncTelnyx).toHaveBeenCalledWith("biz_1");
   });
 

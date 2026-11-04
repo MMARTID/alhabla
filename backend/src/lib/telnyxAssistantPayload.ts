@@ -235,6 +235,17 @@ export function buildTelnyxTransferTool(input: {
  * instruyéndole a usarlas: los 25/25 escenarios de `telnyxCallBattery.ts`
  * fallaron porque ningún assistant de las 5 cuentas de prueba las tenía.
  */
+/** `idioma` de las tools que devuelven una fecha (cuandoEnSuIdioma en
+ * voiceTools/service.ts): con él, `cuando` llega ya en el idioma de quien
+ * llama. Laboratorio del 03-11 (E3): con el `cuando` en castellano, el
+ * primer turno tras la tool salía en castellano a quien hablaba inglés. */
+const IDIOMA_DE_LA_RESPUESTA = {
+  type: "string",
+  enum: [...CODIGOS_DE_IDIOMA],
+  description:
+    "El idioma en que te habla quien llama ahora (por ejemplo, en-GB si te habla en inglés). Con él, cuando llega ya en ese idioma.",
+} as const;
+
 export function buildTelnyxVoiceTools(
   baseUrl: string
 ): TelnyxWebhookToolInput[] {
@@ -273,13 +284,14 @@ export function buildTelnyxVoiceTools(
         professionalConfirmed: {
           type: "boolean",
           description:
-            "true SOLO si ya propusiste una vez a la persona que recomendó la herramienta y el cliente insistió en la que pidió por su nombre. Nunca lo envíes en la primera comprobación.",
+            "true SOLO si check_availability te devolvió una recommendation, la propusiste y el cliente prefiere a la persona que pidió por su nombre: entonces te da su hueco. Nunca en la primera comprobación.",
         },
         replacesBookingId: {
           type: "string",
           description:
             "Solo para cambiar una cita que ya tiene: el bookingId que devolvió find_my_appointment, o el que devolvió book_appointment si es la cita reservada en esta misma llamada. Su hora no cuenta como ocupada y, al reservar con el token de esta comprobación, el sistema anula la cita antigua (solo si la nueva queda reservada).",
         },
+        idioma: IDIOMA_DE_LA_RESPUESTA,
       },
       required: ["startDateTime", "durationMinutes"],
     },
@@ -295,7 +307,7 @@ export function buildTelnyxVoiceTools(
         clientPhone: {
           type: "string",
           description:
-            "Teléfono de contacto solo si el cliente da uno distinto al número desde el que llama o book_appointment te lo pidió, tal como lo confirmó al repetírselo (opcional).",
+            "Teléfono de contacto solo si el cliente da uno distinto al número desde el que llama o book_appointment te lo pidió (opcional). Pásalo en cuanto lo dicte: si hay que confirmarlo, la respuesta te dice cómo repetírselo.",
         },
         availabilityToken: {
           type: "string",
@@ -307,11 +319,12 @@ export function buildTelnyxVoiceTools(
           description:
             "true si el cliente dijo que sí a recibir la confirmación y un recordatorio por WhatsApp en este número; false si dijo que no, dudó o no se le preguntó.",
         },
-        professionalConfirmed: {
+        phoneConfirmed: {
           type: "boolean",
           description:
-            "true SOLO si check_availability devolvió una recomendación, la propusiste una vez y el cliente insistió en la persona que pidió. Sin esto, la reserva se frena hasta que lo hayas propuesto.",
+            "true SOLO si book_appointment respondió CLIENT_PHONE_CONFIRMATION_REQUIRED, le repetiste ese teléfono tal como venía y el cliente dijo que sí.",
         },
+        idioma: IDIOMA_DE_LA_RESPUESTA,
       },
       required: ["clientName", "availabilityToken"],
     },
@@ -319,7 +332,7 @@ export function buildTelnyxVoiceTools(
       name: "find_my_appointment",
       description:
         "Busca la próxima cita del negocio asociada al número desde el que llama. Devuelve su bookingId (para cancelarla, o para cambiarla con replacesBookingId en check_availability) y clientName (el nombre con el que se reservó; puede venir vacío en citas antiguas): úsalo si el cliente quiere la cita nueva al mismo nombre. Úsala solo si quien llama pide cambiar o cancelar una cita existente y no te ha dado datos concretos.",
-      properties: {},
+      properties: { idioma: IDIOMA_DE_LA_RESPUESTA },
     },
     {
       name: "cancel_appointment",
@@ -533,9 +546,14 @@ export function adaptManagedPromptForTelnyx(
   // {{telnyx_current_time_<zona>}} sin resolver y el agente sin saber qué
   // día es (fecha inventada para «mañana»).
   const zona = resolveManagedPromptTimezone(timezone);
+  // En el prompt en JSON (FormatoDelPrompt) el nombre cae dentro de una
+  // cadena: unas comillas en «Peluquería "La Rosa"» lo romperían.
+  const nombre = instructions.trimStart().startsWith("{")
+    ? JSON.stringify(businessName).slice(1, -1)
+    : businessName;
   return instructions
     .split("{{nombre_negocio}}")
-    .join(businessName)
+    .join(nombre)
     .split("{{user_number}}")
     .join("{{telnyx_end_user_target}}")
     .replace(RETELL_CURRENT_TIME_PATTERN, `{{telnyx_current_time_${zona}}}`)
@@ -793,8 +811,11 @@ export function buildTelnyxAssistantPayload(
 
   if (input.includeHangupTool ?? true) {
     tools.push(
+      // Telnyx solo deja cambiar la descripción: es lo que el modelo ve de la
+      // tool. Con la de antes («cuando la conversación haya terminado») se
+      // despedía y no colgaba (laboratorio y AI Tests del 03-11).
       buildTelnyxHangupTool(
-        "Cuelga la llamada cuando la conversación haya terminado."
+        "Cuelga la llamada. Llámala en el mismo turno en que te despides, justo después de tu frase de despedida: si no, la llamada se queda abierta y el cliente espera en silencio. También cuando te pidan colgar con claridad. Nunca en el chat de WhatsApp."
       )
     );
   }
@@ -817,16 +838,22 @@ export function buildTelnyxAssistantPayload(
     // (LLM+STT+TTS) factura una TARIFA PLANA de $0.05 por minuto
     // (redondeado a bloques de 60s) sin importar el modelo — mismo coste
     // exacto con Kimi-K2.6 y con gpt-5.6-luna en llamadas de duración
-    // comparable. El modelo NO afecta al coste; se mantiene gpt-5.6-luna
-    // por preferencia del usuario, no por ahorro. La única palanca real de
+    // comparable. El modelo NO afecta al coste. La única palanca real de
     // coste es la duración de la llamada.
-    model: "openai/gpt-5.6-luna",
-    // gpt-5.6-luna NO lo aloja Telnyx: `GET /v2/ai/models` lo da con
-    // `owned_by: "openai"`, así que la conversación sale a OpenAI (fuera del
-    // EEE; docs/auditorias/2026-10-16-pipelines-ue-y-datos.md). Kimi-K2.6,
-    // el fallback, sí es de Telnyx (`owned_by: "Telnyx"`): no exige una
-    // Integration Secret propia, y es el modelo ya validado con llamadas
-    // reales antes de este cambio.
+    //
+    // Desde el 2026-11-02, zai-org/GLM-5.3-Flash (decisión del usuario). Lo
+    // aloja Telnyx (antes gpt-5.6-luna, de OpenAI y fuera del EEE;
+    // docs/auditorias/2026-10-16-pipelines-ue-y-datos.md) y es el único
+    // modelo de assistants que Telnyx sirve en la región EU con
+    // `privacy_settings.in_transit_data_locality` (Kimi-K2.6 no está en EU:
+    // 422/10027 medido el 02-11). En el laboratorio de prompt
+    // (laboratorioDePrompt.ts) acierta como luna (~80 %) y contesta unas
+    // tres veces más rápido (~1,2 s por turno frente a ~3,9 s).
+    model: "zai-org/GLM-5.3-Flash",
+    // Kimi-K2.6 también es de Telnyx (`owned_by: "Telnyx"`), no exige una
+    // Integration Secret y es el modelo validado con llamadas reales antes
+    // de luna. No se sirve en EU: si algún día se activa
+    // `in_transit_data_locality`, el respaldo tendrá que ser otro.
     fallbackConfig: { model: "moonshotai/Kimi-K2.6" },
     // voice_speed retirado (encontrado 2026-09-14): la propia documentación
     // del SDK dice "only applicable for Telnyx Natural voices" — la cuenta

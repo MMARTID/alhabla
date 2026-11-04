@@ -187,6 +187,91 @@ function fechaEnZona(fecha: Date, timeZone: string): string {
   }).format(fecha);
 }
 
+const NUMEROS_HABLADOS = [
+  "cero",
+  "una",
+  "dos",
+  "tres",
+  "cuatro",
+  "cinco",
+  "seis",
+  "siete",
+  "ocho",
+  "nueve",
+  "diez",
+  "once",
+  "doce",
+  "trece",
+  "catorce",
+  "quince",
+  "dieciséis",
+  "diecisiete",
+  "dieciocho",
+  "diecinueve",
+  "veinte",
+  "veintiuno",
+  "veintidós",
+  "veintitrés",
+  "veinticuatro",
+  "veinticinco",
+  "veintiséis",
+  "veintisiete",
+  "veintiocho",
+  "veintinueve",
+];
+const DECENAS_HABLADAS: Record<number, string> = {
+  3: "treinta",
+  4: "cuarenta",
+  5: "cincuenta",
+};
+
+/** Minutos de 1 a 59 en palabras: «cinco», «veinte», «cuarenta y dos». */
+function minutosHablados(minutos: number): string {
+  if (minutos === 1) return "uno";
+  if (minutos < 30) return NUMEROS_HABLADOS[minutos];
+  const decena = DECENAS_HABLADAS[Math.floor(minutos / 10)];
+  const unidad = minutos % 10;
+  return unidad ? `${decena} y ${unidad === 1 ? "uno" : NUMEROS_HABLADOS[unidad]}` : decena;
+}
+
+/** La franja del día de una hora (0-23), como se dice en España. */
+function franjaDelDia(hora: number): string {
+  // Las 00:30 son «las doce y media de la noche», no de la madrugada.
+  if (hora === 0) return "de la noche";
+  if (hora < 6) return "de la madrugada";
+  if (hora < 12) return "de la mañana";
+  if (hora < 14) return "del mediodía";
+  if (hora < 21) return "de la tarde";
+  return "de la noche";
+}
+
+/**
+ * Una hora de reloj (0-23 y 0-59) como se dice por teléfono: 17:00 es «a
+ * las cinco de la tarde», 9:30 «a las nueve y media», 13:15 «a la una y
+ * cuarto del mediodía» y 16:45 «a las cinco menos cuarto de la tarde». El
+ * laboratorio del 02-11 con zai-org/GLM-5.3-Flash copiaba «a las 17:00» tal
+ * cual aunque el prompt le pedía decirla con palabras.
+ */
+export function horaParaDecir(hora: number, minutos: number): string {
+  const franja = franjaDelDia(hora);
+  // «menos cuarto» es de la hora siguiente, con la franja de la hora real
+  // («a las doce menos cuarto de la mañana»).
+  const enPunto = minutos === 45 ? (hora + 1) % 24 : hora;
+  const deDoce = enPunto % 12 || 12;
+  const articulo = deDoce === 1 ? "a la" : "a las";
+  const minutosDichos =
+    minutos === 0
+      ? ""
+      : minutos === 15
+        ? " y cuarto"
+        : minutos === 30
+          ? " y media"
+          : minutos === 45
+            ? " menos cuarto"
+            : ` y ${minutosHablados(minutos)}`;
+  return `${articulo} ${NUMEROS_HABLADOS[deDoce]}${minutosDichos} ${franja}`;
+}
+
 const DIAS_RELATIVOS: Record<number, string> = {
   0: "hoy",
   1: "mañana",
@@ -195,12 +280,66 @@ const DIAS_RELATIVOS: Record<number, string> = {
 
 /**
  * El día y la hora de una cita como se dicen («mañana, jueves, 15 de
- * octubre, a las 17:00»), en la zona del negocio. Las tools lo devuelven en
+ * octubre, a las cinco de la tarde»), en la zona del negocio. Las tools lo devuelven en
  * `cuando` para que la recepcionista no calcule el día: en una llamada de
  * producción del 14-10 dijo «dijous setze» de una cita del jueves 15. El
  * día relativo (hoy, mañana, pasado mañana) se cuenta desde `ahora`. Una
  * entrada que no es una fecha válida devuelve null.
  */
+/**
+ * `cuando` en otro idioma que el castellano (`locale`, uno de
+ * CODIGOS_DE_IDIOMA): el día con el formato de ese idioma, «hoy» y «mañana»
+ * en él, y la hora en cifras, como se lee allí («Friday 6 November, 5 pm»,
+ * «vendredi 6 novembre, 17:00»). Laboratorio del 03-11 (E3): con el
+ * `cuando` en castellano delante, GLM-5.3-Flash contestaba en castellano el
+ * primer turno tras check_availability a un cliente que hablaba inglés.
+ */
+export function cuandoEnOtroIdioma(
+  instante: string | Date,
+  timeZone: string,
+  locale: string,
+  ahora: Date = new Date()
+): string | null {
+  const fecha = instante instanceof Date ? instante : new Date(instante);
+  if (Number.isNaN(fecha.getTime())) return null;
+  const zona = timeZone || "Europe/Madrid";
+  try {
+    const dia = new Intl.DateTimeFormat(locale, {
+      timeZone: zona,
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+    }).format(fecha);
+    const enIngles = locale.startsWith("en");
+    const enPunto =
+      new Intl.DateTimeFormat("en-GB", { timeZone: zona, minute: "2-digit" })
+        .format(fecha)
+        .replace(/^0+/, "") === "";
+    // En inglés, «5 pm» y no «17:00» ni «5:00 pm».
+    const hora = new Intl.DateTimeFormat(locale, {
+      timeZone: zona,
+      hour: "numeric",
+      ...(enIngles && enPunto ? {} : { minute: "2-digit" }),
+      ...(enIngles ? { hour12: true } : {}),
+    }).format(fecha);
+    const diferencia = Math.round(
+      (Date.parse(fechaEnZona(fecha, zona)) -
+        Date.parse(fechaEnZona(ahora, zona))) /
+        86_400_000
+    );
+    const relativo =
+      diferencia === 0 || diferencia === 1
+        ? new Intl.RelativeTimeFormat(locale, { numeric: "auto" }).format(
+            diferencia,
+            "day"
+          )
+        : null;
+    return `${relativo ? `${relativo}, ` : ""}${dia}, ${hora}`;
+  } catch {
+    return null;
+  }
+}
+
 export function cuandoParaDecir(
   instante: string | Date,
   timeZone: string,
@@ -216,19 +355,22 @@ export function cuandoParaDecir(
       day: "numeric",
       month: "long",
     }).format(fecha);
-    const hora = new Intl.DateTimeFormat("es-ES", {
+    const [hora, minutos] = new Intl.DateTimeFormat("es-ES", {
       timeZone: zona,
       hour: "2-digit",
       minute: "2-digit",
       hourCycle: "h23",
-    }).format(fecha);
+    })
+      .format(fecha)
+      .split(":")
+      .map(Number);
     const diferencia = Math.round(
       (Date.parse(fechaEnZona(fecha, zona)) -
         Date.parse(fechaEnZona(ahora, zona))) /
         86_400_000
     );
     const relativo = DIAS_RELATIVOS[diferencia];
-    return `${relativo ? `${relativo}, ` : ""}${dia}, a las ${hora}`;
+    return `${relativo ? `${relativo}, ` : ""}${dia}, ${horaParaDecir(hora, minutos)}`;
   } catch {
     return null;
   }

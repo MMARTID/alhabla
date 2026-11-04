@@ -21,6 +21,14 @@ const mockedServiceFindMany = vi.mocked(prisma.service.findMany);
 const AHORA = new Date("2026-10-13T10:00:00Z");
 const HACE_UN_MES = new Date("2026-09-13T10:00:00Z");
 
+/** La última reserva con nombre (la del saludo) y, aparte, la próxima cita
+ * (la que buscaría find_my_appointment: no anulada y por venir). */
+function conReservas(ultima: unknown, proxima: unknown = null) {
+  mockedBookingFindFirst.mockImplementation((async (args: {
+    where: { isCancelled?: boolean };
+  }) => (args.where.isCancelled === false ? proxima : ultima)) as never);
+}
+
 const negocio = (campos: Record<string, unknown> = {}) => ({
   id: "biz_1",
   name: "Peluquería Ana",
@@ -34,7 +42,7 @@ describe("resolverContextoDeLlamada", () => {
     vi.clearAllMocks();
     mockedCallFindFirst.mockResolvedValue({ startedAt: HACE_UN_MES } as any);
     mockedClienteFindUnique.mockResolvedValue(null);
-    mockedBookingFindFirst.mockResolvedValue(null);
+    conReservas(null);
     mockedServiceFindMany.mockResolvedValue([]);
   });
 
@@ -54,6 +62,8 @@ describe("resolverContextoDeLlamada", () => {
         nombre_cliente: "",
         ultimo_servicio: "",
         proximos_dias: proximosDias(AHORA, "Europe/Madrid"),
+        telefono_para_decir: "seis cero cero, uno uno uno, dos dos dos",
+        proxima_cita: "",
       },
     });
     // Solo los datos de ese negocio y ese teléfono.
@@ -114,7 +124,7 @@ describe("resolverContextoDeLlamada", () => {
     mockedClienteFindUnique.mockResolvedValue({
       grabacionAceptada: true,
     } as any);
-    mockedBookingFindFirst.mockResolvedValue({
+    conReservas({
       clientName: " Lucía ",
       serviceIds: ["srv_1"],
     } as any);
@@ -135,6 +145,8 @@ describe("resolverContextoDeLlamada", () => {
         nombre_cliente: "Lucía",
         ultimo_servicio: "Corte",
         proximos_dias: proximosDias(AHORA, "Europe/Madrid"),
+        telefono_para_decir: "seis cero cero, uno uno uno, dos dos dos",
+        proxima_cita: "",
       },
     });
     // Solo servicios activos de ese negocio.
@@ -152,7 +164,7 @@ describe("resolverContextoDeLlamada", () => {
   // Llamada de producción del 14-10: «¿Quieres repetir Coloración y
   // Hidratación profunda y Peinado…?» se hacía largo.
   it("con varios servicios, el saludo dice «lo de la última vez» y el prompt los tiene todos", async () => {
-    mockedBookingFindFirst.mockResolvedValue({
+    conReservas({
       clientName: "Lucía",
       serviceIds: ["srv_1", "srv_2", "srv_3"],
     } as any);
@@ -177,7 +189,7 @@ describe("resolverContextoDeLlamada", () => {
   // Los nombres del catálogo suelen estar en castellano: dentro de un
   // saludo en catalán sonaban raros («Vols repetir Peinado…?»).
   it("si no saluda en castellano, no nombra el servicio", async () => {
-    mockedBookingFindFirst.mockResolvedValue({
+    conReservas({
       clientName: "Lucía",
       serviceIds: ["srv_1"],
     } as any);
@@ -199,7 +211,7 @@ describe("resolverContextoDeLlamada", () => {
 
   describe("en el idioma en que habló la última vez", () => {
     const lucia = () => {
-      mockedBookingFindFirst.mockResolvedValue({
+      conReservas({
         clientName: "Lucía",
         serviceIds: ["srv_1"],
       } as any);
@@ -292,7 +304,7 @@ describe("resolverContextoDeLlamada", () => {
   it.each(["fisioterapia", "centro-de-estetica", "other"])(
     "en %s el saludo no nombra el servicio, pero el prompt lo tiene",
     async (businessType) => {
-      mockedBookingFindFirst.mockResolvedValue({
+      conReservas({
         clientName: "Lucía",
         serviceIds: ["srv_1"],
       } as any);
@@ -328,7 +340,7 @@ describe("resolverContextoDeLlamada", () => {
   });
 
   it("con voz masculina, «el recepcionista»", async () => {
-    mockedBookingFindFirst.mockResolvedValue({
+    conReservas({
       clientName: "Lucía",
       serviceIds: [],
     } as any);
@@ -343,6 +355,64 @@ describe("resolverContextoDeLlamada", () => {
 
     expect(contexto.saludo).toBe(
       "Hola, Lucía, soy el recepcionista de IA de Peluquería Ana. ¿Quieres repetir lo de la última vez o prefieres algo nuevo?"
+    );
+  });
+
+  // Variables del 03-11: el número lo leía de memoria desde «+34…» y la cita
+  // pendiente costaba una find_my_appointment.
+  it("su próxima cita, como la buscaría find_my_appointment: cuándo, qué, con quién, a qué nombre y su bookingId", async () => {
+    conReservas(null, {
+      id: "booking_9",
+      programedAt: new Date("2026-10-14T15:00:00Z"),
+      serviceIds: ["srv_1"],
+      clientName: "Lucía",
+      professional: { name: "Laura" },
+    });
+    mockedServiceFindMany.mockResolvedValue([{ name: "Corte" }] as any);
+
+    const contexto = await resolverContextoDeLlamada({
+      business: negocio(),
+      telefono: "+34600111222",
+      ahora: AHORA,
+    });
+
+    expect(contexto.variables.proxima_cita).toBe(
+      "mañana, miércoles, 14 de octubre, a las cinco de la tarde: Corte, con Laura, a nombre de Lucía (bookingId booking_9)"
+    );
+    expect(mockedBookingFindFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          call: { businessId: "biz_1" },
+          isCancelled: false,
+          programedAt: { gte: AHORA },
+          OR: [
+            { clientPhone: "+34600111222" },
+            { clientPhone: null, call: { fromNumber: "+34600111222" } },
+          ],
+        },
+        orderBy: { programedAt: "asc" },
+      })
+    );
+  });
+
+  it("en un sector con dato sensible, la próxima cita va sin el servicio", async () => {
+    conReservas(null, {
+      id: "booking_9",
+      programedAt: new Date("2026-10-14T15:00:00Z"),
+      serviceIds: ["srv_1"],
+      clientName: null,
+      professional: null,
+    });
+    mockedServiceFindMany.mockResolvedValue([{ name: "Suelo pélvico" }] as any);
+
+    const contexto = await resolverContextoDeLlamada({
+      business: negocio({ businessType: "fisioterapia" }),
+      telefono: "+34600111222",
+      ahora: AHORA,
+    });
+
+    expect(contexto.variables.proxima_cita).toBe(
+      "mañana, miércoles, 14 de octubre, a las cinco de la tarde (bookingId booking_9)"
     );
   });
 
@@ -368,5 +438,7 @@ describe("resolverContextoDeLlamada", () => {
     expect(mockedClienteFindUnique).not.toHaveBeenCalled();
     expect(mockedBookingFindFirst).not.toHaveBeenCalled();
     expect(contexto.grabar).toBe(false);
+    expect(contexto.variables.telefono_para_decir).toBe("");
+    expect(contexto.variables.proxima_cita).toBe("");
   });
 });

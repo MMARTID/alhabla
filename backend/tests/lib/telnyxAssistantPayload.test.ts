@@ -183,6 +183,19 @@ describe("buildTelnyxHangupTool", () => {
 });
 
 describe("adaptManagedPromptForTelnyx", () => {
+  it("escapa el nombre del negocio dentro del prompt en JSON: unas comillas no lo rompen", () => {
+    const result = adaptManagedPromptForTelnyx(
+      JSON.stringify({ Rol: ["Eres la recepcionista de {{nombre_negocio}}."] }),
+      'Peluquería "La Rosa"',
+      "Europe/Madrid"
+    );
+
+    expect(JSON.parse(result)).toEqual({
+      Rol: ['Eres la recepcionista de Peluquería "La Rosa".'],
+    });
+  });
+
+
   it("sustituye {{nombre_negocio}} por el nombre real del negocio, en texto plano", () => {
     const result = adaptManagedPromptForTelnyx(
       "Eres la recepcionista virtual de {{nombre_negocio}}.",
@@ -331,7 +344,7 @@ describe("buildTelnyxAssistantPayload", () => {
   it("fija el modelo LLM primario y su fallback — decisión explícita del usuario 2026-09-12; el modelo NO afecta al coste (ai-voice-assistant es tarifa plana por minuto, confirmado con una llamada real)", () => {
     const payload = buildTelnyxAssistantPayload(baseInput);
 
-    expect(payload.model).toBe("openai/gpt-5.6-luna");
+    expect(payload.model).toBe("zai-org/GLM-5.3-Flash");
     expect(payload.fallbackConfig).toEqual({ model: "moonshotai/Kimi-K2.6" });
   });
 
@@ -647,6 +660,8 @@ describe("buildTelnyxAssistantPayload", () => {
       nombre_cliente: "",
       ultimo_servicio: "",
       proximos_dias: "",
+      telefono_para_decir: "",
+      proxima_cita: "",
     });
   });
 
@@ -687,7 +702,9 @@ describe("buildTelnyxAssistantPayload", () => {
     expect(payload.tools?.[1]).toEqual({
       type: "hangup",
       hangup: {
-        description: "Cuelga la llamada cuando la conversación haya terminado.",
+        description: expect.stringMatching(
+          /^Cuelga la llamada\. Llámala en el mismo turno en que te despides/
+        ),
       },
     });
   });
