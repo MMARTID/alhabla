@@ -100,6 +100,8 @@ también se pueden escribir a mano:
 - **Plantilla**: un mensaje listo para copiar, con botón «Copiar»; `\n` es un salto de línea.
 - **Faq**: además de verse como acordeón, cada bloque se declara a Google como `FAQPage` (JSON-LD con las
   mismas preguntas y respuestas): escribe las respuestas completas, en texto plano y sin enlaces.
+  Todo artículo publicado lleva uno, con su título `## Preguntas frecuentes` y al menos cuatro preguntas
+  sacadas de lo que dice el propio texto (`tests/lib/blog-faq.test.ts` lo exige).
 
 `destino` de la Cta: `planes`, `demo`, `como_funciona`, `desvio-de-llamadas`, `agenda-por-whatsapp` o el
 slug de un sector (`barberia`…).
