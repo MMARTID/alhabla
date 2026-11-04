@@ -109,8 +109,8 @@ export const PAGINAS: readonly PaginaIndexable[] = [
       nombre,
       resumen,
       seccion: "sectores",
-      // 1-11: tres guías del blog al pie (components/sector/guias-del-sector.tsx).
-      actualizado: "2026-11-01",
+      // 4-11: nuevas guías de WhatsApp en el pie (components/sector/guias-del-sector.tsx).
+      actualizado: "2026-11-04",
     })
   ),
   {

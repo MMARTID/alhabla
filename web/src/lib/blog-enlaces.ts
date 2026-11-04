@@ -30,7 +30,7 @@ export const SIGUE_LEYENDO: Readonly<Record<string, readonly string[]>> = {
   "mensajes-automaticos-whatsapp-business": [
     "whatsapp-business-para-citas",
     "recordatorios-de-citas-por-whatsapp",
-    "reservas-fuera-de-horario",
+    "whatsapp-business-o-whatsapp-normal",
     "quitar-contestador-movil",
   ],
   "quitar-contestador-movil": [
@@ -113,7 +113,7 @@ export const SIGUE_LEYENDO: Readonly<Record<string, readonly string[]>> = {
   ],
   "ia-que-contesta-llamadas": [
     "que-hace-una-recepcionista-virtual",
-    "desviar-llamadas-sin-cambiar-de-numero",
+    "chatbot-ia-whatsapp-business",
     "contestador-automatico-vs-recepcionista-virtual",
     "recepcionista-virtual-para-fisioterapia",
   ],
@@ -127,7 +127,7 @@ export const SIGUE_LEYENDO: Readonly<Record<string, readonly string[]>> = {
     "cuanto-cuesta-una-recepcionista-de-ia",
     "contestador-automatico-vs-recepcionista-virtual",
     "recepcionista-virtual-para-fisioterapia",
-    "whatsapp-business-para-citas",
+    "chatbot-ia-whatsapp-business",
   ],
   "recepcionista-virtual-para-fisioterapia": [
     "que-hace-una-recepcionista-virtual",
@@ -139,7 +139,7 @@ export const SIGUE_LEYENDO: Readonly<Record<string, readonly string[]>> = {
     "whatsapp-business-para-citas",
     "cambiar-cita-por-whatsapp-peluqueria",
     "citas-recurrentes-salon-de-unas",
-    "mensajes-automaticos-whatsapp-business",
+    "whatsapp-business-google-calendar",
   ],
   "reservas-fuera-de-horario": [
     "ia-que-contesta-llamadas",
@@ -149,9 +149,27 @@ export const SIGUE_LEYENDO: Readonly<Record<string, readonly string[]>> = {
   ],
   "whatsapp-business-para-citas": [
     "recordatorios-de-citas-por-whatsapp",
-    "cambiar-cita-por-whatsapp-peluqueria",
-    "reservas-fuera-de-horario",
+    "whatsapp-business-google-calendar",
+    "whatsapp-business-o-whatsapp-normal",
     "mensajes-automaticos-whatsapp-business",
+  ],
+  "whatsapp-business-o-whatsapp-normal": [
+    "mensajes-automaticos-whatsapp-business",
+    "whatsapp-business-para-citas",
+    "chatbot-ia-whatsapp-business",
+    "whatsapp-business-google-calendar",
+  ],
+  "chatbot-ia-whatsapp-business": [
+    "whatsapp-business-o-whatsapp-normal",
+    "ia-que-contesta-llamadas",
+    "whatsapp-business-google-calendar",
+    "que-hace-una-recepcionista-virtual",
+  ],
+  "whatsapp-business-google-calendar": [
+    "whatsapp-business-para-citas",
+    "recordatorios-de-citas-por-whatsapp",
+    "chatbot-ia-whatsapp-business",
+    "whatsapp-business-o-whatsapp-normal",
   ],
 };
 
@@ -175,12 +193,12 @@ export const GUIAS_POR_SECTOR: Readonly<Record<SectorSlug, readonly string[]>> =
   "centro-de-estetica": [
     "cabinas-y-profesionales-centro-de-estetica",
     "recordatorios-de-citas-por-whatsapp",
-    "que-hace-una-recepcionista-virtual",
+    "whatsapp-business-google-calendar",
   ],
   "salon-de-unas": [
     "citas-recurrentes-salon-de-unas",
     "whatsapp-business-para-citas",
-    "desviar-llamadas-sin-cambiar-de-numero",
+    "chatbot-ia-whatsapp-business",
   ],
   fisioterapia: [
     "recepcionista-virtual-para-fisioterapia",
@@ -189,7 +207,7 @@ export const GUIAS_POR_SECTOR: Readonly<Record<SectorSlug, readonly string[]>> =
   ],
   "pestanas-y-cejas": [
     "citas-recurrentes-salon-de-unas",
-    "lista-de-espera-huecos-libres",
+    "que-hace-una-recepcionista-virtual",
     "mensajes-automaticos-whatsapp-business",
   ],
   "spa-y-masajes": [
@@ -198,8 +216,8 @@ export const GUIAS_POR_SECTOR: Readonly<Record<SectorSlug, readonly string[]>> =
     "contestador-automatico-vs-recepcionista-virtual",
   ],
   "peluqueria-canina": [
-    "recordatorios-de-citas-por-whatsapp",
     "quitar-contestador-movil",
-    "que-hace-una-recepcionista-virtual",
+    "desviar-llamadas-sin-cambiar-de-numero",
+    "whatsapp-business-o-whatsapp-normal",
   ],
 };
