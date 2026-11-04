@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { getFacebookAuthUrl } from "@/lib/api";
-import { BetaPill } from "@/components/beta-pill";
 
 type FacebookAuthButtonProps = {
   onError: (message: string) => void;
@@ -52,12 +51,8 @@ export function FacebookAuthButton({
     }
   };
 
-  // Beta: la app de Facebook sigue pendiente de verificación/publicación y
-  // solo entran cuentas de prueba; la pastilla avisa, el botón sigue
-  // funcionando (mismo patrón que GoogleAuthButton).
   return (
     <div className="relative">
-      <BetaPill />
       <button
         type="button"
         onClick={startFacebookAuth}
