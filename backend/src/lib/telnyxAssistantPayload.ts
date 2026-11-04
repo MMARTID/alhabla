@@ -25,6 +25,15 @@ export function buildTelnyxAssistantName(
   return `alhabla-${businessId}-${agentId}`;
 }
 
+/** Lo mismo para el assistant del chat de clientes por WhatsApp del
+ * agente (tipo «recepcionista_chat», lib/tiposDeAsistente.ts). */
+export function buildTelnyxChatAssistantName(
+  businessId: string,
+  agentId: string
+): string {
+  return `alhabla-chat-${businessId}-${agentId}`;
+}
+
 export interface TelnyxWebhookToolInput {
   name: string;
   description: string;
@@ -92,7 +101,7 @@ const TOOLS_CON_FRASE_DE_ESPERA = new Set([
 ]);
 const ESPERA_ANTES_DE_LA_FRASE_MS = 1500;
 
-function conFraseDeEspera(
+export function conFraseDeEspera(
   tool: TelnyxWebhookToolInput,
   isoDelPrincipal: string
 ): TelnyxWebhookToolInput {
@@ -126,8 +135,9 @@ export interface CanalDeTools {
   timeoutMs: number;
 }
 
-/** Recepcionista (voz y chat de clientes por WhatsApp): el negocio sale de
- * la Call que identifica `{{call_control_id}}` (voiceTools/service.ts). */
+/** Recepcionista (sus dos assistants, voz y chat de clientes por
+ * WhatsApp): el negocio sale de la Call que identifica
+ * `{{call_control_id}}` (voiceTools/service.ts). */
 export const CANAL_DE_TOOLS_DE_VOZ: CanalDeTools = {
   ruta: "/webhooks/telnyx/tools",
   cabeceras: [
@@ -246,10 +256,52 @@ const IDIOMA_DE_LA_RESPUESTA = {
     "El idioma en que te habla quien llama ahora (por ejemplo, en-GB si te habla en inglés). Con él, cuando llega ya en ese idioma.",
 } as const;
 
+/**
+ * Las tools de webhook del assistant de llamadas. Sin informar_al_negocio
+ * desde el 2026-11-04: el informe de una llamada lo escribe el backend al
+ * colgar (jobs/informeDeLlamada.ts).
+ */
 export function buildTelnyxVoiceTools(
   baseUrl: string
 ): TelnyxWebhookToolInput[] {
   return construirToolsDeWebhook(baseUrl, CANAL_DE_TOOLS_DE_VOZ, [
+    ...definicionesComunes(),
+    {
+      // Grabación con permiso (lib/grabacion.ts): la recepcionista lo
+      // pregunta mientras comprueba el primer servicio.
+      name: "preferencia_de_grabacion",
+      description:
+        "Guarda lo que contesta quien llama sobre grabar sus llamadas (el audio es solo para que el negocio las revise). Con acepta true se empieza a grabar y se recuerda para sus próximas llamadas; con false no se graba (o se deja de grabar) y no se guarda el audio; la transcripción sí. Úsala solo en dos casos: cuando conteste con claridad a la pregunta_de_grabacion que te dio check_availability, o cuando pida con sus palabras que no se grabe. Nunca en otro momento, ni con lo que conteste a otras preguntas (su nombre, la hora, el WhatsApp).",
+      properties: {
+        acepta: {
+          type: "boolean",
+          description:
+            "true si acepta con claridad que se grabe (sí, vale, claro); false si dice que no.",
+        },
+      },
+      required: ["acepta"],
+    },
+  ]);
+}
+
+/**
+ * Las tools de webhook del assistant del chat de clientes por WhatsApp: las
+ * de reservar y consultar, que son las mismas que en voz (y las mismas tools
+ * de la biblioteca de Telnyx, lib/toolsCompartidas.ts), y el informe, que en
+ * el chat sigue mandando la recepcionista. Sin grabación ni colgar.
+ */
+export function buildTelnyxChatTools(
+  baseUrl: string
+): TelnyxWebhookToolInput[] {
+  return construirToolsDeWebhook(baseUrl, CANAL_DE_TOOLS_DE_VOZ, [
+    ...definicionesComunes(),
+    buildInformarAlNegocioTool(),
+  ]);
+}
+
+/** Las tools de reservar y consultar, iguales en los dos assistants. */
+function definicionesComunes(): DefinicionDeToolDeWebhook[] {
+  return [
     {
       name: "get_catalog",
       description:
@@ -379,117 +431,110 @@ export function buildTelnyxVoiceTools(
       },
       required: ["startDateTime", "durationMinutes"],
     },
-    {
-      // Grabación con permiso (lib/grabacion.ts): la recepcionista lo
-      // pregunta mientras comprueba el primer servicio.
-      name: "preferencia_de_grabacion",
-      description:
-        "Guarda lo que contesta quien llama sobre grabar sus llamadas (el audio es solo para que el negocio las revise). Con acepta true se empieza a grabar y se recuerda para sus próximas llamadas; con false no se graba (o se deja de grabar) y no se guarda el audio; la transcripción sí. Úsala solo en dos casos: cuando conteste con claridad a la pregunta_de_grabacion que te dio check_availability, o cuando pida con sus palabras que no se grabe. Nunca en otro momento, ni con lo que conteste a otras preguntas (su nombre, la hora, el WhatsApp). No la uses en el chat de WhatsApp.",
-      properties: {
-        acepta: {
-          type: "boolean",
-          description:
-            "true si acepta con claridad que se grabe (sí, vale, claro); false si dice que no.",
-        },
-      },
-      required: ["acepta"],
-    },
-    buildInformarAlNegocioTool(),
-  ]);
+  ];
 }
 
 /**
- * Tool de POST-CONVERSACIÓN (PLAN-CANAL-DUENO.md § 10): Telnyx vuelve a
- * invocar al assistant ~1 s después de colgar (`post_conversation_settings
- * .enabled`) y el prompt le pide llamar UNA vez a esta tool con el informe
- * de la llamada. Verificado en la fase 0.5: llega, pero DOS veces por
- * llamada y a veces con contenido distinto — la idempotencia por
- * call_control_id la hace `procesarInformeFinal` (modules/whatsapp/
- * recados.ts). El recado (nombre, teléfono, motivo) se convierte en un
- * `Lead` tipo `message` y en el aviso #2 al dueño.
+ * El informe de una conversación para el negocio (PLAN-CANAL-DUENO.md
+ * § 10): resultado, motivo de escalada, recado, dudas sin respuesta… Lo
+ * procesa `procesarInformeFinal` (modules/whatsapp/recados.ts), con la
+ * idempotencia por call_control_id: el recado (nombre, teléfono, motivo) se
+ * convierte en un `Lead` tipo `message` y en el aviso #2 al dueño.
+ *
+ * En el chat es una tool que la recepcionista llama al despedirse. En las
+ * llamadas fue una tool de post-conversación (Telnyx volvía a invocar al
+ * assistant tras colgar, con el prompt entero, y llegaba dos veces) hasta el
+ * 2026-11-04: ahora el mismo informe lo rellena el backend con la
+ * transcripción (jobs/informeDeLlamada.ts), con estas mismas propiedades.
  */
 export function buildInformarAlNegocioTool(): DefinicionDeToolDeWebhook {
   return {
     name: "informar_al_negocio",
     description:
-      "Informe final de la llamada para el negocio. Llámala UNA sola vez, solo cuando la llamada ya ha terminado (post-conversación), nunca durante la conversación. Resume cómo acabó y, si el cliente dejó un recado o pidió que le llamen, inclúyelo en recado.",
-    properties: {
-      resultado: {
-        type: "string",
-        enum: [
-          "RESOLVED",
-          "FRUSTRATED",
-          "NO_ANSWER",
-          "ESCALATED",
-          "LEAD_CAPTURED",
-        ],
-        description:
-          "RESOLVED si el cliente consiguió lo que quería (reservar, consultar, cancelar); FRUSTRATED si se fue molesto o sin solución; NO_ANSWER si nadie habló o colgó enseguida; ESCALATED si hubo que remitirle al negocio; LEAD_CAPTURED si dejó recado o pidió que le llamen.",
-      },
-      motivo_escalada: {
-        type: "string",
-        enum: [
-          "CLIENTE_LO_PIDIO",
-          "FALLO_TECNICO",
-          "FUERA_DE_HORARIO",
-          "CONSULTA_COMPLEJA",
-          "NO_APLICA",
-        ],
-        description:
-          "Por qué no se resolvió en la llamada. NO_APLICA si se resolvió.",
-      },
-      fallo_de_tool: {
-        type: "boolean",
-        description:
-          "true si alguna herramienta (disponibilidad, reserva, cancelación) falló o devolvió error durante la llamada.",
-      },
-      servicio_pedido: {
-        type: "string",
-        description:
-          "Nombre del servicio que pidió el cliente, tal como aparece en el catálogo; vacío si no pidió ninguno.",
-      },
-      recado: {
-        type: "object",
-        description:
-          "Solo si el cliente dejó un recado explícito o pidió que el negocio le llame. Si no, no lo envíes.",
-        properties: {
-          nombre: {
-            type: "string",
-            description: "Nombre que dio el cliente; vacío si no lo dijo.",
-          },
-          telefono: {
-            type: "string",
-            description:
-              "Teléfono al que quiere que le llamen, SOLO si el cliente lo dictó o confirmó que le llamen al número desde el que llama. Nunca lo rellenes por tu cuenta.",
-          },
-          motivo: {
-            type: "string",
-            description:
-              "Qué quiere o qué pregunta, en una o dos frases, con sus palabras.",
-          },
-          quiere_que_le_llamen: {
-            type: "boolean",
-            description: "true si pidió que el negocio le devuelva la llamada.",
-          },
-        },
-        required: ["motivo"],
-      },
-      // Para saludarle en su idioma la próxima vez (lib/idiomaDelCliente.ts).
-      idioma_del_cliente: {
-        type: "string",
-        enum: [...CODIGOS_DE_IDIOMA],
-        description: `El idioma en que habló quien llama la mayor parte de la llamada: ${CODIGOS_DE_IDIOMA.map(
-          (codigo) => `${codigo} ${IDIOMAS[codigo].nombreEnPrompt}`
-        ).join(", ")}. Si no llegó a hablar, no lo envíes.`,
-      },
-      dudas_sin_respuesta: {
-        type: "array",
-        items: { type: "string" },
-        description:
-          "Preguntas del cliente que no pudiste responder porque no tenías esa información (formas de pago, aparcamiento, si hacéis algo…), una por elemento y con sus palabras. No incluyas lo que sí respondiste ni lo que era para el negocio (recados, quejas). Si respondiste a todo, no lo envíes.",
-      },
-    },
+      "Informe final de la conversación para el negocio. Llámala UNA sola vez, cuando el cliente se despida o ya no quede nada pendiente. Resume cómo acabó y, si el cliente dejó un recado o pidió que le llamen, inclúyelo en recado.",
+    properties: propiedadesDelInformeFinal(),
     required: ["resultado"],
+  };
+}
+
+/** Las propiedades del informe (el esquema de `postCallReport`): las de la
+ * tool del chat y las que rellena el job de las llamadas. */
+export function propiedadesDelInformeFinal(): Record<string, unknown> {
+  return {
+    resultado: {
+      type: "string",
+      enum: [
+        "RESOLVED",
+        "FRUSTRATED",
+        "NO_ANSWER",
+        "ESCALATED",
+        "LEAD_CAPTURED",
+      ],
+      description:
+        "RESOLVED si el cliente consiguió lo que quería (reservar, consultar, cancelar); FRUSTRATED si se fue molesto o sin solución; NO_ANSWER si nadie habló o colgó enseguida; ESCALATED si hubo que remitirle al negocio; LEAD_CAPTURED si dejó recado o pidió que le llamen.",
+    },
+    motivo_escalada: {
+      type: "string",
+      enum: [
+        "CLIENTE_LO_PIDIO",
+        "FALLO_TECNICO",
+        "FUERA_DE_HORARIO",
+        "CONSULTA_COMPLEJA",
+        "NO_APLICA",
+      ],
+      description:
+        "Por qué no se resolvió en la llamada. NO_APLICA si se resolvió.",
+    },
+    fallo_de_tool: {
+      type: "boolean",
+      description:
+        "true si alguna herramienta (disponibilidad, reserva, cancelación) falló o devolvió error durante la llamada.",
+    },
+    servicio_pedido: {
+      type: "string",
+      description:
+        "Nombre del servicio que pidió el cliente, tal como aparece en el catálogo; vacío si no pidió ninguno.",
+    },
+    recado: {
+      type: "object",
+      description:
+        "Solo si el cliente dejó un recado explícito o pidió que el negocio le llame. Si no, no lo envíes.",
+      properties: {
+        nombre: {
+          type: "string",
+          description: "Nombre que dio el cliente; vacío si no lo dijo.",
+        },
+        telefono: {
+          type: "string",
+          description:
+            "Teléfono al que quiere que le llamen, SOLO si el cliente lo dictó o confirmó que le llamen al número desde el que llama. Nunca lo rellenes por tu cuenta.",
+        },
+        motivo: {
+          type: "string",
+          description:
+            "Qué quiere o qué pregunta, en una o dos frases, con sus palabras.",
+        },
+        quiere_que_le_llamen: {
+          type: "boolean",
+          description: "true si pidió que el negocio le devuelva la llamada.",
+        },
+      },
+      required: ["motivo"],
+    },
+    // Para saludarle en su idioma la próxima vez (lib/idiomaDelCliente.ts).
+    idioma_del_cliente: {
+      type: "string",
+      enum: [...CODIGOS_DE_IDIOMA],
+      description: `El idioma en que habló quien llama la mayor parte de la llamada: ${CODIGOS_DE_IDIOMA.map(
+        (codigo) => `${codigo} ${IDIOMAS[codigo].nombreEnPrompt}`
+      ).join(", ")}. Si no llegó a hablar, no lo envíes.`,
+    },
+    dudas_sin_respuesta: {
+      type: "array",
+      items: { type: "string" },
+      description:
+        "Preguntas del cliente que no pudiste responder porque no tenías esa información (formas de pago, aparcamiento, si hacéis algo…), una por elemento y con sus palabras. No incluyas lo que sí respondiste ni lo que era para el negocio (recados, quejas). Si respondiste a todo, no lo envíes.",
+    },
   };
 }
 
@@ -782,8 +827,15 @@ export interface BuildTelnyxAssistantPayloadInput {
    * (`Soniox.tts-rt-v2.<voz>`) o de ElevenLabs vía `api_key_ref` — resuelto
    * contra la API de voces de la cuenta, no fijo. */
   voice: string;
+  /** El grupo de insights vacío de la recepcionista (lib/insightsDeTelnyx.ts):
+   * sin él Telnyx pone «Default» y corre sus 6 insights en cada llamada. */
   insightGroupId?: string;
+  /** Tools de webhook inline (las demos y el laboratorio). Las
+   * recepcionistas de los negocios las llevan de la biblioteca, en
+   * `toolIds`. */
   tools?: TelnyxWebhookToolInput[];
+  /** Tools de la biblioteca de Telnyx (lib/toolsCompartidas.ts). */
+  toolIds?: string[];
   includeHangupTool?: boolean;
   /** Transferencia al dueño (fase 4): con destino se añade la tool nativa
    * `transfer`; sin él (ajuste «nunca» o sin móvil válido) no se registra.
@@ -833,7 +885,7 @@ export function buildTelnyxAssistantPayload(
       // tool. Con la de antes («cuando la conversación haya terminado») se
       // despedía y no colgaba (laboratorio y AI Tests del 03-11).
       buildTelnyxHangupTool(
-        "Cuelga la llamada. Llámala en el mismo turno en que te despides, justo después de tu frase de despedida: si no, la llamada se queda abierta y el cliente espera en silencio. También cuando te pidan colgar con claridad. Nunca en el chat de WhatsApp."
+        "Cuelga la llamada. Llámala en el mismo turno en que te despides, justo después de tu frase de despedida: si no, la llamada se queda abierta y el cliente espera en silencio. También cuando te pidan colgar con claridad."
       )
     );
   }
@@ -1086,19 +1138,72 @@ export function buildTelnyxAssistantPayload(
     // messaging, que estos assistants no usan.
     privacySettings: { data_retention: true, pii_redaction: "redact" },
     insightGroupId: input.insightGroupId,
-    // Post-conversación (PLAN-CANAL-DUENO.md § 10): el assistant vuelve a
-    // ejecutarse tras colgar para llamar a informar_al_negocio.
-    postConversationSettings: { enabled: true },
+    // Sin post-conversación desde el 2026-11-04: era una pasada más del
+    // modelo, con el prompt entero, solo para llamar a informar_al_negocio
+    // (y llegaba dos veces). El informe lo rellena el backend al colgar con
+    // la transcripción sin redactar (jobs/informeDeLlamada.ts). `false` y no
+    // ausente: Telnyx mezcla el campo y los assistants de antes lo tienen.
+    postConversationSettings: { enabled: false },
     // Lo de quien llama lo manda el backend en cada llamada
-    // (lib/contextoDeLlamada.ts); estos valores quedan para el chat y para
-    // una llamada en la que no se pudo mirar nada.
+    // (lib/contextoDeLlamada.ts); estos valores quedan para una llamada en
+    // la que no se pudo mirar nada.
     dynamicVariables: { ...VARIABLES_DE_LA_LLAMADA_POR_DEFECTO },
     tools,
+    ...(input.toolIds ? { toolIds: input.toolIds } : {}),
     // null y no ausente: un negocio que deja la zona (cambia de dirección)
     // pierde el nodo al sincronizar.
     conversationFlow: flujoDeLaCooficial({
       idiomas: input.idiomas.idiomas ?? [],
       cooficialDeLaZona: input.idiomas.cooficialDeLaZona ?? null,
     }),
+  };
+}
+
+export interface BuildTelnyxChatAssistantPayloadInput {
+  businessId: string;
+  agentId: string;
+  businessName: string;
+  timezone?: string;
+  /** El prompt de chat (buildManagedAgentPrompt con `canal: "chat"`) o el
+   * manual del negocio. */
+  instructions: string;
+  insightGroupId?: string;
+  /** Inline (laboratorio) o de la biblioteca (`toolIds`), como en voz. */
+  tools?: TelnyxWebhookToolInput[];
+  toolIds?: string[];
+}
+
+/**
+ * El assistant del chat de clientes por WhatsApp (tipo «recepcionista_chat»,
+ * lib/tiposDeAsistente.ts): lo usa `ai.assistants.chat` desde
+ * modules/whatsapp/chatCliente.ts. Solo prompt, modelo y tools: sin voz,
+ * transcripción, telefonía, saludo, flujo de idiomas ni hangup/transfer, y
+ * con `enabled_features` vacío (comprobado contra la API el 2026-11-04: el
+ * chat contesta igual). Las tools son las mismas de la biblioteca que las de
+ * voz, más informar_al_negocio y menos la grabación.
+ */
+export function buildTelnyxChatAssistantPayload(
+  input: BuildTelnyxChatAssistantPayloadInput
+): CreateTelnyxAssistantInput {
+  return {
+    name: buildTelnyxChatAssistantName(input.businessId, input.agentId),
+    instructions: adaptManagedPromptForTelnyx(
+      input.instructions,
+      input.businessName,
+      input.timezone
+    ),
+    // El mismo modelo y respaldo que la voz (ver buildTelnyxAssistantPayload).
+    model: "zai-org/GLM-5.3-Flash",
+    fallbackConfig: { model: "moonshotai/Kimi-K2.6" },
+    enabledFeatures: [],
+    // Sin pii_redaction: no se aplica a las conversaciones que crea Alhabla
+    // (ver la voz).
+    privacySettings: { data_retention: true },
+    insightGroupId: input.insightGroupId,
+    tools: (input.tools ?? []).map((tool) => toTelnyxWebhookTool(tool)),
+    ...(input.toolIds ? { toolIds: input.toolIds } : {}),
+    // Un assistant de chat no tiene nodos: null por si se creó con otro
+    // payload.
+    conversationFlow: null,
   };
 }

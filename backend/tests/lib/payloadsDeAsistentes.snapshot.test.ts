@@ -2,6 +2,8 @@ import { describe, it, expect } from "vitest";
 import { createHash } from "node:crypto";
 import {
   buildTelnyxAssistantPayload,
+  buildTelnyxChatAssistantPayload,
+  buildTelnyxChatTools,
   buildTelnyxVoiceTools,
 } from "../../src/lib/telnyxAssistantPayload.js";
 import {
@@ -24,6 +26,24 @@ const BASE_URL = "https://api.alhabla.test/";
 describe("payloads de asistentes (instantáneas)", () => {
   it("tools de voz de la recepcionista", () => {
     expect(buildTelnyxVoiceTools(BASE_URL)).toMatchSnapshot();
+  });
+
+  it("tools del chat de clientes de la recepcionista", () => {
+    expect(buildTelnyxChatTools(BASE_URL)).toMatchSnapshot();
+  });
+
+  it("assistant del chat de clientes de la recepcionista", () => {
+    expect(
+      buildTelnyxChatAssistantPayload({
+        businessId: "neg_1",
+        agentId: "ag_1",
+        businessName: "Peluquería Ana",
+        timezone: "Europe/Madrid",
+        instructions: "Hola {{nombre_negocio}} ({{zona_horaria}}).",
+        toolIds: ["tool-get_catalog", "tool-informar_al_negocio"],
+        insightGroupId: "grupo-vacio",
+      })
+    ).toMatchSnapshot();
   });
 
   it("assistant de la recepcionista, completo con transferencia y palabras clave", () => {

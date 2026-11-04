@@ -14,9 +14,12 @@ import { avisarRecado } from "./avisosNegocio.js";
 import * as mensajes from "./mensajes.js";
 
 /**
- * Informe final de la llamada (PLAN-CANAL-DUENO.md § 10): la tool
- * `informar_al_negocio` que la recepcionista llama en la post-conversación
- * de Telnyx. Hace tres cosas, en este orden:
+ * Informe final de una conversación (PLAN-CANAL-DUENO.md § 10): el de cada
+ * llamada lo escribe el backend al colgar con la transcripción
+ * (jobs/informeDeLlamada.ts, desde el 2026-11-04; antes, la recepcionista en
+ * la post-conversación de Telnyx), y el del chat de WhatsApp lo manda la
+ * recepcionista con la tool `informar_al_negocio`. Hace tres cosas, en este
+ * orden:
  *
  * 1. Guarda el primer informe en `Call.postCallReport` (reclamo atómico por
  *    `call_control_id`) y cada informe siguiente lo completa
@@ -27,11 +30,12 @@ import * as mensajes from "./mensajes.js";
  *    mitad de llamada pese al prompt (65 de 80 llamadas de prueba en dev, del
  *    03 al 07-10, sobre todo al dejar un recado). Antes ganaba el primero y
  *    el de la post-conversación, el que ha oído la llamada entera, se perdía.
- * 2. Doble escritura con los insights: rellena `Call.outcome`,
- *    `escalationReason`, `toolFailureDetected` y `requestedService` solo si
- *    siguen a null o tienen lo que puso un informe anterior (los insights
- *    nativos mandan mientras convivan) y deja en el log cualquier
- *    discrepancia, que es lo que hay que medir antes de retirar los insights.
+ * 2. Rellena `Call.outcome`, `escalationReason`, `toolFailureDetected` y
+ *    `requestedService` solo si siguen a null o tienen lo que puso un informe
+ *    anterior, y deja en el log cualquier discrepancia. Era la doble
+ *    escritura con los insights de Telnyx, retirados el 2026-11-04
+ *    (lib/insightsDeTelnyx.ts): un `Call` con lo que pusieron antes no se
+ *    toca.
  * 3. Un recado se convierte en un `Lead` tipo `message` y en el aviso #2 al
  *    dueño (WhatsApp con botones; email si no es posible), una sola vez por
  *    llamada. Si el `Lead` no se pudo crear, el recado sigue en el informe:

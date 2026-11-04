@@ -199,10 +199,19 @@ describe("buildManagedAgentPrompt", () => {
     expect(prompt).toContain(
       "llama a preferencia_de_grabacion con acepta false en ese mismo turno"
     );
-    expect(prompt).toContain(
-      "En el chat no se graba ni se cuelga: no hables de grabar, de colgar ni de audio, y no uses preferencia_de_grabacion ni hangup."
-    );
     expect(prompt).not.toContain("no_grabar");
+
+    // El del chat no habla de grabar: no tiene la tool.
+    const chat = buildManagedAgentPrompt({
+      businessName: "Barbería Ejemplo",
+      settings: DEFAULT_AGENT_SETTINGS,
+      canal: "chat",
+    });
+    expect(chat).not.toContain("## Grabación");
+    expect(chat).not.toContain("preferencia_de_grabacion");
+    expect(chat).toContain(
+      "En el chat no se graba ni se cuelga: no hables de grabar, de colgar ni de audio."
+    );
   });
 
   it("sabe quién llama: nombre y último servicio de su última reserva", () => {
@@ -927,20 +936,29 @@ describe("buildManagedAgentPrompt — profesionales y especialidades", () => {
   });
 });
 
-describe("buildManagedAgentPrompt — recados y post-conversación (PR 5)", () => {
-  it("pide confirmar el teléfono del recado y llamar una vez a informar_al_negocio al terminar", () => {
-    const prompt = buildManagedAgentPrompt({
+describe("buildManagedAgentPrompt — recados y el informe (PR 5)", () => {
+  it("pide confirmar el teléfono del recado; el informe, solo en el chat (el de las llamadas lo escribe el backend)", () => {
+    const voz = buildManagedAgentPrompt({
       businessName: "Peluquería Ejemplo",
       settings: DEFAULT_AGENT_SETTINGS,
     });
+    const chat = buildManagedAgentPrompt({
+      businessName: "Peluquería Ejemplo",
+      settings: DEFAULT_AGENT_SETTINGS,
+      canal: "chat",
+    });
 
-    expect(prompt).toContain("## Recados");
-    expect(prompt).toContain("nunca uses el número desde el que llama sin que lo confirme");
-    expect(prompt).toContain("## Al terminar la llamada");
-    expect(prompt).toContain("llama UNA sola vez a informar_al_negocio");
-    expect(prompt).toContain("No la uses durante la conversación");
+    for (const prompt of [voz, chat]) {
+      expect(prompt).toContain("## Recados");
+      expect(prompt).toContain(
+        "nunca uses el número desde el que llama sin que lo confirme"
+      );
+    }
+    expect(voz).not.toContain("informar_al_negocio");
+    expect(chat).toContain("## Al terminar la conversación");
+    expect(chat).toContain("llama UNA sola vez a informar_al_negocio");
     // Lo que no supo responder vuelve al dueño por el Gestor.
-    expect(prompt).toContain("apúntalo en dudas_sin_respuesta");
+    expect(chat).toContain("apúntalo en dudas_sin_respuesta");
   });
 });
 
@@ -949,6 +967,7 @@ describe("buildManagedAgentPrompt — privacidad del número (docs/historico/PLA
     const prompt = buildManagedAgentPrompt({
       businessName: "Fisio a domicilio",
       settings: DEFAULT_AGENT_SETTINGS,
+      canal: "chat",
     });
 
     expect(prompt).not.toContain("## Privacidad");
@@ -960,6 +979,7 @@ describe("buildManagedAgentPrompt — privacidad del número (docs/historico/PLA
       businessName: "Fisio a domicilio",
       settings: DEFAULT_AGENT_SETTINGS,
       ocultarNumeroDelNegocio: true,
+      canal: "chat",
     });
 
     expect(prompt).toContain("## Privacidad");
@@ -1012,10 +1032,15 @@ describe("buildManagedAgentPrompt — pasar la llamada al dueño (fase 4)", () =
       "Si la transferencia falla o el responsable no contesta, la llamada sigue contigo"
     );
     expect(prompt).toContain("si prefiere que le llamen o dejar recado");
-    // El bloque va antes del informe final, no dentro de él.
-    expect(prompt.indexOf("## Pasar la llamada")).toBeLessThan(
-      prompt.indexOf("## Al terminar la llamada")
-    );
+    // El chat no tiene la tool: tampoco el bloque.
+    expect(
+      buildManagedAgentPrompt({
+        businessName: "Peluquería Ejemplo",
+        settings: DEFAULT_AGENT_SETTINGS,
+        transferenciaAlDueno: activa,
+        canal: "chat",
+      })
+    ).not.toContain("## Pasar la llamada");
   });
 
   it("«siempre que sea posible»: también quejas, urgencias y pagos, pero solo en horario", () => {
@@ -1046,18 +1071,20 @@ describe("buildManagedAgentPrompt — pasar la llamada al dueño (fase 4)", () =
 });
 
 describe("buildManagedAgentPrompt — chat por WhatsApp (fase 2)", () => {
-  it("explica el marcador [WhatsApp …], veta hangup en chat y da por dado el consentimiento", () => {
+  it("explica el marcador [WhatsApp …], sin colgar en el chat, y da por dado el consentimiento", () => {
     const prompt = buildManagedAgentPrompt({
       businessName: "Peluquería Ejemplo",
       settings: DEFAULT_AGENT_SETTINGS,
+      canal: "chat",
     });
 
     expect(prompt).toContain("## Chat por WhatsApp");
     expect(prompt).toContain("[WhatsApp · número · fecha y hora]");
     expect(prompt).toContain(
-      "Ese marcador lo pone el sistema: usa su número como teléfono del cliente y su fecha y hora como el momento actual"
+      "ese marcador lo pone el sistema. Usa su número como teléfono del cliente y su fecha y hora como el momento actual"
     );
-    expect(prompt).toContain("ni hangup");
+    expect(prompt).not.toContain("hangup");
+    expect(prompt).not.toContain("## Cierre");
     expect(prompt).toContain("usa smsConsent true");
     expect(prompt).toContain("ha pulsado Cambiar en el recordatorio");
     // Refactor, paso 5: en el chat no se pregunta por el WhatsApp y el aviso
@@ -1066,6 +1093,66 @@ describe("buildManagedAgentPrompt — chat por WhatsApp (fase 2)", () => {
       "Al reservar pregúntale su nombre antes de ofrecerle reservar, aunque su perfil de WhatsApp muestre uno, y no preguntes por el WhatsApp"
     );
     expect(prompt).toContain("En el chat no hay saludo del sistema");
+  });
+
+  it("el de llamadas no lleva la sección del chat ni lo que dice el chat de sí mismo", () => {
+    const voz = buildManagedAgentPrompt({
+      businessName: "Peluquería Ejemplo",
+      settings: DEFAULT_AGENT_SETTINGS,
+    });
+    expect(voz).not.toContain("## Chat por WhatsApp");
+    expect(voz).not.toContain("en el chat");
+    expect(voz).not.toContain("[WhatsApp");
+  });
+
+  it("el del chat no lleva frases de voz ni las variables de cada llamada", () => {
+    const chat = buildManagedAgentPrompt({
+      businessName: "Peluquería Ejemplo",
+      settings: DEFAULT_AGENT_SETTINGS,
+      canal: "chat",
+    });
+    for (const deVoz of [
+      "## Cliente",
+      "## Datos de esta llamada",
+      "## Referencia temporal",
+      "telefono_para_decir",
+      "{{user_number}}",
+      "{{nombre_cliente}}",
+      "{{proximos_dias}}",
+      "en voz alta",
+      "La transcripción puede fallar",
+      "como se hablan por teléfono",
+      "el saludo ya lo dice al descolgar",
+    ]) {
+      expect(chat, deVoz).not.toContain(deVoz);
+    }
+  });
+
+  it("en el de llamadas, lo que cambia en cada llamada va junto al final, tras lo que es igual en todas", () => {
+    const voz = buildManagedAgentPrompt({
+      businessName: "Peluquería Ejemplo",
+      settings: DEFAULT_AGENT_SETTINGS,
+    });
+    const primeraVariable = Math.min(
+      ...[
+        "{{nombre_cliente}}",
+        "{{ultimo_servicio}}",
+        "{{telefono_para_decir}}",
+        "{{proxima_cita}}",
+        "{{user_number}}",
+        "{{current_time_",
+        "{{proximos_dias}}",
+      ].map((variable) => {
+        const posicion = voz.indexOf(variable);
+        expect(posicion, variable).toBeGreaterThan(-1);
+        return posicion;
+      })
+    );
+    // Hoy, más allá del 85 % del prompt (antes, la primera al 15 %).
+    expect(primeraVariable / voz.length).toBeGreaterThan(0.85);
+    expect(voz.indexOf("## Datos de esta llamada")).toBeLessThan(
+      voz.indexOf("## Referencia temporal")
+    );
   });
 });
 

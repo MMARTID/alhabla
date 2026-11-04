@@ -106,7 +106,13 @@ export interface CreateTelnyxAssistantInput {
   telephonySettings?: TelephonySettingsInput;
   privacySettings?: PrivacySettings;
   insightGroupId?: string;
+  /** Solo las inline (hangup, transfer y las de los assistants que no usan
+   * la biblioteca): Telnyx devuelve también las compartidas, con
+   * `shared: true`, y reenviarlas las duplicaría. */
   tools?: Array<TelnyxWebhookTool | HangupTool | TelnyxTransferTool>;
+  /** Tools de la biblioteca (lib/toolsCompartidas.ts). Al actualizar, la
+   * lista sustituye a las que tuviera; sin el campo se quedan. */
+  toolIds?: string[];
   enabledFeatures?: AssistantCreateParams["enabled_features"];
   /** `post_conversation_settings.enabled`: el assistant se invoca de nuevo
    * al terminar la llamada para las tools finales (informar_al_negocio). */
@@ -154,6 +160,7 @@ function toAssistantCreatePayload(
       ? { insight_group_id: input.insightGroupId }
       : undefined,
     tools: input.tools,
+    tool_ids: input.toolIds,
     enabled_features: input.enabledFeatures ?? ["telephony"],
     post_conversation_settings: input.postConversationSettings,
     dynamic_variables: input.dynamicVariables,
@@ -309,6 +316,7 @@ export class TelnyxAiAdapter {
       payload.insight_settings = { insight_group_id: input.insightGroupId };
     }
     if (input.tools !== undefined) payload.tools = input.tools;
+    if (input.toolIds !== undefined) payload.tool_ids = input.toolIds;
     if (input.enabledFeatures !== undefined)
       payload.enabled_features = input.enabledFeatures;
     if (input.postConversationSettings !== undefined)
@@ -535,6 +543,84 @@ export class TelnyxAiAdapter {
     await client.ai.conversations.insightGroups.insights.assign(insightId, {
       group_id: groupId,
     });
+  }
+
+  /** Los grupos de insights de la cuenta, con cuántos insights lleva cada
+   * uno (lib/insightsDeTelnyx.ts busca el vacío de la recepcionista). */
+  async listInsightGroups(): Promise<
+    Array<{ id: string; name: string; insights: number }>
+  > {
+    const client = getTelnyxClient();
+    const grupos: Array<{ id: string; name: string; insights: number }> = [];
+    for await (const grupo of client.ai.conversations.insightGroups.retrieveInsightGroups()) {
+      grupos.push({
+        id: grupo.id,
+        name: grupo.name,
+        insights: grupo.insights?.length ?? 0,
+      });
+    }
+    return grupos;
+  }
+
+  async createInsightGroup(input: {
+    name: string;
+    description: string;
+  }): Promise<{ id: string }> {
+    const client = getTelnyxClient();
+    const response = await client.ai.conversations.insightGroups.insightGroups({
+      name: input.name,
+      description: input.description,
+    });
+    if (!response.data?.id) {
+      throw new Error("Telnyx no devolvió el id del grupo de insights creado");
+    }
+    return { id: response.data.id };
+  }
+
+  // ---------------------------------------------------------------------
+  // Biblioteca de tools (tools compartidas, lib/toolsCompartidas.ts): una
+  // tool se crea una vez y los assistants la llevan por `tool_ids`.
+  // ---------------------------------------------------------------------
+
+  async listSharedTools(): Promise<
+    Array<{ id: string; displayName: string; type: string }>
+  > {
+    const client = getTelnyxClient();
+    const tools: Array<{ id: string; displayName: string; type: string }> = [];
+    for await (const tool of client.ai.tools.list({ "page[size]": 100 })) {
+      tools.push({
+        id: tool.id,
+        displayName: tool.display_name ?? "",
+        type: tool.type,
+      });
+    }
+    return tools;
+  }
+
+  /** Crea una tool de webhook en la biblioteca, con la misma forma que la
+   * inline (`webhook` y `timeout_ms` al nivel de la tool). */
+  async createSharedWebhookTool(input: {
+    displayName: string;
+    tool: TelnyxWebhookTool;
+  }): Promise<{ id: string }> {
+    const client = getTelnyxClient();
+    const response = await client.ai.tools.create({
+      display_name: input.displayName,
+      type: "webhook",
+      webhook: input.tool.webhook as unknown as Record<string, unknown>,
+      ...(input.tool.timeout_ms !== undefined
+        ? { timeout_ms: input.tool.timeout_ms }
+        : {}),
+    });
+    if (!response?.id) {
+      throw new Error("Telnyx no devolvió el id de la tool creada");
+    }
+    return { id: response.id };
+  }
+
+  async deleteSharedTool(toolId: string): Promise<void> {
+    const client = getTelnyxClient();
+    await client.ai.tools.delete(toolId);
   }
 
   async setPhoneNumberBillingGroup(
@@ -903,6 +989,54 @@ export class TelnyxAiAdapter {
     )) as { choices?: Array<{ message?: { content?: unknown } }> };
     const contenido = response?.choices?.[0]?.message?.content;
     return typeof contenido === "string" ? contenido : "";
+  }
+
+  /**
+   * Una respuesta de inferencia con la salida obligada a un esquema JSON
+   * (`response_format: json_schema`, la vía que Telnyx da para salida
+   * estructurada con sus modelos), servida en la UE si se puede (`region`
+   * preferida: si el modelo no está allí, Telnyx la sirve en otra). La usa
+   * el informe de cada llamada (jobs/informeDeLlamada.ts). Devuelve el texto
+   * de la respuesta, sin parsear, y los tokens si Telnyx los da.
+   */
+  async completarConEsquema(input: {
+    modelo: string;
+    mensajes: Array<{ role: "system" | "user"; content: string }>;
+    esquema: { nombre: string; schema: Record<string, unknown> };
+    timeoutMs?: number;
+  }): Promise<{
+    contenido: string;
+    tokens: { entrada: number | null; salida: number | null };
+  }> {
+    const client = getTelnyxClient();
+    const response = (await client.ai.openai.chat.createCompletion(
+      {
+        model: input.modelo,
+        messages: input.mensajes,
+        temperature: 0,
+        region: "EU",
+        // Con el razonamiento de GLM, el informe de 16 llamadas de dev tardó
+        // 4 veces más (3–14 s), con 10 veces más tokens, y no acertó más
+        // (04-11).
+        enable_thinking: false,
+        response_format: {
+          type: "json_schema",
+          json_schema: { name: input.esquema.nombre, schema: input.esquema.schema },
+        },
+      },
+      { timeout: input.timeoutMs ?? 60_000 }
+    )) as {
+      choices?: Array<{ message?: { content?: unknown } }>;
+      usage?: { prompt_tokens?: number; completion_tokens?: number };
+    };
+    const contenido = response?.choices?.[0]?.message?.content;
+    return {
+      contenido: typeof contenido === "string" ? contenido : "",
+      tokens: {
+        entrada: response?.usage?.prompt_tokens ?? null,
+        salida: response?.usage?.completion_tokens ?? null,
+      },
+    };
   }
 
   // ---------------------------------------------------------------------

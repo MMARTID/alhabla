@@ -1,5 +1,7 @@
 import {
   buildTelnyxAssistantName,
+  buildTelnyxChatAssistantName,
+  buildTelnyxChatTools,
   buildTelnyxVoiceTools,
   CANAL_DE_TOOLS_DE_VOZ,
   type CanalDeTools,
@@ -25,7 +27,11 @@ import {
  * ni cambia lo que se le envía.
  */
 
-export type ClaveDeTipoDeAsistente = "recepcionista" | "demo" | "gestor";
+export type ClaveDeTipoDeAsistente =
+  | "recepcionista"
+  | "recepcionista_chat"
+  | "demo"
+  | "gestor";
 
 export interface TipoDeAsistente {
   clave: ClaveDeTipoDeAsistente;
@@ -58,16 +64,35 @@ export const TIPOS_DE_ASISTENTE: Readonly<
   recepcionista: {
     clave: "recepcionista",
     descripcion:
-      "Recepcionista de un negocio: atiende sus llamadas y, con el mismo assistant, el chat de clientes por WhatsApp (modules/whatsapp/chatCliente.ts).",
+      "Recepcionista de un negocio en sus llamadas: el assistant del número (Agent.telnyxAssistantId), con el prompt de voz.",
     ambito: "por_agente",
-    canales: ["voz", "whatsapp"],
+    canales: ["voz"],
     proveedores: { principal: "telnyx" },
     canalDeTools: CANAL_DE_TOOLS_DE_VOZ,
     nombreEnTelnyx: ({ businessId, agentId }) =>
       buildTelnyxAssistantName(businessId, agentId),
     tools: buildTelnyxVoiceTools,
     sincronizacion:
-      "lib/telnyxAgentSync.ts (Telnyx, por hash del payload)",
+      "lib/telnyxAgentSync.ts (Telnyx, por hash del payload; tools de la biblioteca, lib/toolsCompartidas.ts)",
+  },
+  // Aparte del de voz desde el 2026-11-04: hasta entonces el mismo assistant
+  // atendía las dos cosas y cada pasada del modelo releía las reglas del
+  // otro canal. Mismo agente, mismas tools de reservar (las mismas de la
+  // biblioteca) y el mismo canal de tools: el backend distingue el chat por
+  // su Call sintética `whatsapp:chat:…`.
+  recepcionista_chat: {
+    clave: "recepcionista_chat",
+    descripcion:
+      "Recepcionista de un negocio en el chat de clientes por WhatsApp (modules/whatsapp/chatCliente.ts): Agent.telnyxChatAssistantId, con el prompt de chat, sin voz ni telefonía.",
+    ambito: "por_agente",
+    canales: ["whatsapp"],
+    proveedores: { principal: "telnyx" },
+    canalDeTools: CANAL_DE_TOOLS_DE_VOZ,
+    nombreEnTelnyx: ({ businessId, agentId }) =>
+      buildTelnyxChatAssistantName(businessId, agentId),
+    tools: buildTelnyxChatTools,
+    sincronizacion:
+      "lib/telnyxAgentSync.ts, junto al de voz del mismo agente (lo crea si falta)",
   },
   demo: {
     clave: "demo",

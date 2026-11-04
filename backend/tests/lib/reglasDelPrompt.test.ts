@@ -7,8 +7,11 @@ import {
 } from "../../src/lib/managedAgentPrompt.js";
 import {
   buildTelnyxAssistantPayload,
+  buildTelnyxChatAssistantPayload,
+  buildTelnyxChatTools,
   buildTelnyxVoiceTools,
 } from "../../src/lib/telnyxAssistantPayload.js";
+import type { CanalDelPrompt } from "../../src/lib/seccionesDelPrompt.js";
 import { BUSINESS_TYPES } from "../../src/lib/businessType.js";
 import {
   idiomasQueHabla,
@@ -285,12 +288,20 @@ const VARIANTES = {
 
 type IdDeVariante = keyof typeof VARIANTES;
 
-const PROMPTS: Record<IdDeVariante, string> = Object.fromEntries(
-  (Object.keys(VARIANTES) as IdDeVariante[]).map((id) => [
-    id,
-    buildManagedAgentPrompt(VARIANTES[id]),
-  ])
-) as Record<IdDeVariante, string>;
+/** Desde el 2026-11-04 cada variante tiene dos prompts: el del assistant de
+ * llamadas y el del chat de clientes por WhatsApp. */
+function promptsDelCanal(canal: CanalDelPrompt): Record<IdDeVariante, string> {
+  return Object.fromEntries(
+    (Object.keys(VARIANTES) as IdDeVariante[]).map((id) => [
+      id,
+      buildManagedAgentPrompt({ ...VARIANTES[id], canal }),
+    ])
+  ) as Record<IdDeVariante, string>;
+}
+
+const PROMPTS_POR_CANAL: Record<CanalDelPrompt, Record<IdDeVariante, string>> =
+  { voz: promptsDelCanal("voz"), chat: promptsDelCanal("chat") };
+const PROMPTS = PROMPTS_POR_CANAL.voz;
 
 /** El prompt partido por secciones: «Rol» → «## Rol\n\n…». Un título es la
  * primera línea de cada bloque que empieza por «## ». */
@@ -318,7 +329,11 @@ function textosDeLasTools(): Map<string, string> {
     }
   };
 
-  for (const tool of buildTelnyxVoiceTools("https://api.alhabla.test")) {
+  // Las de los dos assistants: las comunes son la misma tool.
+  for (const tool of [
+    ...buildTelnyxVoiceTools("https://api.alhabla.test"),
+    ...buildTelnyxChatTools("https://api.alhabla.test"),
+  ]) {
     const salida: string[] = [tool.name, tool.description];
     recoger(tool.properties, salida);
     textos.set(tool.name, salida.join("\n"));
@@ -348,7 +363,10 @@ function textosDeLasTools(): Map<string, string> {
 
 const TEXTOS_DE_LAS_TOOLS = textosDeLasTools();
 const NOMBRES_DE_LAS_TOOLS = new Set(
-  buildTelnyxVoiceTools("https://api.alhabla.test").map((tool) => tool.name)
+  [
+    ...buildTelnyxVoiceTools("https://api.alhabla.test"),
+    ...buildTelnyxChatTools("https://api.alhabla.test"),
+  ].map((tool) => tool.name)
 );
 
 // ---------------------------------------------------------------------------
@@ -360,13 +378,15 @@ type Lugar =
   /** Una frase del prompt, dentro de la sección `seccion` ("Rol", sin las
    * almohadillas), en cada variante de `variantes` (por defecto, solo la
    * base; «todas» las recorre). `alFinal`: además tiene que ser la última
-   * sección del prompt. */
+   * sección del prompt. `canal`: el prompt del assistant de llamadas (por
+   * defecto) o el del chat de clientes por WhatsApp. */
   | {
       en: "prompt";
       seccion: string;
       texto: string;
       variantes?: readonly IdDeVariante[] | "todas";
       alFinal?: boolean;
+      canal?: CanalDelPrompt;
     }
   /** Una frase de la descripción de la tool o del esquema de sus parámetros
    * (también `hangup` y `transfer`). */
@@ -417,6 +437,7 @@ const REGLAS: readonly Regla[] = [
       },
       {
         en: "prompt",
+        canal: "chat",
         seccion: "Chat por WhatsApp",
         texto:
           "en tu primera respuesta di, en una frase corta, que le atiende la recepcionista de IA de {{nombre_negocio}}",
@@ -1342,6 +1363,7 @@ const REGLAS: readonly Regla[] = [
       },
       {
         en: "prompt",
+        canal: "chat",
         seccion: "Chat por WhatsApp",
         texto: "no le des ningún teléfono",
         variantes: ["conPrivacidad"],
@@ -1410,9 +1432,23 @@ const REGLAS: readonly Regla[] = [
         texto: "Un recado no sustituye a una reserva",
       },
       {
+        en: "prompt",
+        canal: "chat",
+        seccion: "Recados",
+        texto: "nunca uses el número desde el que llama sin que lo confirme",
+      },
+      {
         en: "descripcionDeTool",
         tool: "informar_al_negocio",
         texto: "Nunca lo rellenes por tu cuenta.",
+      },
+      // Desde el 04-11 el informe de una llamada lo escribe el backend
+      // (jobs/informeDeLlamada.ts), con la misma regla para el teléfono.
+      {
+        en: "guardaDelBackend",
+        simbolo:
+          "El teléfono del recado, solo si lo dictó o confirmó que le llamen al número desde el que llama",
+        fichero: "src/jobs/informeDeLlamada.ts",
       },
     ],
   },
@@ -1465,7 +1501,15 @@ const REGLAS: readonly Regla[] = [
       {
         en: "prompt",
         seccion: "Cliente",
-        texto: "Nómbrala solo si pregunta por ella o quiere cambiarla o anularla",
+        texto:
+          "Nombra «Su próxima cita» solo si pregunta por ella o quiere cambiarla o anularla",
+      },
+      // Desde el 04-11 el valor va al final, con lo demás que cambia en
+      // cada llamada (lo de delante se reutiliza en la caché).
+      {
+        en: "prompt",
+        seccion: "Datos de esta llamada",
+        texto: "Su próxima cita: {{proxima_cita}}.",
       },
       {
         en: "prompt",
@@ -1489,12 +1533,38 @@ const REGLAS: readonly Regla[] = [
       {
         en: "prompt",
         seccion: "Cliente",
-        texto: "Su número, para decirlo tal cual: {{telefono_para_decir}}.",
+        texto:
+          "Si le dices su número, dilo tal cual viene en «Su número, para decirlo».",
+      },
+      {
+        en: "prompt",
+        seccion: "Datos de esta llamada",
+        texto: "Su número, para decirlo: {{telefono_para_decir}}.",
       },
       {
         en: "guardaDelBackend",
         simbolo: "telefonoParaDecir",
         fichero: "src/lib/contextoDeLlamada.ts",
+      },
+    ],
+  },
+  {
+    id: "variables-de-la-llamada-al-final",
+    descripcion:
+      "Lo que cambia en cada llamada (quién llama, su número, su próxima cita y la hora) va junto al final del prompt de voz, detrás de todo lo que es igual en todas las llamadas del negocio.",
+    origen:
+      "Separación de assistants del 04-11: {{nombre_cliente}} estaba al 15 % del prompt y {{telnyx_end_user_target}} al 43 %, y lo que iba detrás no se podía reutilizar en la caché del modelo en ninguna de las 11–15 pasadas por llamada.",
+    lugares: [
+      {
+        en: "prompt",
+        seccion: "Datos de esta llamada",
+        texto: "El número desde el que llama: {{user_number}}.",
+        variantes: "todas",
+      },
+      {
+        en: "prompt",
+        seccion: "Cliente",
+        texto: "En «Datos de esta llamada» tienes el nombre de su última reserva",
       },
     ],
   },
@@ -1717,14 +1787,19 @@ const REGLAS: readonly Regla[] = [
     lugares: [
       {
         en: "prompt",
+        canal: "chat",
         seccion: "Chat por WhatsApp",
         texto:
-          "Si el mensaje empieza por [WhatsApp · número · fecha y hora], estás en un chat de WhatsApp, no en una llamada.",
+          "Cada mensaje del cliente empieza por [WhatsApp · número · fecha y hora]: ese marcador lo pone el sistema.",
       },
+      // Desde el 04-11 el prompt de chat no lleva otra hora (sin
+      // «Referencia temporal»): el marcador es la única.
       {
         en: "prompt",
+        canal: "chat",
         seccion: "Chat por WhatsApp",
-        texto: "por encima de cualquier otra hora que tengas",
+        texto:
+          "Usa su número como teléfono del cliente y su fecha y hora como el momento actual.",
       },
       {
         en: "guardaDelBackend",
@@ -1742,13 +1817,34 @@ const REGLAS: readonly Regla[] = [
     lugares: [
       {
         en: "prompt",
+        canal: "chat",
         seccion: "Chat por WhatsApp",
         texto: "En el chat no se graba ni se cuelga",
       },
+      // Desde el 04-11 el assistant de chat no tiene ni la tool de grabar ni
+      // hangup (antes, la descripción de la tool le decía que no la usara).
       {
-        en: "descripcionDeTool",
-        tool: "preferencia_de_grabacion",
-        texto: "No la uses en el chat de WhatsApp.",
+        en: "guardaDelBackend",
+        simbolo: "buildTelnyxChatTools",
+        fichero: "src/lib/telnyxAssistantPayload.ts",
+        comprueba: () =>
+          !buildTelnyxChatTools("https://api.alhabla.test").some(
+            (tool) => tool.name === "preferencia_de_grabacion"
+          ),
+      },
+      {
+        en: "guardaDelBackend",
+        simbolo: "buildTelnyxChatAssistantPayload",
+        fichero: "src/lib/telnyxAssistantPayload.ts",
+        comprueba: () =>
+          (
+            buildTelnyxChatAssistantPayload({
+              businessId: "negocio",
+              agentId: "agente",
+              businessName: "Peluquería Ana",
+              instructions: "i",
+            }).tools ?? []
+          ).length === 0,
       },
       {
         en: "guardaDelBackend",
@@ -1766,19 +1862,22 @@ const REGLAS: readonly Regla[] = [
     lugares: [
       {
         en: "prompt",
+        canal: "chat",
         seccion: "Chat por WhatsApp",
         texto:
           "Al reservar pregúntale su nombre antes de ofrecerle reservar, aunque su perfil de WhatsApp muestre uno",
       },
       {
         en: "prompt",
+        canal: "chat",
         seccion: "Chat por WhatsApp",
         texto: "usa smsConsent true",
       },
       {
         en: "prompt",
+        canal: "chat",
         seccion: "Reserva",
-        texto: "también en el chat aunque veas el de su perfil",
+        texto: "pídelo antes y solo eso, aunque veas el de su perfil",
       },
     ],
   },
@@ -1791,11 +1890,13 @@ const REGLAS: readonly Regla[] = [
     lugares: [
       {
         en: "prompt",
+        canal: "chat",
         seccion: "Chat por WhatsApp",
         texto: "Si dice que ha pulsado Cambiar en el recordatorio de una cita",
       },
       {
         en: "prompt",
+        canal: "chat",
         seccion: "Chat por WhatsApp",
         texto: "dale el teléfono del negocio",
       },
@@ -1804,25 +1905,36 @@ const REGLAS: readonly Regla[] = [
   {
     id: "informar-al-negocio-al-terminar",
     descripcion:
-      "Llama UNA sola vez a informar_al_negocio, solo cuando la llamada ya ha terminado y nunca durante la conversación; apunta en dudas_sin_respuesta lo que no pudo responder.",
+      "El negocio recibe UN informe por conversación, con dudas_sin_respuesta para lo que no pudo responder. En una llamada lo escribe el backend al colgar con la transcripción; en el chat, la recepcionista llama una vez a informar_al_negocio al despedirse.",
     origen:
-      "PR #118 y #210 (6bd7347): Telnyx dispara la post-conversación dos veces (AGENTS.md, 19-09); la idempotencia la hace procesarInformeFinal.",
+      "PR #118 y #210 (6bd7347): Telnyx dispara la post-conversación dos veces (AGENTS.md, 19-09); la idempotencia la hace procesarInformeFinal. Desde el 04-11 la post-conversación ya no existe: era una pasada más del modelo con el prompt entero.",
     lugares: [
       {
         en: "prompt",
-        seccion: "Al terminar la llamada",
+        canal: "chat",
+        seccion: "Al terminar la conversación",
         texto: "llama UNA sola vez a informar_al_negocio",
       },
       {
         en: "prompt",
-        seccion: "Al terminar la llamada",
+        canal: "chat",
+        seccion: "Al terminar la conversación",
         texto: "dudas_sin_respuesta",
       },
       {
         en: "descripcionDeTool",
         tool: "informar_al_negocio",
-        texto:
-          "Llámala UNA sola vez, solo cuando la llamada ya ha terminado (post-conversación), nunca durante la conversación.",
+        texto: "Llámala UNA sola vez, cuando el cliente se despida",
+      },
+      {
+        en: "guardaDelBackend",
+        simbolo: "processInformeDeLlamadaJob",
+        fichero: "src/jobs/informeDeLlamada.ts",
+      },
+      {
+        en: "guardaDelBackend",
+        simbolo: "pedirInformeDeLlamada",
+        fichero: "src/adapters/telnyx/webhookHandlers.ts",
       },
       {
         en: "descripcionDeTool",
@@ -1851,7 +1963,7 @@ interface Resultado {
 function describirLugar(lugar: Lugar): string {
   switch (lugar.en) {
     case "prompt":
-      return `prompt › ## ${lugar.seccion} › «${lugar.texto}»`;
+      return `prompt${lugar.canal === "chat" ? " de chat" : ""} › ## ${lugar.seccion} › «${lugar.texto}»`;
     case "descripcionDeTool":
       return `descripción de ${lugar.tool} › «${lugar.texto}»`;
     case "respuestaDeTool":
@@ -1870,7 +1982,9 @@ function evaluarLugar(lugar: Lugar): Resultado {
           : (lugar.variantes ?? (["base"] as const));
       const fallos: string[] = [];
       for (const variante of variantes) {
-        const secciones = seccionesDe(PROMPTS[variante]);
+        const secciones = seccionesDe(
+          PROMPTS_POR_CANAL[lugar.canal ?? "voz"][variante]
+        );
         const cuerpo = secciones.get(lugar.seccion);
         if (cuerpo === undefined) {
           fallos.push(
@@ -2077,6 +2191,15 @@ describe("tamaño del prompt (v1)", () => {
       mayor.caracteres,
       `La más cargada es «${mayor.id}» con ${mayor.caracteres}`
     ).toBeLessThan(LIMITES_DEL_PROMPT.v1.techo);
+  });
+
+  it("el prompt de chat es más corto que el de voz en cada variante", () => {
+    for (const id of Object.keys(PROMPTS) as IdDeVariante[]) {
+      expect(
+        PROMPTS_POR_CANAL.chat[id].length,
+        `«${id}»: chat ${PROMPTS_POR_CANAL.chat[id].length}, voz ${PROMPTS[id].length}`
+      ).toBeLessThan(PROMPTS[id].length);
+    }
   });
 
   it("con todo activo, ningún nicho pasa del techo teórico", () => {

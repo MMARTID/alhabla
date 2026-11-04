@@ -7,6 +7,17 @@ import { prisma } from "../../src/lib/prisma.js";
 import { componerSaludo } from "../../src/lib/idiomas/catalogo.js";
 import { telnyxAiAdapter } from "../../src/adapters/telnyx/TelnyxAiAdapter.js";
 
+// La biblioteca de tools y el grupo de insights de Telnyx: un id por tool
+// (su nombre) y un grupo fijo, sin llamar a Telnyx.
+vi.mock("../../src/lib/toolsCompartidas.js", () => ({
+  idsDeToolsCompartidas: vi.fn(async (tools: Array<{ webhook: { name: string } }>) =>
+    tools.map((tool) => `tool-${tool.webhook.name}`)
+  ),
+}));
+vi.mock("../../src/lib/insightsDeTelnyx.js", () => ({
+  grupoDeInsightsDeLaRecepcionista: vi.fn().mockResolvedValue("grupo-vacio"),
+}));
+
 vi.mock("../../src/lib/prisma.js", () => ({
   prisma: {
     business: {
@@ -89,7 +100,8 @@ describe("createBusinessAgent", () => {
     });
 
     expect(result).toEqual(expect.objectContaining({ id: "agent_db_1" }));
-    expect(mockedTelnyxCreateAssistant).toHaveBeenCalledTimes(1);
+    // El de llamadas y el de chat de clientes.
+    expect(mockedTelnyxCreateAssistant).toHaveBeenCalledTimes(2);
     expect(mockedAgentUpdate).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: "agent_db_1" },
@@ -157,17 +169,15 @@ describe("createBusinessAgent", () => {
     await createBusinessAgent({ businessId: "biz_new", name: "Nuevo negocio" });
 
     const payload = mockedTelnyxCreateAssistant.mock.calls[0][0];
-    const nombres = payload.tools!.map((tool) =>
-      tool.type === "webhook" ? tool.webhook.name : tool.type
-    );
-    expect(nombres).toEqual(
+    // Las de webhook, de la biblioteca de Telnyx (lib/toolsCompartidas.ts).
+    expect(payload.toolIds).toEqual(
       expect.arrayContaining([
-        "get_catalog",
-        "check_availability",
-        "book_appointment",
-        "hangup",
+        "tool-get_catalog",
+        "tool-check_availability",
+        "tool-book_appointment",
       ])
     );
+    expect(payload.tools!.map((tool) => tool.type)).toContain("hangup");
   });
 });
 

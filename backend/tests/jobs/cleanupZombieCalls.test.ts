@@ -84,7 +84,7 @@ describe("avisarDeLlamadasSinResultado", () => {
       outcome: null,
       OR: [{ providerCostCents: null }, { providerCostCents: { not: 0 } }],
     });
-    // De hace 25 a hace 10 minutos: 10 de margen para los insights y 15 de
+    // De hace 25 a hace 10 minutos: 10 de margen para el informe y 15 de
     // ventana, la cadencia del barrido, para avisar de cada una una vez.
     expect(where.endedAt.gte).toEqual(new Date("2026-10-17T11:35:00Z"));
     expect(where.endedAt.lt).toEqual(new Date("2026-10-17T11:50:00Z"));
@@ -99,7 +99,7 @@ describe("avisarDeLlamadasSinResultado", () => {
     await avisarDeLlamadasSinResultado(ahora);
 
     expect(errorLog).toHaveBeenCalledWith(
-      "[Salud] 1 llamada de Telnyx acabó hace más de 10 min sin resultado (no llegaron los insights de la conversación): call_1 (negocio biz_1)"
+      "[Salud] 1 llamada de Telnyx acabó hace más de 10 min sin resultado (no llegó el informe de la llamada): call_1 (negocio biz_1)"
     );
     errorLog.mockRestore();
   });

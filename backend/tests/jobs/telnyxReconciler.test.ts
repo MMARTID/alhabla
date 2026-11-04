@@ -233,6 +233,38 @@ describe("telnyxReconcilerJob", () => {
     expect(mockedSendMail).toHaveBeenCalled();
   });
 
+  it("comprueba también el assistant de chat del agente, con su nombre", async () => {
+    mockedAgentFindMany
+      .mockResolvedValueOnce([
+        {
+          id: "agent1",
+          businessId: "biz1",
+          telnyxAssistantId: "asst_voz",
+          telnyxSyncError: null,
+        },
+      ] as any)
+      .mockResolvedValueOnce([
+        {
+          id: "agent1",
+          businessId: "biz1",
+          telnyxSyncError: null,
+          telnyxChatAssistantId: "asst_chat",
+        },
+      ] as any);
+    mockedGetAssistant.mockImplementation(async (id: string) =>
+      id === "asst_voz"
+        ? ({ id, name: "alhabla-biz1-agent1", instructions: "" } as any)
+        : ({ id, name: "otro-nombre", instructions: "" } as any)
+    );
+
+    const result = await telnyxReconcilerJob();
+
+    expect(mockedGetAssistant).toHaveBeenCalledWith("asst_chat");
+    expect(result.assistantsWithUnexpectedName).toEqual([
+      'biz1/agent1 de chat (esperado "alhabla-chat-biz1-agent1", remoto "otro-nombre")',
+    ]);
+  });
+
   it("detecta un assistant remoto con nombre distinto al determinista esperado", async () => {
     mockedAgentFindMany
       .mockResolvedValueOnce([

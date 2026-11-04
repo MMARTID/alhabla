@@ -158,3 +158,14 @@ describe("prompt gestionado (instantáneas)", () => {
     });
   }
 });
+
+// El del assistant de chat de clientes por WhatsApp (desde el 2026-11-04).
+describe("prompt gestionado del chat (instantáneas)", () => {
+  for (const [nombre, entrada] of CASOS) {
+    it(nombre, () => {
+      expect(
+        buildManagedAgentPrompt({ ...entrada, canal: "chat" })
+      ).toMatchSnapshot();
+    });
+  }
+});

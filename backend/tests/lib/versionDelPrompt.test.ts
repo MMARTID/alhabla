@@ -24,6 +24,17 @@ const buildManagedAgentPrompt = (
 // parseAgentSettings es la real, envuelta: el test del PATCH le hace leer
 // de lo guardado una versión que el body no puede traer, para distinguir
 // «conserva la guardada» de «el esquema puso la de por defecto».
+// La biblioteca de tools y el grupo de insights de Telnyx: un id por tool
+// (su nombre) y un grupo fijo, sin llamar a Telnyx.
+vi.mock("../../src/lib/toolsCompartidas.js", () => ({
+  idsDeToolsCompartidas: vi.fn(async (tools: Array<{ webhook: { name: string } }>) =>
+    tools.map((tool) => `tool-${tool.webhook.name}`)
+  ),
+}));
+vi.mock("../../src/lib/insightsDeTelnyx.js", () => ({
+  grupoDeInsightsDeLaRecepcionista: vi.fn().mockResolvedValue("grupo-vacio"),
+}));
+
 vi.mock("../../src/lib/managedAgentPrompt.js", async (importOriginal) => {
   const real =
     await importOriginal<

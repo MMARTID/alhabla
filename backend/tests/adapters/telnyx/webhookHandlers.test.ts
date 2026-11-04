@@ -20,6 +20,7 @@ import {
   enqueueUsageReportJob,
 } from "../../../src/lib/cloudTasks.js";
 import { executeVoiceTool } from "../../../src/modules/voiceTools/service.js";
+import { pedirInformeDeLlamada } from "../../../src/jobs/informeDeLlamada.js";
 import { programarRecuperacionDeTranscripcion } from "../../../src/jobs/recuperarTranscripcion.js";
 import {
   codificarClientState,
@@ -66,6 +67,12 @@ vi.mock("../../../src/lib/cloudTasks.js", () => ({
 // programa.
 vi.mock("../../../src/jobs/recuperarTranscripcion.js", () => ({
   programarRecuperacionDeTranscripcion: vi.fn().mockResolvedValue(undefined),
+}));
+
+// El informe de la llamada tiene su propio test (tests/jobs/
+// informeDeLlamada.test.ts); aquí, cuándo se pide.
+vi.mock("../../../src/jobs/informeDeLlamada.js", () => ({
+  pedirInformeDeLlamada: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock("../../../src/lib/grabacion.js", () => ({
@@ -821,6 +828,8 @@ describe("handleCallConversationEnded", () => {
 
     expect(result).toEqual({ success: true });
     expect(mockedTranscriptUpsert).not.toHaveBeenCalled();
+    // Sin transcripción no hay informe todavía: lo pide la recuperación.
+    expect(pedirInformeDeLlamada).not.toHaveBeenCalled();
     expect(mockedProgramarRecuperacion).toHaveBeenCalledWith({
       businessId: "biz_infinity",
       callRowId: "cmufcsz4b0006s601kncxcf5m",
@@ -913,6 +922,12 @@ describe("handleCallConversationEnded", () => {
     expect(result).toEqual({ success: true });
     expect(mockedListConversationMessages).not.toHaveBeenCalled();
     expect(mockedProgramarRecuperacion).not.toHaveBeenCalled();
+    // El informe sale de esta transcripción, la que no va redactada.
+    expect(pedirInformeDeLlamada).toHaveBeenCalledWith({
+      callRowId: "call_db_1",
+      businessId: "biz1",
+      origen: "el fin de la conversación",
+    });
     expect(mockedTranscriptUpsert).toHaveBeenCalledWith({
       where: { callId: "call_db_1" },
       create: {
@@ -979,6 +994,10 @@ describe("handleCallConversationEnded", () => {
     });
 
     expect(mockedListConversationMessages).toHaveBeenCalledWith("conv_1");
+    // Con lo que haya: mejor un informe sin nombre que ninguno.
+    expect(pedirInformeDeLlamada).toHaveBeenCalledWith(
+      expect.objectContaining({ callRowId: "call_db_1", businessId: "biz1" })
+    );
     const aviso = String(warn.mock.calls[0][0]);
     expect(aviso).toContain("redactados");
     expect(aviso).toContain("biz1");

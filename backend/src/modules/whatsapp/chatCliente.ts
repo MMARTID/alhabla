@@ -24,8 +24,11 @@ import { esAvisoDeBucleDeTelnyx } from "../../lib/avisoDeBucleDeTelnyx.js";
 /**
  * La recepcionista por chat (PLAN-CANAL-DUENO.md § 7, fase 2 / PR 1): el
  * texto libre de un cliente en el número de clientes va, por
- * `ai.assistants.chat`, al MISMO assistant de Telnyx que atiende la llamada
- * de su negocio, con sus tools de siempre. No hay assistant de cliente.
+ * `ai.assistants.chat`, al assistant de chat de su negocio
+ * (`Agent.telnyxChatAssistantId`, tipo «recepcionista_chat» en
+ * lib/tiposDeAsistente.ts). Hasta el 2026-11-04 iba al mismo assistant que
+ * atendía las llamadas; ahora cada uno tiene su prompt y sus tools, y las
+ * de reservar son las mismas de la biblioteca de Telnyx.
  *
  * Cómo funcionan las tools en chat (verificado en dev el 2026-09-20 contra
  * la recepcionista de Peluquería Alhambra): la conversación de Telnyx se
@@ -34,13 +37,13 @@ import { esAvisoDeBucleDeTelnyx } from "../../lib/avisoDeBucleDeTelnyx.js";
  * de las tools, igual que en una llamada; el backend resuelve esa Call
  * sintética (`voiceProvider: "whatsapp"`, `fromNumber` = móvil del
  * cliente) y todo (`get_catalog`, `find_my_appointment`, `book_appointment`,
- * `informar_al_negocio`…) funciona sin tocar ningún assistant.
+ * `informar_al_negocio`…) funciona igual que en una llamada.
  *
  * Lo que el LLM no ve en chat: `{{telnyx_end_user_target}}` no resuelve y
  * `{{telnyx_current_time}}` resuelve en UTC, así que el marcador que
  * antepone el backend a cada mensaje lleva el móvil del cliente y la fecha
  * y hora en la zona del negocio; el bloque «Chat por WhatsApp» del prompt
- * (managedAgentPrompt.ts) le dice que use eso.
+ * de chat (seccionesDelPrompt.ts) le dice que use eso.
  *
  * Reglas: interruptor global (TELNYX_CLIENT_CHAT_ENABLED) y por negocio
  * (`clientChatEnabled`); 20 turnos por cliente, negocio y día; un turno a
@@ -100,7 +103,11 @@ interface NegocioDelChat {
   subscriptionStatus: string | null;
   callsSuspendedAt: Date | null;
   paymentFailureSuspensionAt: Date | null;
-  agents: Array<{ id: string; telnyxAssistantId: string | null }>;
+  agents: Array<{
+    id: string;
+    telnyxAssistantId: string | null;
+    telnyxChatAssistantId: string | null;
+  }>;
 }
 
 const SELECT_NEGOCIO_DEL_CHAT = {
@@ -123,7 +130,7 @@ const SELECT_NEGOCIO_DEL_CHAT = {
     where: { active: true, deletedAt: null, telnyxAssistantId: { not: null } },
     orderBy: { createdAt: "asc" as const },
     take: 1,
-    select: { id: true, telnyxAssistantId: true },
+    select: { id: true, telnyxAssistantId: true, telnyxChatAssistantId: true },
   },
 } as const;
 
@@ -380,11 +387,21 @@ export async function conversarConRecepcionista(input: {
     return { atendido: false, motivo: "apagado_negocio" };
   }
   const agent = business.agents[0];
-  if (!agent?.telnyxAssistantId) {
+  // Un agente de antes de separar los assistants recibe el de chat en su
+  // siguiente sincronización (el deploy lanza el reconciliador); mientras,
+  // contesta el de voz, que hasta entonces atendía también el chat.
+  const assistantDelChat =
+    agent?.telnyxChatAssistantId ?? agent?.telnyxAssistantId ?? null;
+  if (!agent || !assistantDelChat) {
     console.warn(
       `[WhatsApp] Chat cliente ${business.id}/${from}: el negocio no tiene recepcionista en Telnyx; respuesta fija`
     );
     return { atendido: false, motivo: "sin_recepcionista" };
+  }
+  if (!agent.telnyxChatAssistantId) {
+    console.warn(
+      `[WhatsApp] Chat cliente ${business.id}/${from}: el agente ${agent.id} aún no tiene assistant de chat; contesta el de llamadas (${agent.telnyxAssistantId}) hasta su próxima sincronización`
+    );
   }
 
   const negocio = nombreParaCliente(business);
@@ -437,7 +454,7 @@ export async function conversarConRecepcionista(input: {
       const t0 = Date.now();
       try {
         respuesta = await conTimeout(
-          telnyxAiAdapter.chatWithAssistant(agent.telnyxAssistantId, {
+          telnyxAiAdapter.chatWithAssistant(assistantDelChat, {
             content,
             conversationId: conversacion.conversationId,
             name: message.contactName ?? undefined,

@@ -2594,8 +2594,14 @@ export interface ContextoDelNegocio {
    * se contestaría esa llamada en producción (cliente conocido, aviso de
    * grabación, negocio nuevo…). Sin entrada, el saludo del assistant. */
   porLlamada?: Record<string, ContextoDeLaLlamada>;
-  /** Un payload por variante pedida, ya con el nombre del laboratorio. */
+  /** Un payload por variante pedida, ya con el nombre del laboratorio: el
+   * del assistant de llamadas. */
   payloads: Record<NombreDeVariante, CreateTelnyxAssistantInput>;
+  /** El del assistant del chat de clientes de cada variante (desde el
+   * 2026-11-04 cada negocio tiene dos, lib/tiposDeAsistente.ts): con él, los
+   * guiones de chat van a este y los de llamada al de `payloads`. Sin él,
+   * todos al de `payloads`. */
+  payloadsDeChat?: Partial<Record<NombreDeVariante, CreateTelnyxAssistantInput>>;
   /** `callId` de llamadas antiguas sin cita, las más recientes primero. */
   llamadas: string[];
   /** El `fromNumber` de esas llamadas: a él va el WhatsApp de una reserva. */
@@ -2604,6 +2610,44 @@ export interface ContextoDelNegocio {
    * para los guiones de chat; `telefono` es el del cliente. */
   chats: LlamadaAsignada[];
   avisos: string[];
+}
+
+/** Qué assistant del negocio y la variante atiende una tarea: el de chat
+ * para los guiones de chat, si la variante lo tiene; si no, el de llamadas. */
+export function claveDelAssistant(
+  tarea: Pick<Tarea, "negocioId" | "variante" | "guion">,
+  contexto: Pick<ContextoDelNegocio, "payloadsDeChat"> | undefined
+): string {
+  const deChat =
+    tarea.guion.canal === "chat" &&
+    contexto?.payloadsDeChat?.[tarea.variante] !== undefined;
+  return `${tarea.negocioId}:${tarea.variante}${deChat ? ":chat" : ""}`;
+}
+
+/** Los assistants que hay que crear: clave (claveDelAssistant) → payload. */
+export function assistantsDeLasTareas(
+  tareas: Tarea[],
+  contextos: Map<string, ContextoDelNegocio>
+): Map<string, { contexto: ContextoDelNegocio; payload: CreateTelnyxAssistantInput; variante: NombreDeVariante }> {
+  const assistants = new Map<
+    string,
+    {
+      contexto: ContextoDelNegocio;
+      payload: CreateTelnyxAssistantInput;
+      variante: NombreDeVariante;
+    }
+  >();
+  for (const tarea of tareas) {
+    const contexto = contextos.get(tarea.negocioId);
+    if (!contexto) continue;
+    const clave = claveDelAssistant(tarea, contexto);
+    if (assistants.has(clave)) continue;
+    const payload = clave.endsWith(":chat")
+      ? contexto.payloadsDeChat![tarea.variante]!
+      : contexto.payloads[tarea.variante];
+    assistants.set(clave, { contexto, payload, variante: tarea.variante });
+  }
+  return assistants;
 }
 
 /** La Call antigua con la que corre una repetición. */
@@ -3226,9 +3270,7 @@ export function describirPlan(
   const ejecutables = asignacion
     ? plan.tareas.filter((tarea) => asignacion.porTarea.has(tarea))
     : plan.tareas;
-  const usados = new Set(
-    ejecutables.map((tarea) => `${tarea.negocioId}:${tarea.variante}`)
-  );
+  const porCrear = assistantsDeLasTareas(ejecutables, mapaDeContextos);
   const lineas: string[] = [
     `Laboratorio de prompt (--dry-run: no se llama a Telnyx)`,
     `Guiones: ${plan.guiones.map((g) => g.clave).join(", ") || "ninguno"}`,
@@ -3277,9 +3319,8 @@ export function describirPlan(
     "Assistants que crearía (y borraría al acabar, con su app TeXML):",
   ];
   for (const contexto of contextos) {
-    for (const variante of opciones.variantes) {
-      if (!usados.has(`${contexto.negocioId}:${variante}`)) continue;
-      const payload = contexto.payloads[variante];
+    for (const { contexto: deEse, payload } of porCrear.values()) {
+      if (deEse !== contexto) continue;
       const herramientas = (payload.tools ?? []).map((tool) => {
         const t = tool as { type?: string; webhook?: { name?: string } };
         return t.webhook?.name ?? t.type ?? "?";
@@ -3527,15 +3568,14 @@ export async function ejecutarLaboratorio(
         console.error(`[Laboratorio] ${aviso}`);
       }
     }
-    // Un assistant por (negocio, variante), solo de los que se van a usar.
+    // Un assistant por (negocio, variante) y, si la variante separa voz y
+    // chat, otro para los guiones de chat; solo de los que se van a usar.
     const sinAssistant = new Map<string, string>();
-    const usados = new Set(
-      ejecutables.map((t) => `${t.negocioId}:${t.variante}`)
-    );
-    for (const contexto of contextos.values()) {
-      for (const variante of opciones.variantes) {
-        if (!usados.has(`${contexto.negocioId}:${variante}`)) continue;
-        const payload = contexto.payloads[variante];
+    for (const [clave, { contexto, payload, variante }] of assistantsDeLasTareas(
+      ejecutables,
+      contextos
+    )) {
+      {
         if (!esNombreDeLaboratorio(payload.name)) {
           throw new Error(
             `[Laboratorio] Nombre de assistant no permitido: ${payload.name}`
@@ -3556,12 +3596,12 @@ export async function ejecutarLaboratorio(
           // Un negocio cuyo assistant Telnyx no acepta no para la tanda: sus
           // repeticiones salen como error de ejecución, no del prompt.
           const motivo = `No se pudo crear el assistant ${payload.name}: ${mensajeDeError(error)}`;
-          sinAssistant.set(`${contexto.negocioId}:${variante}`, motivo);
+          sinAssistant.set(clave, motivo);
           avisos.push(motivo);
           console.error(`[Laboratorio] ${motivo}`);
           continue;
         }
-        entornos.set(`${contexto.negocioId}:${variante}`, {
+        entornos.set(clave, {
           assistantId: creado.id,
           contexto,
         });
@@ -3593,7 +3633,7 @@ export async function ejecutarLaboratorio(
       opciones.paralelo,
       async (tarea) => {
         if (!(await freno.puedeSeguir())) return;
-        const clave = `${tarea.negocioId}:${tarea.variante}`;
+        const clave = claveDelAssistant(tarea, contextos.get(tarea.negocioId));
         const entorno = entornos.get(clave);
         if (!entorno) {
           resultados.push({
@@ -3783,14 +3823,21 @@ export function conModeloDelAssistant(
   modelo: string
 ): ContextoDelNegocio {
   if (modelo === MODELO_DEL_ASSISTANT) return contexto;
+  const conModelo = <T extends Partial<ContextoDelNegocio["payloads"]>>(
+    payloads: T
+  ): T =>
+    Object.fromEntries(
+      Object.entries(payloads).map(([variante, payload]) => [
+        variante,
+        { ...payload!, model: modelo },
+      ])
+    ) as T;
   return {
     ...contexto,
-    payloads: Object.fromEntries(
-      Object.entries(contexto.payloads).map(([variante, payload]) => [
-        variante,
-        { ...payload, model: modelo },
-      ])
-    ) as ContextoDelNegocio["payloads"],
+    payloads: conModelo(contexto.payloads),
+    ...(contexto.payloadsDeChat
+      ? { payloadsDeChat: conModelo(contexto.payloadsDeChat) }
+      : {}),
   };
 }
 
@@ -4080,6 +4127,7 @@ async function cargarContextoReal(input: {
   }
 
   const payloads = {} as ContextoDelNegocio["payloads"];
+  const payloadsDeChat: NonNullable<ContextoDelNegocio["payloadsDeChat"]> = {};
   for (const variante of input.variantes) {
     const { version, formato } = VARIANTES[variante];
     if (version !== "v1" && !v2Disponible) {
@@ -4091,7 +4139,7 @@ async function cargarContextoReal(input: {
     const ajustes = conVersionDelPrompt
       ? { ...agentSettings, versionDelPrompt: version }
       : agentSettings;
-    const instrucciones = prompt.buildManagedAgentPrompt({
+    const entradaDelPrompt = {
       businessName: negocio.name,
       businessDetails: negocio.businessDetails,
       businessType,
@@ -4105,7 +4153,8 @@ async function cargarContextoReal(input: {
       transferenciaAlDueno: transferencia,
       idiomas: idiomas.idiomas,
       formato,
-    });
+    };
+    const instrucciones = prompt.buildManagedAgentPrompt(entradaDelPrompt);
     const construido = payloadLib.buildTelnyxAssistantPayload({
       businessId: negocio.id,
       agentId: "laboratorio",
@@ -4130,6 +4179,22 @@ async function cargarContextoReal(input: {
     if (payloads[variante].model !== MODELO_DEL_ASSISTANT) {
       avisos.push(`El modelo del payload es ${payloads[variante].model}`);
     }
+    // El assistant del chat de clientes, como en producción
+    // (lib/telnyxAgentSync.ts): su prompt y sus tools, inline.
+    payloadsDeChat[variante] = {
+      ...payloadLib.buildTelnyxChatAssistantPayload({
+        businessId: negocio.id,
+        agentId: "laboratorio",
+        businessName: negocio.name,
+        timezone: negocio.timezone,
+        instructions: prompt.buildManagedAgentPrompt({
+          ...entradaDelPrompt,
+          canal: "chat",
+        }),
+        tools: payloadLib.buildTelnyxChatTools(baseUrl),
+      }),
+      name: `${nombreDelAssistant(input.fecha, variante, input.sufijo)}-chat`,
+    };
   }
 
   const textos = input.variantes.map((v) => payloads[v].instructions);
@@ -4146,6 +4211,7 @@ async function cargarContextoReal(input: {
     saludo: payloads[input.variantes[0]!].greeting ?? "",
     porLlamada,
     payloads,
+    payloadsDeChat,
     llamadas: llamadas.map((llamada) => llamada.callId),
     telefonos: Object.fromEntries(
       llamadas.map((llamada) => [llamada.callId, llamada.fromNumber])

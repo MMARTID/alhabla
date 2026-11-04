@@ -156,7 +156,10 @@ function resolverTranscripcion(
  */
 export function instruccionesDeIdioma(
   idiomas: readonly CodigoDeIdioma[],
-  principal: CodigoDeIdioma
+  principal: CodigoDeIdioma,
+  /** En el chat (prompt del assistant de chat, desde el 2026-11-04) no hay
+   * saludo del sistema ni pregunta del WhatsApp. */
+  canal: "voz" | "chat" = "voz"
 ): { instruccion: string; recordatorio: string | null } {
   if (idiomas.length === 1) {
     return {
@@ -173,8 +176,12 @@ export function instruccionesDeIdioma(
     .map((nota) => ` ${nota}`)
     .join("");
   return {
-    instruccion: `En las llamadas, el saludo ya lo dice el sistema al descolgar (en ${IDIOMAS[principal].nombreEnPrompt} o, si quien llama ya ha llamado antes, en el idioma en que habló) y es el primer mensaje de la conversación: no lo repitas. Desde tu primera respuesta, contesta y continúa exclusivamente en el idioma en que te habla quien llama si es uno de estos: ${lista}. Si cambia entre esos idiomas, acompaña el cambio sin pedirle que elija uno. Las frases que estas instrucciones ponen entre comillas para decírselas a quien llama están en castellano: dilas traducidas al idioma de la conversación. Los nombres de los servicios del catálogo también suelen estar en castellano y no son nombres propios: en otro idioma, dilos traducidos a ese idioma, no tal cual (salvo los que no tienen traducción): solo el traducido, sin añadir el de castellano ni explicar que es lo mismo.${notas}`,
-    recordatorio: `## Idioma\nContesta cada turno en el idioma en que te habla quien llama si es uno de estos: ${lista}; también tu primera respuesta, lo que digas después de usar una herramienta (aunque te conteste en castellano), los nombres de los servicios, el resumen de la reserva, la pregunta del WhatsApp y la despedida. No cambies de idioma por tu cuenta mientras siga hablando en el suyo.`,
+    instruccion: `${
+      canal === "voz"
+        ? `En las llamadas, el saludo ya lo dice el sistema al descolgar (en ${IDIOMAS[principal].nombreEnPrompt} o, si quien llama ya ha llamado antes, en el idioma en que habló) y es el primer mensaje de la conversación: no lo repitas. `
+        : ""
+    }Desde tu primera respuesta, contesta y continúa exclusivamente en el idioma en que te habla quien llama si es uno de estos: ${lista}. Si cambia entre esos idiomas, acompaña el cambio sin pedirle que elija uno. Las frases que estas instrucciones ponen entre comillas para decírselas a quien llama están en castellano: dilas traducidas al idioma de la conversación. Los nombres de los servicios del catálogo también suelen estar en castellano y no son nombres propios: en otro idioma, dilos traducidos a ese idioma, no tal cual (salvo los que no tienen traducción): solo el traducido, sin añadir el de castellano ni explicar que es lo mismo.${notas}`,
+    recordatorio: `## Idioma\nContesta cada turno en el idioma en que te habla quien llama si es uno de estos: ${lista}; también tu primera respuesta, lo que digas después de usar una herramienta (aunque te conteste en castellano), los nombres de los servicios, el resumen de la reserva${canal === "voz" ? ", la pregunta del WhatsApp" : ""} y la despedida. No cambies de idioma por tu cuenta mientras siga hablando en el suyo.`,
   };
 }
 

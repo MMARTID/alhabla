@@ -178,6 +178,29 @@ describe("accountService", () => {
       consoleWarn.mockRestore();
     });
 
+    it("borra también el assistant de chat del agente", async () => {
+      mockedBusinessFindUnique.mockResolvedValue({
+        id: "business_123",
+        name: "Peluquería Norte",
+        stripeSubscriptionId: null,
+        telnyxPhoneNumberId: null,
+        agents: [
+          {
+            telnyxAssistantId: "assistant-abc",
+            telnyxChatAssistantId: "assistant-chat-abc",
+          },
+        ],
+        calls: [],
+      } as any);
+
+      await borrarCuenta();
+
+      expect(mockedDeleteAssistant).toHaveBeenCalledWith("assistant-abc");
+      expect(mockedDeleteAssistant).toHaveBeenCalledWith("assistant-chat-abc");
+      // El de chat no tiene app TeXML.
+      expect(mockedDeleteTexmlApp).not.toHaveBeenCalledWith("assistant-chat-abc");
+    });
+
     it("la borra después del assistant", async () => {
       await borrarCuenta();
 

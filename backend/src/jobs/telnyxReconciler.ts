@@ -6,7 +6,10 @@ import {
 } from "../lib/telnyxAgentSync.js";
 import { sendZohoMail } from "../lib/zohoMail.js";
 import { errorMessage } from "../lib/logUtils.js";
-import { buildTelnyxAssistantName } from "../lib/telnyxAssistantPayload.js";
+import {
+  buildTelnyxAssistantName,
+  buildTelnyxChatAssistantName,
+} from "../lib/telnyxAssistantPayload.js";
 import {
   incorporarPlantillasNuevas,
   refrescarPlantillasConClave,
@@ -168,7 +171,12 @@ export async function telnyxReconcilerJob(): Promise<TelnyxReconcilerResult> {
   // quedar limpio si el reintento de hoy funcionó.
   const agentsAfter = await prisma.agent.findMany({
     where: { id: { in: agentsBefore.map((agent) => agent.id) } },
-    select: { id: true, businessId: true, telnyxSyncError: true },
+    select: {
+      id: true,
+      businessId: true,
+      telnyxSyncError: true,
+      telnyxChatAssistantId: true,
+    },
   });
   const errorById = new Map(
     agentsAfter.map((agent) => [agent.id, agent.telnyxSyncError])
@@ -183,21 +191,43 @@ export async function telnyxReconcilerJob(): Promise<TelnyxReconcilerResult> {
     ),
   ];
 
+  const chatById = new Map(
+    agentsAfter.map((agent) => [agent.id, agent.telnyxChatAssistantId])
+  );
   for (const agent of agentsBefore) {
     result.agentsChecked++;
 
-    try {
-      const remote = await telnyxAiAdapter.getAssistant(agent.telnyxAssistantId!);
-      const expectedName = buildTelnyxAssistantName(agent.businessId, agent.id);
-      if (remote.name !== expectedName) {
-        result.assistantsWithUnexpectedName.push(
-          `${agent.businessId}/${agent.id} (esperado "${expectedName}", remoto "${remote.name}")`
+    // Los dos assistants del agente: el de llamadas y el de chat de
+    // clientes (si el sync no pudo crearlo, ya sale en telnyxSyncError).
+    const comprobar = [
+      {
+        id: agent.telnyxAssistantId!,
+        esperado: buildTelnyxAssistantName(agent.businessId, agent.id),
+        cual: "",
+      },
+      ...(chatById.get(agent.id)
+        ? [
+            {
+              id: chatById.get(agent.id)!,
+              esperado: buildTelnyxChatAssistantName(agent.businessId, agent.id),
+              cual: " de chat",
+            },
+          ]
+        : []),
+    ];
+    for (const { id, esperado, cual } of comprobar) {
+      try {
+        const remote = await telnyxAiAdapter.getAssistant(id);
+        if (remote.name !== esperado) {
+          result.assistantsWithUnexpectedName.push(
+            `${agent.businessId}/${agent.id}${cual} (esperado "${esperado}", remoto "${remote.name}")`
+          );
+        }
+      } catch (error) {
+        result.assistantsMissingOnTelnyx.push(
+          `${agent.businessId}/${agent.id}${cual} (${id}): ${errorMessage(error)}`
         );
       }
-    } catch (error) {
-      result.assistantsMissingOnTelnyx.push(
-        `${agent.businessId}/${agent.id} (${agent.telnyxAssistantId}): ${errorMessage(error)}`
-      );
     }
   }
 
