@@ -38,4 +38,16 @@ describe("preguntas frecuentes de los artículos del blog", () => {
       expect(preguntas.length, `${slug} tiene solo ${preguntas.length} preguntas`).toBeGreaterThanOrEqual(4);
     }
   });
+
+  it("los enlaces de las respuestas están bien formados: `[texto](/ruta)` o `[texto](https://…)`, sin restos de marcado", () => {
+    const enlace = /\[[^\]]+\]\((?:\/[^)\s]*|https:\/\/[^)\s]+)\)/g;
+    for (const { slug, texto } of articulos) {
+      const faq = texto.split(/^## Preguntas frecuentes/m)[1] ?? "";
+      const respuestas = [...faq.matchAll(/respuesta:\s*"((?:[^"\\]|\\.)+)"/g)].map((m) => m[1]);
+      for (const r of respuestas) {
+        const sinEnlaces = r.replace(enlace, "");
+        expect(sinEnlaces, `${slug}: marcado de enlace roto en «${r.slice(0, 60)}…»`).not.toMatch(/\]\(|\[[^\]]*\]/);
+      }
+    }
+  });
 });
