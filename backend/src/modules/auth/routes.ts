@@ -174,9 +174,11 @@ function getFacebookAuthConfig() {
   // usuarios con el inicio de sesión de Facebook" — separada a propósito de
   // la app de WhatsApp Business: Meta no permite combinar el caso de uso de
   // Login con los de negocio (WhatsApp/Ads/Threads) en una misma app.
-  const appId = process.env.FACEBOOK_LOGIN_APP_ID;
-  const appSecret = process.env.FACEBOOK_LOGIN_APP_SECRET;
-  const redirectUri = process.env.FACEBOOK_LOGIN_REDIRECT_URI;
+  // `trim()`: un secreto guardado con `--data-file=-` suele llevar un salto de
+  // línea al final y Meta lo rechaza con un 400 en el canje del código.
+  const appId = process.env.FACEBOOK_LOGIN_APP_ID?.trim();
+  const appSecret = process.env.FACEBOOK_LOGIN_APP_SECRET?.trim();
+  const redirectUri = process.env.FACEBOOK_LOGIN_REDIRECT_URI?.trim();
 
   if (!appId || !appSecret || !redirectUri) {
     throw new Error("Facebook authentication is not configured");
@@ -786,8 +788,23 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
           { signal: AbortSignal.timeout(FACEBOOK_REQUEST_TIMEOUT_MS) }
         );
         if (!tokenResponse.ok) {
+          // El motivo (secreto, redirect_uri, código gastado…) viene en
+          // `error.message`/`code`; no lleva secretos y sin él el 400 no se
+          // puede diagnosticar.
+          const motivo = await tokenResponse
+            .json()
+            .then((cuerpo) => {
+              const { error } = cuerpo as {
+                error?: { message?: string; code?: number };
+              };
+              return JSON.stringify({
+                code: error?.code,
+                message: error?.message,
+              });
+            })
+            .catch(() => "sin cuerpo");
           throw new Error(
-            `Facebook token exchange failed with status ${tokenResponse.status}`
+            `Facebook token exchange failed with status ${tokenResponse.status}: ${motivo}`
           );
         }
         const { access_token: accessToken } =
