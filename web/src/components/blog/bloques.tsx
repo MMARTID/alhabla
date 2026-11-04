@@ -7,6 +7,7 @@ import {
   MessageCircle,
   MessageSquareQuote,
 } from "lucide-react";
+import { BotonCopiar } from "@/components/blog/boton-copiar";
 import { nicheLandings, type NicheSlug } from "@/lib/niche-landings";
 
 /**
@@ -32,6 +33,14 @@ const DESTINOS: Record<string, { href: string; texto: string }> = {
     texto: "Alhabla para salones de uñas",
   },
   fisioterapia: { href: "/fisioterapia", texto: "Alhabla para fisioterapia" },
+  "desvio-de-llamadas": {
+    href: "/desvio-de-llamadas",
+    texto: "Ver cómo se desvía con tu operador",
+  },
+  "agenda-por-whatsapp": {
+    href: "/agenda-por-whatsapp",
+    texto: "Ver tu asistente por WhatsApp",
+  },
 };
 
 export function Cta({
@@ -290,6 +299,258 @@ export function Checklist({ items = [] }: { items?: { texto: string }[] }) {
         </li>
       ))}
     </ul>
+  );
+}
+
+/**
+ * Texto plano de los hijos de un encabezado de MDX (puede llevar negritas o
+ * enlaces dentro), para sacar su ancla.
+ */
+export function textoPlano(nodo: React.ReactNode): string {
+  if (nodo === null || nodo === undefined || typeof nodo === "boolean") return "";
+  if (typeof nodo === "string" || typeof nodo === "number") return String(nodo);
+  if (Array.isArray(nodo)) return nodo.map(textoPlano).join("");
+  if (typeof nodo === "object" && "props" in nodo) {
+    return textoPlano((nodo.props as { children?: React.ReactNode }).children);
+  }
+  return "";
+}
+
+/**
+ * Ancla de un apartado a partir de su título: «¿Cuánto cuesta en 2026?» →
+ * «cuanto-cuesta-en-2026». La usan los `##` del artículo (que reciben este
+ * `id`) y el bloque `Indice`, así que el índice no se escribe a mano.
+ */
+export function idDeApartado(texto: string): string {
+  return texto
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80);
+}
+
+/** Los `##` del artículo con su ancla, para que el `Indice` pueda saltar. */
+export function Apartado({ children }: { children?: React.ReactNode }) {
+  return (
+    <h2 id={idDeApartado(textoPlano(children))} className="scroll-mt-24">
+      {children}
+    </h2>
+  );
+}
+
+/**
+ * Índice del artículo: los títulos de sus `##`, tal cual, y cada uno salta a
+ * su apartado. Para artículos largos; va después de la entradilla.
+ */
+export function Indice({ apartados = [] }: { apartados?: { texto: string }[] }) {
+  return (
+    <nav
+      aria-label="En este artículo"
+      className="not-prose my-8 rounded-3xl border border-[#e5e5e5] bg-[#fafafa] p-6"
+    >
+      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#6d28d9]">
+        En este artículo
+      </p>
+      <ol className="mt-3 grid gap-x-8 gap-y-1.5 sm:grid-cols-2">
+        {apartados.map((a, i) => (
+          <li key={i} className="flex gap-2 text-sm leading-6">
+            <span className="w-5 shrink-0 font-semibold tabular-nums text-[#a1a1aa]">
+              {i + 1}
+            </span>
+            <a
+              href={`#${idDeApartado(a.texto)}`}
+              className="font-medium text-[#27272a] hover:text-[#6d28d9]"
+            >
+              {a.texto}
+            </a>
+          </li>
+        ))}
+      </ol>
+    </nav>
+  );
+}
+
+/**
+ * Celda de tabla: lo que va entre comillas invertidas (`##002#`) sale en
+ * monoespaciado, aunque esté en mitad del texto («marca `##002#` o llama»).
+ */
+function Celda({ texto }: { texto: string }) {
+  const trozos = texto.split(/`([^`]+)`/);
+  return (
+    <>
+      {trozos.map((trozo, i) =>
+        i % 2 === 1 ? (
+          <code
+            key={i}
+            className="whitespace-nowrap rounded-md bg-[#f4f4f5] px-1.5 py-0.5 font-mono text-[13px] font-semibold text-[#0a0a0a]"
+          >
+            {trozo}
+          </code>
+        ) : (
+          trozo
+        )
+      )}
+    </>
+  );
+}
+
+/**
+ * Tabla de datos (el MDX del blog no lleva tablas de Markdown). La primera
+ * columna va en negrita; en el móvil se desplaza en horizontal dentro de su
+ * marco, sin mover la página. Los códigos para marcar, entre comillas
+ * invertidas.
+ */
+export function Tabla({
+  titulo,
+  columnas = [],
+  filas = [],
+  nota,
+}: {
+  titulo?: string;
+  columnas?: string[];
+  filas?: { celdas: string[] }[];
+  nota?: string;
+}) {
+  return (
+    <figure className="not-prose my-8 overflow-hidden rounded-3xl border border-[#e5e5e5] bg-white">
+      {titulo ? (
+        <figcaption className="border-b border-[#e5e5e5] bg-[#fafafa] px-5 py-3 text-xs font-semibold uppercase tracking-[0.12em] text-[#6d28d9]">
+          {titulo}
+        </figcaption>
+      ) : null}
+      <div className="overflow-x-auto">
+        {/* Ancho mínimo según las columnas: en el móvil la tabla se desliza
+            dentro de su marco en vez de estrujar cinco columnas en 375 px. */}
+        <table
+          className="w-full border-collapse text-left text-sm"
+          style={{ minWidth: `${Math.max(28, columnas.length * 9)}rem` }}
+        >
+          <thead>
+            <tr>
+              {columnas.map((c, i) => (
+                <th
+                  key={i}
+                  scope="col"
+                  className="border-b border-[#e5e5e5] px-4 py-3 text-xs font-semibold uppercase tracking-[0.08em] text-[#52525b]"
+                >
+                  {c}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-[#f0f0f0]">
+            {filas.map((f, i) => (
+              <tr key={i} className="align-top">
+                {f.celdas.map((c, j) =>
+                  j === 0 ? (
+                    <th
+                      key={j}
+                      scope="row"
+                      className="px-4 py-3 font-semibold text-[#0a0a0a]"
+                    >
+                      <Celda texto={c} />
+                    </th>
+                  ) : (
+                    <td key={j} className="px-4 py-3 leading-6 text-[#27272a]">
+                      <Celda texto={c} />
+                    </td>
+                  )
+                )}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {nota ? (
+        <p className="border-t border-[#e5e5e5] px-5 py-3 text-xs leading-5 text-muted">
+          {nota}
+        </p>
+      ) : null}
+    </figure>
+  );
+}
+
+/**
+ * Una cuenta paso a paso: conceptos con su importe y el total destacado en
+ * tinta. Para enseñar de dónde sale una cifra (el coste de un sueldo, un
+ * plan) en vez de darla sin más.
+ */
+export function Cuenta({
+  titulo,
+  lineas = [],
+  totalConcepto = "Total",
+  total,
+  nota,
+}: {
+  titulo?: string;
+  lineas?: { concepto: string; importe: string; detalle?: string }[];
+  totalConcepto?: string;
+  total: string;
+  nota?: string;
+}) {
+  return (
+    <figure className="not-prose my-8 overflow-hidden rounded-3xl border border-[#e5e5e5] bg-white">
+      {titulo ? (
+        <figcaption className="border-b border-[#e5e5e5] bg-[#fafafa] px-5 py-3 text-xs font-semibold uppercase tracking-[0.12em] text-[#6d28d9]">
+          {titulo}
+        </figcaption>
+      ) : null}
+      <dl className="divide-y divide-[#f0f0f0]">
+        {lineas.map((l, i) => (
+          <div key={i} className="flex items-start justify-between gap-6 px-5 py-3">
+            <dt className="text-sm leading-6 text-[#27272a]">
+              {l.concepto}
+              {l.detalle ? (
+                <span className="block text-xs leading-5 text-muted">{l.detalle}</span>
+              ) : null}
+            </dt>
+            <dd className="shrink-0 text-sm font-semibold tabular-nums text-[#0a0a0a]">
+              {l.importe}
+            </dd>
+          </div>
+        ))}
+      </dl>
+      <div className="flex items-center justify-between gap-6 bg-[#0a0a0a] px-5 py-4 text-white">
+        <span className="text-sm font-semibold">{totalConcepto}</span>
+        <span className="text-xl font-extrabold tabular-nums tracking-tight">{total}</span>
+      </div>
+      {nota ? (
+        <p className="px-5 py-3 text-xs leading-5 text-muted">{nota}</p>
+      ) : null}
+    </figure>
+  );
+}
+
+/**
+ * Un mensaje listo para copiar: para qué sirve, el texto como saldría en
+ * WhatsApp y el botón «Copiar». Los saltos de línea del texto se respetan.
+ */
+export function Plantilla({
+  titulo,
+  cuando,
+  texto,
+}: {
+  titulo: string;
+  cuando?: string;
+  texto: string;
+}) {
+  return (
+    <figure className="not-prose my-6 rounded-3xl border border-[#e5e5e5] bg-white p-5 sm:p-6">
+      <figcaption className="flex items-start justify-between gap-4">
+        <span>
+          <span className="block font-semibold text-[#0a0a0a]">{titulo}</span>
+          {cuando ? (
+            <span className="mt-0.5 block text-sm leading-6 text-muted">{cuando}</span>
+          ) : null}
+        </span>
+        <BotonCopiar texto={texto} />
+      </figcaption>
+      <p className="mt-4 max-w-[85%] whitespace-pre-line rounded-2xl rounded-tl-md border border-[#ddd6fe] bg-[#f3eeff] px-4 py-3 text-sm leading-6 text-[#27272a]">
+        {texto}
+      </p>
+    </figure>
   );
 }
 

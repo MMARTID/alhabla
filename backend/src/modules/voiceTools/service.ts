@@ -250,7 +250,10 @@ function siguientePasoConHueco(canal: "voice" | "client_chat"): string {
   if (canal === "client_chat") {
     return `Guarda el availabilityToken. Pídele su nombre aunque veas el de su perfil y resume en un solo turno servicio, día y hora (cuando) y nombre; pregunta solo si lo reservas. Sin confirmaciones sueltas como «¿te viene bien esa hora?».`;
   }
-  return `Guarda el availabilityToken. Con su nombre (pídelo antes si falta), resume en un solo turno servicio, día y hora (cuando) y nombre y haz la pregunta del paso 3 de Reserva (la cita y el WhatsApp). No pidas confirmaciones sueltas como «¿te viene bien esa hora?».`;
+  // «pregunta solo cómo se llama»: con «Con su nombre (pídelo antes si
+  // falta)», en las llamadas de prueba del 04-11 en catalán preguntó el
+  // nombre, la cita y el WhatsApp en el mismo turno.
+  return `Guarda el availabilityToken. Si no sabes su nombre, di lo comprobado y pregunta solo cómo se llama. Con su nombre, resume en un solo turno servicio, día y hora (cuando) y nombre y haz la pregunta del paso 3 de Reserva (la cita y el WhatsApp). Sin confirmaciones sueltas («¿te viene bien esa hora?»).`;
 }
 
 const SIGUIENTE_PASO_CON_ALTERNATIVA =

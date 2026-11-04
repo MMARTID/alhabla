@@ -723,6 +723,16 @@ function enumerarConO(palabras: readonly string[]): string {
  * `transition__<id>`; en el chat no están y contesta en la cooficial sin
  * más. Al volver al nodo inicial contestó una vez en catalán y castellano a
  * quien ya hablaba inglés: de ahí «solo en el suyo».
+ *
+ * Llamadas del 04-11 (las de prueba del usuario y AI Tests de Telnyx):
+ * - El cambio era un silencio de 3 a 4 s, y de 8 s ese día. Ahora la
+ *   primera respuesta en la cooficial empieza por su `fraseAlCambiar`, con
+ *   su voz: sonó a los 2 s y siguió contestando. Un nodo `speak` con la
+ *   frase sonaba antes, pero cerraba el turno y no contestaba a lo pedido
+ *   hasta que el cliente volvía a hablar (4 de 4).
+ * - Quien volvía al castellano seguía oyendo catalán: «contéstale en
+ *   castellano» sin cambiar de nodo no bastaba. Ahora el castellano también
+ *   lleva al nodo inicial, con su voz, si es una frase entera.
  */
 export function flujoDeLaCooficial(
   idiomas: Pick<PerfilDeIdiomas, "idiomas" | "cooficialDeLaZona">
@@ -730,13 +740,17 @@ export function flujoDeLaCooficial(
   const cooficial = idiomas.cooficialDeLaZona;
   if (!cooficial) return null;
   const lengua = IDIOMAS[cooficial.idioma].nombreEnPrompt;
-  const otros = enumerarConO(
-    idiomas.idiomas
+  const frase = IDIOMAS[cooficial.idioma].fraseAlCambiar;
+  // Los que vuelven al nodo inicial: el castellano, con una frase entera
+  // (una palabra suelta como «vale» la dicen igual en catalán), y el resto.
+  const deVuelta = enumerarConO([
+    "castellano (una frase entera, no una palabra suelta como «vale»)",
+    ...idiomas.idiomas
       .filter(
         (idioma) => idioma !== IDIOMA_OBLIGATORIO && idioma !== cooficial.idioma
       )
-      .map((idioma) => IDIOMAS[idioma].nombreEnPrompt)
-  );
+      .map((idioma) => IDIOMAS[idioma].nombreEnPrompt),
+  ]);
   return {
     start_node_id: "inicial",
     nodes: [
@@ -756,7 +770,11 @@ export function flujoDeLaCooficial(
         instructions_mode: "append",
         tools_mode: "append",
         shared_tool_ids: [],
-        instructions: `## Idioma en este paso\n\nDesde ahora habla en ${lengua} con naturalidad; no repitas el saludo ni el aviso de IA ya dados, pero si aún no se ha dicho en ${lengua} que eres una inteligencia artificial (el saludo puede haberlo dicho ya en ${lengua}), dilo brevemente en tu primera frase. Si quien llama vuelve a hablarte en castellano, contéstale en castellano. Si habla en ${otros}, llama a la herramienta transition__a_inicial en ese mismo turno, sin decir nada antes, y contéstale después solo en su idioma. Usa transition__a_inicial solo para eso.`,
+        instructions: `## Idioma en este paso\n\nDesde ahora habla en ${lengua} con naturalidad.${
+          frase
+            ? ` Empieza tu primera respuesta en ${lengua} con «${frase}» y, en ese mismo turno, contesta a lo que ha pedido; si el saludo ya fue en ${lengua}, sáltate esa frase, y no la repitas después.`
+            : ""
+        } No repitas el saludo ni el aviso de IA ya dados, pero si aún no se ha dicho en ${lengua} que eres una inteligencia artificial (el saludo puede haberlo dicho ya en ${lengua}), dilo brevemente en tu primera frase. Fíjate en el idioma de su última frase: si habla en ${deVuelta}, llama a la herramienta transition__a_inicial en ese mismo turno, sin decir nada antes, y contéstale después solo en su idioma. Usa transition__a_inicial solo para eso.`,
         voice_settings: vozDeLaCooficial(cooficial),
       },
     ],
@@ -776,7 +794,7 @@ export function flujoDeLaCooficial(
         target: { type: "node", node_id: "inicial" },
         condition: {
           type: "llm",
-          prompt: `Quien llama habla ${otros}.`,
+          prompt: `Quien llama habla ${deVuelta}.`,
         },
       },
     ],

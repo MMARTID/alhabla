@@ -366,16 +366,19 @@ function seccionReserva(contexto: ContextoDelPrompt): Parrafos {
     // programarMensajesAlCliente): antes el plan Inicio también lo prometía.
     // En el chat ya escribe por WhatsApp: se pregunta solo por la reserva y
     // smsConsent va a true (seccionChat).
+    // «y solo eso»: en las llamadas de prueba del 04-11 en catalán, con
+    // «pídelo antes si te falta» preguntó en el mismo turno el nombre, la
+    // cita y el WhatsApp, y el cliente contestó «Què?».
     voz
-      ? `3. Confirmación y WhatsApp. Cuando tengas el hueco y el nombre (pídelo antes si te falta), en un solo turno resume servicio, día, hora y nombre y pregunta si lo reservas y le envías ${
+      ? `3. Confirmación y WhatsApp. Cuando tengas el hueco y el nombre (si te falta, pídelo antes y solo eso), en un solo turno resume servicio, día, hora y nombre y pregunta si lo reservas y le envías ${
           contexto.recordatorioPorWhatsapp
             ? "la confirmación y un recordatorio"
             : "la confirmación"
         } por WhatsApp a este número. Un sí claro confirma las dos cosas (smsConsent true). Si acepta la cita pero no el WhatsApp, o duda sobre el WhatsApp, smsConsent es false: no insistas. Si no queda claro si acepta la cita, pregunta solo eso. Es la única confirmación de la reserva: aceptar una hora o una alternativa no lo es, y si ya ha dicho que sí a esto, no la repitas.`
-      : "3. Confirmación. Cuando tengas el hueco y el nombre (pídelo antes si te falta, aunque veas el de su perfil), en un solo turno resume servicio, día, hora y nombre y pregunta si lo reservas. Si no queda claro si acepta la cita, pregunta solo eso. Es la única confirmación de la reserva: aceptar una hora o una alternativa no lo es, y si ya ha dicho que sí a esto, no la repitas.",
+      : "3. Confirmación. Cuando tengas el hueco y el nombre (si te falta, pídelo antes y solo eso, aunque veas el de su perfil), en un solo turno resume servicio, día, hora y nombre y pregunta si lo reservas. Si no queda claro si acepta la cita, pregunta solo eso. Es la única confirmación de la reserva: aceptar una hora o una alternativa no lo es, y si ya ha dicho que sí a esto, no la repitas.",
     // «y espera su respuesta»: llamada de prueba del 03-11, llamó a
     // book_appointment sin nombre y el backend la frenó (CLIENT_NAME_REQUIRED).
-    "4. Reserva. Con su sí, usa book_appointment con su nombre en clientName (nunca vacío: si aún no lo tienes, pídelo y espera su respuesta) y el availabilityToken de la opción aceptada. Da la cita por hecha solo si devuelve éxito; si te pide un dato (nombre o teléfono), pídeselo y vuelve a llamarla; si falla por otra cosa, explícalo en una frase y escala.",
+    "4. Reserva. Con su sí, usa book_appointment con su nombre en clientName (nunca vacío: si no lo tienes, pídelo y espera) y el availabilityToken de la opción aceptada. Da la cita por hecha solo si devuelve éxito; si te pide un dato (nombre o teléfono), pídeselo y vuelve a llamarla; si falla por otra cosa, explícalo en una frase y escala.",
     // Hallazgo 7 de la auditoría del 28-10: una segunda reserva en la misma
     // llamada sustituía a la primera en silencio. El backend la rechaza con
     // YA_HAY_CITA_EN_ESTA_LLAMADA; esto es para que no la prometa antes.
