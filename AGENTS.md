@@ -217,8 +217,12 @@ each page's image explicitly from its `openGraph`/`twitter` metadata.
   WhatsApp on the iPhone render plus the panel on the same 3D laptop, reacting to each change; a
   timed simulation, not scroll-driven, that cycles through three real assistant actions —
   `marcar_ausencia` + `mover_cita` + `avisar_cliente`, `cerrar_dia`, `editar_servicio`. The
-  laptop helpers shared by both scenes live in `web/src/lib/portatil-3d.ts`; on phones only the
-  iPhone is shown), `PuntosFuertesSection`, `WhatsAppClientesSection`, `EnMarchaSection`,
+  laptop helpers shared by both scenes live in `web/src/lib/portatil-3d.ts`, which imports three:
+  components must NOT import it (they take the credit from `portatil-3d-credito.ts`, no three), or
+  ~170 KB of three.js land in the home's initial JS; `web/tests/lib/js-inicial.test.ts` guards it,
+  as well as the on-demand `DemoVoiceCallDiferida` and the home hero's CSS entrance `.entrada-hero`
+  — never wrap the hero's H1 in `Reveal`, whose HTML ships with opacity 0 until hydration and made
+  the LCP wait for all the JS; on phones only the iPhone is shown), `PuntosFuertesSection`, `WhatsAppClientesSection`, `EnMarchaSection`,
   `EscenasDeOficio` (`#sectores`, «Elige tu oficio y mira la llamada que entra.»: since
   2026-10-30 the eight sectors are drawn scenes, not the stock-photo accordion. One card per sector
   in menu order, data in `web/src/lib/escenas-de-oficio.ts`: the ringing tile, «Suena y estás…»,

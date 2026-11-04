@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Headphones } from "lucide-react";
-import { DemoVoiceCall } from "@/components/demo-voice-call";
+import { DemoVoiceCallDiferida } from "@/components/demo-voice-call-diferida";
 
 /**
  * El botón del cierre del blog: abre la demo de voz en la misma página, que
@@ -22,7 +22,7 @@ export function EscucharUnaLlamada() {
         <Headphones className="h-4 w-4" aria-hidden="true" />
         Escuchar una llamada
       </button>
-      <DemoVoiceCall open={abierta} onClose={() => setAbierta(false)} />
+      <DemoVoiceCallDiferida open={abierta} onClose={() => setAbierta(false)} />
     </>
   );
 }

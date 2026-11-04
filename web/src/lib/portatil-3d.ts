@@ -33,13 +33,8 @@ import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
  * vertical y el pivote en la bisagra. Medidas en cm.
  */
 
-export const MODELO = {
-  titulo: "macbook pro M3 16 inch 2024",
-  origen:
-    "https://sketchfab.com/3d-models/macbook-pro-m3-16-inch-2024-8e34fc2b303144f78490007d91ff57c4",
-  autor: "https://sketchfab.com/jackbaeten",
-  licencia: "https://creativecommons.org/licenses/by/4.0/",
-} as const;
+// El crédito vive en un fichero sin three.js (ver portatil-3d-credito.ts).
+export { MODELO } from "@/lib/portatil-3d-credito";
 
 export const RUTA_MODELO = "/modelos/macbook.glb";
 

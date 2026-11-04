@@ -6,7 +6,7 @@ import { useState } from "react";
 import { ArrowRight, Check, Headphones } from "lucide-react";
 
 import { HeroHilos } from "@/components/hero-hilos";
-import { DemoVoiceCall } from "@/components/demo-voice-call";
+import { DemoVoiceCallDiferida } from "@/components/demo-voice-call-diferida";
 import type { NicheAccent, NicheSlug } from "@/lib/niche-landings";
 
 /**
@@ -102,7 +102,7 @@ export function LandingHero({
         </div>
       </section>
 
-      <DemoVoiceCall
+      <DemoVoiceCallDiferida
         open={demoAbierta}
         onClose={() => setDemoAbierta(false)}
         niche={demo}
