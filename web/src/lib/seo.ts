@@ -37,6 +37,13 @@ export function absoluteUrl(path = "/") {
 
 /** Correo público (el del pie de la web). */
 export const contactEmail = "hola@alhabla.ai";
+/** Alias, por tema, del único buzón de Zoho (admin@): llegan al mismo sitio,
+ * pero se pueden filtrar y, el día que haya equipo, repartir. Una dirección
+ * nueva se crea en Zoho antes de publicarla: si no existe, rebota. */
+export const correoDePrensa = "prensa@alhabla.ai";
+export const correoDeEmpresas = "empresas@alhabla.ai";
+export const correoDeColaboraciones = "colaboraciones@alhabla.ai";
+export const correoDeSeguridad = "seguridad@alhabla.ai";
 
 /**
  * Imagen de Open Graph / Twitter de una página: cada ruta indexable tiene

@@ -92,8 +92,8 @@ export default function CheckoutPage(props: { searchParams: Promise<{ plan?: str
         <h1 className="text-3xl font-semibold text-tinta">El pago no está disponible ahora mismo</h1>
         <p className="mt-4 text-muted">
           Escríbenos a{" "}
-          <a href="mailto:hola@alhabla.ai" className="font-semibold text-morado-tinta underline underline-offset-2">
-            hola@alhabla.ai
+          <a href="mailto:facturacion@alhabla.ai" className="font-semibold text-morado-tinta underline underline-offset-2">
+            facturacion@alhabla.ai
           </a>{" "}
           y lo resolvemos.
         </p>

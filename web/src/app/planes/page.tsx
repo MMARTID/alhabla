@@ -15,6 +15,7 @@ import {
   absoluteUrl,
   buildBreadcrumbStructuredData,
   buildFaqPageStructuredData,
+  correoDeEmpresas,
   ogImages,
   siteName,
   websiteId,
@@ -150,7 +151,14 @@ export default function PlansPage() {
                 </h2>
                 <p className="mt-2 text-base leading-7 text-muted">
                   Cuéntanos tu caso y te contesta una persona del equipo antes
-                  de que pagues nada.
+                  de que pagues nada. Cadenas y franquicias, también en{" "}
+                  <a
+                    href={`mailto:${correoDeEmpresas}`}
+                    className="rounded font-semibold text-morado-tinta underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-morado"
+                  >
+                    {correoDeEmpresas}
+                  </a>
+                  .
                 </p>
               </div>
               <div className="flex flex-wrap gap-3 lg:shrink-0">

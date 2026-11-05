@@ -228,8 +228,8 @@ export default function CheckoutResultPage(props: {
         {!confirmed && isTakingLong ? (
           <p className="mt-3 text-sm leading-6 text-aviso">
             Esto está tardando más de lo normal. Si no se confirma en unos minutos, escríbenos a{" "}
-            <a href="mailto:hola@alhabla.ai" className="font-semibold underline underline-offset-2">
-              hola@alhabla.ai
+            <a href="mailto:facturacion@alhabla.ai" className="font-semibold underline underline-offset-2">
+              facturacion@alhabla.ai
             </a>{" "}
             y te ayudamos.
           </p>
