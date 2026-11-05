@@ -1,5 +1,5 @@
 import { formatIncludedMinutes, plans } from "@/lib/plans";
-import { contactEmail } from "@/lib/seo";
+import { correoDeColaboraciones } from "@/lib/seo";
 
 /**
  * Lo común de las comparativas con plataformas de agentes de voz
@@ -65,14 +65,14 @@ export const FUENTE_LEY: { nombre: string; url: string } = {
 
 /** Texto de la Nota «Sobre esta comparativa» que cierra cada página. */
 export function notaSobreLaComparativa(marca: string) {
-  return `Comparación de características publicadas, hecha por Alhabla con los datos consultados el ${CONSULTADAS_EN_TEXTO}, según el artículo 10 de la Ley 3/1991 de Competencia Desleal. ${marca} es una marca de su titular; Alhabla no tiene relación con ella. Si un dato ha cambiado, escríbenos a ${contactEmail} y lo corregimos.`;
+  return `Comparación de características publicadas, hecha por Alhabla con los datos consultados el ${CONSULTADAS_EN_TEXTO}, según el artículo 10 de la Ley 3/1991 de Competencia Desleal. ${marca} es una marca de su titular; Alhabla no tiene relación con ella. Si un dato ha cambiado, escríbenos a ${correoDeColaboraciones} y lo corregimos.`;
 }
 
 /** La pregunta que reconoce quién escribe la comparativa. */
 export function preguntaDeImparcialidad(marca: string) {
   return {
     question: "¿Esta comparativa es imparcial?",
-    answer: `La escribe Alhabla, así que tenlo en cuenta. Para compensarlo, solo usamos lo que ${marca} publica en su web, con el enlace a cada dato, y decimos en qué casos te conviene más ${marca}. Si ves un dato desactualizado, escríbenos a ${contactEmail} y lo corregimos.`,
+    answer: `La escribe Alhabla, así que tenlo en cuenta. Para compensarlo, solo usamos lo que ${marca} publica en su web, con el enlace a cada dato, y decimos en qué casos te conviene más ${marca}. Si ves un dato desactualizado, escríbenos a ${correoDeColaboraciones} y lo corregimos.`,
   };
 }
 

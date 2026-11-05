@@ -2,7 +2,7 @@ import Image from "next/image";
 import { Download, Newspaper } from "lucide-react";
 import { PaginaGuia, Seccion, Tabla, Texto } from "@/components/pagina-guia";
 import { plans, TRIAL_DAYS } from "@/lib/plans";
-import { contactEmail, metadataDePagina } from "@/lib/seo";
+import { correoDePrensa, metadataDePagina } from "@/lib/seo";
 
 /**
  * Sala de prensa (2026-10-20). Alhabla todavía no ha salido en ningún medio,
@@ -31,7 +31,7 @@ export default function PrensaPage() {
       descripcion={descripcion}
       ubicacion="prensa"
       cta={null}
-      ctaSecundario={{ texto: "Escribir a prensa", href: `mailto:${contactEmail}?subject=Prensa` }}
+      ctaSecundario={{ texto: "Escribir a prensa", href: `mailto:${correoDePrensa}` }}
       entradilla={
         <p>
           Si estás escribiendo sobre inteligencia artificial en el pequeño comercio, el sector de la belleza o las
@@ -84,7 +84,7 @@ export default function PrensaPage() {
             ["Calendarios", "Google Calendar, Outlook o Calendario de Apple (iCloud), o la agenda de Alhabla sin conectar ninguno"],
             ["Precio", `Desde ${desde} € + IVA al mes; ${TRIAL_DAYS} días de prueba; sin permanencia`],
             ["Web", "alhabla.ai"],
-            ["Contacto de prensa", contactEmail],
+            ["Contacto de prensa", correoDePrensa],
           ]}
         />
       </Seccion>
@@ -126,7 +126,7 @@ export default function PrensaPage() {
           </ul>
           <p>
             Para entrevistas, datos o una demostración en directo, escribe a{" "}
-            <a href={`mailto:${contactEmail}?subject=Prensa`}>{contactEmail}</a> con «Prensa» en el asunto.
+            <a href={`mailto:${correoDePrensa}`}>{correoDePrensa}</a>.
           </p>
         </Texto>
       </Seccion>

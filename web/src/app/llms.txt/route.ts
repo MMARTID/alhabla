@@ -1,7 +1,15 @@
 import { listarArticulos } from "@/lib/blog";
 import { PAGINAS, type SeccionDelSitio } from "@/lib/paginas";
 import { formatIncludedMinutes, IVA_PORCENTAJE, plans, TRIAL_DAYS } from "@/lib/plans";
-import { absoluteUrl, contactEmail, defaultDescription } from "@/lib/seo";
+import {
+  absoluteUrl,
+  contactEmail,
+  correoDeColaboraciones,
+  correoDeEmpresas,
+  correoDePrensa,
+  correoDeSeguridad,
+  defaultDescription,
+} from "@/lib/seo";
 
 /**
  * /llms.txt (https://llmstxt.org): el resumen de alhabla.ai para los
@@ -83,6 +91,10 @@ ${articulos.join("\n")}
 
 - Web: ${absoluteUrl("/")}
 - Email: ${contactEmail}
+- Prensa: ${correoDePrensa}
+- Cadenas y franquicias: ${correoDeEmpresas}
+- Colaboraciones, directorios y correcciones: ${correoDeColaboraciones}
+- Seguridad: ${correoDeSeguridad}
 - Formulario y WhatsApp del equipo: ${absoluteUrl("/contacto")}
 `;
 

@@ -10,6 +10,6 @@ export default function OpenGraphImage() {
     etiqueta: "Prensa",
     titulo: "Kit de prensa de Alhabla",
     subtitulo: "Descripción, datos clave, logotipos y contacto.",
-    derecha: { tipo: "panel", grande: "hola@alhabla.ai" },
+    derecha: { tipo: "panel", grande: "prensa@alhabla.ai" },
   });
 }
