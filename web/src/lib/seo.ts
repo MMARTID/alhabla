@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { plans } from "@/lib/plans";
+import { REDES } from "@/lib/redes";
 
 export const siteName = "Alhabla";
 export const defaultTitle = "Alhabla: recepcionista de IA que contesta llamadas y reserva citas";
@@ -94,6 +95,7 @@ export function organizationStructuredData() {
     url: absoluteUrl("/"),
     logo: { "@type": "ImageObject", url: absoluteUrl("/icon.png"), width: 512, height: 512 },
     description: defaultDescription,
+    sameAs: REDES.map(({ url }) => url),
     contactPoint: {
       "@type": "ContactPoint",
       contactType: "customer support",
