@@ -18,6 +18,10 @@ describe("perfiles de Alhabla en redes", () => {
       expect(enlace).toHaveAttribute("target", "_blank");
       expect(enlace).toHaveAttribute("rel", "noopener noreferrer");
       expect(enlace.getAttribute("aria-label")).toMatch(/^Alhabla en /);
+      // Tamaño fijo aunque no cargue el CSS.
+      const icono = enlace.querySelector("svg");
+      expect(icono).toHaveAttribute("width", "18");
+      expect(icono).toHaveAttribute("height", "18");
     }
   });
 

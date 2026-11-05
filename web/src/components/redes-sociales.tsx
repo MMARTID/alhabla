@@ -30,8 +30,13 @@ export function RedesSociales({ className = "" }: { className?: string }) {
             title={nombre}
             className="flex h-11 w-11 items-center justify-center rounded-full text-white/60 transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-morado"
           >
+            {/* El tamaño también como atributo: si el CSS tarda o no carga
+                (pasó en dev al llegar el pie nuevo), el SVG no crece hasta
+                llenar los 44 px del enlace. */}
             <svg
               viewBox="0 0 24 24"
+              width="18"
+              height="18"
               className="h-[18px] w-[18px]"
               fill="currentColor"
               aria-hidden="true"
