@@ -49,6 +49,7 @@ function evento(ruta: string): BeforeSendEvent {
 
 beforeEach(() => {
   document.cookie = "alhabla_analitica=; Path=/; Max-Age=0";
+  document.cookie = "alhabla_cookies=; Path=/; Max-Age=0";
   window.history.replaceState(null, "", "/agenda?cliente=secreto");
   window.dataLayer = undefined;
   window.gtag = undefined;
@@ -119,7 +120,7 @@ describe("analítica de la app", () => {
     render(<AnaliticaDeLaApp />);
     expect(
       await screen.findByRole("link", { name: "Más información" })
-    ).toHaveAttribute("href", webUrl("/legal/privacidad"));
+    ).toHaveAttribute("href", webUrl("/legal/privacidad#cookies"));
   });
 
   it("dentro del panel, el aviso queda encima de la barra inferior y el botón solo sale en escritorio, a la derecha", async () => {

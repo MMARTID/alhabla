@@ -25,7 +25,7 @@ export function AnaliticaDeLaApp() {
   const pathname = usePathname();
   return (
     <GoogleAnalytics
-      enlaceDePrivacidad={webUrl("/legal/privacidad")}
+      enlaceDePrivacidad={webUrl("/legal/privacidad#cookies")}
       rutasSinMedicion={RUTAS_SIN_MEDICION}
       dentroDelPanel={!esRutaSinArmazon(pathname)}
       grupoDeContenido="app"
