@@ -100,11 +100,12 @@ export default function RootLayout({
             no se miden y, directamente, no cargan nada — ni scripts ni aviso
             de cookies. */}
         <GoogleAnalytics
-          enlaceDePrivacidad="/legal/privacidad"
+          enlaceDePrivacidad="/legal/privacidad#cookies"
           rutasSinAnalitica={["keystatic", "vista-previa", "preview", "api"]}
           aplazarAvisoHastaScroll
           grupoDeContenido="web"
           eventosDeRuta={{ planes: "ver_planes" }}
+          paginasVistasEnMeta
         />
         {/* Clics en lo marcado con `data-evento` (docs/eventos-de-analitica.md). */}
         <MedicionDeClics />

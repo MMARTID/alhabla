@@ -22,12 +22,58 @@ export const metadata: Metadata = {
   robots: { index: true, follow: true },
 };
 
+/** Las cookies que puede haber en alhabla.ai y app.alhabla.ai, por tipo. */
+const COOKIES: { tipo: string; filas: [string, string, string, string][] }[] = [
+  {
+    tipo: "Técnicas (siempre activas)",
+    filas: [
+      ["alhabla_cookies", "Alhabla", "Guardar lo que eliges en el aviso de cookies", "1 año"],
+      [
+        "alhabla_google_oauth_state, alhabla_facebook_oauth_state",
+        "Alhabla (api.alhabla.ai)",
+        "Proteger el inicio de sesión con Google o Facebook",
+        "10 minutos",
+      ],
+      [
+        "alhabla_google_session, alhabla_facebook_session",
+        "Alhabla (api.alhabla.ai)",
+        "Terminar el inicio de sesión al volver de Google o Facebook",
+        "1 minuto",
+      ],
+      [
+        "alhabla_google_calendar_oauth_state, alhabla_microsoft_calendar_oauth_state",
+        "Alhabla (api.alhabla.ai)",
+        "Proteger la conexión de tu calendario",
+        "10 minutos",
+      ],
+      ["__stripe_mid, __stripe_sid", "Stripe", "Prevenir el fraude en el pago, solo en la página de pago", "1 año / 30 minutos"],
+    ],
+  },
+  {
+    tipo: "Medición (si las aceptas)",
+    filas: [
+      ["_ga, _ga_Z3RT28K0ZJ", "Google (Google Analytics)", "Contar visitas y saber en qué paso se deja el alta", "2 años"],
+    ],
+  },
+  {
+    tipo: "Publicidad (si las aceptas)",
+    filas: [
+      [
+        "_fbp, _fbc",
+        "Meta (Facebook e Instagram)",
+        "Saber si una visita o un alta llega por un anuncio, y enseñar anuncios a quien ya nos visitó",
+        "90 días",
+      ],
+    ],
+  },
+];
+
 export default function PrivacidadPage() {
   return (
     <LegalPage
       title="Política de privacidad"
       description="Aquí te contamos qué datos tratamos, para qué, quién más interviene y qué puedes exigirnos. Sin cláusulas copiadas: solo lo que el producto hace de verdad."
-      updatedAt="2026-10-20"
+      updatedAt="2026-11-05"
     >
       <LegalSection title="Quién es el responsable">
         <p>
@@ -72,6 +118,14 @@ export default function PrivacidadPage() {
           <li>
             Contestar a lo que nos preguntas por el formulario de contacto, por correo o por WhatsApp: aplicación, a
             petición tuya, de medidas precontractuales.
+          </li>
+          <li>
+            Medir cómo se usan la web y la aplicación, y saber qué anuncios nos traen visitas y altas: consentimiento,
+            por separado para cada finalidad, que das en el aviso de cookies y puedes retirar cuando quieras (ver{" "}
+            <a href="#cookies" className="font-medium text-morado-tinta underline underline-offset-2">
+              Cookies
+            </a>
+            ).
           </li>
         </ul>
       </LegalSection>
@@ -275,10 +329,25 @@ export default function PrivacidadPage() {
             <strong className="font-semibold text-tinta">Cloudflare R2, Vercel y Zoho Mail.</strong> Permiten,
             respectivamente, almacenar grabaciones cifradas, servir la aplicación y entregar correos transaccionales.
           </li>
+          <li>
+            <strong className="font-semibold text-tinta">Google Analytics, Vercel Analytics y Meta.</strong> Solo si
+            aceptas sus cookies: los dos primeros miden las visitas y Meta (Meta Platforms Ireland) recibe las páginas
+            vistas y las altas para medir nuestros anuncios en Facebook e Instagram. Por esa recogida y envío, Meta y
+            Alhabla son corresponsables; lo que Meta haga después con esos datos se rige por su{" "}
+            <a
+              href="https://www.facebook.com/privacy/policy/"
+              target="_blank"
+              rel="noreferrer"
+              className="font-medium text-morado-tinta underline underline-offset-2"
+            >
+              política de privacidad
+            </a>
+            .
+          </li>
         </ul>
       </LegalSection>
 
-      <LegalSection title="Transferencias internacionales">
+      <LegalSection title="Transferencias internacionales" id="transferencias">
         <p>
           Algunos proveedores pueden procesar datos fuera del Espacio Económico Europeo. Por ejemplo, el modelo de
           lenguaje de OpenAI con el que Telnyx genera las respuestas de la recepcionista procesa el texto de la
@@ -374,19 +443,66 @@ export default function PrivacidadPage() {
         </p>
       </LegalSection>
 
-      <LegalSection title="Cookies">
+      <LegalSection title="Cookies" id="cookies">
         <p>
-          Para que la aplicación funcione guardamos en tu navegador la sesión y algunas preferencias — por ejemplo, la
-          estimación que hayas hecho en la calculadora de la web. Son datos técnicos, se quedan en tu dispositivo y no
-          se usan para perfilarte ni para publicidad.
+          Las cookies técnicas hacen falta para que la web y la aplicación funcionen y no piden permiso. Las de medición
+          y las de publicidad son opcionales: no se instalan hasta que las aceptas en el aviso de cookies, puedes
+          aceptar una y rechazar la otra en «Configurar», y rechazarlas no cambia nada del servicio. Tu elección se
+          guarda un año y vale para alhabla.ai y app.alhabla.ai. Para cambiarla, toca el botón de la galleta
+          («Configurar cookies») de la web o de la aplicación o, en la aplicación desde el móvil, «Preferencias de
+          cookies» en Cuenta. Al retirar una finalidad dejamos de enviar datos y borramos sus cookies accesibles desde la página.
         </p>
+        <div className="overflow-x-auto rounded-2xl border border-linea">
+          <table className="w-full min-w-[640px] table-fixed border-collapse text-left text-sm">
+            <colgroup>
+              <col className="w-[30%]" />
+              <col className="w-[20%]" />
+              <col className="w-[34%]" />
+              <col className="w-[16%]" />
+            </colgroup>
+            <thead>
+              <tr className="bg-relleno">
+                {["Cookie", "De quién", "Para qué", "Duración"].map((columna) => (
+                  <th key={columna} scope="col" className="border-b border-linea px-4 py-3 font-semibold text-apagado">
+                    {columna}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            {COOKIES.map(({ tipo, filas }) => (
+              <tbody key={tipo}>
+                <tr>
+                  <th colSpan={4} scope="colgroup" className="bg-relleno/60 px-4 py-2 text-xs font-semibold uppercase tracking-[0.06em] text-tinta">
+                    {tipo}
+                  </th>
+                </tr>
+                {filas.map(([nombre, quien, para, duracion]) => (
+                  <tr key={nombre} className="border-b border-linea-suave last:border-0">
+                    <th scope="row" className="px-4 py-3 align-top font-mono text-xs font-medium text-tinta [overflow-wrap:anywhere]">
+                      {nombre.split(", ").map((cookie) => (
+                        <span key={cookie} className="block">
+                          {cookie}
+                        </span>
+                      ))}
+                    </th>
+                    <td className="px-4 py-3 align-top text-apagado">{quien}</td>
+                    <td className="px-4 py-3 align-top text-apagado">{para}</td>
+                    <td className="px-4 py-3 align-top text-apagado">{duracion}</td>
+                  </tr>
+                ))}
+              </tbody>
+            ))}
+          </table>
+        </div>
         <p>
-          Usamos Google Analytics y Vercel Analytics para conocer cómo se navega por la web y la aplicación. Solo se
-          cargan si aceptas las cookies de medición en el aviso de cookies; puedes rechazarlas sin que afecte al
-          servicio. Tu elección se guarda durante un año y se comparte entre alhabla.ai y app.alhabla.ai. Puedes
-          cambiarla en cualquier momento con el botón de la galleta («Configurar cookies») de la web o la aplicación.
-          Al rechazarlas, dejamos de enviar datos de analítica y eliminamos las cookies de Google Analytics accesibles
-          desde la página.
+          La aplicación guarda además en tu navegador, sin cookies, la sesión, el tema claro u oscuro y los pasos del
+          alta, y la demo de voz de la web guarda lo necesario para la llamada mientras dura. Vercel Analytics no usa
+          cookies, pero también espera a que aceptes la medición. Google y Meta pueden tratar los datos fuera del
+          Espacio Económico Europeo con las garantías de{" "}
+          <a href="#transferencias" className="font-medium text-morado-tinta underline underline-offset-2">
+            Transferencias internacionales
+          </a>
+          .
         </p>
       </LegalSection>
 
