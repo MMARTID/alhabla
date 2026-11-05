@@ -128,9 +128,9 @@ segundo plano corren vía Cloud Tasks/Cloud Scheduler contra ese mismo servicio,
 worker aparte). Dos proyectos en Vercel: `alhabla-frontend` (la app, `app.alhabla.ai`) y
 `alhabla-web` (la web pública, `alhabla.ai`; `www` y toda ruta de la app redirigen con 301).
 `alhabla-api` escala como mucho a 11 instancias (presupuesto de conexiones de Cloud SQL; el deploy
-se para si el máximo es mayor). DNS en Cloudflare, con el Worker `alhabla-failover-laliga`
-(`infra/cloudflare/failover-laliga/`), que cada 2 minutos mira la lista de bloqueos de LaLiga y
-quita o vuelve a poner el proxy de las webs. Ver `AGENTS.md` § Deployment Notes para la
+se para si el máximo es mayor). DNS en Cloudflare, todo en solo DNS desde el 2026-11-05: las
+webs llegan directas a Vercel, sin proxy de Cloudflare (el Worker `alhabla-failover-laliga`, que
+lo quitaba en los bloqueos de LaLiga, ya no tiene nada que hacer). Ver `AGENTS.md` § Deployment Notes para la
 arquitectura completa y los comandos de despliegue, y `docs/historico/PLAN-APP-DOMINIO.md` para el
 reparto entre las dos webs.
 
@@ -140,15 +140,12 @@ graph TD
     M[Meta · WhatsApp]
 
     subgraph CF["Cloudflare — DNS de alhabla.ai"]
-        DNS[DNS]
-        WKR[[Worker alhabla-failover-laliga<br/>cron 2 min: proxy on/off<br/>en los bloqueos de LaLiga]]
+        DNS[DNS<br/>todo en solo DNS, sin proxy]
     end
 
-    WKR -.->|proxied de alhabla.ai, www y app| DNS
-
     U --> DNS
-    DNS -->|alhabla.ai| WEB[Vercel · alhabla-web<br/>web pública Next.js]
-    DNS -->|app.alhabla.ai| APP[Vercel · alhabla-frontend<br/>app Next.js]
+    DNS -->|"alhabla.ai, www<br/>CNAME → vercel-dns-017.com"| WEB[Vercel · alhabla-web<br/>web pública Next.js]
+    DNS -->|"app.alhabla.ai<br/>CNAME → vercel-dns-017.com"| APP[Vercel · alhabla-frontend<br/>app Next.js]
     DNS -->|"api.alhabla.ai<br/>CNAME → ghs.googlehosted.com<br/>(DNS-only, sin proxy naranja)"| CR_API
 
     WEB -->|301 rutas de la app · pase de registro| APP

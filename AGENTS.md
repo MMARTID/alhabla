@@ -1842,11 +1842,10 @@ eliminar (`10015`).
 **Otros datos útiles.** Los MDR (`GET /v2/detail_records?filter[record_type]=messaging`) solo
 registran salientes (hay entregas reales de WhatsApp al móvil del usuario desde el 15-09); los
 entrantes no aparecen ahí. Precio de modelos y catálogo: `GET /v2/ai/models` (ver plan). Desde
-el Mac del usuario no se llega por HTTP a los hosts de `alhabla.ai` proxied por Cloudflare
-(`dev-api.alhabla.ai`, `alhabla.ai`), aunque desde internet responden: probar con
-`web_fetch`/otro equipo, no con `curl` local. *(Es el bloqueo de IPs de Cloudflare durante los
-partidos de LaLiga. Desde el 11-10 el Worker `alhabla-failover-laliga` quita el proxy de
-`alhabla.ai`, `www` y `app` mientras dura, pero no el de `api` ni `dev-api`; ver § Cloudflare
+el Mac del usuario, durante los partidos de LaLiga, no se llega por HTTP a los hosts proxied por
+Cloudflare (hoy solo `dev-api.alhabla.ai`, el túnel), aunque desde internet responden: probar con
+`web_fetch`/otro equipo, no con `curl` local. *(Es el bloqueo de IPs de Cloudflare. `alhabla.ai`,
+`www` y `app` van en solo DNS a Vercel desde el 2026-11-05 y ya no les afecta; ver § Cloudflare
 failover for LaLiga blocks.)*
 
 ## Stripe Billing Fields on `Business`
@@ -4288,8 +4287,8 @@ landings de sector compartían el 55–58 % del texto de `<main>`. Desde el 2026
     port 5432 where local uses 5433: that 5433 only exists to dodge Homebrew's Postgres, which
     holds `127.0.0.1:5432` on the dev machine and answers `P1010` to these credentials.
   - The **Infra — Worker de LaLiga** job (added 2026-10-11) runs `node --test` in
-    `infra/cloudflare/failover-laliga`, the Cloudflare Worker that turns the proxy off and on
-    during LaLiga's IP blocks. It has no dependencies and deploys nothing: the Worker is
+    `infra/cloudflare/failover-laliga`, the Cloudflare Worker that turned the proxy off and on
+    during LaLiga's IP blocks (idle since the webs went DNS-only on 2026-11-05). It has no dependencies and deploys nothing: the Worker is
     uploaded by hand (that folder's README). Not a required check.
   - The **diff** job (pull requests only, added 2026-09-19) reads the PR's own diff rather than
     the code:
@@ -4356,9 +4355,12 @@ landings de sector compartían el 55–58 % del texto de `<main>`. Desde el 2026
   every project: `alhabla-frontend` (Root Directory `frontend`, domain `app.alhabla.ai`),
   `alhabla-web` (Root Directory `web`, domains `alhabla.ai` + `www` → 308 to `alhabla.ai`) and,
   since 2026-10-30, `alhabla-growth` (Root Directory `growth`, `growth.alhabla.ai`, DNS-only;
-  § Alhabla Growth). The first two were split on 2026-09-21 (`docs/historico/PLAN-APP-DOMINIO.md`). DNS lives in Cloudflare (proxied CNAMEs to the
-  project's `*.vercel-dns-017.com` target; see «Cloudflare failover for LaLiga blocks» below for
-  who turns that proxy off and on). `alhabla.ai` answers every app route with a permanent
+  § Alhabla Growth). The first two were split on 2026-09-21 (`docs/historico/PLAN-APP-DOMINIO.md`). DNS lives in Cloudflare: **DNS-only** CNAMEs
+  (grey cloud) to the project's `*.vercel-dns-017.com` target since 2026-11-05, so Vercel serves
+  every web directly with its own Let's Encrypt certificates. They were proxied until then;
+  Vercel recommends against a reverse proxy in front of it, and the proxy was exactly what
+  LaLiga's blocks took down (see «Cloudflare failover for LaLiga blocks» below). Do not turn the
+  proxy back on. `alhabla.ai` answers every app route with a permanent
   redirect to `app.alhabla.ai` (308: `permanent: true` in `web/next.config.mjs`; checked with
   `curl -I` on 2026-11-02), which is what keeps the Meta template URL buttons
   (`alhabla.ai/ajustes/{{1}}`) and old emails working. Backend URLs: `APP_URL`
@@ -4497,6 +4499,12 @@ keeps at least one Cloud Run instance warm most of the time — fewer cold start
 callers, at the cost of a few thousand trivial requests a day.
 
 ### Cloudflare failover for LaLiga blocks (Worker `alhabla-failover-laliga`)
+
+> **Idle since 2026-11-05.** `alhabla.ai`, `www` and `app` were switched to DNS-only by hand that
+> day (Cloudflare API, `proxied:false`, TTL auto), with no marca in KV. Per its own rules a
+> DNS-only record without a marca is «turned off by a human» and the Worker never touches it, so
+> it keeps running but has nothing to switch. What follows describes how it worked while the
+> webs were proxied; retiring it (Worker, KV, folder and CI job) is a separate decision.
 
 - **The problem.** During LaLiga matches Spanish ISPs block Cloudflare IPs by court order
   (`188.114.96.x`/`97.x`; on Movistar also `2a06:98c1:3120::`/`3121::`). With the proxy on,
