@@ -28,11 +28,12 @@ encendido. Las dos webs en Vercel (proyectos `alhabla-frontend`, root `frontend`
 `app.alhabla.ai`; y `alhabla-web`, root `web`, dominio `alhabla.ai`). `alhabla.ai` redirige con
 308 toda ruta de la app a `app.alhabla.ai`. `alhabla-api` tiene un **máximo de 11 instancias**:
 es el presupuesto de conexiones de Cloud SQL (`max_connections` 50; 4 por instancia en el peor
-caso), y el deploy se para si alguien lo sube. El DNS está en Cloudflare, y el Worker
-`alhabla-failover-laliga` (`infra/cloudflare/failover-laliga/`) quita y vuelve a poner por sí solo el
-proxy de `alhabla.ai`, `www` y `app` cuando LaLiga hace bloquear las IPs de Cloudflare: no se
-tocan a mano. Detalle completo, IDs de recursos y comandos reales en `AGENTS.md` § Deployment
-Notes.
+caso), y el deploy se para si alguien lo sube. El DNS está en Cloudflare y, desde el
+2026-11-05, **todos los registros de las webs van en solo DNS** (nube gris): Vercel las sirve
+directamente, sin proxy de Cloudflare delante (Vercel lo desaconseja, y era lo que tumbaban los
+bloqueos de LaLiga). No se vuelve a poner el proxy. El Worker `alhabla-failover-laliga`
+(`infra/cloudflare/failover-laliga/`) sigue subido pero ya no tiene nada que conmutar. Detalle
+completo, IDs de recursos y comandos reales en `AGENTS.md` § Deployment Notes.
 
 ## Reglas que no se negocian
 

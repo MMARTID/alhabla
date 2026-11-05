@@ -3,6 +3,12 @@
 Worker de Cloudflare que mantiene las webs accesibles desde España durante los
 bloqueos de LaLiga.
 
+> **Sin trabajo desde el 2026-11-05.** Ese día los tres CNAME pasaron a solo DNS
+> a mano y para siempre (sin marca en KV): Vercel sirve las webs directamente y
+> los bloqueos de IPs de Cloudflare ya no les afectan. Un registro DNS-only sin
+> marca es, para el Worker, «lo apagó un humano», así que no lo vuelve a
+> encender. Lo de abajo explica cómo funcionaba con el proxy puesto.
+
 ## El problema
 
 Mientras hay partido, las operadoras españolas bloquean IPs concretas de
