@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { BrandMark } from "@/components/brand-mark";
+import { RedesSociales } from "@/components/redes-sociales";
 import { contactEmail } from "@/lib/seo";
 
 /**
@@ -103,12 +104,19 @@ export function SiteFooter() {
           ))}
         </nav>
         <div className="flex flex-col gap-4 border-t border-white/10 pt-5 md:flex-row md:items-center md:justify-between">
-          <div className="flex items-center gap-3">
-            <BrandMark className="h-8 w-8 shrink-0" />
-            <div className="flex flex-col gap-1">
-              <p className="text-sm">© 2026 Alhabla</p>
-              <p className="text-sm">Titular: Miguel Martín Delgado</p>
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+            <div className="flex items-center gap-3">
+              <BrandMark className="h-8 w-8 shrink-0" />
+              <div className="flex flex-col gap-1">
+                <p className="text-sm">© 2026 Alhabla</p>
+                <p className="text-sm">Titular: Miguel Martín Delgado</p>
+              </div>
             </div>
+            {/* -ml-3: el icono queda alineado con el texto aunque cada
+                enlace ocupe 44 px para el dedo. */}
+            <nav aria-label="Alhabla en redes sociales">
+              <RedesSociales className="-ml-3" />
+            </nav>
           </div>
           <nav
             aria-label="Empresa y enlaces legales"
