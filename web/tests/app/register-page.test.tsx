@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { render, screen, waitFor, fireEvent } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import RegisterPage from "@/app/register/page";
 import * as apiModule from "@/lib/api";
@@ -49,10 +49,10 @@ describe("RegisterPage", () => {
   });
 
   // Sin bloqueo en Facebook: se puede pulsar siempre. Google está oculto.
-  it("el botón de registro empieza deshabilitado hasta aceptar los términos; el de Facebook no; Google no sale", () => {
+  it("el botón de registro y el de Facebook están activos; Google no sale", () => {
     render(<RegisterPage />);
 
-    expect(screen.getByRole("button", { name: /registrarse/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /registrarse/i })).toBeEnabled();
     expect(screen.getByRole("button", { name: /continuar con facebook/i })).toBeEnabled();
     expect(screen.queryByRole("button", { name: /continuar con google/i })).not.toBeInTheDocument();
   });
@@ -81,6 +81,30 @@ describe("RegisterPage", () => {
       screen.queryByText("Debes aceptar los Términos y Condiciones y la Política de privacidad.")
     ).not.toBeInTheDocument();
     expect(location.getHref()).toBe("https://facebook.test/dialog");
+  });
+
+  it("los enlaces legales van en gris y solo se ponen lilas en la casilla que se intentó saltar", async () => {
+    render(<RegisterPage />);
+    const user = userEvent.setup();
+    await fillRequiredFields(user);
+    const [casillaTerminos, casillaDpa] = screen.getAllByRole("checkbox");
+    const enlacesDe = (casilla: HTMLElement) => within(casilla.closest("label")!).getAllByRole("link");
+
+    for (const enlace of [...enlacesDe(casillaTerminos), ...enlacesDe(casillaDpa)]) {
+      expect(enlace).not.toHaveClass("text-morado-tinta");
+    }
+
+    await user.click(screen.getByRole("button", { name: /registrarse/i }));
+
+    expect(await screen.findByText("Debes aceptar los Términos y Condiciones y la Política de privacidad.")).toBeInTheDocument();
+    for (const enlace of [...enlacesDe(casillaTerminos), ...enlacesDe(casillaDpa)]) {
+      expect(enlace).toHaveClass("text-morado-tinta");
+    }
+
+    await user.click(casillaTerminos);
+    expect(screen.queryByText("Debes aceptar los Términos y Condiciones y la Política de privacidad.")).not.toBeInTheDocument();
+    for (const enlace of enlacesDe(casillaTerminos)) expect(enlace).not.toHaveClass("text-morado-tinta");
+    for (const enlace of enlacesDe(casillaDpa)) expect(enlace).toHaveClass("text-morado-tinta");
   });
 
   it("con los términos aceptados pero sin el DPA no llama a la API y pide aceptarlo", async () => {
