@@ -20,6 +20,8 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:integration": "vitest run --config vitest.integration.config.ts",
+    "test:conocimiento": "vitest run tests/mcp/f2-conocimiento tests/mcp/growthConocimiento tests/modules/growth",
+    "test:integration:conocimiento": "vitest run --config vitest.integration.config.ts tests/integration/growth",
     "test:integration:watch": "vitest --config vitest.integration.config.ts",
     "growth:conocimiento": "node --import tsx mcp/growth/conocimiento/cli.ts",
     "mcp:probar": "tsx mcp/probar.ts",

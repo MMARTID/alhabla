@@ -1959,7 +1959,7 @@ que además quita `calendarConnections` (lleva las credenciales). Es la única m
 un `Business` al cliente; las rutas cargan las filas con `INCLUDE_CONEXIONES`. Fijado en
 `tests/modules/businesses/me.test.ts`.
 
-Historial (expand/contract, porque `cloudbuild.yaml` migra antes del cambio de tráfico y la revisión
+Historial (expand/contract, porque `cloudbuild-migraciones.yaml` migra antes del cambio de tráfico y la revisión
 anterior sigue sirviendo unos minutos contra el schema nuevo): PR #77 creó la tabla con backfill y
 escribía las columnas antiguas en espejo; PR #78 retiró el espejo y las columnas del schema Prisma
 (el cliente ya no las selecciona) sin borrarlas de la BD; y, una vez desplegado ese código, la migración
@@ -2012,7 +2012,7 @@ aplicada en la base de datos. Esto es un artefacto exclusivo de tener un
 proceso Node de larga duración en dev (`docker-compose.yml` lo arranca con
 `sh -c "npx prisma generate && npm run dev"`, una sola vez); **no ocurre en
 producción** — cada deploy construye una imagen nueva (`prisma generate` en
-el build, ver Dockerfile stage `builder`) y `cloudbuild.yaml` aplica
+el build, ver Dockerfile stage `builder`) y `cloudbuild-migraciones.yaml` aplica
 `prisma migrate deploy` contra Cloud SQL *antes* de que `gcloud run deploy`
 publique esa imagen, así que el proceso que sirve tráfico siempre arranca ya
 con el cliente y el esquema en el mismo commit — nunca hay un proceso vivo
@@ -4327,10 +4327,14 @@ landings de sector compartían el 55–58 % del texto de `<main>`. Desde el 2026
   mide, para cada par de páginas del sitemap, qué parte del texto de `<main>` de la más corta aparece en
   la otra (secuencias de 5 palabras). Falla con 0,50 (`UMBRAL=0.4` para ser más estricto). Corre en el
   job «Web — lint, test, build» del CI.
-- **Vistas previas de Vercel**: los proyectos `alhabla-web` y `alhabla-frontend` tienen como «Ignored Build
-  Step» `git diff --quiet HEAD^ HEAD -- .`: solo construyen si el ÚLTIMO commit toca su carpeta. Si lo último
-  que se sube a una rama es un merge de `main` que no toca `web/`, la vista previa sale «Canceled by Ignored
-  Build Step» aunque la PR cambie la web (PR #335). Para tener vista previa, que el último commit toque `web/`.
+- **Vistas previas de Vercel**: los tres proyectos (`alhabla-web`, `alhabla-frontend` y, desde el 2026-11-06,
+  `alhabla-growth`, que antes se construía en cada push) se saltan el build si su carpeta no cambia desde el
+  último despliegue bueno de esa rama: `ignoreCommand` en `<carpeta>/vercel.json` (versionado; manda sobre
+  el «Ignored Build Step» del panel) compara con `VERCEL_GIT_PREVIOUS_SHA` y, sin él, construye. Antes era
+  `git diff --quiet HEAD^ HEAD -- .`, que solo miraba el ÚLTIMO commit: un push de varios commits en el que
+  solo el primero tocaba `web/` no se publicaba, y una rama cuyo último commit era un merge de `main` salía
+  «Canceled by Ignored Build Step» (PR #335). La cuenta es Hobby: **un build a la vez** entre los tres
+  proyectos, y uno que se salta también ocupa la cola unos segundos.
 - **IndexNow**: `npm run seo:indexnow` (o `-- /ruta /otra`) avisa a Bing/Yandex de las URLs del sitemap
   de producción con la clave de `web/public/36dd951327300353ad396b40d72dbd75.txt`. Google no usa
   IndexNow: para Google, Search Console.
@@ -4344,9 +4348,33 @@ landings de sector compartían el 55–58 % del texto de `<main>`. Desde el 2026
   `seo:similitud`), growth (`lint`/`test`/`build` plus the check that the demo sentinel is not in
   the build), the shared-copies check (`scripts/comprobar-copias-compartidas.sh`, job «Copias
   compartidas app/web») and the LaLiga Worker; `diff` runs on pull requests only. Required checks
-  on `main` (branch protection, checked 2026-11-02): «Backend — typecheck, lint, test», «Backend —
-  tests de integración», «Frontend — lint, test, build» and «Web — lint, test, build».
-  Test-only, never deploys.
+  on `main` (branch protection, checked 2026-11-06): «Backend — typecheck, lint, test», «Backend —
+  tests de integración», «Frontend — lint, test, build» and «Web — lint, test, build»; since
+  2026-11-06 the branch no longer has to be **up to date** with `main` (`strict: false`, the
+  user's decision): each merged PR forced every other open PR to merge `main` and rerun everything,
+  and auto-merge waited until someone pressed «Update branch». Every PR is still tested merged
+  with the `main` of its run, and the push run on `main` plus the deploy's own tests catch the
+  rare clash of two PRs that pass apart. Test-only, never deploys.
+  - **By zones (since 2026-11-06).** The first job, «Qué cambia», runs
+    `.github/scripts/zonas-del-ci.sh <base> <head>` (the PR against its base, a push against
+    `before`) and every other job runs only if its zone changed: `backend`, `conocimiento`
+    (what the Growth knowledge base reads outside `backend/`: `PRODUCT.md`, `web/content/blog`,
+    `web/src/lib/{plans,paginas,comparativas}.ts`, `web/src/lib/sectores/`,
+    `growth/agentes/reglas/`), `frontend`, `web`, `growth` (also `backend/src/modules/growth/`,
+    which its parity tests read), `laliga` and `copias`. A change to the CI itself, those scripts
+    or `.nvmrc` runs everything, and so does a failure of «Qué cambia»
+    (`needs.cambios.result != 'success'`). A job skipped by its `if` counts as passed for the
+    required checks, so they did not change. A knowledge-only change (a blog post) runs the backend
+    jobs in a light mode: `npm run test:conocimiento` (the unit tests that read the real repo,
+    ~8 s) and `npm run test:integration:conocimiento` (`tests/integration/growth`, ~20 s) instead
+    of the full suites (~2 min and ~3 min 20 s). Before, a blog post ran everything; the knowledge
+    check is still needed — PR #434 (docs only) failed on two new `PRODUCT.md` bullets.
+    `scripts/comprobar-rama.sh` uses the same zones script, so the local check runs what CI will.
+  - Also since 2026-11-06: `concurrency` cancels a PR's superseded run (label events go in their
+    own group, so adding `migracion-contract` never cancels the real run), `permissions:
+    contents: read`, a `timeout-minutes` per job, actions on their current majors (`checkout@v7`,
+    `setup-node@v7`, `cache@v6`: v4 ran on the deprecated Node 20) and the Next build cache
+    (`.next/cache`, keyed on the lockfile and the sources) in frontend, web and growth.
   - The **integration** job (added 2026-09-19) runs `npm run test:integration` against real
     a Postgres service container, after `npx prisma migrate deploy` creates the schema.
     That suite existed for a while but **nothing ran it** — only the unit tests were gated, so the
@@ -4361,7 +4389,7 @@ landings de sector compartían el 55–58 % del texto de `<main>`. Desde el 2026
     uploaded by hand (that folder's README). Not a required check.
   - The **diff** job (pull requests only, added 2026-09-19) reads the PR's own diff rather than
     the code:
-    - **Destructive migrations fail the PR.** `cloudbuild.yaml` applies migrations *before*
+    - **Destructive migrations fail the PR.** `cloudbuild-migraciones.yaml` applies migrations *before*
       traffic switches, so during a deploy the new schema coexists with the old revision. A
       `DROP COLUMN`/`DROP TABLE`/`RENAME`/`SET NOT NULL` shipped alongside the code that stopped
       using the column breaks that old revision while the switch happens — the expand/contract
@@ -4372,10 +4400,22 @@ landings de sector compartían el 55–58 % del texto de `<main>`. Desde el 2026
       merge while the backend still has to build, migrate and roll out a revision, so a frontend
       that depends on something new can be live first. It never blocks — the window is short and
       the risk occasional.
-- **`.github/workflows/deploy-backend.yml`** — on push to `main` only: a `test` job (same backend
-  checks, kept as an independent pre-deploy gate on purpose, not just a dependency on `ci.yml`)
-  must pass before the `deploy` job runs `gcloud builds submit --config cloudbuild.yaml
-  --substitutions=_TAG=<commit sha>` then `gcloud run deploy alhabla-api --image=...:<sha>` and
+- **`.github/workflows/deploy-backend.yml`** — on push to `main` only (`backend/**` or the
+  workflow). Since 2026-11-06 the `test` job (same backend checks, kept as an independent
+  pre-deploy gate on purpose, not just a dependency on `ci.yml`) and the `imagen` job run **at
+  the same time**: building the image touches nothing in production. `imagen` runs
+  `.github/scripts/cloud-build.sh backend backend/cloudbuild.yaml "_TAG=<commit sha>"` (submit
+  `--async` and poll, because streaming the log needs the project Viewer role that
+  `github-actions-ci` lacks on purpose). The image build uses **buildx with a registry layer
+  cache** (`alhabla/backend-cache:buildx`, `mode=max`, buildkit pulling Docker Hub through
+  `mirror.gcr.io`): with the same lockfile the two `npm ci` of the Dockerfile come from the cache;
+  the Artifact Registry cleanup policy (prefix `backend`, older than 7 days) keeps it small. Only
+  when both pass does the `deploy` job («Migrar y desplegar en Cloud Run») check the max
+  instances, apply the migrations with `backend/cloudbuild-migraciones.yaml` (only the Prisma CLI
+  at the lockfile's exact version, installed in a step **without** `DATABASE_URL` because
+  `npm install` runs third-party install scripts; then the proxy and `prisma migrate deploy` in a
+  step that has it; `_ORDEN=status` checks without applying), and runs
+  `gcloud run deploy alhabla-api --image=...:<sha>` and
   `gcloud run services update-traffic alhabla-api --to-latest` (after an automatic rollback the
   service stays pinned to the old revision, and the next deploy would otherwise create a revision
   with no traffic while `/health` answered from the old one and the workflow went green), then
@@ -4476,7 +4516,9 @@ landings de sector compartían el 55–58 % del texto de `<main>`. Desde el 2026
 - **`backend/cloudbuild.yaml` gained a `_TAG` substitution** (default `latest`) so CI can tag each
   deploy with the commit SHA instead of always overwriting `:latest` — avoids ambiguity if two
   builds ever overlap. Manual builds (`gcloud builds submit --config cloudbuild.yaml .` with no
-  `--substitutions`) are unaffected, still publish `:latest` exactly as before.
+  `--substitutions`) still publish `:latest`, but since 2026-11-06 they **no longer migrate**:
+  a manual deploy also needs `gcloud builds submit --config cloudbuild-migraciones.yaml .` before
+  `gcloud run deploy`.
 
 - The `backend/Dockerfile` has 5 stages: `base`, `deps`, `builder`, `runtime`, `development`.
 - Production image runs `node dist/server.js` (compiled output).

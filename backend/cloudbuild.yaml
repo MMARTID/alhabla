@@ -1,68 +1,51 @@
+# La imagen de alhabla-api, y nada más: no toca producción. Las migraciones van
+# en cloudbuild-migraciones.yaml, que deploy-backend.yml lanza cuando han
+# pasado los tests; así la imagen se construye a la vez que los tests.
+#
+# Con caché de capas (desde el 2026-11-06). Antes cada build reinstalaba las
+# dependencias de cero, dos veces (etapas deps y runtime del Dockerfile): 3 min
+# 20 s de los 5 min 36 s del build. buildx guarda TODAS las capas de todas las
+# etapas (mode=max) en alhabla/backend-cache:buildx; con el mismo
+# package-lock.json, los `npm ci` salen de la caché y solo se recompila src/.
+# La política de limpieza de Artifact Registry (prefijo «backend», más de 7
+# días) la mantiene pequeña; si se borra, el siguiente build la rehace.
+#
+# Sin atestaciones (--provenance/--sbom=false): con ellas buildx publica un
+# índice OCI con un manifiesto de atestación aparte, que la política de
+# «conservar las 10 más recientes» cuenta como otra versión, y la imagen deja
+# de ser la de siempre. Con oci-mediatypes=false sale el mismo tipo que antes
+# de buildx (un manifiesto Docker v2 de una sola plataforma); la caché sí va en
+# OCI, que es lo que Artifact Registry pide para los manifiestos de caché.
+#
+# buildkit va en su propio contenedor (driver docker-container, el único que
+# exporta caché a un registro) y tira de Docker Hub por mirror.gcr.io, el
+# espejo de Google, para no depender del límite de descargas anónimas.
 substitutions:
   # Override con --substitutions=_TAG=<sha> desde CI para que cada deploy
   # tenga una imagen propia y sin ambigüedad si dos builds se solapan; los
   # builds manuales (sin pasar _TAG) siguen publicando :latest como siempre.
   _TAG: latest
-
+  _IMAGEN: europe-west1-docker.pkg.dev/project-84381467-a606-4b71-a6e/alhabla/backend
+  _CACHE: europe-west1-docker.pkg.dev/project-84381467-a606-4b71-a6e/alhabla/backend-cache:buildx
 steps:
-  # 1. Build y publica la imagen de producción (stage `runtime` del Dockerfile
-  #    multi-stage — sin --target construiría el último stage, `development`).
+  # La etapa `runtime` del Dockerfile multi-stage: sin --target construiría la
+  # última, `development`.
   - name: "gcr.io/cloud-builders/docker"
-    args:
-      - "build"
-      - "--target=runtime"
-      - "-t"
-      - "europe-west1-docker.pkg.dev/project-84381467-a606-4b71-a6e/alhabla/backend:${_TAG}"
-      - "."
-
-  # 2. Dependencias para las migraciones, en un paso SIN secretos. `npm ci`
-  #    ejecuta los scripts de instalación de cientos de paquetes de terceros:
-  #    si este paso tuviera DATABASE_URL en el entorno, cualquiera de ellos
-  #    podría leer la cadena de conexión de producción. node_modules queda en
-  #    /workspace y lo usa el paso siguiente.
-  - name: "node:22-alpine"
-    id: dependencias-de-migraciones
-    entrypoint: "npm"
-    args: ["ci"]
-
-  # 3. Aplica las migraciones de Prisma pendientes contra Cloud SQL antes de
-  #    desplegar la imagen nueva — evita que el código nuevo corra contra un
-  #    esquema desactualizado (ver memoria del proyecto, 2026-09-03: columnas
-  #    de la migración add_niche_prompt_personalization nunca se aplicaron en
-  #    producción y rompieron /business/me con PrismaClientKnownRequestError
-  #    P2022 hasta que se corrió `prisma migrate deploy` a mano).
-  #    `prisma migrate deploy` usa un lock de Postgres — seguro aunque este
-  #    paso se ejecute más de una vez o en paralelo con otro build.
-  #    El binario de cloud-sql-proxy se comprueba contra su SHA-256 antes de
-  #    ejecutarlo (verificado el 2026-10-08 contra el MD5 que publica el
-  #    bucket de Google). Al subir de versión, actualiza URL y hash a la vez.
-  - name: "node:22-alpine"
-    entrypoint: "sh"
+    entrypoint: "bash"
     args:
       - "-c"
       - |
-        set -e
-        apk add --no-cache curl
-        curl -sSL -o /usr/local/bin/cloud-sql-proxy \
-          https://storage.googleapis.com/cloud-sql-connectors/cloud-sql-proxy/v2.25.4/cloud-sql-proxy.linux.amd64
-        echo "b780c0d2c445ffd5d2fdba0925f2722c19fcd0d2c27c538e85713732698561f2  /usr/local/bin/cloud-sql-proxy" | sha256sum -c -
-        chmod +x /usr/local/bin/cloud-sql-proxy
-        mkdir -p /cloudsql
-        /usr/local/bin/cloud-sql-proxy --unix-socket=/cloudsql \
-          project-84381467-a606-4b71-a6e:europe-west1:alhabla-db &
-        SOCKET=/cloudsql/project-84381467-a606-4b71-a6e:europe-west1:alhabla-db/.s.PGSQL.5432
-        for i in $$(seq 1 15); do
-          [ -S "$$SOCKET" ] && break
-          sleep 1
-        done
-        [ -S "$$SOCKET" ]
-        npx prisma migrate deploy
-    secretEnv: ["DATABASE_URL"]
-
-images:
-  - "europe-west1-docker.pkg.dev/project-84381467-a606-4b71-a6e/alhabla/backend:${_TAG}"
-
-availableSecrets:
-  secretManager:
-    - versionName: projects/project-84381467-a606-4b71-a6e/secrets/DATABASE_URL/versions/latest
-      env: "DATABASE_URL"
+        set -euo pipefail
+        printf '[registry."docker.io"]\n  mirrors = ["mirror.gcr.io"]\n' > /tmp/buildkitd.toml
+        docker buildx create --name alhabla --driver docker-container \
+          --driver-opt image=mirror.gcr.io/moby/buildkit:buildx-stable-1 \
+          --config /tmp/buildkitd.toml --use
+        docker buildx build \
+          --target=runtime \
+          --cache-from "type=registry,ref=${_CACHE}" \
+          --cache-to "type=registry,ref=${_CACHE},mode=max,image-manifest=true,oci-mediatypes=true" \
+          --provenance=false \
+          --sbom=false \
+          --tag "${_IMAGEN}:${_TAG}" \
+          --output "type=registry,oci-mediatypes=false" \
+          .

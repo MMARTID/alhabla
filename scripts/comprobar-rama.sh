@@ -10,11 +10,15 @@
 #   scripts/comprobar-rama.sh --todo          # todo, toque lo que toque
 #   scripts/comprobar-rama.sh --solo backend,web
 #
-# Comprobaciones (nombre para --solo): backend (typecheck, lint, test),
-# conocimiento (Growth, siempre: tarda un segundo), integracion (alhabla_test
-# del Postgres de docker-compose, :5433, que comparten todas las sesiones: con
-# cerrojo), migraciones (destructivas sin confirmar), copias (app/web),
-# frontend, web y growth (lint, test, build) y laliga (Worker). Cada una deja
+# Qué toca cada cambio lo decide .github/scripts/zonas-del-ci.sh, el mismo
+# que usa CI: lo que corre aquí es lo que va a correr allí.
+#
+# Comprobaciones (nombre para --solo): backend (typecheck, lint, test; si solo
+# cambia lo que lee la base de conocimiento de Growth, como un artículo del
+# blog, solo los tests que leen el repo), conocimiento (Growth), integracion
+# (alhabla_test del Postgres de docker-compose, :5433, que comparten todas las
+# sesiones: con cerrojo), migraciones (destructivas sin confirmar), copias
+# (app/web), frontend, web y growth (lint, test, build) y laliga (Worker). Cada una deja
 # su log en una carpeta temporal; al final, una tabla y el final del log de lo
 # que falló. Sale con 1 si algo falla. Si un PR ya está en rojo, fallos_ci (MCP
 # alhabla-dev) dice por qué.
@@ -52,7 +56,8 @@ RESUMEN=""
 FALLOS=""
 AVISOS=""
 
-toca() { [ "$TODO" = 1 ] || printf '%s\n' "$CAMBIOS" | grep -qE "$1"; }
+ZONAS="$(printf '%s\n' "$CAMBIOS" | bash "$RAIZ/.github/scripts/zonas-del-ci.sh" -)"
+zona() { [ "$TODO" = 1 ] || printf '%s\n' "$ZONAS" | grep -qx "$1=true"; }
 quiere() { [ -z "$SOLO" ] || case "$SOLO" in *",$1,"*) return 0 ;; *) return 1 ;; esac; }
 anotar() { RESUMEN="${RESUMEN}$1"$'\n'; }
 
@@ -82,19 +87,23 @@ dependencias() {
 }
 
 # --- Backend ---------------------------------------------------------------
-if quiere backend || quiere conocimiento || quiere integracion; then
-  dependencias backend
-fi
-if quiere backend && toca '^backend/'; then
-  correr "backend · typecheck" backend npm run typecheck
-  correr "backend · lint" backend npm run lint
-  correr "backend · test" backend npm run test
-fi
-if quiere conocimiento; then
-  correr "conocimiento de Growth" backend npm run growth:conocimiento -- --comprobar
+if zona backend || zona conocimiento; then
+  if quiere backend || quiere conocimiento || quiere integracion; then
+    dependencias backend
+  fi
+  if quiere backend && zona backend; then
+    correr "backend · typecheck" backend npm run typecheck
+    correr "backend · lint" backend npm run lint
+    correr "backend · test" backend npm run test
+  elif quiere backend; then
+    correr "backend · tests que leen el repo" backend npm run test:conocimiento
+  fi
+  if quiere conocimiento; then
+    correr "conocimiento de Growth" backend npm run growth:conocimiento -- --comprobar
+  fi
 fi
 
-if quiere integracion && toca '^backend/(src|prisma|mcp|tests/integration)/'; then
+if quiere integracion && { zona backend || zona conocimiento; }; then
   if [ "$RAPIDO" = 1 ]; then
     anotar "– integración: saltada (--rapido)"
   elif ! (exec 3<>/dev/tcp/127.0.0.1/5433) 2>/dev/null; then
@@ -117,8 +126,9 @@ if quiere integracion && toca '^backend/(src|prisma|mcp|tests/integration)/'; th
     else
       mkdir -p "$CERROJO" && echo $$ >"$CERROJO/pid"
       trap 'rm -rf "$CERROJO"' EXIT
+      if zona backend; then SUITE=test:integration; else SUITE=test:integration:conocimiento; fi
       correr "integración · migraciones" backend sh -c 'set -a; . ./.env.test; set +a; npx prisma migrate deploy' &&
-        correr "integración · tests" backend npm run test:integration
+        correr "integración · $SUITE" backend npm run "$SUITE"
       rm -rf "$CERROJO"
       trap - EXIT
     fi
@@ -142,7 +152,7 @@ if quiere migraciones; then
 fi
 
 # --- Copias compartidas app/web ---------------------------------------------
-if quiere copias; then
+if quiere copias && zona copias; then
   correr "copias compartidas app/web" . bash scripts/comprobar-copias-compartidas.sh
 fi
 
@@ -159,18 +169,18 @@ web_o_app() {
     correr "$carpeta · build" "$carpeta" env "$@" npm run build
   fi
 }
-if quiere frontend && toca '^frontend/'; then
+if quiere frontend && zona frontend; then
   web_o_app frontend NEXT_PUBLIC_API_BASE_URL=https://api.alhabla.ai NEXT_PUBLIC_WEB_URL=https://alhabla.ai
 fi
-if quiere web && toca '^web/'; then
+if quiere web && zona web; then
   web_o_app web NEXT_PUBLIC_API_BASE_URL=https://api.alhabla.ai NEXT_PUBLIC_SITE_URL=https://alhabla.ai NEXT_PUBLIC_APP_URL=https://app.alhabla.ai &&
     [ "$RAPIDO" = 0 ] && correr "web · seo:similitud" web npm run seo:similitud
 fi
-if quiere growth && toca '^growth/'; then
+if quiere growth && zona growth; then
   web_o_app growth NEXT_PUBLIC_API_BASE_URL=https://api.alhabla.ai NEXT_PUBLIC_GROWTH_GOOGLE_CLIENT_ID=ci-sin-valor-real.apps.googleusercontent.com &&
     [ "$RAPIDO" = 0 ] && correr "growth · sin la demostración en el build" growth sh -c '! grep -rl DEMO_ALHABLA_GROWTH_SENTINELA .next/static .next/server'
 fi
-if quiere laliga && toca '^infra/cloudflare/failover-laliga/'; then
+if quiere laliga && zona laliga; then
   correr "Worker de LaLiga" infra/cloudflare/failover-laliga node --test
 fi
 
