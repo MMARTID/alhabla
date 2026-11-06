@@ -467,11 +467,10 @@ export async function selectCalendar(calendarId: string) {
   return data;
 }
 
-/** Dónde reserva el negocio (PLAN-AGENDA-ALHABLA.md): la agenda de Alhabla o
- * el calendario conectado. A `externo` solo se vuelve con una conexión
- * operativa (409 `CALENDAR_NOT_OPERATIVE` si no la hay). */
-export async function cambiarModoDeAgenda(modo: "alhabla" | "externo") {
-  const { data } = await api.patch<Business>("/business/me/agenda/modo", { modo });
+/** Quita el calendario conectado (PLAN-AGENDA-PRINCIPAL.md): la agenda de
+ * Alhabla sigue igual y lo que ya se copió se queda en ese calendario. */
+export async function quitarCalendarioConectado() {
+  const { data } = await api.delete<Business>("/calendar/conexion");
   return data;
 }
 

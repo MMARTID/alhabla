@@ -1,18 +1,24 @@
-import type { Business, CalendarProviderId, ModoDeAgenda } from "./types";
+import type { Business, CalendarProviderId } from "./types";
 
-/** Estado del calendario de un negocio tal como lo necesita el panel: quién
- * es el proveedor activo, si está conectado, si la conexión caducó, cómo
- * llamarlo y, desde PLAN-AGENDA-ALHABLA.md, en qué modo reserva. Única
- * fuente de esta regla (antes estaba copiada en cuatro componentes como
- * `=== "outlook" ? ... : ...`, que no sabía pintar Apple). */
+/** El calendario conectado visto como complemento de la agenda de Alhabla
+ * (PLAN-AGENDA-PRINCIPAL.md): no hay ninguno, está al día (recibe la copia de
+ * cada cita) o no se ve (la conexión caducó; las citas siguen entrando en la
+ * agenda). Nunca impide reservar. */
+export type EstadoDelCalendarioConectado = "ninguno" | "al_dia" | "sin_ver";
+
+/** Estado del calendario conectado de un negocio tal como lo necesita el
+ * panel: quién es el proveedor activo, si está conectado, si la conexión
+ * caducó y cómo llamarlo. Única fuente de esta regla (antes estaba copiada en
+ * cuatro componentes como `=== "outlook" ? ... : ...`, que no sabía pintar
+ * Apple). La agenda es siempre la de Alhabla: desde PLAN-AGENDA-PRINCIPAL.md
+ * ya no hay modo que elegir. */
 export type CalendarState = {
   provider: CalendarProviderId;
   /** Nombre completo: "Google Calendar", "Outlook Calendar", "Calendario de Apple". */
   label: string;
   /** Nombre corto para frases: "Google", "Outlook", "Apple". */
   shortLabel: string;
-  /** Hay un calendario EXTERNO conectado y en uso. En la agenda de Alhabla es
-   * false aunque quede una conexión antigua: el backend la ignora. */
+  /** Hay un calendario externo conectado y operativo. */
   connected: boolean;
   /** Hubo una conexión y se rompió (token caducado, contraseña revocada). */
   expired: boolean;
@@ -20,14 +26,8 @@ export type CalendarState = {
   accountEmail: string | null;
   /** Dónde abre el negocio su agenda en el navegador. */
   webUrl: string;
-  /** `Business.modoDeAgenda`; ausente en la respuesta = `sin_elegir`. */
-  mode: ModoDeAgenda;
-  /** El negocio reserva en la agenda de Alhabla, sin calendario externo. */
-  alhabla: boolean;
-  /** La recepcionista, el Gestor y el panel pueden reservar y mover citas:
-   * agenda de Alhabla o calendario externo conectado. Sin esto la
-   * recepcionista atiende y toma nota, pero no da hora. */
-  bookable: boolean;
+  /** El calendario conectado como complemento (ver el tipo). */
+  calendario: EstadoDelCalendarioConectado;
 };
 
 export const CALENDAR_PROVIDER_INFO: Record<
@@ -51,19 +51,13 @@ export const CALENDAR_PROVIDER_INFO: Record<
   },
 };
 
-/** Nombre visible del modo `alhabla` (decisión D6 del plan). */
+/** Nombre visible de la agenda (decisión D6 de PLAN-AGENDA-ALHABLA.md). */
 export const NOMBRE_AGENDA_DE_ALHABLA = "Agenda de Alhabla";
 
 export function normalizeCalendarProvider(
   value: string | null | undefined
 ): CalendarProviderId {
   return value === "outlook" || value === "caldav" ? value : "google";
-}
-
-export function normalizeModoDeAgenda(
-  value: string | null | undefined
-): ModoDeAgenda {
-  return value === "alhabla" || value === "externo" ? value : "sin_elegir";
 }
 
 /** Usa `activeCalendar` (contrato nuevo) y, si la respuesta aún no lo trae,
@@ -73,7 +67,6 @@ export function getCalendarState(
     Business,
     | "calendarProvider"
     | "activeCalendar"
-    | "modoDeAgenda"
     | "googleCalendarConnected"
     | "googleCalendarDisconnectedAt"
     | "outlookCalendarConnected"
@@ -83,8 +76,6 @@ export function getCalendarState(
 ): CalendarState {
   const provider = normalizeCalendarProvider(business.calendarProvider);
   const info = CALENDAR_PROVIDER_INFO[provider];
-  const mode = normalizeModoDeAgenda(business.modoDeAgenda);
-  const alhabla = mode === "alhabla";
 
   const externo =
     business.activeCalendar !== undefined
@@ -107,22 +98,19 @@ export function getCalendarState(
             }
           : { connected: false, expired: false, accountEmail: null };
 
-  // En la agenda de Alhabla la conexión externa que quede no cuenta: ni
-  // «conectado» ni «caducado», que llevarían a pedir reconectar algo que no
-  // se usa.
-  const connected = alhabla ? false : externo.connected;
-  const expired = alhabla ? false : externo.expired;
   return {
     provider,
     label: info.label,
     shortLabel: info.shortLabel,
-    connected,
-    expired,
-    accountEmail: alhabla ? null : externo.accountEmail,
+    connected: externo.connected,
+    expired: externo.expired,
+    accountEmail: externo.accountEmail,
     webUrl: info.webUrl,
-    mode,
-    alhabla,
-    bookable: alhabla || connected,
+    calendario: externo.connected
+      ? "al_dia"
+      : externo.expired
+        ? "sin_ver"
+        : "ninguno",
   };
 }
 

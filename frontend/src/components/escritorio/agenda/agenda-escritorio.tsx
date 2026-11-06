@@ -212,12 +212,10 @@ export function AgendaEscritorio({ business }: { business: Business }) {
           etiqueta="Cómo ver la agenda"
         />
         <span className="flex-1" />
-        {calendario.bookable ? (
-          <button type="button" onClick={() => setCreando(true)} className="btn-primary h-9 shrink-0 px-3.5 text-sm">
-            <Plus className="h-4 w-4" aria-hidden="true" />
-            Nueva cita
-          </button>
-        ) : null}
+        <button type="button" onClick={() => setCreando(true)} className="btn-primary h-9 shrink-0 px-3.5 text-sm">
+          <Plus className="h-4 w-4" aria-hidden="true" />
+          Nueva cita
+        </button>
         {profesionales.length > 1 ? (
           <div className="flex flex-wrap items-center gap-1.5" role="radiogroup" aria-label="Profesional">
             {[{ id: null, name: "Todos" }, ...profesionales].map((profesional) => {
@@ -265,9 +263,9 @@ export function AgendaEscritorio({ business }: { business: Business }) {
                 </span>
                 <span className="flex-1" />
                 <span>
-                  {calendario.alhabla
-                    ? "Esta es tu agenda: aquí están todas las citas."
-                    : `Solo las citas reservadas con Alhabla.${calendario.connected ? ` El resto sigue en ${calendario.label}.` : ""}`}
+                  {calendario.connected
+                    ? `Esta es tu agenda: aquí están todas tus citas, y también las ves en ${calendario.label}.`
+                    : "Esta es tu agenda: aquí están todas tus citas."}
                 </span>
               </>
             )}
@@ -288,17 +286,13 @@ export function AgendaEscritorio({ business }: { business: Business }) {
               seleccionada={citaId}
               onAbrir={abrir}
               onElegirDia={(destino) => actualizar({ dia: destino === hoy ? null : destino, vista: "dia" })}
-              onSoltar={
-                calendario.bookable
-                  ? (cita, destino, minuto) => {
-                      if (destino < hoy || (destino === hoy && minuto <= minutosDelDia(ahora, timeZone))) {
-                        avisar("Esa hora ya ha pasado: elige un hueco de hoy en adelante.", "error");
-                        return;
-                      }
-                      setSoltada({ cita, dia: destino, minuto });
-                    }
-                  : null
-              }
+              onSoltar={(cita, destino, minuto) => {
+                if (destino < hoy || (destino === hoy && minuto <= minutosDelDia(ahora, timeZone))) {
+                  avisar("Esa hora ya ha pasado: elige un hueco de hoy en adelante.", "error");
+                  return;
+                }
+                setSoltada({ cita, dia: destino, minuto });
+              }}
             />
           ) : vista === "dia" ? (
             <VistaDelDia
