@@ -21,14 +21,8 @@ const TERMINOS_PENDIENTES =
 const DPA_PENDIENTE =
   "Debes aceptar el contrato de tratamiento de datos (DPA).";
 
-// Los enlaces legales van en gris y subrayados; solo se ponen lilas en la casilla
-// que se intentó saltar sin aceptar (ver `pendienteTerminos` y `pendienteDpa`).
 const enlaceLegal =
-  "rounded underline underline-offset-2 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-morado focus-visible:ring-offset-2";
-const enlaceGris = `${enlaceLegal} text-muted hover:text-tinta`;
-const enlaceLila = `${enlaceLegal} font-semibold text-morado-tinta`;
-const casillaBase =
-  "mt-0.5 h-4 w-4 shrink-0 rounded focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-morado/30";
+  "rounded font-semibold text-morado-tinta underline underline-offset-2 transition hover:text-morado-tinta focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-morado focus-visible:ring-offset-2";
 
 export default function RegisterPage() {
   const [email, setEmail] = useState("");
@@ -36,17 +30,12 @@ export default function RegisterPage() {
   const [isEuropeanUnion, setIsEuropeanUnion] = useState<boolean | null>(null);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [acceptedDpa, setAcceptedDpa] = useState(false);
-  // Se activa al pulsar «Registrarse» sin haber aceptado: solo entonces las
-  // casillas pendientes se marcan (enlaces lilas y borde rojo suave).
-  const [intentoSinAceptar, setIntentoSinAceptar] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [niche, setNiche] = useState<string | null>(null);
   const [plan, setPlan] = useState<string | null>(null);
   const casillaTerminos = useRef<HTMLInputElement>(null);
   const casillaDpa = useRef<HTMLInputElement>(null);
-  const pendienteTerminos = intentoSinAceptar && !acceptedTerms;
-  const pendienteDpa = intentoSinAceptar && !acceptedDpa;
   const registroEmpezado = useRef(false);
 
   // Abrir /register ya lo cuenta el `page_view`; esto separa a quien empieza
@@ -78,15 +67,13 @@ export default function RegisterPage() {
       setError("Indica si tus clientes son de la Unión Europea.");
       return;
     }
-    if (!acceptedTerms || !acceptedDpa) {
-      setIntentoSinAceptar(true);
-      if (!acceptedTerms) {
-        setError(TERMINOS_PENDIENTES);
-        casillaTerminos.current?.focus();
-      } else {
-        setError(DPA_PENDIENTE);
-        casillaDpa.current?.focus();
-      }
+    if (!acceptedTerms) {
+      setError(TERMINOS_PENDIENTES);
+      return;
+    }
+    if (!acceptedDpa) {
+      setError(DPA_PENDIENTE);
+      casillaDpa.current?.focus();
       return;
     }
 
@@ -152,15 +139,15 @@ export default function RegisterPage() {
             />
             <p className="text-center text-xs leading-5 text-muted">
               Al continuar con Facebook aceptas los{" "}
-              <Link href="/legal/aviso-legal" target="_blank" className={enlaceGris}>
+              <Link href="/legal/aviso-legal" target="_blank" className="rounded font-semibold text-morado-tinta underline underline-offset-2 transition hover:text-morado-tinta focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-morado focus-visible:ring-offset-2">
                 Términos y Condiciones
               </Link>{" "}
               y la{" "}
-              <Link href="/legal/privacidad" target="_blank" className={enlaceGris}>
+              <Link href="/legal/privacidad" target="_blank" className="rounded font-semibold text-morado-tinta underline underline-offset-2 transition hover:text-morado-tinta focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-morado focus-visible:ring-offset-2">
                 Política de privacidad
               </Link>
               , y el{" "}
-              <Link href="/legal/dpa" target="_blank" className={enlaceGris}>
+              <Link href="/legal/dpa" target="_blank" className="rounded font-semibold text-morado-tinta underline underline-offset-2 transition hover:text-morado-tinta focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-morado focus-visible:ring-offset-2">
                 contrato de tratamiento de datos (DPA)
               </Link>
               .
@@ -239,21 +226,18 @@ export default function RegisterPage() {
               <input
                 ref={casillaTerminos}
                 type="checkbox"
-                                className={`${casillaBase} ${pendienteTerminos ? "border-error/50 text-morado" : "border-linea-fuerte text-morado"}`}
-                aria-invalid={pendienteTerminos}
+                required
+                className="mt-0.5 h-4 w-4 shrink-0 rounded border-linea-fuerte text-morado focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-morado/30"
                 checked={acceptedTerms}
-                onChange={(e) => {
-                  setAcceptedTerms(e.target.checked);
-                  if (e.target.checked) setError((m) => (m === TERMINOS_PENDIENTES ? "" : m));
-                }}
+                onChange={(e) => setAcceptedTerms(e.target.checked)}
               />
               <span>
                 He leído y acepto los{" "}
-                <Link href="/legal/aviso-legal" target="_blank" className={pendienteTerminos ? enlaceLila : enlaceGris}>
+                <Link href="/legal/aviso-legal" target="_blank" className="rounded font-semibold text-morado-tinta underline underline-offset-2 transition hover:text-morado-tinta focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-morado focus-visible:ring-offset-2">
                   Términos y Condiciones
                 </Link>{" "}
                 y la{" "}
-                <Link href="/legal/privacidad" target="_blank" className={pendienteTerminos ? enlaceLila : enlaceGris}>
+                <Link href="/legal/privacidad" target="_blank" className="rounded font-semibold text-morado-tinta underline underline-offset-2 transition hover:text-morado-tinta focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-morado focus-visible:ring-offset-2">
                   Política de privacidad
                 </Link>
                 .
@@ -263,17 +247,14 @@ export default function RegisterPage() {
               <input
                 ref={casillaDpa}
                 type="checkbox"
-                                className={`${casillaBase} ${pendienteDpa ? "border-error/50 text-morado" : "border-linea-fuerte text-morado"}`}
-                aria-invalid={pendienteDpa}
+                required
+                className="mt-0.5 h-4 w-4 shrink-0 rounded border-linea-fuerte text-morado focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-morado/30"
                 checked={acceptedDpa}
-                onChange={(e) => {
-                  setAcceptedDpa(e.target.checked);
-                  if (e.target.checked) setError((m) => (m === DPA_PENDIENTE ? "" : m));
-                }}
+                onChange={(e) => setAcceptedDpa(e.target.checked)}
               />
               <span>
                 Acepto el{" "}
-                <Link href="/legal/dpa" target="_blank" className={pendienteDpa ? enlaceLila : enlaceGris}>
+                <Link href="/legal/dpa" target="_blank" className={enlaceLegal}>
                   contrato de tratamiento de datos (DPA)
                 </Link>
                 : Alhabla trata por mi cuenta los datos de las personas que llaman a mi negocio.
@@ -283,14 +264,9 @@ export default function RegisterPage() {
 
           {/* Alto reservado: sin esto, un error real (email ya registrado)
               desplaza el botón justo cuando el usuario reintenta. */}
-          <p
-            className={`min-h-5 text-sm ${intentoSinAceptar && (pendienteTerminos || pendienteDpa) ? "text-error/75" : "text-error"}`}
-            role="alert"
-          >
-            {error}
-          </p>
+          <p className="min-h-5 text-sm text-error" role="alert">{error}</p>
 
-          <button type="submit" disabled={loading} className="btn-primary w-full justify-center">
+          <button type="submit" disabled={loading || !acceptedTerms || !acceptedDpa} className="btn-primary w-full justify-center">
             {loading ? "Creando cuenta..." : "Registrarse"}
           </button>
 
