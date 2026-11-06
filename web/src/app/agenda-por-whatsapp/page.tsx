@@ -32,11 +32,21 @@ export const metadata: Metadata = metadataDePagina({ ruta, titulo: tituloSeo, de
 
 const desde = Math.min(...plans.map((p) => p.price));
 
-/** Lo que le pide el dueño y lo que hace ella (guiones y tools del backend). */
+/** Lo que le pide el dueño y lo que hace ella (guiones y tools del backend).
+ * Empieza por la agenda (PLAN-AGENDA-PRINCIPAL.md, fase 5: la agenda se
+ * enseña en WhatsApp, con frases que diría la dueña). */
 const peticiones = [
+  {
+    mensaje: "¿Qué tengo mañana?",
+    respuesta: "Te dice tus citas del día, con la hora, el servicio y quién las hace.",
+  },
   {
     mensaje: "Apunta a Rosa el jueves a las 5, mechas",
     respuesta: "La apunta en tu agenda y te pregunta si le manda a Rosa la confirmación por WhatsApp.",
+  },
+  {
+    mensaje: "Bloquea el jueves por la tarde",
+    respuesta: "Cierra esas horas en tu agenda y la recepcionista deja de ofrecerlas.",
   },
   {
     mensaje: "El lunes 12 cerramos, es festivo",
@@ -120,8 +130,8 @@ export default function AgendaPorWhatsappPage() {
         },
         {
           href: "/integraciones",
-          titulo: "¿Tengo que cambiar de agenda?",
-          texto: "No: Google, Outlook, iCloud o, si no usas ninguna, la agenda de Alhabla.",
+          titulo: "Funciona con lo que ya usas",
+          texto: "Tu agenda viene incluida y se conecta a tu Google Calendar, Outlook o iPhone si los usas.",
         },
       ]}
       cierre="Un imprevisto a mediodía, resuelto en un chat."

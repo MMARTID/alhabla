@@ -93,7 +93,7 @@ export default function ComparativasPage() {
           filas={[
             ["Qué dice al coger", "Lo escribes tú en sus instrucciones", "Viene hecho para tu oficio; tú pones servicios, equipo y horario"],
             ["Número español", "Casi ninguna vende números españoles: lo traes de un operador", "Incluido: desvías tu número de siempre"],
-            ["Tu calendario", "Lo conectas tú, con sus integraciones o programando", "Google, Outlook o iCloud, o la agenda de Alhabla"],
+            ["Tu calendario", "Lo conectas tú, con sus integraciones o programando", "Agenda incluida, con copia en Google, Outlook o iCloud si los usas"],
             ["WhatsApp con el cliente", "Si lo hay, lo conectas tú: tu cuenta de WhatsApp Business y sus plantillas", "Confirma cada cita y atiende al cliente que escribe"],
             ["Cambios del día a día", "Tocas instrucciones, base de conocimiento y calendario", "Se lo escribes a tu asistente por WhatsApp"],
             ["Precio", "Dólares por minuto, por piezas", CUOTAS],

@@ -121,7 +121,7 @@ export const salonDeUnas: SectorLanding = {
     {
       question: "Cierro muchas citas por Instagram, ¿pasa algo?",
       answer:
-        "Puedes seguir igual. La recepcionista no lee tus mensajes, pero sí tu agenda: Google Calendar, Outlook, iCloud o, si no usas ninguno, la de Alhabla. Apunta ahí lo que cierras por Instagram, o pídeselo a tu asistente por WhatsApp, y esa hora ya no se ofrece por teléfono.",
+        "Puedes seguir igual. La recepcionista no lee tus mensajes, pero sí tu agenda: lo que cierras por Instagram se lo pides a tu asistente por WhatsApp («apúntame a Carla el viernes a las seis, semipermanente») y esa hora ya no se ofrece por teléfono.",
     },
     {
       question: "¿Da el precio si hay retirada o decoración?",

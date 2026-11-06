@@ -10,14 +10,15 @@ import { IconoGoogleCalendar } from "../iconos-de-calendario";
  * `calendar.events` + `calendar.calendarlist.readonly`, nunca el permiso
  * completo; cuenta como ocupado todo salvo lo cancelado y los eventos con
  * hora marcados como «Disponible» (transparent); el día completo siempre.
- * Sin conexión operativa no ofrece horas y toma nota (AGENTS.md § Modo de
- * agenda). Los avisos del evento: uno al crearse y otro 2 h antes
+ * Desde PLAN-AGENDA-PRINCIPAL.md Google es un complemento de la agenda de
+ * Alhabla: recibe una copia de cada cita y, si se desconecta, la recepcionista
+ * sigue reservando en la agenda. Los avisos del evento: uno al crearse y otro 2 h antes
  * (eventoDeCalendario.ts).
  */
 const ruta = "/integraciones/google-calendar";
 const titulo = "Google Calendar para las citas de tu negocio";
 const descripcion =
-  "Tu recepcionista de IA mira tu Google Calendar antes de dar una hora y apunta ahí la cita, con permiso solo sobre los eventos. Cómo conectarlo en cuatro pasos.";
+  "Tus citas de Alhabla, también en tu Google Calendar: cada cita aparece ahí y lo que apuntes tú cuenta como ocupado. Con permiso solo sobre los eventos; se conecta en cuatro pasos.";
 
 export const metadata = metadataDePagina({ ruta, titulo, descripcion });
 
@@ -126,8 +127,9 @@ export default function GoogleCalendarPage() {
           </p>
           <p>
             Para cortarle el acceso, entra en tu cuenta de Google, en las conexiones con aplicaciones de terceros, y quita
-            a Alhabla. Desde ese momento la recepcionista deja de dar horas, toma nota de lo que le piden y el panel te
-            pide reconectar.
+            a Alhabla. Tus citas siguen entrando en tu agenda de Alhabla, pero lo que apuntes en Google dejamos de verlo
+            hasta que lo reconectes; al reconectar, copiamos ahí las citas que hayan entrado. También lo puedes quitar
+            desde el panel.
           </p>
         </Texto>
       </Seccion>

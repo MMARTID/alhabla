@@ -60,8 +60,8 @@ export default function PrensaPage() {
             <p className="mt-2 text-base leading-7 text-tinta">
               Alhabla nace en 2026 en Sant Celoni (Barcelona) para que ningún negocio pierda una llamada por tener las
               manos ocupadas. El negocio conserva su número y desvía a Alhabla las llamadas que no puede coger. La
-              recepcionista avisa de que es una inteligencia artificial, mira la agenda del negocio (su Google Calendar,
-              Outlook o iCloud, o la agenda de Alhabla si no usa ninguno), reserva con el profesional adecuado y confirma
+              recepcionista avisa de que es una inteligencia artificial, mira la agenda del negocio (la de Alhabla, que
+              viene incluida y se copia en su Google Calendar, Outlook o iCloud si los usa), reserva con el profesional adecuado y confirma
               la cita por WhatsApp, en castellano, en siete idiomas más y en catalán, euskera o gallego según la zona. El
               dueño tiene además su asistente por WhatsApp: si a mediodía falta alguien del equipo, se lo dice, y ella le
               ayuda a recolocar sus citas y avisa a cada cliente cuando él lo confirma. Cuesta desde {desde} € al mes más
@@ -81,7 +81,7 @@ export default function PrensaPage() {
             ["Titular", "Miguel Martín Delgado (autónomo)"],
             ["Sectores", "Peluquerías, barberías, salones de uñas, centros de estética, fisioterapia, pestañas y cejas, spa y masajes, peluquería canina"],
             ["Idiomas", "Castellano, inglés, francés, alemán, italiano, portugués, neerlandés y ruso; y la lengua cooficial de la zona del negocio (catalán, euskera o gallego)"],
-            ["Calendarios", "Google Calendar, Outlook o Calendario de Apple (iCloud), o la agenda de Alhabla sin conectar ninguno"],
+            ["Calendarios", "Agenda de Alhabla incluida; cada cita se copia en Google Calendar, Outlook o Calendario de Apple (iCloud) si el negocio los conecta"],
             ["Precio", `Desde ${desde} € + IVA al mes; ${TRIAL_DAYS} días de prueba; sin permanencia`],
             ["Web", "alhabla.ai"],
             ["Contacto de prensa", correoDePrensa],

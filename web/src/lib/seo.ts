@@ -150,7 +150,7 @@ export const landingStructuredData = {
       // (la misma lista que «Qué hace distinto» de /llms.txt).
       featureList: [
         "Contesta las llamadas que el negocio no coge, con su número de siempre (desvío)",
-        "Comprueba el hueco en Google Calendar, Outlook, iCloud o la agenda de Alhabla antes de reservar",
+        "Agenda incluida: comprueba el hueco antes de reservar y copia cada cita en Google Calendar, Outlook o iCloud si se conectan",
         "Reparto de citas por especialidad de cada profesional",
         "Confirmación de la cita por WhatsApp y recordatorio con botones (Pro y Scale)",
         "Lista de espera: aviso por WhatsApp si se libera por una cancelación la hora que pidió el cliente",

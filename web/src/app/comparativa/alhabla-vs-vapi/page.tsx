@@ -78,7 +78,7 @@ export default function VsVapiPage() {
       relacionadas={[
         { href: "/comparativa", titulo: "Todas las comparativas", texto: "Retell AI, Bland AI, Synthflow y ElevenLabs." },
         { href: "/comparativa/alhabla-vs-retell-ai", titulo: "Alhabla vs Retell AI", texto: "La otra plataforma de agentes de voz más buscada." },
-        { href: "/integraciones", titulo: "Integraciones", texto: "Google, Outlook, iCloud o la agenda de Alhabla." },
+        { href: "/integraciones", titulo: "Integraciones", texto: "La agenda incluida, conectada a Google, Outlook o iCloud." },
       ]}
       cierre="Que tu teléfono conteste esta semana, sin recargar créditos ni escribir código."
     >

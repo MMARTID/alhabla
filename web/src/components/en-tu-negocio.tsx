@@ -439,7 +439,7 @@ export function EnTuNegocioScroll({
                       </span>
                       <div>
                         <small>Agenda</small>
-                        <b>Google Calendar</b>
+                        <b>6 citas hoy</b>
                       </div>
                     </div>
                   </div>

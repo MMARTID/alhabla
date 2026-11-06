@@ -146,7 +146,7 @@ export const spaYMasajes: SectorLanding = {
     {
       question: "¿Tengo que dejar mi programa de reservas?",
       answer:
-        "No hace falta. Reserva en tu Google Calendar, Outlook o iCloud, y lo que tu programa vuelque ahí cuenta como ocupado. Si no usas ninguno, las citas van a la agenda de Alhabla, que ves en el panel.",
+        "No hace falta. Tu recepcionista reserva en tu agenda, y lo que entre por tu programa lo apuntas en el panel o se lo dices a tu asistente por WhatsApp. Si tu programa vuelca sus reservas en Google Calendar, Outlook o iCloud, conéctalo y contará como ocupado solo.",
     },
   ],
 
