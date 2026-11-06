@@ -333,6 +333,7 @@ describe("webhooks de Telnyx: la firma se comprueba en todas las rutas", () => {
       callControlId: "v3:llamada",
       toolName: "check_availability",
       params: JSON.parse(cuerpo),
+      query: {},
     });
   });
 

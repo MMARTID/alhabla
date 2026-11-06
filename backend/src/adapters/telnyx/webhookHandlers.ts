@@ -29,6 +29,12 @@ import {
 } from "./transcripcion.js";
 import { programarRecuperacionDeTranscripcion } from "../../jobs/recuperarTranscripcion.js";
 import { pedirInformeDeLlamada } from "../../jobs/informeDeLlamada.js";
+import {
+  IDIOMAS_CON_CAMBIO,
+  assistantDeDestino,
+  cambiarDeAssistantPorIdioma,
+  esIdiomaConCambio,
+} from "../../lib/cambioDeIdioma.js";
 
 /**
  * Envoltorio real verificado en vivo el 2026-09-11 y contra los tipos de
@@ -1071,12 +1077,61 @@ export interface TelnyxToolInvocationResult {
  * tool real (get_catalog/check_availability/book_appointment) lo declara
  * como parámetro (ver calendarService.buildTelnyxCalendarTools).
  */
+/**
+ * Tool `cambiar_de_idioma` (lib/cambioDeIdioma.ts): contesta enseguida y
+ * cambia de assistant sin esperar, porque al parar el assistant que la
+ * llamó su turno se corta igualmente.
+ */
+function cambiarDeIdioma(input: {
+  callControlId: string;
+  businessId: string;
+  params: Record<string, unknown>;
+  query: Record<string, unknown> | undefined;
+}): TelnyxToolInvocationResult {
+  const { callControlId, businessId, params, query } = input;
+  const idioma = params.idioma;
+  if (!esIdiomaConCambio(idioma)) {
+    return {
+      status: 200,
+      body: {
+        success: false,
+        siguiente_paso: `Ese idioma no necesita cambio: contesta tú en el idioma de quien llama. Solo ${IDIOMAS_CON_CAMBIO.join(", ")}.`,
+      },
+    };
+  }
+  const assistantDestino = assistantDeDestino(query, idioma);
+  if (!assistantDestino) {
+    console.error(
+      `[Telnyx Tool] cambiar_de_idioma sin assistant para ${idioma} en la URL de la tool (${callLabel(callControlId)}, negocio ${businessId})`
+    );
+    return {
+      status: 200,
+      body: { success: false, siguiente_paso: "No se puede cambiar: sigue tú en su idioma lo mejor que puedas." },
+    };
+  }
+  const deVuelta = typeof query?.ue === "string" && /^assistant-/.test(query.ue) ? query.ue : null;
+  void cambiarDeAssistantPorIdioma({
+    callControlId,
+    businessId,
+    idioma,
+    assistantDestino,
+    assistantDeVuelta: deVuelta,
+  });
+  return {
+    status: 200,
+    body: { success: true, siguiente_paso: "No digas nada más: la conversación sigue en su idioma." },
+  };
+}
+
 export async function handleTelnyxToolInvocation(input: {
   callControlId: string | undefined;
   toolName: string;
   params: Record<string, unknown>;
+  /** La query de la URL de la tool (cambiar_de_idioma lleva ahí los
+   * assistants de destino). */
+  query?: Record<string, unknown>;
 }): Promise<TelnyxToolInvocationResult> {
-  const { callControlId, toolName, params } = input;
+  const { callControlId, toolName, params, query } = input;
 
   if (!callControlId) {
     console.error(
@@ -1094,6 +1149,10 @@ export async function handleTelnyxToolInvocation(input: {
     if (!call) {
       console.error(`[Telnyx Tool] No se encontró la llamada ${callControlId}`);
       return { status: 404, body: { error: "Call not found" } };
+    }
+
+    if (toolName === "cambiar_de_idioma") {
+      return cambiarDeIdioma({ callControlId, businessId: call.businessId, params, query });
     }
 
     const result = await executeVoiceTool({

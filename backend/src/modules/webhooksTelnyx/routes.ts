@@ -185,6 +185,7 @@ export async function webhooksTelnyxRoutes(fastify: FastifyInstance) {
       callControlId,
       toolName,
       params: toolParams,
+      query: (request.query as Record<string, unknown>) ?? {},
     });
     return reply.status(status).send(body);
   });

@@ -837,14 +837,51 @@ export class TelnyxAiAdapter {
   async startAssistantOnCall(
     callControlId: string,
     assistantId: string,
-    options: { greeting?: string; clientState?: string } = {}
+    options: {
+      greeting?: string;
+      clientState?: string;
+      /** Lo hablado hasta ahora con otro assistant de la misma llamada
+       * (lib/cambioDeIdioma.ts): el nuevo sigue la conversación. */
+      messageHistory?: Array<{ role: "user" | "assistant"; content: string }>;
+      dynamicVariables?: Record<string, string>;
+    } = {}
   ): Promise<void> {
     const client = getTelnyxClient();
     await client.calls.actions.startAIAssistant(callControlId, {
-      assistant: { id: assistantId },
+      assistant: {
+        id: assistantId,
+        ...(options.dynamicVariables
+          ? { dynamic_variables: options.dynamicVariables }
+          : {}),
+      },
       greeting: options.greeting,
       client_state: options.clientState,
+      ...(options.messageHistory?.length
+        ? { message_history: options.messageHistory }
+        : {}),
     });
+  }
+
+  /** Las conversaciones de Telnyx de una llamada (la del assistant que
+   * contestó y, si se cambió de assistant, las siguientes), de la más
+   * antigua a la más reciente. */
+  async conversacionesDeLaLlamada(
+    callControlId: string
+  ): Promise<Array<{ id: string; assistantId: string | null; createdAt: string | null }>> {
+    const client = getTelnyxClient();
+    const respuesta = await client.ai.conversations.list({
+      "metadata->call_control_id": `eq.${callControlId}`,
+    });
+    return (respuesta.data ?? [])
+      .map((conversacion) => ({
+        id: conversacion.id,
+        assistantId:
+          typeof conversacion.metadata?.assistant_id === "string"
+            ? conversacion.metadata.assistant_id
+            : null,
+        createdAt: conversacion.created_at ?? null,
+      }))
+      .sort((a, b) => (a.createdAt ?? "").localeCompare(b.createdAt ?? ""));
   }
 
   async stopAssistantOnCall(
