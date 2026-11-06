@@ -4,6 +4,7 @@ import { calendarService } from "./service.js";
 import {
   conexionConfirmada,
   marcarCalendarioDesconectado,
+  quitarCalendarioConectado,
   resolverConexionDeCalendario,
   SELECT_CONEXION_DE_CALENDARIO,
   type ConexionResuelta,
@@ -261,6 +262,26 @@ export async function calendarRoutes(fastify: FastifyInstance) {
       } catch (error) {
         fastify.log.error(error);
         return reply.status(500).send({ error: "Failed to generate Microsoft Auth URL" });
+      }
+    },
+  );
+
+  // Quitar el calendario conectado: la agenda de Alhabla sigue igual
+  // (PLAN-AGENDA-PRINCIPAL.md). Lo pide el recordatorio de los 7 días.
+  fastify.delete(
+    "/conexion",
+    { preValidation: [fastify.authenticate] },
+    async (request, reply) => {
+      try {
+        const business = await quitarCalendarioConectado(
+          request.user!.businessId
+        );
+        return reply.send(serializarBusiness(business));
+      } catch (error) {
+        fastify.log.error(error, "[Calendar] No se pudo quitar el calendario");
+        return reply
+          .status(500)
+          .send({ error: "No se pudo quitar el calendario." });
       }
     },
   );

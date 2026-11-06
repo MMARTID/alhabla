@@ -1,6 +1,7 @@
 # Plan: la agenda de Alhabla como agenda principal
 
-Estado: **por empezar** (escrito el 06-11-2026). Sustituye el «principio de diseño» y los tres modos de
+Estado: **fases 1 a 3 en curso** (backend, rama `feat/agenda-principal-backend`, 06-11-2026). Las
+correcciones al implementarlo van marcadas con **[rev]**. Sustituye el «principio de diseño» y los tres modos de
 `PLAN-AGENDA-ALHABLA.md`; lo que ese plan construyó (crear citas desde el panel, bloqueos, ausencias, feed
 iCal) se queda tal cual y pasa a ser de todos los negocios.
 
@@ -56,6 +57,12 @@ que se acepta es no ver, durante un rato, lo que el dueño apunte a mano en su c
    de espera, reintento y panel) se escribe el `Booking` y **después** se crea el evento en el calendario.
    Si la copia falla, la cita está confirmada igual y la copia queda pendiente y se reintenta. Mover y
    cancelar siguen el mismo orden: Alhabla primero; el evento, después.
+   **[rev]** Implementado como «la copia se intenta dentro de la reserva, pero nunca la para»
+   (`intentarCopiaDeLaCita`, que no lanza): el orden de escritura de cada camino se queda como estaba (evento
+   y luego `Booking`), así se conservan la idempotencia y la limpieza del evento si el `Booking` no se guarda.
+   Lo que cambia es que un fallo del calendario ya no deja la reserva pendiente: el `Booking` se guarda
+   siempre. Una cita que se mueve y cuya copia nueva no entra conserva su evento viejo con la copia
+   `pendiente`, y el job lo sustituye.
 4. **Un solo sentido.** Lo que el dueño apunte en Google ocupa el hueco. Las citas de Alhabla que el dueño
    borre o mueva en Google **siguen en Alhabla, a su hora**: la cita de Alhabla bloquea siempre su hueco, y el
    evento movido bloquea además el sitio nuevo. Así nunca se libera un hueco por error. El evento lleva una
@@ -64,6 +71,7 @@ que se acepta es no ver, durante un rato, lo que el dueño apunte a mano en su c
    alerta por WhatsApp (ya existe, una vez al día, `alertarCalendarioDesconectado`) con texto nuevo; el
    panel lo enseña en el estado de la recepcionista y en Calendario. Las caídas breves no avisan: solo si
    una copia lleva más de una hora pendiente.
+   **[rev]** El aviso de copias pendientes sale al cuarto intento (≈ 36 min), una vez al día por negocio.
 
 ## Lo que no es
 
@@ -119,6 +127,10 @@ calendario conectado («copia en Google Calendar, al día» o «sin ver Google C
 
 **Datos:** `Business.modoDeAgenda` deja de leerse en esta fase (`@ignore`) y se borra en la fase 7, con
 otro deploy (receta de la retirada de Retell: el deploy migra antes del cambio de tráfico).
+**[rev]** Sin `@ignore` todavía: la columna se sigue leyendo y escribiendo solo para que la app anterior no
+cambie de cara entre el despliegue del backend y el de la fase 4, y lo mismo `PATCH /business/me/agenda/modo`.
+Ninguno decide ya nada. Se quitan en la fase 7. `checkAvailability` conserva `calendarAvailabilityKnown` y
+`calendarOrigin` como parámetros sin efecto, por la misma razón (fase 7).
 
 ### Fase 2: la copia en el calendario
 
@@ -128,7 +140,11 @@ otro deploy (receta de la retirada de Retell: el deploy migra antes del cambio d
   - `pendiente`, `hecha` o `fallida`.
 - `copiaIntentos Int @default(0)` y `copiaError String?`.
 
-**Job `copiarCitaAlCalendario`** (`jobs/`, por Cloud Tasks en producción y en línea en dev):
+**Job `copiarCitaAlCalendario`** (`jobs/`, por Cloud Tasks en producción y en línea en dev).
+**[rev]** Vive en `modules/calendar/copiaDeLaCita.ts` (`sincronizarCopiaDeLaCita`, ruta
+`/internal/jobs/copiar-cita-al-calendario`), y va con el volcado (`/volcar-agenda-al-calendario`) y el
+recordatorio (`/recordar-calendario-desconectado`) por la cola existente `retry-failed-booking`: los tres
+programan sus propios reintentos con `scheduleTime`, así que no hace falta cola ni Scheduler nuevos.
 - Crea, mueve o borra el evento de una cita, con la idempotencia que ya tiene `crearEvento` (clave por
   `booking.id`).
 - Reintentos con espera creciente durante 48 h.
@@ -137,7 +153,9 @@ otro deploy (receta de la retirada de Retell: el deploy migra antes del cambio d
 
 **Volcado al conectar** (antes era un extra; ahora es parte del MVP):
 - Al conectar o reconectar un calendario, se copian las citas futuras de Alhabla que no tengan evento en
-  ese calendario, `pendiente` incluidas.
+  ese calendario, `pendiente` incluidas. **[rev]** También las `fallida`. Las que ya tienen evento en otro
+  calendario (el negocio cambió de proveedor) se quedan donde están. 150 por pasada; si hay más, se encola
+  otra.
 - Así, conectar Google enseña la agenda entera, y reconectar pone al día lo que entró mientras no se veía.
 
 **Texto del evento** (`adapters/calendar/eventoDeCalendario.ts`): la línea de la regla 4, con el enlace a
@@ -145,6 +163,7 @@ la cita en el panel.
 
 **Reconciliador:** un pase del Scheduler (cada hora, o el `telnyxReconciler` existente si encaja) busca
 copias pendientes de más de una hora y avisa al dueño una vez (regla 5).
+**[rev]** No hace falta: avisa el propio job de copia en su cuarto intento.
 
 ### Fase 3: avisos al dueño
 
@@ -153,10 +172,15 @@ copias pendientes de más de una hora y avisa al dueño una vez (regla 5).
   el tono de la fase 5 (ver «Textos de la app»).
 - **Recordatorio a los 7 días sin reconectar:** pregunta si sigue usando ese calendario, con dos botones,
   «Reconectar» y «Ya no lo uso». El segundo quita la conexión y deja de avisar.
+  **[rev]** Sin botones: sale por la misma alerta operativa (plantilla `alerta_operativa_negocio`, que solo
+  lleva el botón «Ir a Ajustes»), y el texto le dice que, si ya no lo usa, lo quite en Agente › Calendario.
+  Lo programa la propia alerta de desconexión como una tarea diferida de 7 días, y no dice nada si para
+  entonces reconectó o se volvió a caer en otro momento.
 - `avisosNegocio.motivoDeFallo` conserva los códigos de calendario para los `Lead` antiguos; ningún camino
   nuevo los escribe.
 - La plantilla de WhatsApp de esta alerta (si la hay aprobada en Meta) necesita texto nuevo y una nueva
-  aprobación: revisarlo antes de desplegar.
+  aprobación: revisarlo antes de desplegar. **[rev]** No hace falta: `alerta_operativa_negocio` recibe el
+  texto como parámetro.
 
 ### Fase 4: la app
 

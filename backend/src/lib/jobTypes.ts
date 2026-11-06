@@ -11,6 +11,27 @@ export interface RetryFailedBookingJob {
   attempt?: number;
 }
 
+/** Copia de una cita en el calendario conectado (calendar/copiaDeLaCita.ts). */
+export interface CopiaDeLaCitaJob {
+  bookingId: string;
+  /** Número de intento (1 el primero); acota los reintentos. */
+  attempt?: number;
+}
+
+/** Volcado de la agenda al calendario recién conectado. */
+export interface VolcadoDeLaAgendaJob {
+  businessId: string;
+}
+
+/** Recordatorio a los 7 días de un calendario desconectado. */
+export interface RecordatorioDeCalendarioJob {
+  businessId: string;
+  provider: string;
+  /** `disconnectedAt` de la desconexión que lo programó: si al llegar es
+   * otra (reconectó y se volvió a caer), este recordatorio ya no vale. */
+  desconectadoEn: string;
+}
+
 export interface ReportUsageJob {
   businessId: string;
 }
