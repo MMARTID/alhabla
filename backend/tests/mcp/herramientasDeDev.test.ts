@@ -10,6 +10,7 @@ import {
   claveDePase,
   destinoDeLaApp,
   llamarApiDeDev,
+  urlDeLaApp,
 } from "../../mcp/sesionDeDev.js";
 
 describe("simular_conversacion: memoria entre pasos", () => {
@@ -54,6 +55,13 @@ describe("simular_conversacion: memoria entre pasos", () => {
 describe("entrar_en_app_dev", () => {
   it("usa la misma clave de pase que modules/auth/pase.ts", () => {
     expect(claveDePase("abc")).toBe("auth:pase:abc");
+  });
+
+  it("abre la app fija, la vista previa o la de una rama, y nada más", () => {
+    expect(urlDeLaApp()).toBe("http://localhost:3001");
+    expect(urlDeLaApp(3101)).toBe("http://localhost:3101");
+    expect(urlDeLaApp(3111)).toBe("http://localhost:3111");
+    expect(() => urlDeLaApp(3000)).toThrow(/no sirve en :3000/);
   });
 
   it("solo acepta rutas de la app como destino", () => {

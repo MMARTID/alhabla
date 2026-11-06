@@ -14,6 +14,24 @@ import { BASE_DEV, BASE_TELNYX_SIMULACION } from "./webhooks.js";
  */
 export const URL_APP_DEV = "http://localhost:3001";
 
+/**
+ * Dónde puede abrirse la app con el pase (todas contra el backend fijo y la
+ * BD de dev): la del entorno fijo, la vista previa de la sesión
+ * (`frontend-dev` de .claude/launch.json) y la de una rama (`app-rama`,
+ * scripts/dev/vista-previa-rama.sh).
+ */
+export const PUERTOS_DE_LA_APP = [3001, 3101, 3111] as const;
+export type PuertoDeLaApp = (typeof PUERTOS_DE_LA_APP)[number];
+
+export function urlDeLaApp(puerto: number = 3001): string {
+  if (!(PUERTOS_DE_LA_APP as readonly number[]).includes(puerto)) {
+    throw new Error(
+      `[MCP] La app de dev no sirve en :${puerto}; usa ${PUERTOS_DE_LA_APP.join(", ")}`
+    );
+  }
+  return `http://localhost:${puerto}`;
+}
+
 export type UsuarioDeDev = {
   id: string;
   email: string;
@@ -162,9 +180,11 @@ export async function crearEnlaceDeEntradaDeDev(
   urlDeBdDeDev: string,
   usuario: UsuarioDeDev,
   destino?: string,
-  minutos = 10
+  minutos = 10,
+  puerto: number = 3001
 ): Promise<{ url: string; caduca: string }> {
   const ruta = destinoDeLaApp(destino);
+  const base = urlDeLaApp(puerto);
   const codigo = randomBytes(32).toString("hex");
   const cliente = new pg.Client({ connectionString: urlDeBdDeDev });
   await cliente.connect();
@@ -180,7 +200,7 @@ export async function crearEnlaceDeEntradaDeDev(
         minutos,
       ]
     );
-    const url = new URL("/auth/entrar", URL_APP_DEV);
+    const url = new URL("/auth/entrar", base);
     url.searchParams.set("pase", codigo);
     // Siempre: sin destino, /auth/entrar sigue al alta (/bienvenida).
     url.searchParams.set("destino", ruta);
