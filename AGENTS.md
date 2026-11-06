@@ -2157,7 +2157,7 @@ extra-minutes price to subscriptions created before it existed), invoked after a
      - **Saludo y aviso de IA.** Al entrar la llamada, `lib/contextoDeLlamada.ts` mira tres cosas: si ese teléfono ya reservó en el negocio (nombre y último servicio, sacados de `Booking`), si deja grabar (`ClienteDelNegocio`) y si el negocio está en su primera semana desde su primera llamada. Con eso `handleCallInitiated` contesta con `answer`, pasando el saludo de esa llamada (`assistant.greeting`) y las variables del prompt (`nombre_cliente`, `ultimo_servicio`, `proximos_dias` y, desde el 03-11, `telefono_para_decir` —el número de quien llama ya escrito para decirlo, vacío con número oculto— y `proxima_cita` —su próxima cita con el criterio de `find_my_appointment`, con su bookingId y sin el servicio en los sectores con `datoSensible`—). El assistant guarda unos valores por defecto para el chat. En el laboratorio, `telefono_para_decir` cambia con cada llamada y va solo en los metadata de cada conversación (`VARIABLES_DE_CADA_LLAMADA`).
        - Las piezas del saludo están en `lib/idiomas/catalogo.ts` (10 idiomas). Todas dicen que es una IA (Reglamento europeo de IA, art. 50; Alhabla es el proveedor): en español y en inglés «su recepcionista de IA» / «AI receptionist», con la sigla (decisión del usuario del 2026-10-29); el resto, «inteligencia artificial» en su idioma.
        - En fisioterapia, estética y «otro», el saludo no nombra el servicio anterior.
-       - **En el idioma del cliente (2026-10-14).** El informe final (`informar_al_negocio`) lleva `idioma_del_cliente` (enum del catálogo), y `lib/idiomaDelCliente.ts` lo guarda en `ClienteDelNegocio.idioma`/`idiomaAt`: siempre el de su última llamada. En la siguiente, si la recepcionista habla ese idioma (`perfil.idiomas`, con la cooficial de la zona sacada de la dirección), el saludo va en él. Si es la cooficial de la zona, `answer` lleva además `assistant.voice_settings` con Marta o Sergio (`vozDeLaCooficial`, la misma del nodo «cooficial» del flujo): toda esa llamada habla con esa voz, que también habla castellano. El servicio solo se nombra si el saludo va en castellano en un negocio que atiende en castellano. El aviso de IA que el backend antepone en el chat usa el mismo idioma (`idiomaGuardadoDelCliente`).
+       - **En el idioma del cliente (2026-10-14).** El informe final (`informar_al_negocio`) lleva `idioma_del_cliente` (enum del catálogo), y `lib/idiomaDelCliente.ts` lo guarda en `ClienteDelNegocio.idioma`/`idiomaAt`: siempre el de su última llamada. En la siguiente, si la recepcionista habla ese idioma (`perfil.idiomas`, con la cooficial de la zona sacada de la dirección), el saludo va en él. Si es la cooficial de la zona, desde el 06-11 se contesta con el assistant de esa lengua (`Agent.telnyxCooficialAssistantId`, ver «La cooficial de la zona» en § Idiomas de atención); sin él, `answer` lleva `assistant.voice_settings` con Marta o Sergio (`vozDeLaCooficial`): toda esa llamada habla con esa voz, que también habla castellano. El servicio solo se nombra si el saludo va en castellano en un negocio que atiende en castellano. El aviso de IA que el backend antepone en el chat usa el mismo idioma (`idiomaGuardadoDelCliente`).
      - **Grabación con permiso.** El assistant no graba por su cuenta (`recording_settings.enabled: false`).
        - Si el cliente ya aceptó, se graba desde que se contesta (`record: "record-from-answer"`, MP3 dual) y el saludo lo avisa.
        - Si no se le ha preguntado, la recepcionista se lo pregunta mientras comprueba la disponibilidad de lo que le piden. Cuándo lo decide el backend, no el modelo (con la regla en el prompt volvía a preguntar a quien ya lo había aceptado): `tocaPreguntarPorGrabar` (`lib/grabacion.ts`) añade `pregunta_de_grabacion` a la primera respuesta de `check_availability` de la llamada que ofrece algo (hueco o alternativa; no un error ni un «no» sin alternativa) (no de `get_catalog`, que también se consulta para el horario o antes de pasar la llamada) y lo anota en `Call.grabacionPreguntadaAt`, una sola vez. Desde el 2026-11-03 esa respuesta lleva **solo la pregunta** (y un `siguiente_paso`): lo comprobado se guarda en el almacén temporal (`grabacion_pendiente:<callId>`, 5 min) y lo devuelve `preferencia_de_grabacion` con la respuesta del cliente, para que el modelo no junte el hueco con la pregunta (E8 del laboratorio). Una `preferencia_de_grabacion` que llega menos de 2 s después de la pregunta es del mismo turno (respuesta inventada): no se guarda y devuelve `GRABACION_SIN_RESPUESTA`. Una comprobación nueva descarta lo pendiente. Si el almacén falla, la pregunta va junto a lo comprobado, como antes. Con su sí, la tool `preferencia_de_grabacion` guarda el permiso y hace `record_start`.
@@ -3402,20 +3402,57 @@ listas de idiomas ni decide por su cuenta:
     («08440 Cardedeu») en una línea que no nombra otro país: la bienvenida ofrece otros países y sus
     códigos se confundirían (20123 Milano, 32801 Orlando). Los números de Telnyx se compran todos en
     Barcelona: su prefijo no sirve.
-    - Con zona (`AjustesDeIdioma.zona`), `resolverIdiomas` suma la cooficial a los idiomas (ocho,
-      también en el prompt), pasa la transcripción a Soniox con las pistas del español, el
-      principal y la cooficial, deja la voz Ultra del principal y da `cooficialDeLaZona`: Marta o
-      Sergio, del género de la voz que atiende.
-    - `telnyxAssistantPayload.ts` (`flujoDeLaCooficial`) le pone un `conversation_flow` de dos
-      nodos: «inicial» y el de la cooficial, que **solo cambia la voz** (Soniox en esa lengua).
-      Las aristas son `llm` (en voz, tools `transition__a_cooficial` y `transition__a_inicial`; en
-      el chat no hay y contesta directamente). Sin zona, `conversationFlow: null`, que borra un
-      flujo anterior al actualizar (al crear no se manda).
-    - Es la variante S del laboratorio con llamadas reales del 14-10: catalán perfecto y los
-      mensajes del cliente guardados, con un segundo más de espera en los turnos con consulta
-      (3,7–3,9 s frente a 2,2–2,6). Descartadas: flux con un nodo que cambia a Soniox (Telnyx deja
-      de guardar los mensajes del cliente y flux solo detectó el catalán una vez) y dos assistants
-      con traspaso (flux transcribió el catalán como italiano y nunca hubo traspaso).
+    - Con zona (`AjustesDeIdioma.zona`), `resolverIdiomas` suma la cooficial a los idiomas (ocho)
+      y da `cooficialDeLaZona`: Marta o Sergio, del género de la voz que atiende, con su
+      `transcripcion` (Soniox con las pistas del español, el principal y la cooficial). La
+      `transcripcion` del perfil es la del principal sin ella: flux.
+    - **Desde el 2026-11-06, dos assistants de voz por agente** (`lib/cambioDeIdioma.ts`). La
+      llamada contesta con el de siempre (`telnyxAssistantId`: flux `multi` y la voz Ultra, sin
+      `conversation_flow`), con 0,5–0,7 s por turno frente a los 2–4 s de Soniox, que era lo que
+      tenían todas las llamadas de estos negocios. Su prompt deja la cooficial fuera de sus idiomas
+      y lleva `instruccionesDelCambioDeIdioma`: si quien llama habla la lengua (flux la deforma,
+      «Vuldemanar hora por tallarme el Skabels», pero GLM la reconoce), llama a la tool
+      `cambiar_de_idioma` (de la biblioteca, solo en estos negocios) con `idioma`, `lo_que_dice`
+      (su frase bien escrita) y `primera_respuesta` (lo que le contestaría en su lengua).
+      - La tool (`handleTelnyxToolInvocation` → `cambiarDeIdioma`) comprueba que la lengua es la de
+        la zona y que el agente tiene `telnyxCooficialAssistantId`; si no, le contesta que siga en
+        castellano. Si sí, sube `Call.assistantsArrancados`, **para el assistant dentro de la
+        propia tool** (así no tiene otro turno: en el laboratorio seguía llamando a get_catalog y
+        check_availability) con un reintento si es un 5xx, y mientras lee lo hablado
+        (`ai.conversations` de la llamada) y el contexto de quien llama (`resolverContextoDeLlamada`,
+        para las variables del prompt). Después arranca el de la lengua (`startAIAssistant`) con
+        `greeting` = `fraseAlCambiar` + `primera_respuesta` y `message_history` = lo hablado, con
+        `lo_que_dice` en vez de la frase deformada: contesta nada más arrancar en vez de esperar a
+        que el cliente repita (el hueco de 9–12 s del laboratorio).
+      - Si el de la lengua no arranca, vuelve el de flux con lo hablado y «¿Me lo puedes decir en
+        castellano?»; si tampoco, se cuelga y se pide el informe con lo que haya. Si no se puede
+        parar, el de flux sigue en castellano.
+      - El de la lengua (`buildTelnyxCooficialAssistantPayload`, tipo `recepcionista_cooficial`,
+        nombre `alhabla-cooficial-<negocio>-<agente>`): el prompt de voz con todos sus idiomas más
+        `instruccionesDeLaCooficial`, las mismas tools de voz sin `cambiar_de_idioma`, Soniox y la
+        voz Marta o Sergio, sin saludo propio. Soniox entiende también el castellano y la voz lo
+        habla: no se vuelve a flux.
+      - Quien habló la última vez en la lengua (`ClienteDelNegocio.idioma`) **empieza ya en ese
+        assistant**, saludado en ella. Sin él (agente aún sin sincronizar), el de siempre con la voz
+        cambiada (`vozDeLaCooficial`), como antes.
+      - Cada assistant es otra conversación de Telnyx: `handleCallConversationEnded` apunta cada una
+        en `Call.conversacionesDeTelnyx` (`providerConversationId` se queda con la primera), junta
+        las transcripciones en orden de hora quitando los mensajes sembrados en el historial del
+        nuevo (guardados en el almacén temporal, `cambio-de-idioma:sembrados:<call>`), pone la
+        duración de la llamada entera y pide **un solo informe**, al terminar la última.
+      - `syncAgentToTelnyx` crea o actualiza el de la lengua **antes** que el de llamadas (si falla,
+        el de llamadas se queda como estaba y el error va a `telnyxSyncError`) y lo borra, con su
+        app TeXML, si el negocio deja la zona. Al crear un agente se crea después del de llamadas
+        (si no sale, la tool contesta que siga en castellano). El reconciliador, el borrado de la
+        cuenta y el inventario del MCP lo conocen.
+      - Sin `in_transit_data_locality` (cortaba ~5 de cada 7 llamadas el 06-11; consulta abierta
+        con Telnyx). Laboratorio: `scripts/laboratorioCambioDeIdioma.ts`.
+    - *Histórico (14-10 al 06-11):* un solo assistant con Soniox desde el principio y un
+      `conversation_flow` de dos nodos (`flujoDeLaCooficial`), «inicial» y el de la cooficial, que
+      solo cambiaba la voz; la variante S del laboratorio del 14-10 (catalán perfecto, un segundo
+      más de espera en los turnos con consulta). Descartadas entonces: flux con un nodo que cambia a
+      Soniox (Telnyx deja de guardar los mensajes del cliente) y dos assistants con traspaso nativo
+      (flux transcribió el catalán como italiano y nunca hubo traspaso).
     - El panel lo dice en la vista previa, pero su `languages` va sin la cooficial: se guarda, y
       una cooficial ahí pasaría a ser el principal. Cambiar la dirección resincroniza solo si
       cambia la cooficial.
@@ -3427,7 +3464,8 @@ listas de idiomas ni decide por su cuenta:
   y Scale" }` con el número de voces del principal, o `null` si no hay más que elegir que mujer u
   hombre —Marta y Sergio—) y la vista previa (los idiomas que habla, la voz que atenderá, las
   `voces` elegibles con su `requiereParaElegirVoz`, la entradilla, el saludo real y avisos en
-  español llano: la espera más larga con una cooficial, 1,4–2 s frente a ~0,9 s; Marta o Sergio;
+  español llano: la espera más larga con una cooficial, 1,4–2 s frente a ~0,9 s (con la de la zona,
+  solo cuando le hablan en ella, desde el 06-11); Marta o Sergio;
   el saludo extranjero a los clientes de aquí; y, con un principal de voces Ultra, que no entiende
   el catalán, el euskera ni el gallego —«elígela como idioma principal», sin plan desde el
   07-10—, porque flux no los transcribe —47 % de error de palabra con un cliente en catalán en la
