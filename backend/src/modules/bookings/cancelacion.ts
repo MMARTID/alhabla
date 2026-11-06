@@ -57,7 +57,11 @@ export async function cancelarReserva(input: {
   /** Para los logs («llamada …», «boton cliente <inboundId>»). */
   etiqueta: string;
   inboundMessageId?: string;
-}): Promise<{ resultado: "cancelada" | "ya_cancelada" | "no_encontrada" }> {
+}): Promise<{
+  resultado: "cancelada" | "ya_cancelada" | "no_encontrada";
+  /** Se borró su copia del calendario conectado (para el texto del panel). */
+  quitadaDelCalendario?: boolean;
+}> {
   const existe = await prisma.booking.findFirst({
     where: { id: input.bookingId, call: { businessId: input.businessId } },
     select: { id: true },
@@ -123,6 +127,7 @@ export async function cancelarReserva(input: {
   }
 
   // Evento externo: contra el proveedor y el calendario con los que se creó.
+  let quitadaDelCalendario = false;
   if (business && booking.externalEventId && booking.externalCalendarProvider) {
     const proveedor = normalizarProveedorDeCalendario(
       booking.externalCalendarProvider
@@ -145,6 +150,7 @@ export async function cancelarReserva(input: {
         eventId: booking.externalEventId,
         resultado: borrado,
       });
+      quitadaDelCalendario = borrado.resultado !== "no_estaba";
     } catch (error) {
       console.error(
         `[Booking] ${input.etiqueta} canceló la cita ${booking.id} del negocio ${input.businessId} pero no pudo borrar el evento ${booking.externalEventId} de ${proveedor}: ${errorMessage(error)}`
@@ -198,5 +204,5 @@ export async function cancelarReserva(input: {
     );
   }
 
-  return { resultado: "cancelada" };
+  return { resultado: "cancelada", quitadaDelCalendario };
 }

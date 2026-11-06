@@ -18,6 +18,10 @@ import {
 } from "../calendar/conexion.js";
 import { limitesDelDia, mapaDeServicios } from "../whatsapp/avisosNegocio.js";
 import { panelUrl } from "../whatsapp/mensajes.js";
+import {
+  DESCRIPTORES_DE_PROVEEDOR,
+  normalizarProveedorDeCalendario,
+} from "../../adapters/calendar/CalendarProvider.js";
 import { registrarPropuesta } from "./acciones.js";
 import { buscarHueco } from "./buscarHueco.js";
 import { buscarCliente } from "./buscarCliente.js";
@@ -245,29 +249,41 @@ async function contextoNegocio(businessId: string) {
     business.calendarProvider,
     business.calendarConnections
   );
-  // `conectado` aquí significa «se puede apuntar»: en la agenda de Alhabla
-  // también, aunque no haya calendario externo (PLAN-AGENDA-ALHABLA.md).
-  // Sin esto el Gestor pedía al dueño que conectara el calendario.
-  const calendario = conexion.agendaPropia
+  // La agenda es siempre la de Alhabla (PLAN-AGENDA-PRINCIPAL.md): las citas
+  // se apuntan aquí pase lo que pase con el calendario conectado, que solo
+  // recibe una copia y avisa de lo que el dueño apunta en él. `conectado`
+  // dice si ese calendario está al día; nunca impide apuntar.
+  const nombreDelCalendario = activo
+    ? DESCRIPTORES_DE_PROVEEDOR[
+        normalizarProveedorDeCalendario(activo.provider)
+      ].nombre
+    : null;
+  const calendario = !activo
     ? {
-        conectado: true,
-        proveedor: "alhabla",
+        agenda: "Alhabla",
+        conectado: false,
+        proveedor: null,
         estado:
-          "agenda de Alhabla: las citas se guardan solo en Alhabla, sin calendario externo; lo que el negocio apunte fuera no se ve aquí",
+          "agenda de Alhabla, sin calendario conectado: las citas se apuntan aquí; lo que el negocio apunte en papel o en otro programa no se ve. Conectar Google Calendar, Outlook o el iPhone es opcional, desde el panel.",
       }
     : conexionOperativa(conexion)
-      ? { conectado: true, proveedor: conexion.provider, estado: "conectado" }
+      ? {
+          agenda: "Alhabla",
+          conectado: true,
+          proveedor: conexion.provider,
+          estado: `agenda de Alhabla, con copia en ${nombreDelCalendario} al día`,
+        }
       : {
-        conectado: false,
-        proveedor: activo?.provider ?? null,
-        // «a medias»: Outlook/Apple con la cuenta enlazada pero sin
-        // calendario elegido; «caducado»: hay que volver a conectar.
-        estado: !activo
-          ? "sin conectar"
-          : activo.disconnectedAt || activo.lastError || activo.connected
-            ? "caducado: hay que volver a conectarlo desde el panel"
-            : "a medias: falta elegir el calendario en el panel",
-      };
+          agenda: "Alhabla",
+          conectado: false,
+          proveedor: activo.provider,
+          // «a medias»: Outlook/Apple con la cuenta enlazada pero sin
+          // calendario elegido; «desconectado»: hay que volver a conectar.
+          estado:
+            activo.disconnectedAt || activo.lastError || activo.connected
+              ? `agenda de Alhabla; ${nombreDelCalendario} está desconectado: las citas se siguen apuntando, pero no se ve lo que el dueño apunte en él hasta que lo reconecte desde el panel`
+              : `agenda de Alhabla; ${nombreDelCalendario} está a medias: falta elegir el calendario en el panel`,
+        };
   const { citasPendientes, recados } = await pendientesYRecados(
     business.id,
     business.timezone
@@ -279,7 +295,6 @@ async function contextoNegocio(businessId: string) {
     !horarioConfigurado ? "horario" : null,
     business.services.length === 0 ? "servicios" : null,
     business.professionals.length === 0 ? "profesionales" : null,
-    !calendario.conectado ? "calendario" : null,
     business.phoneNumberStatus !== "active"
       ? "número de teléfono de Alhabla"
       : null,

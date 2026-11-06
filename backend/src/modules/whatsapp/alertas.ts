@@ -1,6 +1,9 @@
 import { prisma } from "../../lib/prisma.js";
 import { errorMessage } from "../../lib/logUtils.js";
-import { enqueueEmailJob } from "../../lib/cloudTasks.js";
+import {
+  enqueueEmailJob,
+  enqueueRecordatorioDeCalendarioJob,
+} from "../../lib/cloudTasks.js";
 import {
   forwardingCheckedEmail,
   operationalAlertEmail,
@@ -130,18 +133,100 @@ async function alertar(input: {
   }
 }
 
-/** Calendario desconectado: una vez al día por proveedor. */
+/** Días sin reconectar tras los que se recuerda, una vez. */
+const DIAS_HASTA_EL_RECORDATORIO = 7;
+
+/** Calendario desconectado: una vez al día por proveedor. Con
+ * `desconectadoEn`, deja programado el recordatorio de los 7 días (una
+ * tarea diferida de Cloud Tasks: no hace falta un job del Scheduler). */
 export async function alertarCalendarioDesconectado(input: {
   businessId: string;
   proveedor: string;
   providerId: string;
+  desconectadoEn?: Date;
 }): Promise<ResultadoAviso> {
-  return alertar({
+  const resultado = await alertar({
     businessId: input.businessId,
     causa: "calendario",
     recursoId: (negocio) =>
       `calendario:${input.businessId}:${input.providerId}:${diaDeHoy(negocio.timezone)}`,
     texto: () => mensajes.alertaCalendario({ proveedor: input.proveedor }),
+    conEmailDeRespaldo: true,
+  });
+  if (input.desconectadoEn) {
+    try {
+      await enqueueRecordatorioDeCalendarioJob(
+        {
+          businessId: input.businessId,
+          provider: input.providerId,
+          desconectadoEn: input.desconectadoEn.toISOString(),
+        },
+        `recordatorio-calendario-${input.businessId}-${input.providerId}-${input.desconectadoEn.getTime()}`,
+        new Date(
+          input.desconectadoEn.getTime() +
+            DIAS_HASTA_EL_RECORDATORIO * 24 * 60 * 60 * 1000
+        )
+      );
+    } catch (error) {
+      console.error(
+        `[WhatsApp] No se pudo programar el recordatorio del calendario desconectado del negocio ${input.businessId} (${input.providerId}): ${errorMessage(error)}`
+      );
+    }
+  }
+  return resultado;
+}
+
+/** Job `recordar-calendario-desconectado`: a los 7 días, si sigue
+ * desconectado desde la misma vez, se le pregunta si lo sigue usando. Si
+ * reconectó (o se volvió a caer después), no se dice nada. */
+export async function recordarCalendarioDesconectado(input: {
+  businessId: string;
+  provider: string;
+  desconectadoEn: string;
+}): Promise<ResultadoAviso> {
+  const fila = await prisma.calendarConnection.findFirst({
+    where: { businessId: input.businessId, provider: input.provider },
+    select: { connected: true, disconnectedAt: true },
+  });
+  const mismaDesconexion =
+    fila &&
+    !fila.connected &&
+    fila.disconnectedAt?.toISOString() === input.desconectadoEn;
+  if (!mismaDesconexion) {
+    return {
+      via: "ninguna",
+      motivo: "ya no está desconectado desde entonces",
+      deliberado: true,
+    };
+  }
+  const { DESCRIPTORES_DE_PROVEEDOR, normalizarProveedorDeCalendario } =
+    await import("../../adapters/calendar/CalendarProvider.js");
+  const proveedor =
+    DESCRIPTORES_DE_PROVEEDOR[normalizarProveedorDeCalendario(input.provider)]
+      .nombre;
+  return alertar({
+    businessId: input.businessId,
+    causa: "calendario",
+    recursoId: () =>
+      `calendario-recordatorio:${input.businessId}:${input.provider}:${input.desconectadoEn}`,
+    texto: () => mensajes.recordatorioCalendario({ proveedor }),
+    conEmailDeRespaldo: true,
+  });
+}
+
+/** Copias que no entran en el calendario tras varios intentos: una vez al
+ * día por negocio (calendar/copiaDeLaCita.ts). */
+export async function alertarCopiasPendientes(input: {
+  businessId: string;
+  proveedor: string;
+}): Promise<ResultadoAviso> {
+  return alertar({
+    businessId: input.businessId,
+    causa: "calendario",
+    recursoId: (negocio) =>
+      `calendario-copias:${input.businessId}:${diaDeHoy(negocio.timezone)}`,
+    texto: () =>
+      mensajes.alertaCopiasPendientes({ proveedor: input.proveedor }),
     conEmailDeRespaldo: true,
   });
 }

@@ -649,6 +649,8 @@ checkout PRINCIPAL aunque se lance desde un worktree (`git rev-parse --git-commo
 | `simular_conversacion` | Varios pasos seguidos sobre la MISMA llamada simulada (canal `voz`) o del Gestor (canal `gestor`: `/webhooks/telnyx/gestor/<tool>` con `x-alhabla-business` y `x-alhabla-role: owner`). `{{nombre}}` en un cuerpo toma el último valor con ese nombre que devolvió un paso anterior (`{{availabilityToken}}`, `{{bookingId}}`); un `book_appointment` sin token ni `startDateTime` toma el del último `check_availability`. Devuelve cada paso, las citas y reservas pendientes que dejó la llamada y los envíos simulados (`mcp/conversacionSimulada.ts`) | Las de `simular_webhook_telnyx`; máximo 20 pasos |
 | `backend_sim` | De qué carpeta, rama y commit corre backend-sim y cuántos commits de backend va por detrás de `main`; `levantar` sin rama lo pone en el último main (las herramientas, actualizadas antes) y con rama o nº de PR en `~/.alhabla-sim` (worktree detached solo para él, sin `node_modules`: usa los de la imagen); `reiniciar` (schema nuevo), `reconstruir` (dependencias nuevas; `levantar` lo hace solo si cambia el lock) y `parar`. Al levantar aplica las migraciones de ese código a la BD de dev (`mcp/backendSim.ts`) | Solo ramas ya subidas a origin; no toca `~/.alhabla-sim` si tiene cambios a mano |
 | `ver_envios_simulados` | Los WhatsApp, SMS y correos que `backend-sim` NO envió (`ENVIOS_SIMULADOS=1`) y solo registró en su log: canal, destino y detalle, para comprobar que una tool simulada avisó a quien tocaba. Filtros `desde` (`30m` por defecto), `canal`, `destino` y `limite`; lee `docker logs` de `alhabla_backend_sim` | Solo lectura |
+| `calendario_falso` | El calendario falso de backend-sim (`CALENDARIOS_FALSOS=1`, `src/adapters/calendar/falso/calendarioFalso.ts`) para probar de punta a punta la agenda de Alhabla y sus copias sin un Google real (`PLAN-AGENDA-PRINCIPAL.md`): `conectar` (por el camino real, que vuelca la agenda), `estado` ok/caido/revocado, `apuntar`, `mover` y `borrar` eventos como el dueño, `copiar` (el job de copia ya), `volcar`, `recordar` (el de los 7 días) y `quitar`. Corre `scripts/sim/calendarioFalso.ts` DENTRO de `alhabla_backend_sim` (`mcp/calendarioFalso.ts`) | Solo conexiones con credenciales `falso:`; el falso no existe fuera de backend-sim ni en producción |
+| `agenda_dev` | Las citas de un negocio de dev con el estado de su copia (`copiaEnCalendario`, intentos, error), la conexión, las reservas pendientes y, con el calendario falso, sus eventos y los descuadres (activas sin evento, eventos de canceladas, a otra hora, que ya no están, apuntados a mano) | Solo lectura |
 | `borrar_llamadas_simuladas` | Borra las `sim-mcp-…` (de un negocio o de todas) para que no salgan en el historial del panel | Conserva y devuelve las que tienen una cita viva con evento en el calendario: borrarla dejaría el evento huérfano |
 | `describir_tabla` | Tablas de dev o prod con su modelo de Prisma y filas aproximadas; con `tabla` (nombre real o modelo: `Booking`), columnas con tipo/NULL/defecto, índices y claves foráneas (`mcp/esquema.ts`) | Las mismas que `consultar_bd_*`; en prod, consultas una tras otra (el rol de lectura admite 2 conexiones) |
 | `ver_logs_prod` | Cloud Logging de `alhabla-api` en orden: busca a la vez en `textPayload` (`console.*`) y `jsonPayload.msg`/`err.message` (Fastify), quita «incoming request»/«request completed»; `soloErrores` mira stderr y el nivel de pino (`console.error` no trae `severity`). Devuelve el filtro usado (`mcp/logsDeProd.ts`) | Solo lectura con las credenciales de gcloud del Mac; fechas validadas antes de entrar al filtro y textos escapados |
@@ -1182,7 +1184,7 @@ de abajo (`procesarInformeFinal`, combinar informes, la revisión de escaladas) 
   `espera-<leadId>-<epochSeg>` (una por OFERTA). Resultados: `avisado | en_oferta | nadie |
   sin_plantilla | error`. `reservarDesdeListaDeEspera` («Sí, resérvala») calca
   `retryFailedBooking`: lock por negocio, relectura del lead dentro del lock, `fuera_de_plazo` ≠
-  `ocupado`, no reserva a ciegas (`calendario_caido`), evento con `buildCalendarIdempotencyKey`
+  `ocupado`, reserva aunque el calendario esté caído o caducado (copia pendiente, `PLAN-AGENDA-PRINCIPAL.md`), evento con `buildCalendarIdempotencyKey`
   (`lib/calendarIdempotency.ts`, compartido con voz y el job) con `distintivo =
   inboundMessageId` (una clave por TOQUE: tras un `error` con el evento deshecho, la misma clave
   haría que Google devolviera el evento CANCELADO como éxito ante el 409 — reserva invisible y
@@ -2177,7 +2179,7 @@ extra-minutes price to subscriptions created before it existed), invoked after a
    - Retries a `book_appointment` that failed during a live call for a probably-transient reason (`BOOK_APPOINTMENT_FAILED`, `CALENDAR_TIMEOUT`, `CALENDAR_RATE_LIMITED`, or an unclassified error) — enqueued by `capturePendingBookingLead`/`enqueueRetryFailedBooking` in `voiceTools/service.ts`. Not enqueued for `*_RECONNECT_REQUIRED` failures, since retrying doesn't help until the business reconnects the calendar manually.
    - Loads the pending booking from the `Lead` row (`type: "pending_booking"`) by `leadId`, re-fetches the business's calendar tokens fresh (never trusts stale tokens from the original failed attempt), calls `calendarService.bookAppointment()` again, and on success creates the `Booking` row and sets `Lead.resolvedAt`.
    - Cloud Tasks queue `retry-failed-booking`: 4 attempts, exponential backoff 30s base (the caller already hung up — there's no live request waiting, so a few minutes of backoff is fine).
-   - **Calendar disconnected:** the job reschedules itself every 6 h, up to 8 times (two days), instead of throwing. A `*_RECONNECT_REQUIRED` raised by `bookAppointment` inside the job marks the calendar disconnected and takes the same path — the lead is no longer closed, so it books itself once the owner reconnects.
+   - **Calendar (since 2026-11-06, `PLAN-AGENDA-PRINCIPAL.md`):** the job no longer waits for the calendar. It books in the Alhabla agenda and copies to the connected calendar with `intentarCopiaDeLaCita` (pending copy + `copiar-cita-al-calendario` if the calendar fails). Leads saved as pending by the calendar before this change book themselves the next time the job runs. The old «every 6 h, up to 8 times» reschedule (`esperarAlCalendario`) is gone.
    - **How it ends (2026-10-21):** before, a lead the job could no longer book was closed in silence (`abandonLead`), and the client had been told «he tomado nota de tu solicitud para confirmártela». Now:
      - a real loss (slot taken, outside business hours, past or outside the booking window) closes the lead and calls `avisarReservaPerdida`: WhatsApp to the owner with the reason in plain words and the client's phone to call them, or the email `finalDeReservaPendienteEmail` (`reserva-perdida-<lead>`);
      - after the 8 retries with the calendar still disconnected, the lead stays pending and `avisarReintentosAgotados` sends the «La apunté yo / Reintentar / Reconectar» buttons with the plain lead id, or the email (`reserva-agotada-<lead>`);
@@ -2902,17 +2904,66 @@ Lo que el plan dejó fuera del código (rescatado al archivarlo en `docs/histori
 - **Switching calendars:** `GET /calendar/calendars` lists the calendars of the connected account (Google `calendarList`, Microsoft Graph or a CalDAV `PROPFIND`) with `{ provider, selectedCalendarId, calendars: [{ id, name, primary }] }`; `POST /calendar/select` with `{ calendarId }` switches the active calendar for any of the three. The `/agente` calendar section uses both for its "Cambiar de calendario" picker.
 - `getUpcomingEvents` normalizes events from all three providers into a common format.
 - If credentials stop working (Google/Graph `invalid_grant`, CalDAV 401/403), the backend throws a `CalendarBusinessError` with code `GOOGLE_CALENDAR_RECONNECT_REQUIRED`, `OUTLOOK_CALENDAR_RECONNECT_REQUIRED` or `CALDAV_CALENDAR_RECONNECT_REQUIRED`. The frontend should prompt the user to reconnect.
-- **Appointment booking** (`book_appointment` webhook handler) works with all three providers. It creates the calendar event and persists a `Booking` row with `professionalId`, `serviceIds` and `durationMinutes` (duration recalculated server-side from the verified services). If no `professionalId` is provided, it selects `availableProfessionals[0]` from `checkAvailability` (specialist first, then the least-loaded that day; never a "no sugerir").
+- **Appointment booking** (`book_appointment` webhook handler) works with or without a connected calendar (see "Agenda de Alhabla y calendarios conectados" below): it copies the appointment to the connected calendar if there is one and always persists a `Booking` row with `professionalId`, `serviceIds` and `durationMinutes` (duration recalculated server-side from the verified services). If no `professionalId` is provided, it selects `availableProfessionals[0]` from `checkAvailability` (specialist first, then the least-loaded that day; never a "no sugerir").
 
-### Modo de agenda y agenda de Alhabla (`PLAN-AGENDA-ALHABLA.md`, desde 2026-10-28, PRs #364–#367)
+### Agenda de Alhabla y calendarios conectados (`PLAN-AGENDA-PRINCIPAL.md`, desde 2026-11-06)
 
-- **`Business.modoDeAgenda`** (`sin_elegir` | `alhabla` | `externo`, `lib/modoDeAgenda.ts`): dónde se reservan las citas. **El modo se elige, no se deduce.** Conectar un calendario (`guardarConexionDeCalendario` con `conectado: true`) pasa el negocio a `externo`; el dueño elige `alhabla` desde el alta o desde `/agente › Calendario` (`PATCH /business/me/agenda/modo`, que a `externo` solo vuelve con una conexión operativa, 409 `CALENDAR_NOT_OPERATIVE`). Una conexión caducada **nunca** pasa el negocio a `alhabla`: un `externo` caducado sigue sin reservar (regla de la auditoría de septiembre).
-- **`sin_elegir` (sin calendario): la recepcionista atiende y toma nota, pero no reserva.** `check_availability` no ofrece hora (`available: false` con `CALENDAR_NOT_CONNECTED` si nunca hubo conexión, o el `<P>_CALENDAR_RECONNECT_REQUIRED` del proveedor si caducó) y manda llamar igualmente a `book_appointment`, que guarda el `Lead` pendiente con ese código y responde al cliente sin nombrar a Google. `avisosNegocio.motivoDeFallo` y `lib/llamadas.ts` de la app distinguen los dos códigos. `nuncaConectoCalendario` / `codigoDeCalendarioNoOperativo` viven en `calendar/conexion.ts`.
-- **`alhabla`: la regla vive en la conexión resuelta.** `resolverConexionDeCalendario` marca `agendaPropia` cuando el modo es `alhabla` y no se fuerza proveedor, y deja `credentials` a null: la conexión externa que quede se ignora para leer ocupación y crear eventos sin tocar `usaCalendarioExterno` ni `getBusyIntervals`. Con proveedor forzado (cancelar o mover una cita antigua con `externalEventId`) la conexión real sigue ahí. **`puedeReservar(c) = c.agendaPropia || conexionOperativa(c)`** es lo que deciden `book_appointment`, el Gestor, la lista de espera y el reintento; `conexionOperativa` a secas queda para quien necesita la conexión de verdad. `calendarService.bookAppointment` devuelve `{ id: null, htmlLink: null }` con `agendaPropia` antes de `exigirConexionActiva`, así que los cinco caminos que reservan siguen llamándolo y escriben el `Booking` sin evento; `origenExternoDeLaCita(c)` deja `externalCalendarProvider`/`externalCalendarId` a null. La caché de voz acepta la entrada sin conexión confirmada en modo `alhabla`; el contexto del Gestor dice «agenda de Alhabla»; el paso `calendar` del onboarding se da por hecho.
+La agenda de Alhabla es **la** agenda del negocio; Google, Outlook y Apple son complementos que reciben una
+copia de cada cita y le cuentan a la recepcionista lo que el dueño apunta en ellos. Sustituye al «modo de
+agenda» de `PLAN-AGENDA-ALHABLA.md` (28-10, PRs #364–#367).
+
+- **Siempre se puede reservar.** El calendario conectado no decide si se reserva ni si se ofrece hora: ni
+  sin conectar, ni caducado, ni caído (decisiones D2 y D3 del plan; revierte a propósito la regla de
+  septiembre de no reservar a ciegas). Siguen mandando horario, festivos, ausencias, capacidad, las citas de
+  Alhabla y el cerrojo por negocio. Desaparecieron `puedeReservar`, `agendaPropia` y `origenExternoDeLaCita`
+  (`calendar/conexion.ts`), la salida «toma nota» de `check_availability`, los `Lead` pendientes por el
+  calendario en `book_appointment` (`CALENDAR_NOT_CONNECTED`, `*_RECONNECT_REQUIRED`, `CALENDAR_UNAVAILABLE`,
+  error al crear el evento), los rechazos del Gestor (`MOTIVO_SIN_CALENDARIO`, `MOTIVO_CALENDARIO_ILEGIBLE`,
+  `calendario_desconectado`, `calendario_rechaza`), los estados `sin_calendario` / `calendario_caido` de la
+  lista de espera y la espera al calendario del reintento (`esperarAlCalendario`). El `Lead` pendiente queda
+  para fallos que no son del calendario (cerrojo, error al guardar). `avisosNegocio.motivoDeFallo` conserva
+  los códigos viejos para los `Lead` que ya existían.
+- **La copia** (`calendar/copiaDeLaCita.ts`): `intentarCopiaDeLaCita` se llama en los cinco caminos que
+  reservan (voz y chat, Gestor y panel, lista de espera, reintento) y **nunca lanza**. Devuelve lo que se
+  guarda en el `Booking`: `copiaEnCalendario` (`null` sin calendario; `"pendiente"`, `"hecha"` o `"fallida"`),
+  `copiaIntentos`, `copiaError` y el origen del evento. Con la conexión caducada la copia queda `pendiente` sin
+  gastar intentos; un `invalid_grant` marca el calendario desconectado; cualquier otro error la deja
+  `pendiente` y el llamador encola `encolarCopiaDeLaCita` tras guardar el `Booking`. Una cita que se mueve y
+  cuya copia nueva no entra conserva su evento viejo (`externalEventId`) con la copia `pendiente`, y el job lo
+  sustituye.
+- **Jobs** (los tres por la cola `retry-failed-booking`, con sus propios reintentos por `scheduleTime`; en dev
+  en línea salvo los programados a futuro):
+  - `/internal/jobs/copiar-cita-al-calendario` (`sincronizarCopiaDeLaCita`): borra el evento viejo si lo hay,
+    crea el nuevo con la clave `copia:<bookingId>:<inicio>:<duración>` y deja la copia `hecha`. Esperas de 1, 5,
+    30, 120, 360, 720 y 1.440 min; al cuarto intento avisa al dueño (`alertarCopiasPendientes`, una vez al día) y
+    al séptimo la deja `fallida` con un `console.error` «COPIA FALLIDA». Con la conexión caducada no gasta intento.
+  - `/internal/jobs/volcar-agenda-al-calendario` (`volcarAgendaAlCalendario`): lo encola
+    `guardarConexionDeCalendario` al conectar o reconectar; copia las citas futuras sin evento y las
+    `pendiente`/`fallida`, 150 por pasada. Las que tienen evento en otro calendario se quedan donde están.
+  - `/internal/jobs/recordar-calendario-desconectado` (`whatsapp/alertas.ts`, `recordarCalendarioDesconectado`):
+    lo programa `alertarCalendarioDesconectado` a 7 días de la desconexión; solo avisa si sigue desconectado
+    desde la misma vez.
+- **Un solo sentido** (regla 4). Lo que el dueño cambia en su calendario no vuelve a Alhabla, y
+  `checkAvailability` lo refleja: una cita de Alhabla bloquea **siempre** su hora (ya no se «libera» si su
+  evento desaparece, ni pasa a la hora del evento). El evento que es copia de una cita se descarta solo si
+  coincide en hora (±1 min) o si la copia está `pendiente`; si no, ocupa también ese sitio.
+  `calendarAvailabilityKnown` y `calendarOrigin` quedan como parámetros sin efecto hasta la fase 7. El
+  evento lleva al final «Esta cita la gestiona Alhabla. Para moverla o cancelarla, …»
+  (`eventoDeCalendario.ts`).
+- **Avisos al dueño**: `alertaCalendario` («he perdido la conexión con tu …: tus citas siguen entrando en tu
+  agenda…»), `recordatorioCalendario` y `alertaCopiasPendientes` (`whatsapp/mensajes.ts`), todos por la
+  plantilla `alerta_operativa_negocio`, que lleva el texto como parámetro.
+- **Gestor**: `contexto_negocio` devuelve `calendario.agenda = "Alhabla"` y un `estado` que dice si hay copia
+  al día; `faltaPorConfigurar` ya no incluye el calendario, y el prompt (`lib/gestorPayload.ts`) tampoco lo
+  cuenta como paso de configuración. El paso `calendar` del onboarding se da siempre por hecho.
+- **Quitar el calendario**: `DELETE /calendar/conexion` (`quitarCalendarioConectado`) borra las filas de `calendar_connections` del negocio; la agenda sigue igual y los eventos ya copiados se quedan en su calendario.
+- **Sin llamada que vincular**: `book_appointment` responde `BOOKING_CALL_NOT_FOUND` y no confirma nada (antes, con calendario, quedaba solo el evento en Google y la recepcionista la daba por reservada).
+- **Transitorio hasta la fase 7**: `Business.modoDeAgenda` (`lib/modoDeAgenda.ts`) y
+  `PATCH /business/me/agenda/modo` siguen existiendo solo para la app anterior; no deciden nada.
 - **Crear desde el panel** (`bookings/citasDelPanel.ts`): `POST /business/me/bookings`, `/bloqueos` y `/absences` reutilizan `añadir_cita`, `bloquear_franja` y `marcar_ausencia` del Gestor con `meta.origen = "panel"` (`MetaDeEjecucion`); la cita del panel lleva `createdVia: "owner_panel"` y la misma Call sintética con prefijo `whatsapp:gestor:` (no cuenta como llamada). Sin aviso al cliente desde «Nueva cita» (decisión D4). En la app, `components/agenda/nueva-cita.tsx` (tres pestañas) desde el botón «Nueva cita» del escritorio y el «+» del móvil, solo cuando `bookable`.
 - **Feed iCal de solo lectura** (`modules/agenda/routes.ts`, `lib/feedIcal.ts`): `Business.icalToken` (32 bytes hex, único, nunca serializado con el Business). `GET /agenda/:token.ics` público con límite de 30/min busca el negocio solo por el token (404 igual para mal formado y para inexistente), ventana −30/+120 días, canceladas de los últimos 30 días con `STATUS:CANCELLED`, ausencias como «No está: …», `?pro=` filtrado por negocio, cabeceras `noindex` y `Cache-Control: private, max-age=300`. `GET`/`POST` (`renovar`)/`DELETE /business/me/agenda/feed` desde «Ver tu agenda en el móvil» (`movil/agente/feed-de-agenda.tsx`). Datos mínimos: servicio, nombre del cliente y profesional; nunca el teléfono.
-- **App:** `getCalendarState` (`frontend/src/lib/calendar-state.ts`) expone `mode`, `alhabla` y `bookable`; en `alhabla` una conexión antigua no cuenta ni como conectada ni como caducada. `bookable` decide «Mover» (escritorio y móvil, incluido arrastrar), las tarjetas «Elige dónde reservar», el estado operativo («Atiende, pero no reserva» / «Agenda de Alhabla») y el checklist de `/agente`.
-- **Qué no es:** no sincroniza en dos sentidos (lo que el dueño apunte en su móvil no vuelve a Alhabla), no importa calendarios ajenos (Booksy, Treatwell) y no hay página de reservas para el cliente final.
+- **App (hasta la fase 4 de `PLAN-AGENDA-PRINCIPAL.md`, que la cambia):** `getCalendarState` (`frontend/src/lib/calendar-state.ts`) expone `mode`, `alhabla` y `bookable`; en `alhabla` una conexión antigua no cuenta ni como conectada ni como caducada. `bookable` decide «Mover» (escritorio y móvil, incluido arrastrar), las tarjetas «Elige dónde reservar», el estado operativo («Atiende, pero no reserva» / «Agenda de Alhabla») y el checklist de `/agente`.
+- **Qué no es:** no sincroniza en dos sentidos (lo que el dueño apunte o cambie en su calendario o su móvil no vuelve a Alhabla), no importa calendarios ajenos (Booksy, Treatwell) y no hay página de reservas para el cliente final.
 
 ### Arquitectura por adaptadores (`backend/src/adapters/calendar/`, desde 2026-09-18)
 

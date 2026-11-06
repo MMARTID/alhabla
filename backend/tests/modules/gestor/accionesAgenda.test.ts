@@ -8,6 +8,11 @@ import {
   releaseBookingLock,
 } from "../../../src/lib/bookingLock.js";
 import { cancelarReserva } from "../../../src/modules/bookings/cancelacion.js";
+import {
+  resolverConexionDeCalendario,
+  tieneCalendarioConectado,
+} from "../../../src/modules/calendar/conexion.js";
+import { encolarCopiaDeLaCita } from "../../../src/modules/calendar/copiaDeLaCita.js";
 import { guardarHorarioDelNegocio } from "../../../src/modules/businesses/horario.js";
 import {
   programarAvisoAlCliente,
@@ -81,14 +86,9 @@ vi.mock("../../../src/modules/calendar/conexion.js", () => ({
     marcadaConectada: true,
   })),
   conexionOperativa: vi.fn(() => true),
-  // PLAN-AGENDA-ALHABLA.md: la decisión de reservar es puedeReservar (agenda de
-  // Alhabla o conexión operativa); el origen externo de la cita, el del
-  // calendario conectado.
-  puedeReservar: vi.fn(() => true),
-  origenExternoDeLaCita: vi.fn(() => ({
-    externalCalendarProvider: "google",
-    externalCalendarId: "primary",
-  })),
+  // PLAN-AGENDA-PRINCIPAL.md: el calendario conectado no decide si se apunta
+  // la cita, solo si se le copia (copiaDeLaCita.ts, que se usa de verdad).
+  tieneCalendarioConectado: vi.fn(() => true),
   usaCalendarioExterno: vi.fn(() => true),
   origenDeCalendario: vi.fn(() => ({
     provider: "google",
@@ -96,6 +96,18 @@ vi.mock("../../../src/modules/calendar/conexion.js", () => ({
   })),
   marcarCalendarioDesconectado: vi.fn(),
 }));
+// La copia en el calendario es la real (intentarCopiaDeLaCita contra el
+// calendarService de arriba); solo se intercepta el encolado del reintento.
+vi.mock(
+  "../../../src/modules/calendar/copiaDeLaCita.js",
+  async (importActual) => {
+    const actual =
+      await importActual<
+        typeof import("../../../src/modules/calendar/copiaDeLaCita.js")
+      >();
+    return { ...actual, encolarCopiaDeLaCita: vi.fn(async () => undefined) };
+  }
+);
 vi.mock("../../../src/modules/bookings/cancelacion.js", () => ({
   cancelarReserva: vi.fn(),
 }));
@@ -142,6 +154,9 @@ const mockedBusy = vi.mocked(calendarService.getBusyIntervals);
 const mockedBook = vi.mocked(calendarService.bookAppointment);
 const mockedCancelEvent = vi.mocked(calendarService.cancelAppointment);
 const mockedCancelarReserva = vi.mocked(cancelarReserva);
+const mockedTieneCalendario = vi.mocked(tieneCalendarioConectado);
+const mockedResolverConexion = vi.mocked(resolverConexionDeCalendario);
+const mockedEncolarCopia = vi.mocked(encolarCopiaDeLaCita);
 const mockedGuardarHorario = vi.mocked(guardarHorarioDelNegocio);
 const mockedProgramarMensajes = vi.mocked(programarMensajesAlCliente);
 const mockedProgramarAviso = vi.mocked(programarAvisoAlCliente);
@@ -189,6 +204,16 @@ const CITA = {
   externalCalendarId: "primary",
   professional: { id: "pro_laura", name: "Laura" },
   call: { fromNumber: null },
+};
+
+// Lo que resuelve conexion.ts para un negocio que nunca conectó calendario.
+const SIN_CALENDARIO = {
+  provider: "google" as const,
+  calendarId: "primary",
+  credentials: null,
+  businessId: "biz_1",
+  calendarIdConfigurado: null,
+  marcadaConectada: null,
 };
 
 function accion(tipo: string) {
@@ -329,7 +354,7 @@ describe("añadir_cita", () => {
     );
   });
 
-  it("rechaza servicio desconocido, hora pasada, fuera de horario y sin calendario, con palabras del dueño", async () => {
+  it("rechaza servicio desconocido, hora pasada y fuera de horario, con palabras del dueño", async () => {
     expect(
       (
         await comprobar("añadir_cita", {
@@ -358,21 +383,92 @@ describe("añadir_cita", () => {
         })
       ).motivo
     ).toContain("cerrado");
-    const conexion = await import("../../../src/modules/calendar/conexion.js");
-    vi.mocked(conexion.puedeReservar).mockReturnValueOnce(false);
-    expect(
-      (
-        await comprobar("añadir_cita", {
-          cliente: "M",
-          fechaHora: HORA_LOCAL,
-          servicios: ["Corte"],
-        })
-      ).motivo
-    ).toContain("calendario no está conectado");
     expect(mockedCheckAvailability).not.toHaveBeenCalled();
   });
 
-  it("si no hay hueco devuelve el motivo con la alternativa más cercana; si el calendario no se puede leer, no propone", async () => {
+  // PLAN-AGENDA-PRINCIPAL.md: la agenda es la de Alhabla. Sin calendario
+  // conectado se propone y se apunta igual, sin copia que hacer.
+  it("sin calendario conectado propone la cita y la apunta en la agenda de Alhabla, sin copia", async () => {
+    mockedResolverConexion.mockReturnValueOnce(SIN_CALENDARIO);
+    const propuesta = await comprobar("añadir_cita", {
+      cliente: "Pepe",
+      fechaHora: HORA_LOCAL,
+      servicios: ["Corte"],
+    });
+    expect(propuesta).toMatchObject({
+      ok: true,
+      descripcion: expect.stringContaining("apuntar a Pepe"),
+    });
+
+    const tx = transaccionReal();
+    mockedResolverConexion.mockReturnValueOnce(SIN_CALENDARIO);
+    mockedTieneCalendario.mockReturnValueOnce(false);
+    const r = await ejecutar("añadir_cita", {
+      cliente: "Pepe",
+      fechaHora: HORA_LOCAL,
+      servicios: ["svc_corte"],
+    });
+    expect(r).toMatchObject({
+      ok: true,
+      mensaje:
+        "Hecho: Pepe queda apuntado el jueves 12 de noviembre a las 17:00, Corte con Marta. Ya está en tu agenda.",
+    });
+    expect(mockedBook).not.toHaveBeenCalled();
+    expect(tx.booking.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({
+          externalEventId: undefined,
+          copiaEnCalendario: null,
+          copiaError: null,
+          copiaIntentos: 0,
+          externalCalendarProvider: null,
+          externalCalendarId: null,
+        }),
+        update: expect.objectContaining({
+          externalEventId: null,
+          copiaEnCalendario: null,
+        }),
+      })
+    );
+    expect(mockedEncolarCopia).not.toHaveBeenCalled();
+  });
+
+  it("si el calendario no acepta el evento, la cita se apunta igual con la copia pendiente y se encola su reintento", async () => {
+    const tx = transaccionReal();
+    mockedBook.mockRejectedValueOnce(new Error("Google 503"));
+    const r = await ejecutar("añadir_cita", {
+      cliente: "Pepe",
+      fechaHora: HORA_LOCAL,
+      servicios: ["svc_corte"],
+    });
+    expect(r).toMatchObject({
+      ok: true,
+      mensaje:
+        "Hecho: Pepe queda apuntado el jueves 12 de noviembre a las 17:00, Corte con Marta. Ya está en tu agenda.",
+    });
+    expect(mockedBook).toHaveBeenCalledTimes(1);
+    expect(tx.booking.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({
+          externalEventId: undefined,
+          copiaEnCalendario: "pendiente",
+          copiaError: "Google 503",
+          copiaIntentos: 0,
+          externalCalendarProvider: null,
+          externalCalendarId: null,
+        }),
+      })
+    );
+    // El reintento se encola con la reserva ya guardada.
+    expect(mockedEncolarCopia).toHaveBeenCalledWith("b_nueva");
+    expect(mockedEncolarCopia.mock.invocationCallOrder[0]).toBeGreaterThan(
+      tx.booking.upsert.mock.invocationCallOrder[0]
+    );
+    // No hay evento que deshacer.
+    expect(mockedCancelEvent).not.toHaveBeenCalled();
+  });
+
+  it("si no hay hueco devuelve el motivo con la alternativa más cercana; si el calendario no se puede leer, propone y apunta con lo que se sabe", async () => {
     mockedCheckAvailability.mockResolvedValueOnce({
       available: false,
       code: "ALL_PROFESSIONALS_BUSY",
@@ -395,19 +491,34 @@ describe("añadir_cita", () => {
     ).toBe(
       "Todos los profesionales que pueden hacer este servicio están ocupados en ese horario. El hueco libre más cercano es el jueves 12 de noviembre a las 17:30 con Laura."
     );
+    // Calendario ilegible: ya no se rechaza (PLAN-AGENDA-PRINCIPAL.md, D2 y
+    // D3); la disponibilidad se calcula con la agenda de Alhabla.
     mockedBusy.mockResolvedValueOnce({
       intervals: [],
       calendarAvailabilityKnown: false,
     });
-    expect(
-      (
-        await comprobar("añadir_cita", {
-          cliente: "M",
-          fechaHora: HORA_LOCAL,
-          servicios: ["Corte"],
-        })
-      ).motivo
-    ).toContain("no puedo leer el calendario");
+    const propuesta = await comprobar("añadir_cita", {
+      cliente: "M",
+      fechaHora: HORA_LOCAL,
+      servicios: ["Corte"],
+    });
+    expect(propuesta.ok).toBe(true);
+    expect(mockedCheckAvailability).toHaveBeenLastCalledWith(
+      expect.objectContaining({ calendarAvailabilityKnown: false })
+    );
+
+    transaccionReal();
+    mockedBook.mockResolvedValueOnce({ id: "evt_nuevo" } as never);
+    mockedBusy.mockResolvedValueOnce({
+      intervals: [],
+      calendarAvailabilityKnown: false,
+    });
+    const r = await ejecutar("añadir_cita", {
+      cliente: "M",
+      fechaHora: HORA_LOCAL,
+      servicios: ["svc_corte"],
+    });
+    expect(r.ok).toBe(true);
   });
 
   it("al confirmar crea el evento y la reserva con Call sintética y pregunta si mandar la confirmación (solo con móvil)", async () => {
@@ -423,7 +534,7 @@ describe("añadir_cita", () => {
     });
     expect(r.ok).toBe(true);
     expect(r.mensaje).toBe(
-      "Hecho: Marta García queda apuntado el jueves 12 de noviembre a las 17:00, Corte con Laura. Ya está en tu calendario."
+      "Hecho: Marta García queda apuntado el jueves 12 de noviembre a las 17:00, Corte con Laura. Ya está en tu agenda y en tu calendario."
     );
     expect(r.ok && r.siguiente).toMatchObject({
       tipo: "avisar_cliente",
@@ -461,9 +572,16 @@ describe("añadir_cita", () => {
           smsConsent: false,
           createdVia: "owner_chat",
           externalEventId: "evt_nuevo",
+          copiaEnCalendario: "hecha",
+          copiaError: null,
+          copiaIntentos: 0,
+          externalCalendarProvider: "google",
+          externalCalendarId: "primary",
         }),
       })
     );
+    // Copia hecha a la primera: no hay nada que reintentar.
+    expect(mockedEncolarCopia).not.toHaveBeenCalled();
     // Sin confirmación automática: eso lo decide el dueño con el botón.
     expect(mockedProgramarMensajes).not.toHaveBeenCalled();
 
@@ -681,7 +799,7 @@ describe("mover_cita", () => {
     });
     expect(r.ok).toBe(true);
     expect(r.mensaje).toContain(
-      "pasa al jueves 12 de noviembre a las 17:00 con Marta"
+      "pasa al jueves 12 de noviembre a las 17:00 con Marta. Tu calendario ya está al día."
     );
     expect(mockedBookingUpdateMany).toHaveBeenCalledWith({
       where: { id: "b_1", isCancelled: false },
@@ -689,11 +807,15 @@ describe("mover_cita", () => {
         programedAt: new Date(HORA_UTC),
         professionalId: "pro_marta",
         externalEventId: "evt_nuevo",
+        copiaEnCalendario: "hecha",
+        copiaError: null,
+        copiaIntentos: 0,
         externalCalendarProvider: "google",
         externalCalendarId: "primary",
         confirmedByClientAt: null,
       },
     });
+    expect(mockedEncolarCopia).not.toHaveBeenCalled();
     // El evento viejo se busca en la hora ANTERIOR de la cita.
     expect(mockedCancelEvent).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -715,6 +837,85 @@ describe("mover_cita", () => {
       parametros: { cita: "b_1", tipo: "cambio" },
       botones: { confirmar: "Sí, avísale", cancelar: "Le llamo yo" },
     });
+  });
+
+  // PLAN-AGENDA-PRINCIPAL.md, regla 3: si el calendario no acepta la hora
+  // nueva, la cita se mueve igual en Alhabla y conserva su evento viejo, que
+  // sustituirá el job de copia.
+  it("si el calendario no acepta la nueva hora, mueve la cita igual, conserva el evento viejo y encola la copia", async () => {
+    mockedBook.mockRejectedValueOnce(new Error("Google 503"));
+    mockedBookingUpdateMany.mockResolvedValue({ count: 1 });
+    mockedProgramarMensajes.mockResolvedValue({ confirmacion: "programada" });
+    const r = await ejecutar("mover_cita", {
+      cita: "b_1",
+      fechaHora: HORA_LOCAL,
+    });
+    expect(r).toMatchObject({
+      ok: true,
+      mensaje: expect.stringContaining(
+        "pasa al jueves 12 de noviembre a las 17:00 con Laura."
+      ),
+    });
+    expect(r.mensaje).not.toContain("calendario");
+    // Sin externalEventId ni origen del evento: la cita sigue apuntando al
+    // evento viejo, que es el que el job borrará antes de crear el nuevo.
+    expect(mockedBookingUpdateMany).toHaveBeenCalledWith({
+      where: { id: "b_1", isCancelled: false },
+      data: {
+        programedAt: new Date(HORA_UTC),
+        professionalId: "pro_laura",
+        copiaEnCalendario: "pendiente",
+        copiaError: "Google 503",
+        copiaIntentos: 0,
+        confirmedByClientAt: null,
+      },
+    });
+    expect(mockedCancelEvent).not.toHaveBeenCalled();
+    expect(mockedEncolarCopia).toHaveBeenCalledWith("b_1");
+    expect(mockedProgramarMensajes).toHaveBeenCalledWith(
+      expect.objectContaining({ bookingId: "b_1", confirmacion: false })
+    );
+  });
+
+  it("moverReserva devuelve el estado de la copia: hecha, pendiente o ninguna sin calendario", async () => {
+    mockedBookingUpdateMany.mockResolvedValue({ count: 1 });
+    mockedProgramarMensajes.mockResolvedValue({ confirmacion: "programada" });
+    const mover = () =>
+      moverReserva({
+        businessId: "biz_1",
+        timezone: "Europe/Madrid",
+        citaId: "b_1",
+        start: new Date(HORA_UTC),
+        profesional: null,
+        etiqueta: "panel b_1",
+        prefijoDeLog: "[Panel]",
+        idempotencia: { callId: "panel:b_1", distintivo: "d_1" },
+      });
+
+    mockedBook.mockResolvedValueOnce({ id: "evt_nuevo" } as never);
+    expect(await mover()).toMatchObject({ ok: true, copia: "hecha" });
+
+    mockedBook.mockRejectedValueOnce(new Error("Google 503"));
+    expect(await mover()).toMatchObject({ ok: true, copia: "pendiente" });
+
+    // Sin calendario conectado no hay copia, y el evento que la cita tuviera
+    // de un calendario anterior se borra como siempre.
+    mockedBook.mockClear();
+    mockedCancelEvent.mockClear();
+    mockedTieneCalendario.mockReturnValueOnce(false);
+    expect(await mover()).toMatchObject({ ok: true, copia: null });
+    expect(mockedBook).not.toHaveBeenCalled();
+    expect(mockedBookingUpdateMany).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          externalEventId: null,
+          copiaEnCalendario: null,
+        }),
+      })
+    );
+    expect(mockedCancelEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ eventId: "evt_viejo" })
+    );
   });
 
   it("si la cita se canceló entre medias, deshace el evento nuevo y no toca el viejo", async () => {

@@ -152,7 +152,11 @@ describe("cambio de cita por la recepcionista (integración)", () => {
     );
   });
 
-  it("si la nueva no entra en el calendario, la vieja sigue activa", async () => {
+  // PLAN-AGENDA-PRINCIPAL.md: el calendario conectado es un complemento. Si
+  // no acepta la copia de la nueva, el cambio se hace igual en la agenda de
+  // Alhabla y la copia queda pendiente (antes la nueva no entraba y la vieja
+  // seguía en pie hasta que el reintento lo arreglara).
+  it("si la nueva no entra en el calendario, el cambio se hace igual y su copia queda pendiente", async () => {
     const { business, vieja, llamada, nuevaHora } = await preparar();
     vi.mocked(calendarService.bookAppointment).mockRejectedValue(
       new Error("Google 503")
@@ -175,14 +179,29 @@ describe("cambio de cita por la recepcionista (integración)", () => {
       },
     });
 
-    expect(reserva.result?.success).toBe(false);
-    const sigue = await prisma.booking.findUnique({ where: { id: vieja.id } });
-    expect(sigue).toMatchObject({ isCancelled: false, rescheduledToId: null });
-    // La reserva pendiente recuerda qué cita anular si acaba entrando.
+    expect(reserva.result).toMatchObject({
+      success: true,
+      citaAnterior: "anulada",
+    });
+    const nueva = await prisma.booking.findUnique({
+      where: { callId: llamada.id },
+    });
+    expect(nueva).toMatchObject({
+      isCancelled: false,
+      externalEventId: null,
+      copiaEnCalendario: "pendiente",
+      copiaError: "Google 503",
+    });
+    const anulada = await prisma.booking.findUnique({ where: { id: vieja.id } });
+    expect(anulada).toMatchObject({
+      isCancelled: true,
+      rescheduledToId: nueva?.id,
+    });
+    // Ninguna petición pendiente: la cita está reservada.
     const pendiente = await prisma.lead.findFirst({
       where: { callId: llamada.id, type: "pending_booking" },
     });
-    expect(pendiente?.data).toMatchObject({ replacesBookingId: vieja.id });
+    expect(pendiente).toBeNull();
   });
 
   it("no deja cambiar la cita de otro número", async () => {

@@ -1,7 +1,10 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { filaDeConexion } from "../../helpers/conexionDeCalendario.js";
 import { prisma } from "../../../src/lib/prisma.js";
-import { enqueueWhatsappJob } from "../../../src/lib/cloudTasks.js";
+import {
+  enqueueCopiaDeLaCitaJob,
+  enqueueWhatsappJob,
+} from "../../../src/lib/cloudTasks.js";
 import { calendarService } from "../../../src/modules/calendar/service.js";
 import { marcarCalendarioDesconectado } from "../../../src/modules/calendar/conexion.js";
 import {
@@ -50,6 +53,9 @@ vi.mock("../../../src/lib/prisma.js", () => ({
 }));
 vi.mock("../../../src/lib/cloudTasks.js", () => ({
   enqueueWhatsappJob: vi.fn(),
+  // La copia de la cita (calendar/copiaDeLaCita.ts, real aquí).
+  enqueueCopiaDeLaCitaJob: vi.fn(),
+  enqueueVolcadoDeLaAgendaJob: vi.fn(),
 }));
 vi.mock("../../../src/modules/calendar/service.js", () => ({
   calendarService: {
@@ -120,6 +126,7 @@ const mockedServiceFindMany = vi.mocked(prisma.service.findMany);
 const mockedProfessionalFindFirst = vi.mocked(prisma.professional.findFirst);
 const mockedTransaction = vi.mocked(prisma.$transaction);
 const mockedEnqueue = vi.mocked(enqueueWhatsappJob);
+const mockedEnqueueCopia = vi.mocked(enqueueCopiaDeLaCitaJob);
 const mockedBook = vi.mocked(calendarService.bookAppointment);
 const mockedBusy = vi.mocked(calendarService.getBusyIntervals);
 const mockedCancelEvent = vi.mocked(calendarService.cancelAppointment);
@@ -623,8 +630,15 @@ describe("reservarDesdeListaDeEspera", () => {
         clientPhone: MOVIL,
         externalEventId: "evt_1",
         professionalId: "p1",
+        // Calendario operativo: la copia sale en el momento.
+        copiaEnCalendario: "hecha",
+        copiaError: null,
+        copiaIntentos: 0,
+        externalCalendarProvider: "google",
+        externalCalendarId: "primary",
       })
     );
+    expect(mockedEnqueueCopia).not.toHaveBeenCalled();
     expect(upsert.create.clientNotifiedAt).toBeUndefined();
     expect(upsert.update).toEqual(
       expect.objectContaining({
@@ -680,7 +694,9 @@ describe("reservarDesdeListaDeEspera", () => {
     expect(mockedUnlock).toHaveBeenCalledWith("biz_1", "token");
   });
 
-  it("un Sí que acaba en ocupado/calendario_caido/lock no crea ninguna Call", async () => {
+  // El calendario caído ya no es un final del «Sí» (PLAN-AGENDA-PRINCIPAL.md):
+  // ver los tests de calendario de más abajo.
+  it("un Sí que acaba en ocupado/lock no crea ninguna Call", async () => {
     mockedAvailability.mockResolvedValue({
       available: false,
       code: "CAPACITY_REACHED",
@@ -693,14 +709,6 @@ describe("reservarDesdeListaDeEspera", () => {
       available: true,
       availableProfessionals: [],
     } as never);
-    mockedBusy.mockResolvedValue({
-      intervals: [],
-      calendarAvailabilityKnown: false,
-    });
-    expect(await reservarDesdeListaDeEspera(ENTRADA_SI)).toEqual({
-      estado: "calendario_caido",
-    });
-
     mockedLock.mockResolvedValue(null);
     expect(await reservarDesdeListaDeEspera(ENTRADA_SI)).toEqual({
       estado: "lock",
@@ -801,52 +809,165 @@ describe("reservarDesdeListaDeEspera", () => {
     expect(mockedAvailability).not.toHaveBeenCalled();
   });
 
-  it("calendario ilegible ⇒ calendario_caido con lead abierto; conexión revocada ⇒ marcarCalendarioDesconectado y sin_calendario; lock no adquirido ⇒ lock con lead abierto", async () => {
-    mockedBusy.mockResolvedValue({
-      intervals: [],
-      calendarAvailabilityKnown: false,
-    });
-    expect(await reservarDesdeListaDeEspera(ENTRADA_SI)).toEqual({
-      estado: "calendario_caido",
-    });
-    expect(mockedLeadUpdateMany).not.toHaveBeenCalled();
+  // PLAN-AGENDA-PRINCIPAL.md: el calendario conectado solo recibe la copia.
+  // Antes, con el calendario caído o caducado, el «Sí» acababa en
+  // calendario_caido / sin_calendario con el lead abierto.
+  describe("con el calendario caído, caducado o ausente reserva igual", () => {
+    it("calendario ilegible ⇒ reservada (la copia se intenta y sale hecha)", async () => {
+      const tx = transaccionReal();
+      mockedBusy.mockResolvedValue({
+        intervals: [],
+        calendarAvailabilityKnown: false,
+      });
 
-    mockedBusy.mockResolvedValue({
-      intervals: [],
-      calendarAvailabilityKnown: true,
+      expect((await reservarDesdeListaDeEspera(ENTRADA_SI)).estado).toBe(
+        "reservada"
+      );
+      expect(mockedAvailability).toHaveBeenCalledWith(
+        expect.objectContaining({ calendarAvailabilityKnown: false })
+      );
+      expect(mockedBook).toHaveBeenCalledTimes(1);
+      expect(tx.booking.upsert.mock.calls[0][0].create).toEqual(
+        expect.objectContaining({
+          externalEventId: "evt_1",
+          copiaEnCalendario: "hecha",
+        })
+      );
+      expect(tx.lead.updateMany).toHaveBeenCalled();
     });
-    mockedBook.mockRejectedValue(
-      new CalendarBusinessError(
-        "GOOGLE_CALENDAR_RECONNECT_REQUIRED",
-        "token revocado",
-        "google"
-      )
+
+    it("calendario caducado (fila sin credenciales) ⇒ reservada sin llamar al calendario, copia pendiente y sin encolar", async () => {
+      const tx = transaccionReal();
+      mockedBusinessFindUnique.mockResolvedValue({
+        ...NEGOCIO,
+        calendarConnections: [
+          filaDeConexion("google", { refreshToken: null, connected: false }),
+        ],
+      } as never);
+
+      expect((await reservarDesdeListaDeEspera(ENTRADA_SI)).estado).toBe(
+        "reservada"
+      );
+      expect(mockedBook).not.toHaveBeenCalled();
+      const upsert = tx.booking.upsert.mock.calls[0][0];
+      expect(upsert.create).toEqual(
+        expect.objectContaining({
+          externalEventId: undefined,
+          copiaEnCalendario: "pendiente",
+          copiaError: "calendario desconectado",
+          copiaIntentos: 0,
+          externalCalendarProvider: null,
+          externalCalendarId: null,
+        })
+      );
+      expect(upsert.update).toEqual(
+        expect.objectContaining({
+          externalEventId: null,
+          copiaEnCalendario: "pendiente",
+        })
+      );
+      // La copia la hace el volcado al reconectar: no se gasta un intento.
+      expect(mockedEnqueueCopia).not.toHaveBeenCalled();
+      expect(mockedAvisarNueva).toHaveBeenCalled();
+    });
+
+    it("conexión revocada al crear el evento ⇒ marcarCalendarioDesconectado y reservada con copia pendiente, sin encolar", async () => {
+      const tx = transaccionReal();
+      mockedBook.mockRejectedValue(
+        new CalendarBusinessError(
+          "GOOGLE_CALENDAR_RECONNECT_REQUIRED",
+          "token revocado",
+          "google"
+        )
+      );
+
+      expect((await reservarDesdeListaDeEspera(ENTRADA_SI)).estado).toBe(
+        "reservada"
+      );
+      expect(mockedDesconectar).toHaveBeenCalledWith(
+        "biz_1",
+        "google",
+        { modo: "revocar" },
+        { prefijo: "[WhatsApp]" }
+      );
+      expect(tx.booking.upsert.mock.calls[0][0].create).toEqual(
+        expect.objectContaining({
+          externalEventId: undefined,
+          copiaEnCalendario: "pendiente",
+          copiaError: "calendario desconectado",
+        })
+      );
+      expect(mockedEnqueueCopia).not.toHaveBeenCalled();
+    });
+
+    it("sin ningún calendario ⇒ reservada sin copia (copiaEnCalendario null)", async () => {
+      const tx = transaccionReal();
+      mockedBusinessFindUnique.mockResolvedValue({
+        ...NEGOCIO,
+        calendarProvider: null,
+        calendarConnections: [],
+      } as never);
+
+      expect((await reservarDesdeListaDeEspera(ENTRADA_SI)).estado).toBe(
+        "reservada"
+      );
+      expect(mockedBook).not.toHaveBeenCalled();
+      expect(tx.booking.upsert.mock.calls[0][0].create).toEqual(
+        expect.objectContaining({
+          externalEventId: undefined,
+          copiaEnCalendario: null,
+          copiaError: null,
+        })
+      );
+      expect(mockedEnqueueCopia).not.toHaveBeenCalled();
+    });
+  });
+
+  it("calendario operativo que no acepta el evento ⇒ reservada con copia pendiente y encola la copia tras guardar", async () => {
+    const tx = transaccionReal();
+    mockedBook.mockRejectedValue(new Error("Google no responde"));
+
+    const r = await reservarDesdeListaDeEspera(ENTRADA_SI);
+
+    expect(r).toEqual(
+      expect.objectContaining({ estado: "reservada", bookingId: "booking_9" })
     );
-    expect(await reservarDesdeListaDeEspera(ENTRADA_SI)).toEqual({
-      estado: "sin_calendario",
-    });
-    expect(mockedDesconectar).toHaveBeenCalledWith(
-      "biz_1",
-      "google",
-      { modo: "revocar" },
-      { prefijo: "[WhatsApp]" }
+    const upsert = tx.booking.upsert.mock.calls[0][0];
+    expect(upsert.create).toEqual(
+      expect.objectContaining({
+        externalEventId: undefined,
+        copiaEnCalendario: "pendiente",
+        copiaError: "Google no responde",
+        copiaIntentos: 0,
+      })
     );
+    expect(upsert.update).toEqual(
+      expect.objectContaining({
+        externalEventId: null,
+        copiaEnCalendario: "pendiente",
+      })
+    );
+    expect(tx.lead.updateMany).toHaveBeenCalled();
+    expect(mockedEnqueueCopia).toHaveBeenCalledTimes(1);
+    const [payload, taskId, scheduleTime] = mockedEnqueueCopia.mock.calls[0];
+    expect(payload).toEqual({ bookingId: "booking_9", attempt: 1 });
+    expect(taskId).toMatch(/^copia-de-la-cita-booking_9-1-\d+$/);
+    expect((scheduleTime as Date).getTime()).toBeGreaterThan(Date.now());
+    expect(mockedEnqueueCopia.mock.invocationCallOrder[0]).toBeGreaterThan(
+      mockedTransaction.mock.invocationCallOrder[0]
+    );
+    // Sin evento creado no hay nada que deshacer.
+    expect(mockedCancelEvent).not.toHaveBeenCalled();
+    expect(mockedAvisarNueva).toHaveBeenCalled();
+  });
 
-    // Sin conexión operativa ni se entra al lock.
-    mockedBusinessFindUnique.mockResolvedValue({
-      ...NEGOCIO,
-      calendarConnections: [],
-    } as never);
-    expect(await reservarDesdeListaDeEspera(ENTRADA_SI)).toEqual({
-      estado: "sin_calendario",
-    });
-
-    mockedBusinessFindUnique.mockResolvedValue(NEGOCIO as never);
+  it("lock no adquirido ⇒ lock con lead abierto", async () => {
     mockedLock.mockResolvedValue(null);
     expect(await reservarDesdeListaDeEspera(ENTRADA_SI)).toEqual({
       estado: "lock",
     });
     expect(mockedLeadUpdateMany).not.toHaveBeenCalled();
+    expect(mockedBook).not.toHaveBeenCalled();
   });
 
   it("hueco ocupado ⇒ ocupado y lead cerrado ocupado", async () => {

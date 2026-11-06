@@ -29,15 +29,16 @@ import {
 } from "../calendar/borradoDeEvento.js";
 import {
   SELECT_CONEXION_DE_CALENDARIO,
-  origenExternoDeLaCita,
-  puedeReservar,
-  marcarCalendarioDesconectado,
   origenDeCalendario,
   resolverConexionDeCalendario,
-  usaCalendarioExterno,
   type ConexionResuelta,
 } from "../calendar/conexion.js";
-import { proveedorDesdeErrorDeReconexion } from "../../adapters/calendar/errors.js";
+import {
+  camposDeLaCopia,
+  encolarCopiaDeLaCita,
+  intentarCopiaDeLaCita,
+  type EstadoDeCopia,
+} from "../calendar/copiaDeLaCita.js";
 import { normalizarProveedorDeCalendario } from "../../adapters/calendar/CalendarProvider.js";
 import { cancelarReserva } from "../bookings/cancelacion.js";
 import {
@@ -339,13 +340,6 @@ async function describirCita(cita: Cita, timezone: string): Promise<string> {
 // Negocio, calendario y disponibilidad (misma receta que la lista de espera)
 // ---------------------------------------------------------------------------
 
-// Dos motivos escritos para el Gestor (le dicen al modelo qué hacer); la
-// agenda del panel los reconoce por identidad y pone los suyos.
-export const MOTIVO_SIN_CALENDARIO =
-  "El calendario no está conectado (o hay que volver a conectarlo): sin él no puedo apuntar citas. Se conecta desde el panel, con el enlace de contexto_negocio.";
-export const MOTIVO_CALENDARIO_ILEGIBLE =
-  "Ahora mismo no puedo leer el calendario del negocio; sin verlo no apunto nada. Inténtalo en un rato.";
-
 const SELECT_NEGOCIO_AGENDA = {
   name: true,
   schedule: true,
@@ -384,15 +378,10 @@ async function negocioParaReservar(
         "La suscripción no está al día: hasta que se regularice desde el panel no se pueden apuntar citas.",
     };
   }
+  // El calendario conectado no decide si se apunta una cita
+  // (PLAN-AGENDA-PRINCIPAL.md): se apunta en la agenda de Alhabla y se le
+  // copia después.
   const conexion = resolverConexionDeCalendario(business);
-  if (!puedeReservar(conexion)) {
-    // Nunca se reserva a ciegas (auditoría de septiembre): sin calendario
-    // operativo, la cita se hace desde el panel cuando esté conectado.
-    return {
-      ok: false,
-      motivo: MOTIVO_SIN_CALENDARIO,
-    };
-  }
   return { ok: true, business, conexion };
 }
 
@@ -460,13 +449,9 @@ async function comprobarHueco(input: {
   if (!restricciones.success) {
     return { ok: false, motivo: restricciones.message };
   }
+  // Si el calendario conectado no se puede leer, se apunta igual con lo que
+  // se sabe (PLAN-AGENDA-PRINCIPAL.md, D2 y D3).
   const externo = await ocupacionExterna(conexion, start, durationMinutes);
-  if (usaCalendarioExterno(conexion) && !externo.calendarAvailabilityKnown) {
-    return {
-      ok: false,
-      motivo: MOTIVO_CALENDARIO_ILEGIBLE,
-    };
-  }
   const disponibilidad = await checkAvailability({
     businessId: business.id,
     schedule: business.schedule,
@@ -639,9 +624,11 @@ const anadirCita: AccionDelGestor<AnadirCita> = {
       const serviceNames = prep.servicios.map((s) => s.name);
       const clientName = sanearNombre(params.cliente) ?? params.cliente;
 
-      try {
-        const evento = (await calendarService.bookAppointment({
-          conexion,
+      const copia = await intentarCopiaDeLaCita({
+        conexion,
+        businessId: business.id,
+        log: { prefijo: "[Gestor]", etiqueta },
+        evento: {
           clientName,
           startDateTime: start.toISOString(),
           durationMinutes: prep.duracion,
@@ -655,32 +642,9 @@ const anadirCita: AccionDelGestor<AnadirCita> = {
             durationMinutes: prep.duracion,
             distintivo: meta.inboundMessageId,
           }),
-        })) as { id?: string } | undefined;
-        eventoCreado = evento?.id;
-      } catch (error) {
-        const proveedorRoto = proveedorDesdeErrorDeReconexion(error);
-        if (proveedorRoto) {
-          await marcarCalendarioDesconectado(
-            business.id,
-            proveedorRoto,
-            { modo: "revocar" },
-            { prefijo: "[Gestor]" }
-          );
-          return {
-            ok: false,
-            mensaje:
-              "El calendario ha dejado de responder y hay que volver a conectarlo desde el panel; no he apuntado la cita.",
-          };
-        }
-        console.error(
-          `[Gestor] ${etiqueta}: el calendario ${conexion.provider} del negocio ${business.id} no aceptó la cita: ${errorMessage(error)}`
-        );
-        return {
-          ok: false,
-          mensaje:
-            "El calendario no ha aceptado la cita ahora mismo; no la he apuntado. Inténtalo en un rato.",
-        };
-      }
+        },
+      });
+      eventoCreado = copia.externalEventId ?? undefined;
 
       const now = new Date();
       let bookingId: string;
@@ -727,7 +691,7 @@ const anadirCita: AccionDelGestor<AnadirCita> = {
               // Gestor por WhatsApp: misma acción, distinto origen.
               createdVia: meta.origen === "panel" ? "owner_panel" : "owner_chat",
               externalEventId: eventoCreado ?? undefined,
-              ...origenExternoDeLaCita(conexion),
+              ...camposDeLaCopia(copia),
             },
             update: {
               programedAt: start,
@@ -736,8 +700,8 @@ const anadirCita: AccionDelGestor<AnadirCita> = {
               serviceIds: prep.servicios.map((s) => s.id),
               clientName,
               clientPhone: params.telefono ?? null,
-              externalEventId: eventoCreado ?? undefined,
-              ...origenExternoDeLaCita(conexion),
+              externalEventId: eventoCreado ?? null,
+              ...camposDeLaCopia(copia),
               isCancelled: false,
               cancelledAt: null,
               cancelledBy: null,
@@ -780,11 +744,12 @@ const anadirCita: AccionDelGestor<AnadirCita> = {
       console.log(
         `[Gestor] ${etiqueta}: cita ${bookingId} apuntada por el dueño del negocio ${business.id} (${formatearCita(start, ctx.timezone)})`
       );
+      if (copia.reintentar) await encolarCopiaDeLaCita(bookingId);
       const cuando = formatearCita(start, ctx.timezone);
       const con = asignado ? ` con ${asignado.name}` : "";
       return {
         ok: true,
-        mensaje: `Hecho: ${clientName} queda apuntado el ${cuando}, ${listar(serviceNames)}${con}. ${conexion.agendaPropia ? "Ya está en tu agenda." : "Ya está en tu calendario."}`,
+        mensaje: `Hecho: ${clientName} queda apuntado el ${cuando}, ${listar(serviceNames)}${con}. ${copia.copiaEnCalendario === "hecha" ? "Ya está en tu agenda y en tu calendario." : "Ya está en tu agenda."}`,
         nota: `Cita ${bookingId} creada: ${clientName}, ${cuando}, ${listar(serviceNames)}${con}${params.telefono ? `, móvil ${params.telefono}` : ", sin móvil"}.`,
         siguiente: params.telefono
           ? {
@@ -933,10 +898,6 @@ const moverCita: AccionDelGestor<MoverCita> = {
         pasada: "Esa hora ya ha pasado.",
         agenda_ocupada:
           "La agenda está ocupada ahora mismo con otra reserva. Espera un momento y vuelve a pedírmelo.",
-        calendario_desconectado:
-          "El calendario ha dejado de responder y hay que volver a conectarlo desde el panel; la cita sigue como estaba.",
-        calendario_rechaza:
-          "El calendario no ha aceptado la nueva hora; la cita sigue como estaba. Inténtalo en un rato.",
         cancelada_entre_medias:
           "Esa cita se canceló mientras la movía; no he hecho nada.",
         error_interno:
@@ -958,7 +919,7 @@ const moverCita: AccionDelGestor<MoverCita> = {
     const con = asignado ? ` con ${asignado.name}` : "";
     return {
       ok: true,
-      mensaje: `Hecho: ${descripcionAntes} pasa al ${cuando}${con}. El calendario ya está al día.`,
+      mensaje: `Hecho: ${descripcionAntes} pasa al ${cuando}${con}.${r.copia === "hecha" ? " Tu calendario ya está al día." : ""}`,
       nota: `Cita ${cita.id} movida al ${cuando}${con}${telefono ? `, móvil ${telefono}` : ", sin móvil"}.`,
       siguiente: telefono
         ? {
@@ -983,8 +944,6 @@ export type FalloAlMover = {
     | "pasada"
     | "agenda_ocupada"
     | "sin_hueco"
-    | "calendario_desconectado"
-    | "calendario_rechaza"
     | "cancelada_entre_medias"
     | "error_interno";
   /** El motivo en palabras del dueño cuando depende del caso (horario,
@@ -1016,6 +975,8 @@ export async function moverReserva(input: {
       start: Date;
       asignado: { id: string; name: string } | null;
       descripcionAntes: string;
+      /** Estado de la copia en el calendario conectado tras moverla. */
+      copia: EstadoDeCopia | null;
     }
   | FalloAlMover
 > {
@@ -1075,10 +1036,14 @@ export async function moverReserva(input: {
 
     // Evento nuevo primero, reserva después, evento viejo al final: si
     // algo falla a medias, el calendario tiene una cita de más (visible)
-    // y nunca una de menos.
-    try {
-      const evento = (await calendarService.bookAppointment({
-        conexion,
+    // y nunca una de menos. Si el calendario no acepta el nuevo, la cita se
+    // mueve igual en Alhabla y conserva su evento viejo para que el job de
+    // copia lo sustituya (PLAN-AGENDA-PRINCIPAL.md, regla 3).
+    const copia = await intentarCopiaDeLaCita({
+      conexion,
+      businessId: business.id,
+      log: { prefijo: prefijoDeLog, etiqueta },
+      evento: {
         clientName,
         startDateTime: start.toISOString(),
         durationMinutes: cita.durationMinutes,
@@ -1092,24 +1057,11 @@ export async function moverReserva(input: {
           durationMinutes: cita.durationMinutes,
           distintivo: input.idempotencia.distintivo,
         }),
-      })) as { id?: string } | undefined;
-      eventoNuevo = evento?.id;
-    } catch (error) {
-      const proveedorRoto = proveedorDesdeErrorDeReconexion(error);
-      if (proveedorRoto) {
-        await marcarCalendarioDesconectado(
-          business.id,
-          proveedorRoto,
-          { modo: "revocar" },
-          { prefijo: prefijoDeLog }
-        );
-        return fallo("calendario_desconectado");
-      }
-      console.error(
-        `${prefijoDeLog} ${etiqueta}: el calendario ${conexion.provider} del negocio ${business.id} no aceptó la nueva hora de ${cita.id}: ${errorMessage(error)}`
-      );
-      return fallo("calendario_rechaza");
-    }
+      },
+    });
+    eventoNuevo = copia.externalEventId ?? undefined;
+    const conservaEventoViejo =
+      copia.copiaEnCalendario === "pendiente" && Boolean(cita.externalEventId);
 
     const movida = await prisma.booking
       .updateMany({
@@ -1117,8 +1069,16 @@ export async function moverReserva(input: {
         data: {
           programedAt: start,
           professionalId: asignado?.id ?? null,
-          externalEventId: eventoNuevo ?? null,
-          ...origenExternoDeLaCita(conexion),
+          ...(conservaEventoViejo
+            ? {
+                copiaEnCalendario: copia.copiaEnCalendario,
+                copiaError: copia.copiaError,
+                copiaIntentos: 0,
+              }
+            : {
+                externalEventId: eventoNuevo ?? null,
+                ...camposDeLaCopia(copia),
+              }),
           // El cliente aún no ha visto la hora nueva.
           confirmedByClientAt: null,
         },
@@ -1159,6 +1119,7 @@ export async function moverReserva(input: {
     // la hora que tenía la cita ANTES de moverla. Nunca el que se acaba de
     // guardar como puntero (un reintento con la misma clave lo devolvería).
     if (
+      !conservaEventoViejo &&
       cita.externalEventId &&
       cita.externalCalendarProvider &&
       cita.externalEventId !== eventoNuevo
@@ -1203,7 +1164,15 @@ export async function moverReserva(input: {
     console.log(
       `${prefijoDeLog} ${etiqueta}: cita ${cita.id} del negocio ${business.id} movida por el dueño al ${formatearCita(start, input.timezone)}`
     );
-    return { ok: true, cita, start, asignado, descripcionAntes };
+    if (copia.reintentar) await encolarCopiaDeLaCita(cita.id);
+    return {
+      ok: true,
+      cita,
+      start,
+      asignado,
+      descripcionAntes,
+      copia: copia.copiaEnCalendario,
+    };
   } finally {
     await releaseBookingLock(business.id, lockToken);
   }

@@ -95,6 +95,9 @@ vi.mock("../../../src/lib/cloudTasks.js", () => ({
   enqueueSmsJob: vi.fn(),
   enqueueWhatsappJob: vi.fn(),
   enqueueEmailJob: vi.fn(),
+  // La copia de la cita en el calendario (calendar/copiaDeLaCita.ts, real).
+  enqueueCopiaDeLaCitaJob: vi.fn(),
+  enqueueVolcadoDeLaAgendaJob: vi.fn(),
 }));
 
 vi.mock("../../../src/modules/whatsapp/avisosNegocio.js", () => ({
@@ -1014,19 +1017,6 @@ describe("book_appointment: di_al_cliente", () => {
         expectCamposCortos(result);
       }
 
-      it("CALENDAR_UNAVAILABLE (el calendario no se pudo leer)", async () => {
-        const availabilityToken = await tokenDelCambio();
-        mockedGetBusyIntervals.mockResolvedValue({
-          intervals: [],
-          calendarAvailabilityKnown: false,
-        } as any);
-
-        const { result } = await reservar("call_1", { availabilityToken });
-
-        expect(result!.code).toBe("CALENDAR_UNAVAILABLE");
-        expectPendiente(result);
-      });
-
       it("BOOKING_LOCK_TIMEOUT (otra reserva tenía el cerrojo)", async () => {
         const availabilityToken = await tokenDelCambio();
         mockedAdquirirCerrojo.mockResolvedValueOnce({
@@ -1052,28 +1042,68 @@ describe("book_appointment: di_al_cliente", () => {
         expectPendiente(result);
       });
 
-      it("CALENDAR_NOT_CONNECTED (sin calendario operativo)", async () => {
+      // Desde PLAN-AGENDA-PRINCIPAL.md el calendario ya no deja la petición
+      // pendiente (ver el describe de abajo): lo que queda es que la
+      // reserva no se pueda guardar en la BD.
+      it("un fallo al guardar la reserva en la BD (se reintenta solo)", async () => {
         const availabilityToken = await tokenDelCambio();
-        // El calendario se desconecta entre la comprobación y la reserva.
-        mockedBusinessFindUnique.mockResolvedValue(
-          buildBusiness({ calendarConnections: [] }) as any
-        );
-        await invalidarCacheDeVoz("business_123", "[Test]");
-
-        const { result } = await reservar("call_1", { availabilityToken });
-
-        expect(result!.code).toBe("CALENDAR_NOT_CONNECTED");
-        expectPendiente(result);
-      });
-
-      it("un fallo del calendario al crear el evento (se reintenta solo)", async () => {
-        const availabilityToken = await tokenDelCambio();
-        mockedBookAppointment.mockRejectedValue(new Error("timeout"));
+        mockedBookingUpsert.mockRejectedValueOnce(new Error("BD caída"));
 
         const { result } = await reservar("call_1", { availabilityToken });
 
         expect(result!.code).toBe("BOOK_APPOINTMENT_UNEXPECTED_ERROR");
         expectPendiente(result);
+      });
+    });
+
+    // Antes estos tres casos guardaban la petición como pendiente
+    // (CALENDAR_UNAVAILABLE, CALENDAR_NOT_CONNECTED y el error al crear el
+    // evento). Ahora la cita nueva entra en la agenda de Alhabla y la
+    // anterior se anula: el calendario solo recibe una copia.
+    describe("el calendario ya no deja la petición pendiente: el cambio entra", () => {
+      beforeEach(() => {
+        mockedLeadCreate.mockResolvedValue({ id: "lead_1" } as any);
+        vi.spyOn(console, "error").mockImplementation(() => undefined);
+      });
+
+      it.each([
+        [
+          "el calendario no se pudo leer",
+          () =>
+            mockedGetBusyIntervals.mockResolvedValue({
+              intervals: [],
+              calendarAvailabilityKnown: false,
+            } as any),
+        ],
+        [
+          "el calendario se quitó entre la comprobación y la reserva",
+          async () => {
+            mockedBusinessFindUnique.mockResolvedValue(
+              buildBusiness({ calendarConnections: [] }) as any
+            );
+            await invalidarCacheDeVoz("business_123", "[Test]");
+          },
+        ],
+        [
+          "el calendario no aceptó la copia de la cita",
+          () => mockedBookAppointment.mockRejectedValue(new Error("timeout")),
+        ],
+      ])("%s: su cita queda cambiada", async (_caso, preparar) => {
+        const availabilityToken = await tokenDelCambio();
+        await preparar();
+
+        const { result } = await reservar("call_1", { availabilityToken });
+
+        expect(result!.success).toBe(true);
+        expect(result!.code).toBeUndefined();
+        expect(result!.citaAnterior).toBe("anulada");
+        expect(result!.di_al_cliente).toContain("Dile que su cita queda cambiada");
+        expect(result!.di_al_cliente).not.toContain("hasta que se confirme");
+        expect(mockedLeadCreate).not.toHaveBeenCalled();
+        expect(mockedCancelarReserva).toHaveBeenCalledWith(
+          expect.objectContaining({ bookingId: ID_DE_CITA })
+        );
+        expectCamposCortos(result);
       });
     });
 

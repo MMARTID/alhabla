@@ -28,10 +28,7 @@ import {
   enlazarConLaReservaNueva,
   enlazarReservaModificada,
 } from "../bookings/reservaModificada.js";
-import {
-  claveDeCacheDeVoz,
-  invalidarCacheDeVoz,
-} from "../../lib/voiceConfigCache.js";
+import { claveDeCacheDeVoz } from "../../lib/voiceConfigCache.js";
 import {
   checkBusinessHours,
   checkBookingRestrictions,
@@ -50,26 +47,18 @@ import {
   ventanaDeLaCita,
 } from "../calendar/borradoDeEvento.js";
 import {
-  codigoDeCalendarioNoOperativo,
-  conexionConfirmada,
-  origenExternoDeLaCita,
-  puedeReservar,
-  marcarCalendarioDesconectado,
   origenDeCalendario,
   resolverConexionDeCalendario,
   SELECT_CONEXION_DE_CALENDARIO,
-  usaCalendarioExterno,
   type FilaDeConexionDeCalendario,
 } from "../calendar/conexion.js";
 import {
-  DESCRIPTORES_DE_PROVEEDOR,
-  normalizarProveedorDeCalendario,
-} from "../../adapters/calendar/CalendarProvider.js";
-import {
-  codigoDeReconexion,
-  esCalendarBusinessError,
-  proveedorDesdeErrorDeReconexion,
-} from "../../adapters/calendar/errors.js";
+  camposDeLaCopia,
+  encolarCopiaDeLaCita,
+  intentarCopiaDeLaCita,
+} from "../calendar/copiaDeLaCita.js";
+import { normalizarProveedorDeCalendario } from "../../adapters/calendar/CalendarProvider.js";
+import { esCalendarBusinessError } from "../../adapters/calendar/errors.js";
 import {
   cuandoEnOtroIdioma,
   cuandoParaDecir,
@@ -394,19 +383,6 @@ type BusinessVoiceConfig = FilaDeConexionDeCalendario & {
 const MENSAJE_SERVICIO_SUSPENDIDO =
   "No puedo agendar la cita en este momento. Por favor, contacta con el negocio directamente.";
 
-/** Instrucción para la recepcionista cuando el negocio no tiene calendario
- * operativo: toma nota en vez de dar hora. La petición tiene que acabar en
- * book_appointment, que es quien la guarda como pendiente y avisa al dueño;
- * sin esa llamada no queda rastro. No se nombra a Google ni a ningún
- * calendario: el cliente no tiene por qué saber cómo trabaja el negocio. */
-const MENSAJE_TOMA_NOTA_SIN_CALENDARIO =
-  "Ahora mismo no puedes confirmar ni ofrecer ninguna hora: el negocio no tiene la agenda disponible para reservar. Di al cliente que tomas nota de su petición y que el negocio se pondrá en contacto para confirmarla. Pídele su nombre y un teléfono de contacto y llama a book_appointment con la fecha y hora que pidió, sin availabilityToken: así la petición le llega al negocio. No propongas otras horas ni menciones Google, Outlook ni ningún calendario.";
-
-/** Lo que oye el cliente cuando no hay calendario operativo y la petición se
- * guarda como pendiente. Vale para «nunca conectado» y para «caducado». */
-const MENSAJE_PETICION_ANOTADA =
-  "He tomado nota de la petición: el negocio se pondrá en contacto para confirmar la cita. No la des por confirmada ni menciones calendarios.";
-
 async function loadBusinessConfig(
   businessId: string
 ): Promise<BusinessVoiceConfig | null> {
@@ -450,18 +426,11 @@ async function getCachedVoiceConfig(
   try {
     const cachedConfigStr = await leerClave(claveDeCacheDeVoz(businessId));
     if (cachedConfigStr) {
-      const parsed = JSON.parse(cachedConfigStr) as BusinessVoiceConfig;
-      // Token presente y flag === true: una entrada cacheada con el
-      // calendario roto se descarta para releer de BD. Best-effort: como
-      // todo borrado de voice_config, pasa por invalidarCacheDeVoz, que
-      // nunca lanza.
-      // En la agenda de Alhabla no hay conexión que confirmar: la entrada vale.
-      const conexionCacheada = resolverConexionDeCalendario(parsed);
-      if (conexionCacheada.agendaPropia || conexionConfirmada(conexionCacheada)) {
-        return parsed;
-      }
-
-      await invalidarCacheDeVoz(businessId, "[VoiceTools]");
+      // La entrada vale con o sin calendario conectado: desde
+      // PLAN-AGENDA-PRINCIPAL.md el calendario no decide si se reserva, y
+      // cualquier cambio de la conexión ya la invalida
+      // (invalidarCacheDeVoz en calendar/conexion.ts).
+      return JSON.parse(cachedConfigStr) as BusinessVoiceConfig;
     }
   } catch (err) {
     console.error(
@@ -771,36 +740,6 @@ async function executeCheckAvailability(
       return {
         ...yaHayCita,
         result: { available: false, ...yaHayCita.result },
-      };
-    }
-
-    // Sin calendario operativo (nunca conectado, o caducado) book_appointment
-    // va a guardar la petición como pendiente en vez de reservar: no se
-    // ofrece ni se confirma una hora que no se va a poder dar. Antes se
-    // comprobaba solo contra Postgres, el cliente oía «sí, hay hueco» y la
-    // reserva fallaba después (PLAN-AGENDA-ALHABLA.md, fase 0).
-    const conexionParaDisponibilidad = resolverConexionDeCalendario(business);
-    if (!puedeReservar(conexionParaDisponibilidad)) {
-      const code = codigoDeCalendarioNoOperativo(
-        business,
-        conexionParaDisponibilidad
-      );
-      console.warn(
-        `[VoiceTools] ${callLabel} check_availability sin ofrecer horas: el negocio no tiene calendario operativo (${code})`
-      );
-      return {
-        success: true,
-        result: {
-          available: false,
-          code,
-          message: MENSAJE_TOMA_NOTA_SIN_CALENDARIO,
-          cuando: cuandoEnSuIdioma(
-            startDateTime,
-            business.timezone || "Europe/Madrid",
-            idioma
-          ),
-          ...contestaEn(idioma),
-        },
       };
     }
 
@@ -2344,8 +2283,10 @@ async function reservarCita(
       return invalidDurationResult();
     }
 
+    // El calendario conectado es un complemento (PLAN-AGENDA-PRINCIPAL.md):
+    // la cita se reserva siempre en la agenda de Alhabla y se le copia
+    // después (intentarCopiaDeLaCita).
     const conexion = resolverConexionDeCalendario(business);
-    const hasCalendarConnection = puedeReservar(conexion);
 
     // Resuelto aquí arriba, antes de cualquier punto de fallo, para no
     // repetir la misma consulta a Call en cada uno de los tres sitios que
@@ -2353,6 +2294,26 @@ async function reservarCita(
     // fromNumber como fallback del teléfono de contacto del evento cuando
     // el cliente no pidió uno distinto (ver resolveCallForBusiness).
     const call = await resolveCallForBusiness(callId, business.id, callLabel);
+    // Sin la fila Call no hay dónde guardar la cita (Booking.callId es
+    // obligatorio): antes, con calendario, quedaba solo el evento en Google y
+    // la recepcionista la daba por reservada; sin calendario, ni eso. Desde
+    // PLAN-AGENDA-PRINCIPAL.md la cita vive en Alhabla, así que sin Call no
+    // se confirma nada.
+    if (!call) {
+      console.error(
+        `[VoiceTools] ${callLabel}: book_appointment sin llamada que vincular (callId=${callId ?? "—"}, negocio ${business.id}); no se reserva`
+      );
+      return {
+        success: true,
+        result: {
+          success: false,
+          code: "BOOKING_CALL_NOT_FOUND",
+          message:
+            "No he podido dejar la cita guardada." +
+            mensajeDeSeguimiento(null, telefonoParaClientes(business)),
+        },
+      };
+    }
     // Booking.clientPhone solo guarda un teléfono distinto del de la llamada
     // (schema.prisma): si dicta el mismo, se queda en null.
     const clientPhone =
@@ -2447,44 +2408,6 @@ async function reservarCita(
         canalDeLaTool(callId),
         telefonoParaClientes(business)
       );
-    }
-
-    if (!hasCalendarConnection) {
-      // `CALENDAR_NOT_CONNECTED` si el negocio nunca conectó un calendario;
-      // el código de reconexión del proveedor si lo tuvo y caducó. El aviso
-      // al dueño (avisosNegocio.motivoDeFallo) y el panel los distinguen; al
-      // cliente se le dice lo mismo en los dos casos, sin nombrar a Google.
-      const failureCode = codigoDeCalendarioNoOperativo(business, conexion);
-      const providerLabel = DESCRIPTORES_DE_PROVEEDOR[conexion.provider].nombre;
-      console.warn(
-        failureCode === "CALENDAR_NOT_CONNECTED"
-          ? `[VoiceTools] ${callLabel} no puede reservar: el negocio no tiene ningún calendario conectado; la petición se guarda como pendiente`
-          : `[VoiceTools] ${callLabel} no puede reservar: ${providerLabel} requiere reconexión; la petición se guarda como pendiente`
-      );
-      await guardarComoPendiente({
-        resolvedCall: call,
-        businessId: business.id,
-        clientName,
-        clientEmail,
-        clientPhone,
-        startDateTime,
-        durationMinutes: effectiveDuration,
-        serviceIds: requestedServiceIds,
-        professionalId,
-        replacesBookingId,
-        failureCode,
-        callLabel,
-        smsConsent,
-        createdVia: canalDeLaTool(callId),
-      });
-      return {
-        success: true,
-        result: {
-          success: false,
-          code: failureCode,
-          message: MENSAJE_PETICION_ANOTADA,
-        },
-      };
     }
 
     const businessHours = checkBusinessHours(
@@ -2684,55 +2607,11 @@ async function reservarCita(
         };
       }
 
-      // El negocio tiene calendario conectado pero no hemos podido leerlo
-      // (5xx de Google, timeout). Confirmar aquí es reservar a ciegas: si el
-      // dueño había metido una cita a mano en ese hueco, acabamos con dos
-      // clientes a la misma hora. Se guarda como pendiente y se reintenta.
-      // ¿El negocio trabaja con un calendario externo? Distingue el "no hay
-      // nada que leer" (negocio sin calendario, funciona solo con nuestra
-      // agenda) del "no he podido leerlo", que es una caída y no un permiso.
-      if (
-        usaCalendarioExterno(conexion) &&
-        !externalBusy.calendarAvailabilityKnown
-      ) {
-        console.warn(
-          `[VoiceTools] ${callLabel}: no se pudo leer el calendario del negocio; la reserva se guarda como pendiente en vez de confirmarse a ciegas`
-        );
-        const leadCalendarioIlegible = await guardarComoPendiente({
-          resolvedCall: call,
-          businessId: business.id,
-          clientName,
-          clientEmail,
-          clientPhone,
-          startDateTime,
-          durationMinutes: effectiveDuration,
-          serviceIds: verifiedServiceIds,
-          professionalId:
-            verifiedProfessionalId ??
-            availability.availableProfessionals[0]?.id,
-          replacesBookingId,
-          failureCode: "CALENDAR_UNAVAILABLE",
-          callLabel,
-          smsConsent,
-          createdVia: canalDeLaTool(callId),
-        });
-        if (leadCalendarioIlegible) {
-          await enqueueRetryFailedBooking(leadCalendarioIlegible);
-        }
-        return {
-          success: true,
-          result: {
-            success: false,
-            code: "CALENDAR_UNAVAILABLE",
-            message:
-              "No he podido comprobar la agenda del negocio en este momento." +
-              mensajeDeSeguimiento(
-                leadCalendarioIlegible,
-                telefonoParaClientes(business)
-              ),
-          },
-        };
-      }
+      // Si no se pudo leer el calendario conectado (caído, lento o
+      // caducado), se reserva igual con lo que se sabe: horario, ausencias,
+      // capacidad y las citas de Alhabla (PLAN-AGENDA-PRINCIPAL.md, D2 y D3).
+      // El dueño ya sabe que no se ve su calendario por la alerta de
+      // desconexión.
 
       // Si el hueco se había preasignado a alguien y sigue libre, se
       // respeta (el cliente ya oyó ese nombre); si se ocupó, se coge a
@@ -2748,10 +2627,10 @@ async function reservarCita(
         ? verifiedProfessionalName
         : elegido?.name;
 
-      // Idempotencia: si esta llamada YA tiene un Booking con un evento
-      // externo creado para esta misma fecha/duración exactas (Telnyx
-      // reintentando el tool call tras un timeout, por ejemplo), no se crea
-      // un segundo evento — se confirma reutilizando el que ya existe. Una
+      // Idempotencia: si esta llamada YA tiene la cita guardada para esta
+      // misma fecha/duración exactas (Telnyx reintentando el tool call tras
+      // un timeout, por ejemplo), no se vuelve a reservar ni a copiar — se
+      // confirma la que ya existe, tenga o no su copia en el calendario. Una
       // fecha/duración distinta solo llega hasta aquí si es un cambio
       // explícito de esa cita (replacesBookingId con su id); si no, ya se
       // ha respondido YA_HAY_CITA_EN_ESTA_LLAMADA.
@@ -2761,14 +2640,14 @@ async function reservarCita(
         // evento ya se borró al cancelar, así que hay que crear uno nuevo y
         // reactivar la fila (el `update` del upsert de abajo).
         if (
-          existingBooking?.externalEventId &&
+          existingBooking &&
           !existingBooking.isCancelled &&
           existingBooking.programedAt.getTime() ===
             new Date(startDateTime).getTime() &&
           existingBooking.durationMinutes === effectiveDuration
         ) {
           console.log(
-            `[VoiceTools] ${callLabel} ya tenía un evento creado para esta reserva exacta (${existingBooking.externalEventId}); no se crea uno nuevo`
+            `[VoiceTools] ${callLabel} ya tenía guardada esta reserva exacta (${existingBooking.id}); no se reserva de nuevo`
           );
           // Reintento del tool call: los mensajes al cliente ya quedaron
           // programados (idempotentes por clave), pero el LLM solo ve ESTA
@@ -2803,31 +2682,57 @@ async function reservarCita(
       }
 
       try {
-        const result = await calendarService.bookAppointment({
-          clientName,
-          startDateTime,
-          durationMinutes: effectiveDuration,
-          clientEmail,
-          clientPhone: effectiveClientPhone,
-          serviceNames: verifiedServiceNames,
-          professionalName: resolvedProfessionalName,
+        // Primero la copia en el calendario conectado, que nunca falla
+        // hacia fuera: si no entra, la cita se guarda igual con la copia
+        // pendiente y se reintenta después (calendar/copiaDeLaCita.ts).
+        const copia = await intentarCopiaDeLaCita({
           conexion,
-          timezone: business.timezone,
-          // Tras cancelar en la misma llamada la clave cambia (`distintivo`):
-          // con la misma, Google respondería 409 y el adaptador devolvería
-          // el evento CANCELADO como si fuera nuevo (invisible en la agenda
-          // y descartado al reconciliar: doble reserva).
-          idempotencyKey: call
-            ? buildCalendarIdempotencyKey({
-                callId: call.id,
-                startDateTime,
-                durationMinutes: effectiveDuration,
-                distintivo: reservaPrevia?.isCancelled
-                  ? `reactivada:${reservaPrevia.cancelledAt?.getTime() ?? "sin-fecha"}`
-                  : undefined,
-              })
-            : undefined,
+          businessId: business.id,
+          log: { prefijo: "[VoiceTools]", etiqueta: callLabel },
+          evento: {
+            clientName,
+            startDateTime,
+            durationMinutes: effectiveDuration,
+            clientEmail,
+            clientPhone: effectiveClientPhone,
+            serviceNames: verifiedServiceNames,
+            professionalName: resolvedProfessionalName,
+            timezone: business.timezone,
+            // Tras cancelar en la misma llamada la clave cambia (`distintivo`):
+            // con la misma, Google respondería 409 y el adaptador devolvería
+            // el evento CANCELADO como si fuera nuevo (invisible en la agenda
+            // y descartado al reconciliar: doble reserva).
+            idempotencyKey: call
+              ? buildCalendarIdempotencyKey({
+                  callId: call.id,
+                  startDateTime,
+                  durationMinutes: effectiveDuration,
+                  distintivo: reservaPrevia?.isCancelled
+                    ? `reactivada:${reservaPrevia.cancelledAt?.getTime() ?? "sin-fecha"}`
+                    : undefined,
+                })
+              : undefined,
+          },
         });
+        const result = { id: copia.externalEventId, htmlLink: copia.htmlLink };
+        // Una cita de esta llamada que cambia de hora y cuya copia nueva no
+        // entró conserva su evento viejo: el job de copia lo sustituye.
+        // Una cancelada no tiene evento vivo que conservar: cancelarReserva ya
+        // lo borró.
+        const conservaEventoViejo =
+          copia.copiaEnCalendario === "pendiente" &&
+          Boolean(reservaPrevia?.externalEventId) &&
+          !reservaPrevia?.isCancelled;
+        const camposDeCopiaAlActualizar = conservaEventoViejo
+          ? {
+              copiaEnCalendario: copia.copiaEnCalendario,
+              copiaError: copia.copiaError,
+              copiaIntentos: 0,
+            }
+          : {
+              externalEventId: copia.externalEventId,
+              ...camposDeLaCopia(copia),
+            };
 
         // Persist booking in database, vinculada a la llamada exacta cuando se
         // conoce su callId (ver resolveCallForBusiness).
@@ -2847,8 +2752,8 @@ async function reservarCita(
               clientPhone: clientPhone || undefined,
               smsConsent,
               createdVia: canalDeLaTool(callId),
-              externalEventId: (result as { id?: string })?.id ?? undefined,
-              ...origenExternoDeLaCita(conexion),
+              externalEventId: copia.externalEventId ?? undefined,
+              ...camposDeLaCopia(copia),
             },
             update: {
               programedAt: new Date(startDateTime),
@@ -2858,8 +2763,7 @@ async function reservarCita(
               clientName,
               clientPhone: clientPhone || undefined,
               smsConsent,
-              externalEventId: (result as { id?: string })?.id ?? undefined,
-              ...origenExternoDeLaCita(conexion),
+              ...camposDeCopiaAlActualizar,
               // Cancelar y volver a reservar en la misma llamada reactiva la
               // fila: sin esto quedaba cancelada con la hora nueva y el job
               // de confirmación la descartaba (RESERVA_CANCELADA).
@@ -2933,8 +2837,9 @@ async function reservarCita(
         // reconciliara.
         // Si la reserva previa estaba cancelada, su evento ya lo borró
         // `cancelarReserva`: no hay nada que limpiar.
-        const eventoNuevoId = (result as { id?: string })?.id;
+        const eventoNuevoId = result.id;
         if (
+          copia.copiaEnCalendario === "hecha" &&
           reservaPrevia?.externalEventId &&
           !reservaPrevia.isCancelled &&
           reservaPrevia.externalEventId !== eventoNuevoId
@@ -2977,6 +2882,9 @@ async function reservarCita(
         }
 
         console.log(`[VoiceTools] ${callLabel} agendó la cita correctamente`);
+        if (copia.reintentar && reservaGuardadaId) {
+          await encolarCopiaDeLaCita(reservaGuardadaId);
+        }
 
         // Cambio de cita: con la nueva ya guardada, se anula la que cambia
         // (antes el prompt mandaba cancelar primero, y si la reserva fallaba
@@ -3097,51 +3005,6 @@ async function reservarCita(
           },
         };
       } catch (error) {
-        const proveedorRoto = proveedorDesdeErrorDeReconexion(error);
-        if (proveedorRoto) {
-          // El token ya fue rechazado (invalid_grant): se marca desconectado,
-          // se anula el refresh token y se invalida la caché de voz.
-          await marcarCalendarioDesconectado(
-            business.id,
-            proveedorRoto,
-            { modo: "revocar" },
-            { prefijo: "[VoiceTools]" }
-          );
-          const codigoReconexion = codigoDeReconexion(proveedorRoto);
-
-          // Reconectar el calendario requiere una acción manual del negocio:
-          // guardamos la solicitud pero NO la reintentamos sola en segundo plano.
-          const leadReconexion = await guardarComoPendiente({
-            resolvedCall: call,
-            businessId: business.id,
-            clientName,
-            clientEmail,
-            clientPhone,
-            startDateTime,
-            durationMinutes: effectiveDuration,
-            serviceIds: verifiedServiceIds,
-            professionalId: resolvedProfessionalId,
-            replacesBookingId,
-            failureCode: codigoReconexion,
-            callLabel,
-            smsConsent,
-            createdVia: canalDeLaTool(callId),
-          });
-
-          return {
-            success: true,
-            result: {
-              success: false,
-              code: codigoReconexion,
-              message:
-                `No pude acceder al calendario del negocio porque la conexión con ${DESCRIPTORES_DE_PROVEEDOR[proveedorRoto].nombreCorto} expiró o fue revocada.` +
-                (leadReconexion
-                  ? " He tomado nota de tu solicitud para confirmártela en cuanto el negocio la reconecte."
-                  : mensajeDeSeguimiento(null, telefonoParaClientes(business))),
-            },
-          };
-        }
-
         // Cualquier otro fallo (BOOK_APPOINTMENT_FAILED, timeout, rate limit, o
         // un error inesperado): nunca rompemos la llamada con un 500 — siempre
         // degradamos a un mensaje hablable y dejamos la solicitud guardada para
