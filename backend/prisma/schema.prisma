@@ -485,6 +485,13 @@ model Agent {
   // `telnyxAssistantId` sigue siendo el de las llamadas (el del número).
   telnyxChatAssistantId String? @unique
   telnyxChatConfigHash  String?
+  // El de la lengua cooficial de la zona (tipo «recepcionista_cooficial»,
+  // desde el 2026-11-06): Soniox y la voz de Marta o Sergio. Las llamadas
+  // empiezan en el de telnyxAssistantId (flux, más rápido) y el backend
+  // cambia a este si quien llama habla la lengua (lib/cambioDeIdioma.ts).
+  // Null fuera de una zona cooficial.
+  telnyxCooficialAssistantId String? @unique
+  telnyxCooficialConfigHash  String?
 
   business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
   calls    Call[]
@@ -636,7 +643,14 @@ model Call {
   // (lib/grabacion.ts, tocaPreguntarPorGrabar).
   grabacionPreguntadaAt  DateTime?
   providerCallId         String?
+  // La primera conversación de Telnyx de la llamada. Si se cambió de
+  // assistant por el idioma (lib/cambioDeIdioma.ts), cada assistant es otra
+  // conversación: conversacionesDeTelnyx las guarda todas, en el orden en que
+  // terminaron, y assistantsArrancados dice cuántas habrá. El informe sale
+  // cuando han terminado todas.
   providerConversationId String?
+  conversacionesDeTelnyx String[]              @default([])
+  assistantsArrancados   Int                   @default(1)
   // OJO: en Telnyx, providerCostCents viene del webhook call.cost y SOLO
   // cubre telefonía (sip-trunking, call-control, grabación) — el coste de
   // IA (LLM+STT+TTS) se factura aparte como producto ai-voice-assistant y

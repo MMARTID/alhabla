@@ -71,6 +71,10 @@ export async function processRecuperarTranscripcionJob(
       id: true,
       businessId: true,
       transcript: { select: { id: true } },
+      // Con un cambio de idioma (lib/cambioDeIdioma.ts), el informe espera
+      // a la última conversación.
+      assistantsArrancados: true,
+      conversacionesDeTelnyx: true,
     },
   });
   if (!call) {
@@ -106,11 +110,16 @@ export async function processRecuperarTranscripcionJob(
     console.log(
       `[Telnyx] Transcripción recuperada en el intento ${intento} con ${guardados} mensajes (${describir(contexto)})`
     );
-    await pedirInformeDeLlamada({
-      callRowId: call.id,
-      businessId: call.businessId,
-      origen: `recuperar la transcripción (intento ${intento})`,
-    });
+    if (
+      call.assistantsArrancados <= 1 ||
+      call.conversacionesDeTelnyx.length >= call.assistantsArrancados
+    ) {
+      await pedirInformeDeLlamada({
+        callRowId: call.id,
+        businessId: call.businessId,
+        origen: `recuperar la transcripción (intento ${intento})`,
+      });
+    }
     return;
   }
 

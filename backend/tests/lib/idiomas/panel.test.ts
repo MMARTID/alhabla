@@ -311,7 +311,7 @@ describe("vistaPreviaDeIdiomas", () => {
       "Habla en 9 idiomas: español, inglés, francés, catalán, alemán, italiano, portugués, neerlandés y ruso. Saluda en español y sigue en el idioma de quien llama."
     );
     expect(vista.avisos).toEqual([
-      "Como el negocio está donde el catalán es lengua oficial, también lo entiende y, si le hablan en catalán, contesta en catalán con la voz de Marta. A cambio tarda algo más en contestar, también cuando le hablan en español: entre medio segundo y un segundo y medio más por respuesta.",
+      "Como el negocio está donde el catalán es lengua oficial, también lo entiende y, si le hablan en catalán, contesta en catalán con la voz de Marta. En catalán tarda algo más en contestar: uno o dos segundos más por respuesta.",
     ]);
   });
 

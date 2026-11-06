@@ -92,8 +92,9 @@ describe("resolverIdiomas — voz y transcripción", () => {
 });
 
 // La cooficial de donde está el negocio (lib/idiomas/zona.ts, decisión del
-// 2026-10-14): Soniox desde el principio y la voz Ultra del principal; la
-// cooficial la contesta Marta o Sergio en un nodo del conversation_flow.
+// 2026-10-14). Desde el 2026-11-06, el assistant del principal con flux y
+// la voz Ultra, y la cooficial en su propio assistant (Soniox y Marta o
+// Sergio), al que se cambia a mitad de llamada (lib/cambioDeIdioma.ts).
 describe("resolverIdiomas — la cooficial de la zona", () => {
   const conZona = (
     zona: CodigoDeIdioma | null,
@@ -101,7 +102,7 @@ describe("resolverIdiomas — la cooficial de la zona", () => {
     voiceGender: GeneroDeVoz = "femenina"
   ) => resolverIdiomas({ voiceLanguage, voiceGender, zona });
 
-  it("principal español en Cataluña: habla ocho, atiende Blanca y Soniox entiende español y catalán", () => {
+  it("principal español en Cataluña: habla ocho, atiende Blanca con flux y el catalán va en su assistant con Soniox", () => {
     const perfil = conZona("ca-ES");
     expect(perfil.voz.nombre).toBe("Blanca");
     expect(perfil.familia).toBe("ultra");
@@ -116,14 +117,12 @@ describe("resolverIdiomas — la cooficial de la zona", () => {
       "nl-NL",
     "ru-RU",
     ]);
-    expect(perfil.transcripcion).toEqual({
-      motor: "soniox",
-      pistas: ["es", "ca"],
-    });
+    expect(perfil.transcripcion).toEqual({ motor: "flux", idioma: "multi" });
     expect(perfil.cooficialDeLaZona).toEqual({
       idioma: "ca-ES",
       voz: expect.objectContaining({ nombre: "Marta" }),
       iso: "ca",
+      transcripcion: { motor: "soniox", pistas: ["es", "ca"] },
     });
     // Las voces que se eligen siguen siendo las del principal.
     expect(perfil.voces.every((voz) => voz.proveedor === "telnyx")).toBe(true);
@@ -136,8 +135,9 @@ describe("resolverIdiomas — la cooficial de la zona", () => {
       idioma: "gl-ES",
       voz: expect.objectContaining({ nombre: "Sergio" }),
       iso: "gl",
+      transcripcion: { motor: "soniox", pistas: ["es", "gl"] },
     });
-    expect(conZona("eu-ES").transcripcion).toEqual({
+    expect(conZona("eu-ES").cooficialDeLaZona?.transcripcion).toEqual({
       motor: "soniox",
       pistas: ["es", "eu"],
     });
@@ -145,6 +145,10 @@ describe("resolverIdiomas — la cooficial de la zona", () => {
 
   it("con otro principal Ultra, también su pista", () => {
     expect(conZona("ca-ES", "en-GB").transcripcion).toEqual({
+      motor: "flux",
+      idioma: "multi",
+    });
+    expect(conZona("ca-ES", "en-GB").cooficialDeLaZona?.transcripcion).toEqual({
       motor: "soniox",
       pistas: ["es", "en", "ca"],
     });

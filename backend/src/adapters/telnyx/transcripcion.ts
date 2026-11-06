@@ -32,9 +32,17 @@ export interface MensajeDelFinDeConversacion {
  * Además ya viene en orden y antes de que Telnyx termine de escribir su
  * copia (la carrera de la llamada cmufcsz4b0006s601kncxcf5m, 24-09).
  */
+/** Para una llamada con más de una conversación (lib/cambioDeIdioma.ts):
+ * los mensajes con los que se arrancó un assistant después del primero, que
+ * su conversación trae repetidos al principio. */
+export interface OpcionesDeGuardado {
+  sembrados?: ReadonlyArray<{ role: string; content: string }>;
+}
+
 export async function guardarTranscripcionDelWebhook(
   callRowId: string,
-  mensajesDelWebhook: MensajeDelFinDeConversacion[]
+  mensajesDelWebhook: MensajeDelFinDeConversacion[],
+  opciones: OpcionesDeGuardado = {}
 ): Promise<number> {
   const messages: TelnyxConversationMessage[] = mensajesDelWebhook.map(
     (mensaje) => ({
@@ -46,7 +54,7 @@ export async function guardarTranscripcionDelWebhook(
       sentAt: mensaje.timestamp,
     })
   );
-  return guardarMensajes(callRowId, messages);
+  return guardarMensajes(callRowId, messages, opciones);
 }
 
 /**
@@ -67,7 +75,8 @@ export async function guardarTranscripcionDelWebhook(
  */
 export async function guardarTranscripcionDeTelnyx(
   callRowId: string,
-  conversationId: string
+  conversationId: string,
+  opciones: OpcionesDeGuardado = {}
 ): Promise<number> {
   const messages =
     await telnyxAiAdapter.listConversationMessages(conversationId);
@@ -80,30 +89,101 @@ export async function guardarTranscripcionDeTelnyx(
     const timeB = Date.parse(b.sentAt ?? b.createdAt ?? "");
     return timeA - timeB;
   });
-  return guardarMensajes(callRowId, messages);
+  return guardarMensajes(callRowId, messages, opciones);
 }
 
+type MensajeGuardado = {
+  role: string;
+  text: string;
+  createdAt: string | null;
+  sentAt: string | null;
+};
+
+/** Los sembrados, en orden, desde el principio: un mensaje que coincide
+ * con el siguiente sembrado es la copia; los demás se quedan (un «sí» que se
+ * repite más tarde no se pierde). */
+function sinLosSembrados(
+  messages: TelnyxConversationMessage[],
+  sembrados: OpcionesDeGuardado["sembrados"]
+): TelnyxConversationMessage[] {
+  if (!sembrados?.length) return messages;
+  let siguiente = 0;
+  return messages.filter((message) => {
+    const sembrado = sembrados[siguiente];
+    if (
+      sembrado &&
+      sembrado.role === message.role &&
+      sembrado.content.trim() === message.text.trim()
+    ) {
+      siguiente++;
+      return false;
+    }
+    return true;
+  });
+}
+
+function momento(message: MensajeGuardado): number {
+  return Date.parse(message.sentAt ?? message.createdAt ?? "");
+}
+
+/**
+ * Guarda los mensajes de una conversación junto a los que ya tenga la
+ * llamada: con un cambio de idioma hay una conversación por assistant y
+ * cada una llega en su `call.conversation.ended`. Los ya guardados (el
+ * mismo webhook repetido) no se duplican, y todo queda en orden de hora.
+ */
 async function guardarMensajes(
   callRowId: string,
-  messages: TelnyxConversationMessage[]
+  recibidos: TelnyxConversationMessage[],
+  opciones: OpcionesDeGuardado = {}
 ): Promise<number> {
-  if (messages.length === 0) return 0;
+  if (recibidos.length === 0) return 0;
 
-  const fullText = messages
-    .map((message) => `${message.role}: ${message.text}`)
-    .join("\n");
+  const anterior = await prisma.transcript.findUnique({
+    where: { callId: callRowId },
+    select: { messages: true },
+  });
+  const previos = Array.isArray(anterior?.messages)
+    ? (anterior.messages as unknown as MensajeGuardado[])
+    : [];
+  const clave = (message: MensajeGuardado) =>
+    `${message.role}|${message.text}|${message.sentAt ?? message.createdAt ?? ""}`;
+  const yaGuardados = new Set(previos.map(clave));
   // Objeto plano: TelnyxConversationMessage con campos opcionales no
   // encaja en el tipo JSON estructural que exige Prisma.
-  const jsonMessages = messages.map((message) => ({
-    role: message.role,
-    text: message.text,
-    createdAt: message.createdAt ?? null,
-    sentAt: message.sentAt ?? null,
-  }));
+  const nuevos: MensajeGuardado[] = sinLosSembrados(
+    recibidos,
+    opciones.sembrados
+  )
+    .map((message) => ({
+      role: message.role,
+      text: message.text,
+      createdAt: message.createdAt ?? null,
+      sentAt: message.sentAt ?? null,
+    }))
+    .filter((message) => !yaGuardados.has(clave(message)));
+  let jsonMessages = [...previos, ...nuevos];
+  // En orden de hora si todos la traen (los de dos conversaciones se
+  // intercalan bien); si no, como llegaron.
+  if (
+    previos.length > 0 &&
+    nuevos.length > 0 &&
+    jsonMessages.every((message) => !Number.isNaN(momento(message)))
+  ) {
+    jsonMessages = jsonMessages
+      .map((message, indice) => ({ message, indice }))
+      .sort(
+        (a, b) => momento(a.message) - momento(b.message) || a.indice - b.indice
+      )
+      .map(({ message }) => message);
+  }
+  const fullText = jsonMessages
+    .map((message) => `${message.role}: ${message.text}`)
+    .join("\n");
   await prisma.transcript.upsert({
     where: { callId: callRowId },
     create: { callId: callRowId, fullText, messages: jsonMessages },
     update: { fullText, messages: jsonMessages },
   });
-  return messages.length;
+  return recibidos.length;
 }

@@ -33,19 +33,24 @@ export interface AjustesDeIdioma {
   zona?: CodigoDeIdioma | null;
 }
 
-/** La lengua cooficial de la zona que habla un negocio que saluda en otra:
- * contesta en ella con su voz, que cambia solo en un nodo del
- * conversation_flow (telnyxAssistantPayload.ts). */
+export type TranscripcionResuelta =
+  { motor: "flux"; idioma: string } | { motor: "soniox"; pistas: string[] };
+
+/** La lengua cooficial de la zona que habla un negocio que saluda en otra.
+ * Desde el 2026-11-06 la atiende su propio assistant (Soniox y su voz,
+ * buildTelnyxCooficialAssistantPayload): la llamada empieza en el del
+ * principal, con flux, y el backend cambia a este si quien llama habla la
+ * lengua (lib/cambioDeIdioma.ts). */
 export interface CooficialDeLaZona {
   idioma: CodigoDeIdioma;
   /** La de su familia (Marta o Sergio) del género de la voz que atiende. */
   voz: VozDelCatalogo;
   /** `voice_settings.language` de esa voz. */
   iso: string;
+  /** La de su assistant: Soniox con las pistas del obligatorio, el
+   * principal y la lengua (la variante S del 14-10). */
+  transcripcion: TranscripcionResuelta;
 }
-
-export type TranscripcionResuelta =
-  { motor: "flux"; idioma: string } | { motor: "soniox"; pistas: string[] };
 
 /** Todo lo que depende del idioma de un negocio, decidido en un solo
  * sitio. Lo consumen la elegibilidad, el payload de Telnyx, el prompt y el
@@ -243,6 +248,7 @@ export function elegirVoz(
 function resolverCooficialDeLaZona(
   zona: CodigoDeIdioma | null | undefined,
   principal: CodigoDeIdioma,
+  idiomas: readonly CodigoDeIdioma[],
   genero: GeneroDeVoz
 ): CooficialDeLaZona | null {
   if (!zona || !esCooficial(zona) || esCooficial(principal)) return null;
@@ -252,7 +258,15 @@ function resolverCooficialDeLaZona(
     genero,
     undefined
   );
-  return { idioma: zona, voz, iso: IDIOMAS[zona].iso };
+  return {
+    idioma: zona,
+    voz,
+    iso: IDIOMAS[zona].iso,
+    transcripcion: resolverTranscripcion(
+      ordenarIdiomas([...idiomas, zona]),
+      principal
+    ),
+  };
 }
 
 export function resolverIdiomas(ajustes: AjustesDeIdioma): PerfilDeIdiomas {
@@ -269,6 +283,7 @@ export function resolverIdiomas(ajustes: AjustesDeIdioma): PerfilDeIdiomas {
   const deLaZona = resolverCooficialDeLaZona(
     ajustes.zona,
     voiceLanguage,
+    languages,
     voz.genero
   );
   const idiomas = deLaZona
@@ -286,7 +301,9 @@ export function resolverIdiomas(ajustes: AjustesDeIdioma): PerfilDeIdiomas {
     voces: vocesQueHablan(familia.voces, languages),
     alternativas,
     isoDeLaVoz: IDIOMAS[voiceLanguage].iso,
-    transcripcion: resolverTranscripcion(idiomas, voiceLanguage),
+    // La del assistant del principal: sin la cooficial de la zona, que
+    // tiene la suya (deLaZona.transcripcion). Así contesta con flux.
+    transcripcion: resolverTranscripcion(languages, voiceLanguage),
     instruccionDelPrompt: instrucciones.instruccion,
     recordatorioDelPrompt: instrucciones.recordatorio,
     cambios: cambio ? [...cambios, cambio] : cambios,

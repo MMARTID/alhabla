@@ -12,16 +12,29 @@ import {
  * tools".
  */
 export interface TelnyxInboundBusiness extends EstadoDePagoDelNegocio {
-  agents: Array<{ id: string; telnyxAssistantId: string | null }>;
+  agents: Array<{
+    id: string;
+    telnyxAssistantId: string | null;
+    /** El de la lengua de la zona (lib/cambioDeIdioma.ts), si lo tiene. */
+    telnyxCooficialAssistantId?: string | null;
+  }>;
 }
 
 export function selectTelnyxInboundAgent(
   business: TelnyxInboundBusiness,
   now = new Date()
-): { id: string; telnyxAssistantId: string } | null {
+): {
+  id: string;
+  telnyxAssistantId: string;
+  telnyxCooficialAssistantId: string | null;
+} | null {
   if (servicioSuspendidoPorPago(business, now)) return null;
 
   const agent = business.agents[0];
   if (!agent?.telnyxAssistantId) return null;
-  return { id: agent.id, telnyxAssistantId: agent.telnyxAssistantId };
+  return {
+    id: agent.id,
+    telnyxAssistantId: agent.telnyxAssistantId,
+    telnyxCooficialAssistantId: agent.telnyxCooficialAssistantId ?? null,
+  };
 }

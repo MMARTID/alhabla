@@ -363,18 +363,17 @@ export function vistaPreviaDeIdiomas(
   // entiende las lenguas cooficiales (47 % de error de palabra con un
   // cliente en catalán, tanda «B piloto» del laboratorio, 2026-10-05). Que
   // el dueño no lo deduzca de «Habla en 8 idiomas». En una zona cooficial
-  // la entiende Soniox y contesta Marta o Sergio en un nodo (arriba).
+  // la entiende el assistant de la lengua (abajo).
   const cooficiales = oferta.principales.filter(esCooficial);
   const deLaZona = perfil.cooficialDeLaZona;
   if (deLaZona) {
-    // La cooficial de donde está el negocio (lib/idiomas/zona.ts): Soniox
-    // desde el principio y un nodo que cambia la voz. Más espera en todas
-    // las respuestas, también en castellano: 1,4–2 s frente a 0,9 con flux
-    // (2026-10-03) y 3,7–3,9 s frente a 2,2–2,6 en los turnos con consulta
-    // (variante S, 2026-10-14).
+    // La cooficial de donde está el negocio (lib/idiomas/zona.ts): desde el
+    // 2026-11-06 la llamada empieza con flux y pasa al assistant de la
+    // lengua (Soniox) solo si le hablan en ella (lib/cambioDeIdioma.ts).
+    // Ahí cada respuesta tarda 2–4 s, frente a 0,5–0,7 s con flux.
     const lengua = enMinusculas(deLaZona.idioma);
     avisos.push(
-      `Como el negocio está donde el ${lengua} es lengua oficial, también lo entiende y, si le hablan en ${lengua}, contesta en ${lengua} con la voz de ${deLaZona.voz.nombre}. A cambio tarda algo más en contestar, también cuando le hablan en ${enMinusculas(oferta.obligatorio)}: entre medio segundo y un segundo y medio más por respuesta.`
+      `Como el negocio está donde el ${lengua} es lengua oficial, también lo entiende y, si le hablan en ${lengua}, contesta en ${lengua} con la voz de ${deLaZona.voz.nombre}. En ${lengua} tarda algo más en contestar: uno o dos segundos más por respuesta.`
     );
   } else if (!perfil.cooficial && cooficiales.length > 0) {
     avisos.push(

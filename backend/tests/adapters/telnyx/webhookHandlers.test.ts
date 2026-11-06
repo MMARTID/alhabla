@@ -21,6 +21,7 @@ import {
 } from "../../../src/lib/cloudTasks.js";
 import { executeVoiceTool } from "../../../src/modules/voiceTools/service.js";
 import { pedirInformeDeLlamada } from "../../../src/jobs/informeDeLlamada.js";
+import { leerClave } from "../../../src/lib/almacenTemporal.js";
 import { programarRecuperacionDeTranscripcion } from "../../../src/jobs/recuperarTranscripcion.js";
 import {
   codificarClientState,
@@ -42,7 +43,7 @@ vi.mock("../../../src/lib/prisma.js", () => ({
       findUnique: vi.fn(),
       update: vi.fn(),
     },
-    transcript: { upsert: vi.fn() },
+    transcript: { upsert: vi.fn(), findUnique: vi.fn() },
     recording: { upsert: vi.fn() },
   },
 }));
@@ -55,6 +56,11 @@ vi.mock("../../../src/adapters/telnyx/TelnyxAiAdapter.js", () => ({
     listConversationMessages: vi.fn(),
     listRecordingsByCallLegId: vi.fn(),
   },
+}));
+
+vi.mock("../../../src/lib/almacenTemporal.js", () => ({
+  leerClave: vi.fn().mockResolvedValue(null),
+  guardarClave: vi.fn(),
 }));
 
 vi.mock("../../../src/lib/cloudTasks.js", () => ({
@@ -687,13 +693,22 @@ describe("handleCallHangup", () => {
 });
 
 describe("handleCallConversationEnded", () => {
+  // Lo que devuelve la Call tras apuntar la conversación: una sola, como
+  // toda llamada sin cambio de idioma.
+  const UNA_CONVERSACION = {
+    assistantsArrancados: 1,
+    conversacionesDeTelnyx: ["conv_1"],
+    startedAt: new Date("2026-11-06T10:00:00Z"),
+  };
+
   it("guarda conversation_id/duración y descarga la transcripción", async () => {
     mockedCallFindUnique.mockResolvedValue({
       id: "call_db_1",
       providerConversationId: null,
       durationSecs: null,
+      conversacionesDeTelnyx: [],
     } as any);
-    mockedCallUpdate.mockResolvedValue({} as any);
+    mockedCallUpdate.mockResolvedValue(UNA_CONVERSACION as any);
     mockedListConversationMessages.mockResolvedValue([
       { role: "user", text: "Hola" },
       { role: "assistant", text: "¿En qué te ayudo?" },
@@ -713,9 +728,18 @@ describe("handleCallConversationEnded", () => {
     });
 
     expect(result).toEqual({ success: true });
+    expect(mockedCallUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "call_db_1" },
+        data: {
+          providerConversationId: "conv_1",
+          conversacionesDeTelnyx: { push: "conv_1" },
+        },
+      })
+    );
     expect(mockedCallUpdate).toHaveBeenCalledWith({
       where: { id: "call_db_1" },
-      data: { providerConversationId: "conv_1", durationSecs: 42 },
+      data: { durationSecs: 42 },
     });
     expect(mockedTranscriptUpsert).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -733,8 +757,9 @@ describe("handleCallConversationEnded", () => {
       id: "call_db_1",
       providerConversationId: null,
       durationSecs: null,
+      conversacionesDeTelnyx: [],
     } as any);
-    mockedCallUpdate.mockResolvedValue({} as any);
+    mockedCallUpdate.mockResolvedValue(UNA_CONVERSACION as any);
     mockedListConversationMessages.mockResolvedValue([
       {
         role: "assistant",
@@ -778,8 +803,9 @@ describe("handleCallConversationEnded", () => {
       businessId: "biz1",
       providerConversationId: null,
       durationSecs: null,
+      conversacionesDeTelnyx: [],
     } as any);
-    mockedCallUpdate.mockResolvedValue({} as any);
+    mockedCallUpdate.mockResolvedValue(UNA_CONVERSACION as any);
     mockedListConversationMessages.mockRejectedValue(new Error("Telnyx down"));
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
 
@@ -809,8 +835,9 @@ describe("handleCallConversationEnded", () => {
       businessId: "biz_infinity",
       providerConversationId: null,
       durationSecs: null,
+      conversacionesDeTelnyx: [],
     } as any);
-    mockedCallUpdate.mockResolvedValue({} as any);
+    mockedCallUpdate.mockResolvedValue(UNA_CONVERSACION as any);
     mockedListConversationMessages.mockResolvedValue([]);
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
 
@@ -849,8 +876,9 @@ describe("handleCallConversationEnded", () => {
       businessId: "biz1",
       providerConversationId: null,
       durationSecs: null,
+      conversacionesDeTelnyx: [],
     } as any);
-    mockedCallUpdate.mockResolvedValue({} as any);
+    mockedCallUpdate.mockResolvedValue(UNA_CONVERSACION as any);
     mockedListConversationMessages.mockResolvedValue([
       { role: "user", text: "Hola" },
     ]);
@@ -873,8 +901,9 @@ describe("handleCallConversationEnded", () => {
       businessId: "biz1",
       providerConversationId: null,
       durationSecs: null,
+      conversacionesDeTelnyx: [],
     } as any);
-    mockedCallUpdate.mockResolvedValue({} as any);
+    mockedCallUpdate.mockResolvedValue(UNA_CONVERSACION as any);
     mockedTranscriptUpsert.mockResolvedValue({} as any);
 
     const result = await handleCallConversationEnded({
@@ -973,8 +1002,9 @@ describe("handleCallConversationEnded", () => {
       businessId: "biz1",
       providerConversationId: null,
       durationSecs: null,
+      conversacionesDeTelnyx: [],
     } as any);
-    mockedCallUpdate.mockResolvedValue({} as any);
+    mockedCallUpdate.mockResolvedValue(UNA_CONVERSACION as any);
     mockedListConversationMessages.mockResolvedValue([
       { role: "user", text: "Soy <PII:name/>" },
     ]);
@@ -1003,6 +1033,117 @@ describe("handleCallConversationEnded", () => {
     expect(aviso).toContain("biz1");
     expect(aviso).toContain("call_db_1");
     warn.mockRestore();
+  });
+  describe("con un cambio de idioma (dos conversaciones)", () => {
+    const SALUDO = "Peluquería Mallorca, te atiende su recepcionista de IA.";
+    const BIEN_ESCRITO = "Bon dia, voldria hora per demà.";
+
+    it("la primera no pide informe ni toca la duración; la última junta las dos sin lo sembrado, pide un solo informe y pone la duración de la llamada", async () => {
+      const inicio = new Date(Date.now() - 95_000);
+      // Primera conversación (la de flux), al pararla.
+      mockedCallFindUnique.mockResolvedValue({
+        id: "call_db_1",
+        businessId: "biz1",
+        providerConversationId: null,
+        durationSecs: null,
+        conversacionesDeTelnyx: [],
+      } as any);
+      mockedCallUpdate.mockResolvedValue({
+        assistantsArrancados: 2,
+        conversacionesDeTelnyx: ["conv_flux"],
+        startedAt: inicio,
+      } as any);
+      vi.mocked(prisma.transcript.findUnique).mockResolvedValue(null);
+      vi.mocked(leerClave).mockResolvedValue(
+        JSON.stringify([
+          { role: "assistant", content: SALUDO },
+          { role: "user", content: BIEN_ESCRITO },
+        ])
+      );
+      vi.spyOn(console, "log").mockImplementation(() => {});
+
+      await handleCallConversationEnded({
+        data: {
+          id: "evt_1",
+          event_type: "call.conversation.ended",
+          payload: {
+            call_control_id: "call_ctrl_1",
+            conversation_id: "conv_flux",
+            duration_sec: 20,
+            messages: [
+              { role: "assistant", content: SALUDO, timestamp: "2026-11-06T10:00:01Z" },
+              { role: "user", content: "Bondía, vuldria ora per demá", timestamp: "2026-11-06T10:00:06Z" },
+            ],
+          },
+        },
+      });
+
+      expect(pedirInformeDeLlamada).not.toHaveBeenCalled();
+      expect(mockedCallUpdate).toHaveBeenCalledTimes(1);
+      const primera = mockedTranscriptUpsert.mock.calls[0][0] as any;
+      expect(primera.create.messages).toHaveLength(2);
+
+      // Segunda (la de la lengua), al colgar.
+      mockedCallUpdate.mockClear();
+      mockedTranscriptUpsert.mockClear();
+      mockedCallFindUnique.mockResolvedValue({
+        id: "call_db_1",
+        businessId: "biz1",
+        providerConversationId: "conv_flux",
+        durationSecs: null,
+        conversacionesDeTelnyx: ["conv_flux"],
+      } as any);
+      mockedCallUpdate.mockResolvedValue({
+        assistantsArrancados: 2,
+        conversacionesDeTelnyx: ["conv_flux", "conv_ca"],
+        startedAt: inicio,
+      } as any);
+      vi.mocked(prisma.transcript.findUnique).mockResolvedValue({
+        messages: primera.create.messages,
+      } as any);
+
+      await handleCallConversationEnded({
+        data: {
+          id: "evt_2",
+          event_type: "call.conversation.ended",
+          payload: {
+            call_control_id: "call_ctrl_1",
+            conversation_id: "conv_ca",
+            duration_sec: 60,
+            messages: [
+              // Lo sembrado al arrancarlo, que Telnyx devuelve al principio.
+              { role: "assistant", content: SALUDO, timestamp: "2026-11-06T10:00:09Z" },
+              { role: "user", content: BIEN_ESCRITO, timestamp: "2026-11-06T10:00:09Z" },
+              { role: "assistant", content: "Cap problema, et parlo en català. A quina hora?", timestamp: "2026-11-06T10:00:10Z" },
+              { role: "user", content: "A les deu", timestamp: "2026-11-06T10:00:14Z" },
+            ],
+          },
+        },
+      });
+
+      expect(mockedCallUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: {
+            providerConversationId: "conv_flux",
+            conversacionesDeTelnyx: { push: "conv_ca" },
+          },
+        })
+      );
+      const segunda = mockedTranscriptUpsert.mock.calls[0][0] as any;
+      expect(segunda.update.fullText).toBe(
+        [
+          `assistant: ${SALUDO}`,
+          "user: Bondía, vuldria ora per demá",
+          "assistant: Cap problema, et parlo en català. A quina hora?",
+          "user: A les deu",
+        ].join("\n")
+      );
+      expect(pedirInformeDeLlamada).toHaveBeenCalledTimes(1);
+      const duracion = mockedCallUpdate.mock.calls.find(
+        (llamada) => (llamada[0] as any).data.durationSecs !== undefined
+      )?.[0] as any;
+      expect(duracion.data.durationSecs).toBeGreaterThanOrEqual(95);
+    });
   });
 });
 

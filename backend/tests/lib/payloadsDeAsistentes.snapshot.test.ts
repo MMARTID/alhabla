@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { createHash } from "node:crypto";
 import {
   buildTelnyxAssistantPayload,
+  buildTelnyxCooficialAssistantPayload,
   buildTelnyxChatAssistantPayload,
   buildTelnyxChatTools,
   buildTelnyxVoiceTools,
@@ -152,9 +153,9 @@ describe("payloads de asistentes (instantáneas)", () => {
     });
   }
 
-  // La cooficial de la zona (lib/idiomas/zona.ts, 2026-10-14): Soniox desde
-  // el principio con la voz Ultra del principal y un nodo que cambia a
-  // Marta.
+  // La cooficial de la zona (lib/idiomas/zona.ts): desde el 2026-11-06 el de
+  // llamadas va con flux y la voz Ultra, sin nodos, y el catalán en su
+  // propio assistant (lib/cambioDeIdioma.ts).
   it("assistant de la recepcionista que saluda en español en Cataluña", () => {
     const idiomas = resolverIdiomas({
       voiceLanguage: "es-ES",
@@ -172,6 +173,32 @@ describe("payloads de asistentes (instantáneas)", () => {
       boostedKeywords: ["Corte", "Laura"],
     });
     expect({
+      greeting: payload.greeting,
+      voiceSettings: payload.voiceSettings,
+      transcription: payload.transcription,
+      interruptionSettings: payload.interruptionSettings,
+      conversationFlow: payload.conversationFlow,
+    }).toMatchSnapshot();
+  });
+
+  it("assistant de la lengua de la zona (catalán) de esa recepcionista", () => {
+    const idiomas = resolverIdiomas({
+      voiceLanguage: "es-ES",
+      voiceGender: "femenina",
+      zona: "ca-ES",
+    });
+    const payload = buildTelnyxCooficialAssistantPayload({
+      businessId: "neg_1",
+      agentId: "ag_1",
+      businessName: "Peluquería Ana",
+      instructions: "Eres la recepcionista de {{nombre_negocio}}.",
+      idiomas,
+      cooficial: idiomas.cooficialDeLaZona!,
+      boostedKeywords: ["Corte", "Laura"],
+    });
+    expect({
+      name: payload.name,
+      instructions: payload.instructions,
       greeting: payload.greeting,
       voiceSettings: payload.voiceSettings,
       transcription: payload.transcription,

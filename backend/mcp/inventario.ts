@@ -61,7 +61,7 @@ export const SQL_DE_CUENTAS = `SELECT id, name, plan, "subscriptionStatus", "pho
   FROM businesses
  ORDER BY "createdAt"`;
 
-export const SQL_DE_AGENTES = `SELECT id, "businessId", name, "telnyxAssistantId", "telnyxChatAssistantId", active, "deletedAt",
+export const SQL_DE_AGENTES = `SELECT id, "businessId", name, "telnyxAssistantId", "telnyxChatAssistantId", "telnyxCooficialAssistantId", active, "deletedAt",
        "promptManuallyEdited", "telnyxSyncError", "telnyxSyncedAt", "systemPrompt"
   FROM agents
  ORDER BY "createdAt"`;
@@ -76,6 +76,8 @@ export type AgenteDelInventario = {
   assistantId: string | null;
   /** El del chat de clientes por WhatsApp (desde el 2026-11-04). */
   assistantDeChatId: string | null;
+  /** El de la lengua de la zona cooficial (desde el 2026-11-06). */
+  assistantDeLaCooficialId: string | null;
   activo: boolean;
   borrado: string | null;
   promptEditadoAMano: boolean;
@@ -138,6 +140,7 @@ export function montarInventario(
       nombre: String(a.name ?? ""),
       assistantId: texto(a.telnyxAssistantId),
       assistantDeChatId: texto(a.telnyxChatAssistantId),
+      assistantDeLaCooficialId: texto(a.telnyxCooficialAssistantId),
       activo: Boolean(a.active),
       borrado: texto(a.deletedAt),
       promptEditadoAMano: Boolean(a.promptManuallyEdited),
@@ -278,6 +281,11 @@ export function anotarInventario(ref: Referencias, inventario: Inventario) {
         agente.borrado ? ref.deAgentesBorrados : ref.assistants,
         agente.assistantDeChatId,
         `${de}: chat del agente ${agente.id}${agente.borrado ? " (borrado)" : ""}`
+      );
+      anotar(
+        agente.borrado ? ref.deAgentesBorrados : ref.assistants,
+        agente.assistantDeLaCooficialId,
+        `${de}: lengua de la zona del agente ${agente.id}${agente.borrado ? " (borrado)" : ""}`
       );
     }
   }
