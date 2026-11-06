@@ -302,7 +302,7 @@ describe("CalendarService.bookAppointment", () => {
               "Servicios: Corte, Tratamiento capilar",
               "Profesional: Montse",
               "",
-              "Cita generada por el asistente virtual de Alhabla.",
+              "Esta cita la gestiona Alhabla. Para moverla o cancelarla, hazlo desde el panel o díselo a tu asistente por WhatsApp: lo que cambies aquí no llega a Alhabla.",
             ].join("\n"),
             reminders: {
               useDefault: false,
@@ -441,7 +441,7 @@ describe("CalendarService.bookAppointment", () => {
             "Servicios: Corte, Tratamiento capilar",
             "Profesional: Montse",
             "",
-            "Cita generada por el asistente virtual de Alhabla.",
+            "Esta cita la gestiona Alhabla. Para moverla o cancelarla, hazlo desde el panel o díselo a tu asistente por WhatsApp: lo que cambies aquí no llega a Alhabla.",
           ].join("\n"),
           reminderMinutesBeforeStart: 60,
         })
@@ -2003,11 +2003,13 @@ describe("CalendarService.conectarConCredenciales (CalDAV)", () => {
 });
 
 
-// PLAN-AGENDA-ALHABLA.md, fase 1: en la agenda de Alhabla no hay evento que
-// crear, y la conexión que quede de antes no se toca.
-describe("CalendarService.bookAppointment — agenda de Alhabla", () => {
-  it("devuelve «sin evento» sin llamar a ningún proveedor, aunque haya credenciales guardadas", async () => {
-    const insertMock = vi.fn();
+// PLAN-AGENDA-PRINCIPAL.md: ya no hay «agenda propia» que ignore la conexión.
+// Con modoDeAgenda = alhabla y Google conectado, la cita también se copia.
+describe("CalendarService.bookAppointment — agenda principal", () => {
+  it("con el modo antiguo «alhabla» y Google conectado, crea el evento igualmente", async () => {
+    const insertMock = vi.fn().mockResolvedValue({
+      data: { id: "event_copia", htmlLink: "https://calendar.google.com/e/1" },
+    });
     mockedGoogleCalendar.mockReturnValue({
       events: { insert: insertMock, list: vi.fn() },
     } as any);
@@ -2018,7 +2020,6 @@ describe("CalendarService.bookAppointment — agenda de Alhabla", () => {
         filaDeConexion("google", { refreshToken: "refresh_token_123" }),
       ],
     });
-    expect(conexion.agendaPropia).toBe(true);
 
     const result = await calendarService.bookAppointment({
       clientName: "María",
@@ -2027,8 +2028,9 @@ describe("CalendarService.bookAppointment — agenda de Alhabla", () => {
       conexion,
     });
 
-    expect(result).toEqual({ id: null, htmlLink: null });
-    expect(insertMock).not.toHaveBeenCalled();
-    expect(mockedGoogleCalendar).not.toHaveBeenCalled();
+    expect(result).toEqual(
+      expect.objectContaining({ id: "event_copia" })
+    );
+    expect(insertMock).toHaveBeenCalledTimes(1);
   });
 });

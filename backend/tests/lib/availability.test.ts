@@ -60,23 +60,36 @@ function givenBookings(bookings: Array<{
   externalEventId?: string | null;
   externalCalendarProvider?: string | null;
   externalCalendarId?: string | null;
+  copiaEnCalendario?: string | null;
 }>) {
-  mockedBookingFindMany.mockResolvedValue(
-    bookings.map((b, index) => ({
-      id: `booking_${index}`,
-      callId: `call_${index}`,
-      createdAt: new Date(),
-      programedAt: b.programedAt,
-      durationMinutes: b.durationMinutes ?? 30,
-      numberPeople: 1,
-      isCancelled: b.isCancelled ?? false,
-      professionalId: b.professionalId ?? null,
-      externalEventId: b.externalEventId ?? null,
-      externalCalendarProvider: b.externalCalendarProvider ?? null,
-      externalCalendarId: b.externalCalendarId ?? null,
-      serviceIds: [],
-    }))
-  );
+  const filas = bookings.map((b, index) => ({
+    id: `booking_${index}`,
+    callId: `call_${index}`,
+    createdAt: new Date(),
+    programedAt: b.programedAt,
+    durationMinutes: b.durationMinutes ?? 30,
+    numberPeople: 1,
+    isCancelled: b.isCancelled ?? false,
+    professionalId: b.professionalId ?? null,
+    externalEventId: b.externalEventId ?? null,
+    externalCalendarProvider: b.externalCalendarProvider ?? null,
+    externalCalendarId: b.externalCalendarId ?? null,
+    copiaEnCalendario: b.copiaEnCalendario ?? null,
+    serviceIds: [],
+  }));
+  // Filtra como la consulta real lo que checkAvailability pide: canceladas
+  // con evento por un lado, activas sin las excluidas por otro.
+  mockedBookingFindMany.mockImplementation((async (args: {
+    where?: { isCancelled?: boolean; id?: { notIn?: string[] } };
+  }) => {
+    const where = args?.where ?? {};
+    return filas.filter(
+      (fila) =>
+        (where.isCancelled === undefined ||
+          fila.isCancelled === where.isCancelled) &&
+        !(where.id?.notIn ?? []).includes(fila.id)
+    );
+  }) as never);
 }
 
 describe("checkAvailability", () => {
@@ -124,16 +137,20 @@ describe("checkAvailability", () => {
     }
   });
 
-  it("libera una reserva local cuyo evento se canceló manualmente", async () => {
+  // PLAN-AGENDA-PRINCIPAL.md, regla 4: lo que el dueño cambia en su
+  // calendario no vuelve a Alhabla. Antes, borrar el evento en Google
+  // liberaba el hueco aunque el cliente siguiera viniendo.
+  it("una cita de Alhabla cuyo evento se borró en el calendario sigue bloqueando su hora", async () => {
     givenProfessionals([{ id: "prof_1", name: "Ana", serviceIds: [] }]);
     givenBookings([
       {
         programedAt: new Date("2026-08-10T10:00:00Z"),
         durationMinutes: 60,
         professionalId: "prof_1",
-        externalEventId: "event-cancelled",
+        externalEventId: "event-borrado-en-google",
         externalCalendarProvider: "google",
         externalCalendarId: "primary",
+        copiaEnCalendario: "hecha",
       },
     ]);
 
@@ -147,6 +164,117 @@ describe("checkAvailability", () => {
       externalBusyIntervals: [],
       calendarAvailabilityKnown: true,
       calendarOrigin: { provider: "google", calendarId: "primary" },
+    });
+
+    expect(result.available).toBe(false);
+    if (!result.available) {
+      expect(result.code).toBe("CAPACITY_REACHED");
+    }
+  });
+
+  it("una cita movida en Google bloquea su hora en Alhabla y también el sitio nuevo", async () => {
+    givenProfessionals([{ id: "prof_1", name: "Ana", serviceIds: [] }]);
+    givenBookings([
+      {
+        programedAt: new Date("2026-08-10T10:00:00Z"),
+        durationMinutes: 60,
+        professionalId: "prof_1",
+        externalEventId: "event-movido",
+        externalCalendarProvider: "google",
+        externalCalendarId: "primary",
+        copiaEnCalendario: "hecha",
+      },
+    ]);
+    const enGoogle = [
+      {
+        externalEventId: "event-movido",
+        start: new Date("2026-08-10T12:00:00Z"),
+        end: new Date("2026-08-10T13:00:00Z"),
+      },
+    ];
+    const consultar = (hora: string) =>
+      checkAvailability({
+        businessId,
+        schedule: DEFAULT_BUSINESS_SCHEDULE,
+        timezone: europeMadrid,
+        bookingCapacity: 1,
+        startDateTime: hora,
+        durationMinutes: 60,
+        externalBusyIntervals: enGoogle,
+        calendarAvailabilityKnown: true,
+      });
+
+    expect((await consultar("2026-08-10T10:00:00Z")).available).toBe(false);
+    expect((await consultar("2026-08-10T12:00:00Z")).available).toBe(false);
+  });
+
+  it("la copia de una cita a su misma hora cuenta una sola vez", async () => {
+    givenProfessionals([
+      { id: "prof_1", name: "Ana", serviceIds: [] },
+      { id: "prof_2", name: "Luis", serviceIds: [] },
+    ]);
+    givenBookings([
+      {
+        programedAt: new Date("2026-08-10T10:00:00Z"),
+        durationMinutes: 60,
+        professionalId: "prof_1",
+        externalEventId: "event-copia",
+        copiaEnCalendario: "hecha",
+      },
+    ]);
+
+    const result = await checkAvailability({
+      businessId,
+      schedule: DEFAULT_BUSINESS_SCHEDULE,
+      timezone: europeMadrid,
+      bookingCapacity: 2,
+      startDateTime: "2026-08-10T10:00:00Z",
+      durationMinutes: 60,
+      externalBusyIntervals: [
+        {
+          externalEventId: "event-copia",
+          start: new Date("2026-08-10T10:00:00Z"),
+          end: new Date("2026-08-10T11:00:00Z"),
+        },
+      ],
+      calendarAvailabilityKnown: true,
+    });
+
+    // Con capacidad 2, la cita y su copia contadas dos veces lo llenarían.
+    expect(result.available).toBe(true);
+    if (result.available) {
+      expect(result.availableProfessionals.map((p) => p.id)).toEqual(["prof_2"]);
+    }
+  });
+
+  it("el evento viejo de una cita movida con la copia pendiente no bloquea su hora antigua", async () => {
+    givenProfessionals([{ id: "prof_1", name: "Ana", serviceIds: [] }]);
+    givenBookings([
+      {
+        // Ya movida en Alhabla a las 12; su evento sigue a las 10 en Google.
+        programedAt: new Date("2026-08-10T12:00:00Z"),
+        durationMinutes: 60,
+        professionalId: "prof_1",
+        externalEventId: "event-viejo",
+        copiaEnCalendario: "pendiente",
+      },
+    ]);
+
+    const result = await checkAvailability({
+      businessId,
+      schedule: DEFAULT_BUSINESS_SCHEDULE,
+      timezone: europeMadrid,
+      bookingCapacity: 1,
+      startDateTime: "2026-08-10T10:00:00Z",
+      durationMinutes: 60,
+      externalBusyIntervals: [
+        {
+          externalEventId: "event-viejo",
+          start: new Date("2026-08-10T10:00:00Z"),
+          end: new Date("2026-08-10T11:00:00Z"),
+        },
+      ],
+      calendarAvailabilityKnown: true,
     });
 
     expect(result.available).toBe(true);
@@ -980,8 +1108,8 @@ describe("checkAvailability — niveles por servicio", () => {
           where: expect.objectContaining({ id: { notIn: ["booking_0"] } }),
         })
       );
-      // El mock devuelve la reserva igualmente (no filtra por id): lo que se
-      // comprueba aquí es que su evento externo tampoco cuenta.
+      // El mock filtra por id como la consulta real: lo que se comprueba aquí
+      // es que la reserva se excluye y que su evento externo tampoco cuenta.
       expect(result.available).toBe(true);
     });
 

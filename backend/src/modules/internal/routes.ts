@@ -74,6 +74,16 @@ const RetryFailedBookingSchema = z.object({
   attempt: z.number().int().min(0).optional(),
 });
 const ReportUsageSchema = z.object({ businessId: z.string() });
+const CopiaDeLaCitaSchema = z.object({
+  bookingId: z.string(),
+  attempt: z.number().int().min(1).optional(),
+});
+const VolcadoDeLaAgendaSchema = z.object({ businessId: z.string() });
+const RecordatorioDeCalendarioSchema = z.object({
+  businessId: z.string(),
+  provider: z.string(),
+  desconectadoEn: z.string(),
+});
 
 // `idempotencyKey` viaja en el payload de la tarea (enqueue*Job la añade a
 // partir del taskId) y es lo que `reclamarEnvio` usa para que Cloud Tasks,
@@ -399,6 +409,69 @@ export const internalJobsRoutes: FastifyPluginAsync = async (fastify) => {
       }
     }
   );
+
+  // Agenda principal (PLAN-AGENDA-PRINCIPAL.md): la copia de una cita en el
+  // calendario conectado, el volcado de la agenda al conectar uno y el
+  // recordatorio a los 7 días de uno desconectado. Las tres reprograman sus
+  // propios reintentos; un 500 solo sale de un fallo inesperado.
+  const jobsDeLaAgenda = [
+    {
+      ruta: "/jobs/copiar-cita-al-calendario",
+      ejecutar: async (body: unknown) => {
+        const { sincronizarCopiaDeLaCita } =
+          await import("../calendar/copiaDeLaCita.js");
+        return {
+          resultado: await sincronizarCopiaDeLaCita(
+            CopiaDeLaCitaSchema.parse(body)
+          ),
+        };
+      },
+    },
+    {
+      ruta: "/jobs/volcar-agenda-al-calendario",
+      ejecutar: async (body: unknown) => {
+        const { volcarAgendaAlCalendario } =
+          await import("../calendar/copiaDeLaCita.js");
+        return await volcarAgendaAlCalendario(
+          VolcadoDeLaAgendaSchema.parse(body)
+        );
+      },
+    },
+    {
+      ruta: "/jobs/recordar-calendario-desconectado",
+      ejecutar: async (body: unknown) => {
+        const { recordarCalendarioDesconectado } =
+          await import("../whatsapp/alertas.js");
+        return {
+          via: (
+            await recordarCalendarioDesconectado(
+              RecordatorioDeCalendarioSchema.parse(body)
+            )
+          ).via,
+        };
+      },
+    },
+  ];
+  for (const job of jobsDeLaAgenda) {
+    fastify.post(job.ruta, opcionesDeJob, async (request, reply) => {
+      try {
+        const resultado = await job.ejecutar(request.body);
+        return reply.send({ received: true, ...resultado });
+      } catch (error) {
+        if (error instanceof z.ZodError) {
+          return payloadInvalido(
+            fastify.log,
+            reply,
+            job.ruta,
+            request.body,
+            error
+          );
+        }
+        fastify.log.error({ err: error }, `${job.ruta} job failed`);
+        return reply.status(500).send({ error: "Job processing failed" });
+      }
+    });
+  }
 
   fastify.post(
     "/jobs/retry-failed-booking",

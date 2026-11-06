@@ -12,6 +12,11 @@ import { simularConversacion } from "./conversacionSimulada.js";
 import { diagnosticarMcp, recordarCommitAlArrancar } from "./diagnostico.js";
 import { cargarEnv, urlDeBdDeDev, variable } from "./entorno.js";
 import { leerEnviosSimulados } from "./enviosSimulados.js";
+import {
+  ACCIONES_DEL_CALENDARIO_FALSO,
+  agendaDeNegocio,
+  manejarCalendarioFalso,
+} from "./calendarioFalso.js";
 import { describirTabla } from "./esquema.js";
 import { estadoDeProd } from "./estadoDeProd.js";
 import {
@@ -705,6 +710,48 @@ servidor.registerTool(
         mensaje: `Poniendo el entorno de desarrollo en ${rama}. Tarda uno o dos minutos; sigue con estado_dev y luego da al usuario http://localhost:3001.`,
       };
     })
+);
+
+servidor.registerTool(
+  "calendario_falso",
+  {
+    title: "Calendario falso de backend-sim",
+    description:
+      "Maneja el calendario falso de backend-sim (CALENDARIOS_FALSOS=1) para probar de punta a punta la agenda de Alhabla y la copia de las citas en el calendario conectado sin tocar un Google de verdad (PLAN-AGENDA-PRINCIPAL.md). Corre DENTRO de alhabla_backend_sim, con su código y su BD. Acciones: conectar (businessId, proveedor google|outlook|caldav: conecta un calendario falso por el camino real, que vuelca la agenda), estado (sin `estado` lo enseña; con ok|caido|revocado lo cambia: caido lanza un error cualquiera, revocado el de reconexión), apuntar (inicio, fin o duracionMinutos, titulo: lo que el dueño apunta a mano), mover (eventId, inicio) y borrar (eventId), como si lo hiciera el dueño en Google; copiar (businessId o bookingId: el job de copia ahora, que en dev no corre solo si estaba programado), volcar (el volcado al conectar), recordar (el recordatorio de los 7 días, ya) y quitar. Devuelve la conexión, los eventos y los logs de la acción. Las alertas al dueño no salen (ENVIOS_SIMULADOS): ver_envios_simulados.",
+    inputSchema: {
+      accion: z.enum(ACCIONES_DEL_CALENDARIO_FALSO),
+      businessId: z.string().optional(),
+      bookingId: z.string().optional(),
+      proveedor: z.enum(["google", "outlook", "caldav"]).optional(),
+      estado: z.enum(["ok", "caido", "revocado"]).optional(),
+      eventId: z.string().optional(),
+      inicio: z.string().optional().describe("ISO 8601 con zona"),
+      fin: z.string().optional(),
+      duracionMinutos: z.number().int().min(5).max(600).optional(),
+      titulo: z.string().optional(),
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false },
+  },
+  ({ accion, ...entrada }) =>
+    conErrores(() => manejarCalendarioFalso(accion, entrada))
+);
+
+servidor.registerTool(
+  "agenda_dev",
+  {
+    title: "Agenda de un negocio de dev con sus copias",
+    description:
+      "Las citas de un negocio de dev (desde hace diasAtras días) con el estado de su copia en el calendario conectado (copiaEnCalendario: null, pendiente, hecha, fallida; intentos y error), la conexión de calendario, las reservas pendientes sin resolver y, si el negocio usa el calendario falso de backend-sim, sus eventos y lo que no cuadra: citas activas sin evento, eventos de citas canceladas, eventos a otra hora que su cita (movidos «en Google»), citas cuyo evento ya no está y eventos apuntados a mano. Solo lectura.",
+    inputSchema: {
+      businessId: z.string(),
+      diasAtras: z.number().int().min(0).max(60).optional(),
+    },
+    annotations: { readOnlyHint: true },
+  },
+  ({ businessId, diasAtras }) =>
+    conErrores(() =>
+      agendaDeNegocio(urlDeBdDeDev(cargarEnv()), { businessId, diasAtras })
+    )
 );
 
 registrarHerramientasDeProd(servidor);

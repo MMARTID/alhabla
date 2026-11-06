@@ -79,6 +79,7 @@ services:
       PANEL_INVOKER_SERVICE_ACCOUNT: ${PANEL_INVOKER_SERVICE_ACCOUNT}
       TELNYX_PUBLIC_KEY: ${TELNYX_PUBLIC_KEY}
       ENVIOS_SIMULADOS: ${ENVIOS_SIMULADOS:-}
+      CALENDARIOS_FALSOS: ${CALENDARIOS_FALSOS:-}
       TELNYX_CALL_CONTROL_APP_ID: ${TELNYX_CALL_CONTROL_APP_ID}
       TELNYX_ALERT_EMAIL: ${TELNYX_ALERT_EMAIL}
       TELNYX_SMS_SENDER_ID: ${TELNYX_SMS_SENDER_ID}
@@ -205,6 +206,7 @@ services:
       PANEL_INVOKER_SERVICE_ACCOUNT: ${PANEL_INVOKER_SERVICE_ACCOUNT}
       TELNYX_PUBLIC_KEY: ${TELNYX_PUBLIC_KEY}
       ENVIOS_SIMULADOS: ${ENVIOS_SIMULADOS:-}
+      CALENDARIOS_FALSOS: ${CALENDARIOS_FALSOS:-}
       TELNYX_CALL_CONTROL_APP_ID: ${TELNYX_CALL_CONTROL_APP_ID}
       TELNYX_ALERT_EMAIL: ${TELNYX_ALERT_EMAIL}
       TELNYX_SMS_SENDER_ID: ${TELNYX_SMS_SENDER_ID}
@@ -259,6 +261,10 @@ services:
       # Los WhatsApp, SMS y correos de las tools simuladas no salen
       # (src/lib/enviosSimulados.ts); las citas sí van al calendario.
       ENVIOS_SIMULADOS: "1"
+      # Las conexiones de calendario con credenciales `falso:` usan el
+      # calendario falso de las pruebas de punta a punta
+      # (src/adapters/calendar/falso/calendarioFalso.ts); las demás, el real.
+      CALENDARIOS_FALSOS: "1"
     ports: !override
       - "3010:3000"
     profiles: !override

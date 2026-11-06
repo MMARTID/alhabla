@@ -29,7 +29,6 @@ import {
   type CredencialesDe,
 } from "../../adapters/calendar/CalendarProvider.js";
 import { codigoDeReconexion } from "../../adapters/calendar/errors.js";
-import { reservaEnAlhabla } from "../../lib/modoDeAgenda.js";
 import type { CalendarOrigin } from "../../lib/availability.js";
 
 /** Lo que hace falta leer de Business para resolver la conexión. Se usa con
@@ -72,9 +71,9 @@ export type FilaDeConexion = {
 export type FilaDeConexionDeCalendario = {
   id?: string;
   calendarProvider: string | null;
-  /** `Business.modoDeAgenda` (lib/modoDeAgenda.ts). Opcional porque la
-   * caché voice_config y los tests pueden traer negocios sin él: ausente
-   * equivale a `sin_elegir`. */
+  /** `Business.modoDeAgenda` (lib/modoDeAgenda.ts). Desde
+   * PLAN-AGENDA-PRINCIPAL.md ya no decide nada: se lee solo para que la app
+   * anterior siga viéndolo, y se borra en la fase 7. */
   modoDeAgenda?: string | null;
   calendarConnections?: FilaDeConexion[] | null;
 };
@@ -92,13 +91,6 @@ export type ConexionResuelta = CalendarConnection & {
   calendarIdConfigurado: string | null;
   /** `connected` de la fila; null si no hay fila para el proveedor. */
   marcadaConectada: boolean | null;
-  /** El negocio reserva en la agenda de Alhabla (`modoDeAgenda = "alhabla"`,
-   * PLAN-AGENDA-ALHABLA.md): la conexión externa que pudiera quedar se
-   * ignora (credentials llega a null) para leer ocupación y crear eventos,
-   * y `puedeReservar` es verdadero sin calendario. Solo se fuerza cuando no
-   * se pide un proveedor concreto: cancelar o mover una cita antigua con
-   * `externalEventId` sigue borrando su evento con la conexión real. */
-  agendaPropia: boolean;
 };
 
 const CredencialesSchema = z.discriminatedUnion("provider", [
@@ -171,24 +163,16 @@ export function resolverConexionDeCalendario(
     opciones.calendarId !== undefined
       ? opciones.calendarId
       : (fila?.calendarId ?? null);
-  // Agenda de Alhabla: sin proveedor forzado, la conexión externa se ignora
-  // del todo (ver `agendaPropia` en ConexionResuelta).
-  const agendaPropia =
-    opciones.provider === undefined && reservaEnAlhabla(business);
   return {
     provider,
     // `||` y no `??`: "" también cae a "primary", como hasta ahora.
     calendarId:
       calendarIdConfigurado ||
       DESCRIPTORES_DE_PROVEEDOR[provider].calendarIdPorDefecto,
-    credentials:
-      fila && !agendaPropia
-        ? parsearCredenciales(provider, fila.credentials)
-        : null,
+    credentials: fila ? parsearCredenciales(provider, fila.credentials) : null,
     businessId: business?.id ?? null,
     calendarIdConfigurado,
     marcadaConectada: fila?.connected ?? null,
-    agendaPropia,
   };
 }
 
@@ -246,24 +230,14 @@ export const codigoDeCalendarioNoOperativo = (
     ? "CALENDAR_NOT_CONNECTED"
     : codigoDeReconexion(c.provider);
 
-/** ¿Se puede reservar? En la agenda de Alhabla, siempre; si no, solo con una
- * conexión operativa (regla de la auditoría de septiembre: nunca a ciegas).
- * Es lo que deciden book_appointment, el Gestor, la lista de espera, el
- * reintento y el panel; `conexionOperativa` a secas queda para quien de
- * verdad necesita la conexión (leer calendarios, rotar credenciales). */
-export const puedeReservar = (c: ConexionResuelta): boolean =>
-  c.agendaPropia || conexionOperativa(c);
-
-/** Campos `externalCalendarProvider`/`externalCalendarId` de un Booking
- * nuevo: los del calendario donde se creó el evento, o null en la agenda de
- * Alhabla (antes se escribía el proveedor por defecto, «google», aunque no
- * hubiera conexión). */
-export const origenExternoDeLaCita = (
-  c: ConexionResuelta
-): { externalCalendarProvider: string | null; externalCalendarId: string | null } =>
-  c.agendaPropia
-    ? { externalCalendarProvider: null, externalCalendarId: null }
-    : { externalCalendarProvider: c.provider, externalCalendarId: c.calendarId };
+/** El negocio tiene (o tuvo) un calendario conectado en el que copiar sus
+ * citas: hay fila del proveedor activo. Con la conexión caducada sigue
+ * siendo verdad (la copia queda pendiente hasta que reconecte); solo es
+ * falso si nunca se conectó o se quitó. PLAN-AGENDA-PRINCIPAL.md: el
+ * calendario es un complemento de la agenda de Alhabla, nunca decide si
+ * se puede reservar. */
+export const tieneCalendarioConectado = (c: ConexionResuelta): boolean =>
+  c.marcadaConectada !== null;
 
 /** calendarOriginForBusiness de voiceTools y el job. */
 export const origenDeCalendario = (
@@ -386,6 +360,7 @@ export async function marcarCalendarioDesconectado(
         businessId,
         proveedor: nombreProveedor,
         providerId: provider,
+        desconectadoEn: ahora,
       });
     }
   } catch (dbErr) {
@@ -447,10 +422,8 @@ export async function guardarConexionDeCalendario(
     where: { id: businessId },
     data: {
       calendarProvider: provider,
-      // Conectar un calendario pasa el negocio a reservar fuera
-      // (PLAN-AGENDA-ALHABLA.md: el único paso de modo automático). Una
-      // conexión guardada a medias (`conectado: false`, Outlook/Apple sin
-      // calendario elegido) todavía no cambia nada.
+      // Ya no decide nada (PLAN-AGENDA-PRINCIPAL.md); se sigue escribiendo
+      // para la app anterior hasta la fase 7, que borra la columna.
       ...(datos.conectado ? { modoDeAgenda: "externo" } : {}),
       calendarConnections: {
         upsert: {
@@ -480,6 +453,42 @@ export async function guardarConexionDeCalendario(
     include: INCLUDE_CONEXIONES,
   });
   await invalidarCacheDeVoz(businessId);
+  // Conectar (o reconectar) un calendario lo pone al día con la agenda de
+  // Alhabla: se copian las citas futuras que aún no tiene, incluidas las
+  // que entraron mientras estaba caducado (PLAN-AGENDA-PRINCIPAL.md, fase 2).
+  // Import dinámico: copiaDeLaCita.ts depende de este fichero. Nunca tumba
+  // la conexión, pero no es silencioso (best-effort con log ruidoso).
+  if (datos.conectado) {
+    try {
+      const { encolarVolcadoDeLaAgenda } = await import("./copiaDeLaCita.js");
+      await encolarVolcadoDeLaAgenda(businessId);
+    } catch (error) {
+      console.error(
+        `[Calendar] No se pudo encolar el volcado de la agenda al calendario ${provider} del negocio ${businessId}; las citas futuras no se copiarán hasta la próxima conexión:`,
+        error
+      );
+    }
+  }
+  return business;
+}
+
+/** DELETE /calendar/conexion (PLAN-AGENDA-PRINCIPAL.md): el dueño ya no usa
+ * su calendario conectado. Se borran sus filas (credenciales incluidas) y la
+ * agenda de Alhabla sigue igual; los eventos que ya se copiaron se quedan en
+ * su calendario. Las copias pendientes dejan de esperar en cuanto el job las
+ * vuelve a mirar (sin calendario, `copiaEnCalendario` pasa a null). */
+export async function quitarCalendarioConectado(
+  businessId: string
+): Promise<BusinessConConexiones> {
+  await prisma.calendarConnection.deleteMany({ where: { businessId } });
+  const business = await prisma.business.findUniqueOrThrow({
+    where: { id: businessId },
+    include: INCLUDE_CONEXIONES,
+  });
+  console.log(
+    `[Calendar] El negocio ${businessId} quita su calendario conectado; sigue con la agenda de Alhabla`
+  );
+  await invalidarCacheDeVoz(businessId);
   return business;
 }
 
@@ -487,13 +496,10 @@ export type ResultadoDeCambioDeModo =
   | { ok: true; business: BusinessConConexiones }
   | { ok: false; code: "CALENDAR_NOT_OPERATIVE"; motivo: string };
 
-/** PATCH /business/me/agenda/modo (PLAN-AGENDA-ALHABLA.md). A `alhabla` se
- * puede pasar siempre (el dueño asume el riesgo de doble reserva en la
- * interfaz); a `externo`, solo si hay una conexión operativa, porque si no
- * el negocio quedaría sin poder reservar sin que nadie se lo dijera. La
- * conexión se mira con el proveedor forzado para que `agendaPropia` no la
- * esconda. Invalida la caché de voz: la siguiente llamada ya reserva (o
- * deja de reservar) donde toca. */
+/** PATCH /business/me/agenda/modo (PLAN-AGENDA-ALHABLA.md). Desde
+ * PLAN-AGENDA-PRINCIPAL.md el modo ya no decide dónde se reserva (siempre en
+ * la agenda de Alhabla, con copia en el calendario conectado): la ruta se
+ * mantiene solo para la app anterior y se borra en la fase 7. */
 export async function cambiarModoDeAgenda(
   businessId: string,
   modo: "alhabla" | "externo"

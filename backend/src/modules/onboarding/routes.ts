@@ -4,12 +4,7 @@ import { FastifyInstance, FastifyRequest } from "fastify";
 import { prisma } from "../../lib/prisma.js";
 import { SOLO_LLAMADAS_DE_VOZ } from "../../lib/llamadasDeVoz.js";
 import { BusinessScheduleSchema } from "../../lib/businessSchedule.js";
-import {
-  marcadaComoConectada,
-  resolverConexionDeCalendario,
-  SELECT_CONEXION_DE_CALENDARIO,
-} from "../calendar/conexion.js";
-import { reservaEnAlhabla } from "../../lib/modoDeAgenda.js";
+import { SELECT_CONEXION_DE_CALENDARIO } from "../calendar/conexion.js";
 import {
   estadoWhatsappDelDueno,
   type EstadoWhatsappDueno,
@@ -190,13 +185,10 @@ export async function onboardingRoutes(fastify: FastifyInstance) {
           schedule: isValidSchedule(business.schedule),
           services: business.services.length > 0,
           professionals: business.professionals.length > 0,
-          // Solo el flag del proveedor activo, sin mirar el token (semántica
-          // histórica de este paso del onboarding). En la agenda de Alhabla
-          // el paso está hecho sin calendario (PLAN-AGENDA-ALHABLA.md): si
-          // no, el checklist no terminaba nunca.
-          calendar:
-            reservaEnAlhabla(business) ||
-            marcadaComoConectada(resolverConexionDeCalendario(business)),
+          // La agenda de Alhabla viene puesta (PLAN-AGENDA-PRINCIPAL.md):
+          // conectar un calendario es opcional, así que el paso está hecho
+          // siempre. Se mantiene en la lista para la app anterior.
+          calendar: true,
           whatsapp: whatsappStatus === "activo" || whatsappStatus === "baja",
           forwarding: forwardingDone,
         };

@@ -1,24 +1,33 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { prisma } from "../../../src/lib/prisma.js";
-import { enqueueEmailJob } from "../../../src/lib/cloudTasks.js";
+import {
+  enqueueEmailJob,
+  enqueueRecordatorioDeCalendarioJob,
+} from "../../../src/lib/cloudTasks.js";
 import { avisarAlerta } from "../../../src/modules/whatsapp/avisosNegocio.js";
 import {
   alertarCalendarioDesconectado,
+  alertarCopiasPendientes,
   alertarDesvioComprobado,
   alertarDesvioSinComprobar,
   alertarMinutos,
   alertarNumeroNoActivo,
   alertarPagoFallido,
   alertarPruebaTermina,
+  recordarCalendarioDesconectado,
 } from "../../../src/modules/whatsapp/alertas.js";
 
 vi.mock("../../../src/lib/prisma.js", () => ({
   prisma: {
     business: { findUnique: vi.fn() },
     user: { findFirst: vi.fn() },
+    calendarConnection: { findFirst: vi.fn() },
   },
 }));
-vi.mock("../../../src/lib/cloudTasks.js", () => ({ enqueueEmailJob: vi.fn() }));
+vi.mock("../../../src/lib/cloudTasks.js", () => ({
+  enqueueEmailJob: vi.fn(),
+  enqueueRecordatorioDeCalendarioJob: vi.fn(),
+}));
 vi.mock(
   "../../../src/modules/whatsapp/avisosNegocio.js",
   async (importActual) => {
@@ -34,6 +43,8 @@ const mockedBiz = vi.mocked(prisma.business.findUnique);
 const mockedUser = vi.mocked(prisma.user.findFirst);
 const mockedAvisar = vi.mocked(avisarAlerta);
 const mockedEmail = vi.mocked(enqueueEmailJob);
+const mockedRecordatorio = vi.mocked(enqueueRecordatorioDeCalendarioJob);
+const mockedConexion = vi.mocked(prisma.calendarConnection.findFirst);
 
 const HOY = new Intl.DateTimeFormat("en-CA", {
   timeZone: "Europe/Madrid",
@@ -69,12 +80,16 @@ describe("alertas operativas (#5)", () => {
         businessName: "Peluquería Ana",
         causa: "calendario",
         recursoId: `calendario:biz_1:google:${HOY}`,
+        // PLAN-AGENDA-PRINCIPAL.md: las citas siguen entrando en la agenda;
+        // antes decía que se guardaban como pendientes.
         texto: expect.stringContaining(
-          "tu calendario de Google Calendar se ha desconectado"
+          "he perdido la conexión con tu Google Calendar. Tus citas siguen entrando en tu agenda"
         ),
         email: expect.any(Function),
       })
     );
+    // Sin la fecha de la desconexión no se programa el recordatorio.
+    expect(mockedRecordatorio).not.toHaveBeenCalled();
     await mockedAvisar.mock.calls[0][0].email!();
     expect(mockedEmail).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -85,6 +100,125 @@ describe("alertas operativas (#5)", () => {
     );
     expect(mockedEmail.mock.calls[0][0].html).toContain(
       "https://alhabla.ai/ajustes/calendario"
+    );
+  });
+
+  it("calendario desconectado con desconectadoEn: programa el recordatorio a 7 días con un taskId estable", async () => {
+    const desconectadoEn = new Date("2026-11-06T09:15:30.123Z");
+    const r = await alertarCalendarioDesconectado({
+      businessId: "biz_1",
+      proveedor: "Google Calendar",
+      providerId: "google",
+      desconectadoEn,
+    });
+
+    expect(r).toEqual({ via: "interactivo" });
+    expect(mockedAvisar).toHaveBeenCalledTimes(1);
+    expect(mockedRecordatorio).toHaveBeenCalledWith(
+      {
+        businessId: "biz_1",
+        provider: "google",
+        desconectadoEn: "2026-11-06T09:15:30.123Z",
+      },
+      `recordatorio-calendario-biz_1-google-${desconectadoEn.getTime()}`,
+      new Date(desconectadoEn.getTime() + 7 * 24 * 60 * 60 * 1000)
+    );
+
+    // Si no se puede programar, la alerta ya salió y no lanza.
+    mockedRecordatorio.mockRejectedValueOnce(new Error("Cloud Tasks caído"));
+    expect(
+      await alertarCalendarioDesconectado({
+        businessId: "biz_1",
+        proveedor: "Google Calendar",
+        providerId: "google",
+        desconectadoEn,
+      })
+    ).toEqual({ via: "interactivo" });
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringContaining(
+        "No se pudo programar el recordatorio del calendario desconectado del negocio biz_1 (google)"
+      )
+    );
+  });
+
+  describe("recordarCalendarioDesconectado (a los 7 días)", () => {
+    const DESCONECTADO_EN = "2026-10-30T09:15:30.123Z";
+    const ENTRADA = {
+      businessId: "biz_1",
+      provider: "google",
+      desconectadoEn: DESCONECTADO_EN,
+    };
+
+    it("sigue desconectado desde la misma vez: pregunta si lo sigue usando, una vez, con email de respaldo", async () => {
+      mockedConexion.mockResolvedValue({
+        connected: false,
+        disconnectedAt: new Date(DESCONECTADO_EN),
+      } as never);
+
+      expect(await recordarCalendarioDesconectado(ENTRADA)).toEqual({
+        via: "interactivo",
+      });
+      expect(mockedConexion).toHaveBeenCalledWith({
+        where: { businessId: "biz_1", provider: "google" },
+        select: { connected: true, disconnectedAt: true },
+      });
+      expect(mockedAvisar).toHaveBeenCalledWith(
+        expect.objectContaining({
+          businessId: "biz_1",
+          causa: "calendario",
+          recursoId: `calendario-recordatorio:biz_1:google:${DESCONECTADO_EN}`,
+          texto: expect.stringContaining("¿sigues usando Google Calendar?"),
+          email: expect.any(Function),
+        })
+      );
+    });
+
+    it("no avisa si reconectó, si se volvió a desconectar en otro momento o si quitó el calendario", async () => {
+      const silencio = {
+        via: "ninguna",
+        motivo: "ya no está desconectado desde entonces",
+        deliberado: true,
+      };
+
+      // Reconectó (aunque la fecha de la última desconexión siga ahí).
+      mockedConexion.mockResolvedValue({
+        connected: true,
+        disconnectedAt: new Date(DESCONECTADO_EN),
+      } as never);
+      expect(await recordarCalendarioDesconectado(ENTRADA)).toEqual(silencio);
+
+      // Reconectó y se volvió a caer: ese otro corte tiene su recordatorio.
+      mockedConexion.mockResolvedValue({
+        connected: false,
+        disconnectedAt: new Date("2026-11-04T18:00:00.000Z"),
+      } as never);
+      expect(await recordarCalendarioDesconectado(ENTRADA)).toEqual(silencio);
+
+      // Quitó el calendario: ya no hay fila.
+      mockedConexion.mockResolvedValue(null);
+      expect(await recordarCalendarioDesconectado(ENTRADA)).toEqual(silencio);
+
+      expect(mockedAvisar).not.toHaveBeenCalled();
+      expect(mockedBiz).not.toHaveBeenCalled();
+    });
+  });
+
+  it("copias pendientes: una por negocio y día, con email de respaldo", async () => {
+    await alertarCopiasPendientes({
+      businessId: "biz_1",
+      proveedor: "Google Calendar",
+    });
+
+    expect(mockedAvisar).toHaveBeenCalledWith(
+      expect.objectContaining({
+        businessId: "biz_1",
+        causa: "calendario",
+        recursoId: `calendario-copias:biz_1:${HOY}`,
+        texto: expect.stringContaining(
+          "Google Calendar no me deja copiar algunas citas"
+        ),
+        email: expect.any(Function),
+      })
     );
   });
 

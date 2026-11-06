@@ -25,6 +25,20 @@ export async function iniciarServiciosExternos(): Promise<void> {
       "[Server] ENVIOS_SIMULADOS=1 está puesto en producción y se ignora: los envíos salen con normalidad"
     );
   }
+  if (process.env.CALENDARIOS_FALSOS === "1") {
+    const { calendariosFalsosActivos } = await import(
+      "../adapters/calendar/falso/calendarioFalso.js"
+    );
+    if (calendariosFalsosActivos()) {
+      console.warn(
+        "[Server] CALENDARIOS_FALSOS=1: las conexiones con credenciales «falso:» usan el calendario falso (backend-sim)"
+      );
+    } else {
+      console.error(
+        "[Server] CALENDARIOS_FALSOS=1 está puesto en producción y se ignora: todos los calendarios son los reales"
+      );
+    }
+  }
   initStorage();
 }
 

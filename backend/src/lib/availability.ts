@@ -246,6 +246,9 @@ const NEXT_SLOT_SEARCH_MAX_ATTEMPTS = 288;
  * antes de la ventana y todavía sigue ocupando al profesional. 24 h es
  * holgadísimo para cualquier servicio real y mantiene la consulta acotada. */
 const OVERLAP_LOOKBACK_MS = 24 * 60 * 60 * 1000;
+/** Un evento que empieza y acaba a menos de esto de su cita está «a la misma
+ * hora» (redondeos de los proveedores). */
+const MARGEN_DE_MISMA_HORA_MS = 60 * 1000;
 
 /**
  * Milisegundos que checkAvailability mira hacia delante desde
@@ -457,12 +460,12 @@ export async function checkAvailability(input: {
    * ocupado. Opcional: si no se pasa, el comportamiento es el de siempre
    * (solo Postgres). */
   externalBusyIntervals?: ExternalBusyInterval[];
-  /** true solo si se pudo leer el calendario correctamente. Con este dato
-   * podemos liberar una reserva local cuyo evento se canceló manualmente,
-   * sin confundir una caída del proveedor con una agenda vacía. */
+  /** Ya no cambia el resultado: servía para liberar una cita cuyo evento se
+   * borró en el calendario, y desde PLAN-AGENDA-PRINCIPAL.md (regla 4) la
+   * cita de Alhabla bloquea siempre su hora. Se quita, con sus llamadores,
+   * en la limpieza de la fase 7. */
   calendarAvailabilityKnown?: boolean;
-  /** Calendario del que proceden externalBusyIntervals. Solo ese calendario
-   * puede confirmar que un evento propio fue borrado manualmente. */
+  /** Igual que calendarAvailabilityKnown: ya no se usa. */
   calendarOrigin?: CalendarOrigin | null;
   /** Reserva que se está MOVIENDO (el Gestor, fase 2; la recepcionista al
    * cambiar una cita): no cuenta como ocupación, ni ella ni su evento en el
@@ -488,8 +491,6 @@ export async function checkAvailability(input: {
     serviceIds,
     professionalId,
     externalBusyIntervals,
-    calendarAvailabilityKnown = false,
-    calendarOrigin,
     excluir,
     buscarTambienAntes,
   } = input;
@@ -636,8 +637,7 @@ export async function checkAvailability(input: {
       programedAt: true,
       durationMinutes: true,
       externalEventId: true,
-      externalCalendarProvider: true,
-      externalCalendarId: true,
+      copiaEnCalendario: true,
     },
   });
 
@@ -646,68 +646,56 @@ export async function checkAvailability(input: {
       !interval.externalEventId ||
       !eventosExcluidos.has(interval.externalEventId)
   );
-  const externalIntervalsById = new Map(
-    externalIntervals
-      .filter((interval) => Boolean(interval.externalEventId))
-      .map((interval) => [interval.externalEventId!, interval])
+  // La agenda de Alhabla manda (PLAN-AGENDA-PRINCIPAL.md, regla 4): cada cita
+  // bloquea SIEMPRE su hora, la que tiene en Alhabla. Antes, una cita cuyo
+  // evento desaparecía del calendario se daba por cancelada y liberaba el
+  // hueco, y una movida en Google pasaba a bloquear la hora nueva en lugar
+  // de la suya; pero lo que el dueño cambia en su calendario no vuelve a
+  // Alhabla, así que el cliente seguía viniendo a su hora.
+  const reconciledLocalBookings = localBookings;
+
+  // Los eventos que son copia de una cita de Alhabla no cuentan dos veces:
+  // se descartan si están a la misma hora que su cita, o si la copia está
+  // pendiente (es el evento viejo de una cita movida que el job todavía no ha
+  // sustituido). Si el dueño la movió en su calendario, el evento ocupa
+  // también el sitio nuevo: nunca se libera un hueco por error.
+  const citasPorEvento = new Map(
+    localBookings
+      .filter((booking) => Boolean(booking.externalEventId))
+      .map((booking) => [booking.externalEventId!, booking])
   );
-
-  // Una consulta correcta puede liberar una reserva local solo si inspecciona
-  // exactamente el mismo calendario que creó su evento. Al cambiar de
-  // calendario/proveedor, la ausencia del ID anterior no significa que la
-  // cita se haya cancelado: se mantiene como bloqueo conservador.
-  // Los Bookings históricos sin origen también se conservan por seguridad.
-  const reconciledLocalBookings = localBookings.flatMap((booking) => {
-    const belongsToCurrentCalendar =
-      calendarOrigin &&
-      booking.externalCalendarProvider === calendarOrigin.provider &&
-      booking.externalCalendarId === calendarOrigin.calendarId;
-    if (
-      !calendarAvailabilityKnown ||
-      !booking.externalEventId ||
-      !belongsToCurrentCalendar
-    ) {
-      return [booking];
-    }
-
-    const externalInterval = externalIntervalsById.get(booking.externalEventId);
-    if (!externalInterval) {
-      return [];
-    }
-
-    return [{
-      ...booking,
-      programedAt: externalInterval.start,
-      durationMinutes: Math.max(
-        0,
-        (externalInterval.end.getTime() - externalInterval.start.getTime()) / 60_000
-      ),
-    }];
-  });
-
-  const localExternalEventIds = new Set(
-    [
-      ...reconciledLocalBookings.map((booking) => booking.externalEventId),
-      // Un evento de una cita ya cancelada es basura nuestra, no ocupación
-      // del negocio: no puede seguir bloqueando la hora.
-      ...canceladasConEvento.map((booking) => booking.externalEventId),
-    ].filter((eventId): eventId is string => Boolean(eventId))
+  const eventosDeCanceladas = new Set(
+    // Un evento de una cita ya cancelada es basura nuestra, no ocupación
+    // del negocio: no puede seguir bloqueando la hora.
+    canceladasConEvento
+      .map((booking) => booking.externalEventId)
+      .filter((eventId): eventId is string => Boolean(eventId))
   );
+  const esCopiaDeUnaCita = (interval: ExternalBusyInterval): boolean => {
+    if (!interval.externalEventId) return false;
+    if (eventosDeCanceladas.has(interval.externalEventId)) return true;
+    const cita = citasPorEvento.get(interval.externalEventId);
+    if (!cita) return false;
+    if (cita.copiaEnCalendario === "pendiente") return true;
+    const finDeLaCita =
+      cita.programedAt.getTime() + Math.max(0, cita.durationMinutes) * 60_000;
+    return (
+      Math.abs(interval.start.getTime() - cita.programedAt.getTime()) <
+        MARGEN_DE_MISMA_HORA_MS &&
+      Math.abs(interval.end.getTime() - finDeLaCita) < MARGEN_DE_MISMA_HORA_MS
+    );
+  };
 
   // professionalId: null a propósito (ver comentario en el parámetro) — un
   // bloqueo externo resta capacidad pero nunca marca a un profesional
-  // concreto como ocupado, porque no sabemos a cuál corresponde. Los eventos
-  // que ya tienen un Booking local se omiten aquí: ya cuentan una sola vez
-  // arriba, conservando además el profesional asignado.
+  // concreto como ocupado, porque no sabemos a cuál corresponde. Las copias
+  // de citas de Alhabla se omiten aquí: ya cuentan una sola vez arriba,
+  // conservando además el profesional asignado.
   const externalBookings = externalIntervals
     .filter(
       (interval) => interval.start.getTime() < nextSlotSearchWindowEnd.getTime()
     )
-    .filter(
-      (interval) =>
-        !interval.externalEventId ||
-        !localExternalEventIds.has(interval.externalEventId)
-    )
+    .filter((interval) => !esCopiaDeUnaCita(interval))
     .map((interval) => ({
       professionalId: null as string | null,
       programedAt: interval.start,

@@ -74,7 +74,10 @@ export function buildEventContent(input: {
       : null,
     input.professionalName ? `Profesional: ${input.professionalName}` : null,
     "",
-    "Cita generada por el asistente virtual de Alhabla.",
+    // Un solo sentido (PLAN-AGENDA-PRINCIPAL.md, regla 4): lo que el dueño
+    // cambie en su calendario no vuelve a Alhabla, así que se lo dice el
+    // propio evento.
+    "Esta cita la gestiona Alhabla. Para moverla o cancelarla, hazlo desde el panel o díselo a tu asistente por WhatsApp: lo que cambies aquí no llega a Alhabla.",
   ].filter((line) => line !== null);
 
   return { summary, description: descriptionLines.join("\n") };

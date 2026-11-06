@@ -574,8 +574,21 @@ export function recadoYaAtendido(): string {
 // avisarAlerta) y sin exclamaciones; una frase de qué pasa y otra de qué hacer.
 // ---------------------------------------------------------------------------
 
+/** Calendario desconectado (PLAN-AGENDA-PRINCIPAL.md, fase 5: la voz de tu
+ * asistente, sin dramatizar). Las citas siguen entrando en la agenda de
+ * Alhabla; lo único que se pierde es ver lo que el dueño apunta ahí. */
 export function alertaCalendario(input: { proveedor: string }): string {
-  return `tu calendario de ${input.proveedor} se ha desconectado. Hasta que lo reconectes, las citas se guardan como pendientes y no entran en tu agenda.`;
+  return `he perdido la conexión con tu ${input.proveedor}. Tus citas siguen entrando en tu agenda, así que no te pierdes ninguna. Cuando tengas un momento, reconéctalo desde el panel y así veré también lo que apuntes ahí.`;
+}
+
+/** A los 7 días sin reconectar, una sola vez. */
+export function recordatorioCalendario(input: { proveedor: string }): string {
+  return `¿sigues usando ${input.proveedor}? Lleva una semana sin conexión: tus citas siguen entrando en tu agenda, pero no veo lo que apuntas ahí. Si quieres, reconéctalo desde el panel; si ya no lo usas, quítalo en Agente › Calendario y no te vuelvo a avisar.`;
+}
+
+/** Copias que llevan un rato sin poder entrar en el calendario conectado. */
+export function alertaCopiasPendientes(input: { proveedor: string }): string {
+  return `${input.proveedor} no me deja copiar algunas citas ahora mismo. Están bien guardadas en tu agenda y lo sigo intentando; si en unas horas no se arregla, revisa la conexión desde el panel.`;
 }
 
 export function alertaTelefono(): string {

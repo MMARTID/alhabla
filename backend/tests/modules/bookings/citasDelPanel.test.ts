@@ -23,8 +23,6 @@ vi.mock("../../../src/modules/bookings/cancelacion.js", () => ({
 vi.mock("../../../src/modules/gestor/accionesAgenda.js", () => {
   const schema = { parse: (valor: unknown) => valor };
   return {
-    MOTIVO_SIN_CALENDARIO: "motivo-sin-calendario-del-gestor",
-    MOTIVO_CALENDARIO_ILEGIBLE: "motivo-calendario-ilegible-del-gestor",
     instanteLocal: (_zona: string, fecha: string, hora: string) =>
       new Date(`${fecha}T${hora}:00+02:00`),
     moverReserva: vi.fn(),
@@ -81,7 +79,7 @@ beforeEach(() => {
 });
 
 describe("POST /business/me/bookings/:id/mover", () => {
-  it("con soloComprobar no mueve nada y traduce los motivos que el Gestor escribe para el modelo", async () => {
+  it("con soloComprobar no mueve nada y devuelve el motivo del Gestor tal cual", async () => {
     const fastify = await servidor();
     mockedComprobarMover.mockResolvedValueOnce({ ok: true, descripcion: "…" });
     const libre = await mover(fastify, {
@@ -95,18 +93,21 @@ describe("POST /business/me/bookings/:id/mover", () => {
       { cita: "bk_1", fechaHora: "2026-10-09T17:00", profesional: "pro_marta" }
     );
 
+    // PLAN-AGENDA-PRINCIPAL.md: ningún motivo habla ya del calendario (nunca
+    // impide mover), así que el panel no traduce nada.
     mockedComprobarMover.mockResolvedValueOnce({
       ok: false,
-      motivo: "motivo-sin-calendario-del-gestor",
+      motivo: "El negocio está cerrado el domingo 11 de octubre a las 17:00.",
     });
-    const sinCalendario = await mover(fastify, {
-      fechaHora: "2026-10-09T17:00",
+    const cerrado = await mover(fastify, {
+      fechaHora: "2026-10-11T17:00",
       soloComprobar: true,
     });
-    expect(sinCalendario.statusCode).toBe(409);
-    expect(sinCalendario.json().error).toBe(
-      "Para apuntar o mover citas desde aquí, elige la agenda de Alhabla o conecta tu calendario."
-    );
+    expect(cerrado.statusCode).toBe(409);
+    expect(cerrado.json()).toEqual({
+      ok: false,
+      error: "El negocio está cerrado el domingo 11 de octubre a las 17:00.",
+    });
 
     mockedComprobarMover.mockResolvedValueOnce({
       ok: false,
@@ -127,6 +128,7 @@ describe("POST /business/me/bookings/:id/mover", () => {
       start: new Date("2026-10-09T15:00:00Z"),
       asignado: { id: "pro_laura", name: "Laura" },
       descripcionAntes: "…",
+      copia: "hecha",
     } as never);
     mockedComprobarAviso.mockResolvedValue({
       ok: true,
@@ -149,7 +151,7 @@ describe("POST /business/me/bookings/:id/mover", () => {
     expect(response.json()).toEqual({
       ok: true,
       mensaje:
-        "Cita movida al viernes 9 de octubre a las 17:00 con Laura. Tu calendario ya está al día.",
+        "Cita movida al viernes 9 de octubre a las 17:00 con Laura. Tu agenda y tu calendario ya están al día.",
       cita: {
         id: "bk_1",
         programedAt: "2026-10-09T15:00:00.000Z",
@@ -171,6 +173,7 @@ describe("POST /business/me/bookings/:id/mover", () => {
       start: new Date("2026-10-09T15:00:00Z"),
       asignado: null,
       descripcionAntes: "…",
+      copia: "hecha",
     } as never);
     mockedComprobarAviso.mockResolvedValue({ ok: false, motivo: "sin móvil" });
 
@@ -178,7 +181,7 @@ describe("POST /business/me/bookings/:id/mover", () => {
 
     expect(response.json().avisoAlCliente).toBeNull();
     expect(response.json().mensaje).toBe(
-      "Cita movida al viernes 9 de octubre a las 17:00. Tu calendario ya está al día."
+      "Cita movida al viernes 9 de octubre a las 17:00. Tu agenda y tu calendario ya están al día."
     );
   });
 
@@ -190,16 +193,18 @@ describe("POST /business/me/bookings/:id/mover", () => {
         409,
         "El negocio está cerrado el sábado.",
       ],
-      [
-        { motivo: "sin_hueco", detalle: "motivo-calendario-ilegible-del-gestor" },
-        409,
-        "Ahora mismo no se puede leer tu calendario. Inténtalo en un rato.",
-      ],
       [{ motivo: "no_existe", detalle: "" }, 404, "No existe esa cita en tu negocio."],
+      // Ya no hay fallos del calendario (calendario_desconectado,
+      // calendario_rechaza): la cita se mueve igual y la copia queda pendiente.
       [
-        { motivo: "calendario_rechaza", detalle: "" },
-        502,
-        "Tu calendario no ha aceptado la nueva hora. La cita sigue como estaba; inténtalo en un rato.",
+        { motivo: "agenda_ocupada", detalle: "" },
+        409,
+        "La agenda está guardando otra reserva en este momento. Vuelve a intentarlo en unos segundos.",
+      ],
+      [
+        { motivo: "cancelada_entre_medias", detalle: "" },
+        409,
+        "La cita se canceló mientras la movías. No se ha cambiado nada.",
       ],
       [
         { motivo: "error_interno", detalle: "" },
@@ -226,7 +231,10 @@ describe("POST /business/me/bookings/:id/mover", () => {
 describe("POST /business/me/bookings/:id/cancelar", () => {
   it("cancela como owner_panel y ofrece avisar de la cancelación", async () => {
     const fastify = await servidor();
-    mockedCancelar.mockResolvedValue({ resultado: "cancelada" });
+    mockedCancelar.mockResolvedValue({
+      resultado: "cancelada",
+      quitadaDelCalendario: true,
+    });
     mockedComprobarAviso.mockResolvedValue({
       ok: true,
       descripcion: "…",
@@ -331,11 +339,11 @@ describe("crear desde el panel: nueva cita, bloquear horas y ausencia", () => {
     profesionalId: "pro_laura",
   };
 
-  it("POST /business/me/bookings con soloComprobar solo comprueba y traduce el motivo", async () => {
+  it("POST /business/me/bookings con soloComprobar solo comprueba y devuelve el motivo tal cual", async () => {
     const fastify = await servidor();
     vi.mocked(nuevaCita.comprobar).mockResolvedValueOnce({
       ok: false,
-      motivo: "motivo-sin-calendario-del-gestor",
+      motivo: "Esa hora ya ha pasado.",
     });
 
     const r = await fastify.inject({
@@ -345,10 +353,7 @@ describe("crear desde el panel: nueva cita, bloquear horas y ausencia", () => {
     });
 
     expect(r.statusCode).toBe(409);
-    expect(r.json()).toEqual({
-      ok: false,
-      error: "Para apuntar o mover citas desde aquí, elige la agenda de Alhabla o conecta tu calendario.",
-    });
+    expect(r.json()).toEqual({ ok: false, error: "Esa hora ya ha pasado." });
     expect(nuevaCita.ejecutar).not.toHaveBeenCalled();
     // Los nombres del formulario se traducen a los de la acción del Gestor.
     expect(nuevaCita.comprobar).toHaveBeenCalledWith(
@@ -401,6 +406,73 @@ describe("crear desde el panel: nueva cita, bloquear horas y ausencia", () => {
     );
     // Sin aviso al cliente desde «Nueva cita» (decisión D4).
     expect(r.json()).not.toHaveProperty("avisoAlCliente");
+  });
+
+  // PLAN-AGENDA-PRINCIPAL.md: la agenda es la de Alhabla. El panel no mira el
+  // calendario conectado para apuntar ni para mover (ya no existe el aviso de
+  // «elige la agenda de Alhabla o conecta tu calendario»).
+  it("sin calendario conectado, «Nueva cita» apunta y «Mover» mueve", async () => {
+    const fastify = await servidor();
+    vi.mocked(prisma.business.findUnique).mockResolvedValue({
+      timezone: "Europe/Madrid",
+      modoDeAgenda: "sin_elegir",
+      calendarProvider: null,
+      calendarConnections: [],
+    } as never);
+    vi.mocked(nuevaCita.comprobar).mockResolvedValueOnce({
+      ok: true,
+      descripcion: "apuntar a Marta",
+      parametros: { ...CUERPO_CITA, profesional: "pro_laura", duracionMinutos: 30 },
+    });
+    vi.mocked(nuevaCita.ejecutar).mockResolvedValueOnce({
+      ok: true,
+      mensaje: "Hecho: Marta queda apuntado el jueves 5 de noviembre a las 17:00, Corte con Laura. Ya está en tu agenda.",
+    });
+    vi.mocked(prisma.booking.findFirst).mockResolvedValueOnce({
+      id: "bk_nueva",
+      programedAt: new Date("2026-11-05T16:00:00Z"),
+      clientName: "Marta",
+      clientPhone: "+34611222333",
+      professional: { id: "pro_laura", name: "Laura" },
+    } as never);
+
+    const nueva = await fastify.inject({
+      method: "POST",
+      url: "/business/me/bookings",
+      payload: CUERPO_CITA,
+    });
+    expect(nueva.statusCode).toBe(201);
+    expect(nueva.json()).toMatchObject({ ok: true, cita: { id: "bk_nueva" } });
+    expect(nuevaCita.ejecutar).toHaveBeenCalledTimes(1);
+
+    mockedMover.mockResolvedValueOnce({
+      ok: true,
+      cita: CITA,
+      start: new Date("2026-10-09T15:00:00Z"),
+      asignado: { id: "pro_laura", name: "Laura" },
+      descripcionAntes: "…",
+      copia: null,
+    } as never);
+    mockedComprobarAviso.mockResolvedValue({ ok: false, motivo: "sin móvil" });
+    const movida = await mover(fastify, { fechaHora: "2026-10-09T17:00" });
+    expect(movida.statusCode).toBe(200);
+    expect(movida.json()).toMatchObject({
+      ok: true,
+      // Sin copia hecha no se dice que el calendario esté al día.
+      mensaje:
+        "Cita movida al viernes 9 de octubre a las 17:00 con Laura. Tu agenda ya está al día.",
+      cita: { id: "bk_1", programedAt: "2026-10-09T15:00:00.000Z" },
+    });
+
+    mockedCancelar.mockResolvedValueOnce({
+      resultado: "cancelada",
+      quitadaDelCalendario: false,
+    });
+    const cancelada = await fastify.inject({
+      method: "POST",
+      url: "/business/me/bookings/bk_1/cancelar",
+    });
+    expect(cancelada.json()).toMatchObject({ mensaje: "Cita cancelada." });
   });
 
   it("POST /business/me/bookings devuelve 400 con un cuerpo mal formado", async () => {

@@ -1,18 +1,17 @@
 import { prisma } from "../lib/prisma.js";
-import { enqueueEmailJob, enqueueRetryBookingJob } from "../lib/cloudTasks.js";
+import { enqueueEmailJob } from "../lib/cloudTasks.js";
 import { buildCalendarIdempotencyKey } from "../lib/calendarIdempotency.js";
 import { calendarService } from "../modules/calendar/service.js";
 import {
-  origenExternoDeLaCita,
-  puedeReservar,
-  marcarCalendarioDesconectado,
   origenDeCalendario,
   resolverConexionDeCalendario,
   SELECT_CONEXION_DE_CALENDARIO,
-  usaCalendarioExterno,
 } from "../modules/calendar/conexion.js";
-import { DESCRIPTORES_DE_PROVEEDOR } from "../adapters/calendar/CalendarProvider.js";
-import { proveedorDesdeErrorDeReconexion } from "../adapters/calendar/errors.js";
+import {
+  camposDeLaCopia,
+  encolarCopiaDeLaCita,
+  intentarCopiaDeLaCita,
+} from "../modules/calendar/copiaDeLaCita.js";
 import {
   checkBusinessHours,
   checkBookingRestrictions,
@@ -25,7 +24,6 @@ import { acquireBookingLock, releaseBookingLock } from "../lib/bookingLock.js";
 import { RetryFailedBookingJob } from "../lib/jobTypes.js";
 import {
   avisarCitaRecuperada,
-  avisarReintentosAgotados,
   avisarReservaPerdida,
 } from "../modules/whatsapp/avisosNegocio.js";
 import { finalDeReservaPendienteEmail } from "../lib/emailTemplates.js";
@@ -169,56 +167,12 @@ async function perderReserva(
 
 /**
  * Reintenta en segundo plano una reserva que falló durante la llamada (ver
- * capturePendingBookingLead en voiceTools/service.ts) por un fallo probablemente
- * transitorio del calendario. El cliente ya colgó — si el negocio sigue sin
- * reconectar el calendario, lanzamos un error para que Cloud Tasks reintente
- * más tarde en vez de dar la reserva por perdida.
+ * capturePendingBookingLead en voiceTools/service.ts) por un fallo
+ * transitorio (el cerrojo de la agenda, un error inesperado). Desde
+ * PLAN-AGENDA-PRINCIPAL.md el calendario conectado ya no deja una reserva
+ * pendiente: la reserva entra en la agenda de Alhabla y su copia se reintenta
+ * aparte (calendar/copiaDeLaCita.ts).
  */
-/** Cada cuánto se vuelve a mirar si el negocio ya reconectó el calendario, y
- * cuántas veces: 8 intentos cada 6 horas cubren dos días, que es lo que tarda
- * un negocio pequeño en darse cuenta por el aviso del panel o del correo. */
-const HORAS_ENTRE_REINTENTOS = 6;
-const MAX_REINTENTOS_POR_CALENDARIO = 8;
-
-/**
- * El calendario está desconectado: se reprograma el propio reintento unas
- * horas más tarde y, agotado el plazo, se avisa al dueño. Antes esto lanzaba,
- * y Cloud Tasks gastaba sus cuatro reintentos en cuestión de minutos mientras
- * el negocio tardaba días en reconectar; y al agotar el plazo no se avisaba
- * a nadie. La cita sigue sin resolver (panel, resumen semanal) para que el
- * dueño la apunte o la reintente desde el aviso.
- */
-async function esperarAlCalendario(
-  intento: number | undefined,
-  cita: FinalDeLaCita
-): Promise<void> {
-  const siguienteIntento = (intento ?? 0) + 1;
-  if (siguienteIntento <= MAX_REINTENTOS_POR_CALENDARIO) {
-    await enqueueRetryBookingJob(
-      { leadId: cita.leadId, attempt: siguienteIntento },
-      `retry-failed-booking-${cita.leadId}-${siguienteIntento}`,
-      new Date(Date.now() + HORAS_ENTRE_REINTENTOS * 60 * 60 * 1000)
-    );
-    console.log(
-      `[Job] Calendario de ${cita.businessId} aún desconectado; reintento ${siguienteIntento}/${MAX_REINTENTOS_POR_CALENDARIO} del lead ${cita.leadId} programado para dentro de ${HORAS_ENTRE_REINTENTOS}h`
-    );
-    return;
-  }
-  const aviso = await avisarReintentosAgotados({
-    businessId: cita.businessId,
-    businessName: cita.businessName,
-    timezone: cita.timezone,
-    leadId: cita.leadId,
-    clientName: cita.clientName,
-    clientPhone: cita.clientPhone,
-    startDateTime: cita.startDate,
-    email: emailDelFinal(cita, "agotada"),
-  });
-  console.warn(
-    `[Job] Lead ${cita.leadId}: se agotaron los reintentos con el calendario desconectado; queda pendiente de gestión manual. Aviso al negocio ${cita.businessId}: ${aviso.via}${aviso.motivo ? ` (${aviso.motivo})` : ""}`
-  );
-}
-
 export async function processRetryFailedBookingJob(
   data: RetryFailedBookingJob
 ): Promise<void> {
@@ -289,22 +243,21 @@ export async function processRetryFailedBookingJob(
     startDate,
   };
 
+  // El calendario conectado ya no decide si se reserva
+  // (PLAN-AGENDA-PRINCIPAL.md): solo recibe la copia. Las peticiones que se
+  // guardaron como pendientes por el calendario antes de este cambio se
+  // reservan en cuanto el reintento llega aquí.
   const conexion = resolverConexionDeCalendario(business);
-
-  if (!puedeReservar(conexion)) {
-    // El negocio sigue sin reconectar el calendario (ver esperarAlCalendario).
-    await esperarAlCalendario(data.attempt, cita);
-    return;
-  }
 
   // Resueltos aparte (no vienen guardados en el Lead) para que el evento de
   // calendario de un reintento en segundo plano quede tan completo como el
   // de una reserva que sale bien a la primera — ver buildEventContent en
   // calendar/service.ts. Filtrados por businessId igual que en
   // voiceTools/service.ts: serviceIds/professionalId en el Lead pueden venir
-  // sin verificar (capturePendingBookingLead los guarda tal cual cuando el
-  // fallo es por calendario desconectado, antes de que existan las versiones
-  // verificadas) — sin este filtro, un id que por lo que sea coincidiera con
+  // sin verificar (capturePendingBookingLead los guardaba tal cual cuando el
+  // fallo era por calendario desconectado, antes de que existan las versiones
+  // verificadas; quedan leads así de antes de PLAN-AGENDA-PRINCIPAL.md) — sin
+  // este filtro, un id que por lo que sea coincidiera con
   // el de otro negocio filtraría el nombre de SU servicio/profesional al
   // evento de este negocio.
   const requestedServiceIds = data_.serviceIds ?? [];
@@ -375,10 +328,12 @@ export async function processRetryFailedBookingJob(
       const sameRequest =
         existingBooking.programedAt.getTime() === startDate.getTime() &&
         existingBooking.durationMinutes === data_.durationMinutes;
-      if (sameRequest && existingBooking.externalEventId) {
+      // Con o sin evento: desde PLAN-AGENDA-PRINCIPAL.md una cita puede
+      // estar guardada sin copia en el calendario (no hay, o está pendiente).
+      if (sameRequest) {
         await abandonLead(
           leadId,
-          "ya tenía un evento creado para esta reserva exacta; se marca resuelto sin duplicar"
+          "ya estaba guardada esta reserva exacta; se marca resuelto sin duplicar"
         );
       } else {
         await abandonLead(
@@ -458,25 +413,6 @@ export async function processRetryFailedBookingJob(
       ? { intervals: externalBusy, calendarAvailabilityKnown: false }
       : externalBusy;
 
-    // Igual que la reserva en vivo: con un calendario externo que no se pudo
-    // leer, no se reserva a ciegas. checkAvailability ignora la ocupación
-    // externa cuando no se conoce, así que sin esta guarda la cita podía
-    // entrar encima de una que el dueño apuntó a mano. Se lanza para que
-    // Cloud Tasks lo reintente más tarde (el cerrojo se suelta en el
-    // finally); si se agotan los reintentos, la reserva sigue pendiente y el
-    // dueño ya tiene el aviso de cita pendiente.
-    if (
-      usaCalendarioExterno(conexion) &&
-      !normalizedExternalBusy.calendarAvailabilityKnown
-    ) {
-      console.warn(
-        `[Job] Lead ${leadId} (negocio ${call.businessId}): el calendario de ${DESCRIPTORES_DE_PROVEEDOR[conexion.provider].nombreCorto} sigue sin poder leerse; no se reserva a ciegas, se reintentará`
-      );
-      throw new Error(
-        `Calendario ilegible al reintentar la reserva del lead ${leadId}`
-      );
-    }
-
     const availability = await checkAvailability({
       businessId: call.businessId,
       schedule: business.schedule,
@@ -510,10 +446,11 @@ export async function processRetryFailedBookingJob(
     const resolvedProfessionalId =
       verifiedProfessionalId ?? availability.availableProfessionals[0]?.id;
 
-    let result: unknown;
-    try {
-      result = await calendarService.bookAppointment({
-        conexion,
+    const copia = await intentarCopiaDeLaCita({
+      conexion,
+      businessId: call.businessId,
+      log: { prefijo: "[Job]", etiqueta: `lead ${leadId}` },
+      evento: {
         clientName: data_.clientName,
         startDateTime: data_.startDateTime,
         durationMinutes: data_.durationMinutes,
@@ -527,36 +464,8 @@ export async function processRetryFailedBookingJob(
           startDateTime: data_.startDateTime,
           durationMinutes: data_.durationMinutes,
         }),
-      });
-    } catch (error) {
-      const proveedorRoto = proveedorDesdeErrorDeReconexion(error);
-      if (proveedorRoto) {
-        // A diferencia de otros fallos (transitorios, reintentables), este
-        // requiere una acción manual del negocio — igual que en la reserva
-        // en vivo (voiceTools/service.ts), se marca el calendario como
-        // desconectado y se invalida la caché de voz, en vez de dejar que
-        // Cloud Tasks siga reintentando contra una conexión que no va a
-        // arreglarse sola. Sin este catch, el job simplemente fallaba una y
-        // otra vez hasta agotar los reintentos de Cloud Tasks, dejando la
-        // conexión marcada como conectada (el panel seguía mostrando
-        // "conectado") aunque en realidad llevara horas rota.
-        await marcarCalendarioDesconectado(
-          call.businessId,
-          proveedorRoto,
-          { modo: "revocar" },
-          { prefijo: "[Job]" }
-        );
-        // Antes el lead se cerraba aquí y la cita se perdía aunque el dueño
-        // reconectara al rato. Ahora espera como cualquier cita con el
-        // calendario desconectado: se reintenta cada 6 h hasta dos días.
-        console.warn(
-          `[Job] Lead ${leadId}: la conexión de ${DESCRIPTORES_DE_PROVEEDOR[proveedorRoto].nombreCorto} está revocada o expirada; la cita espera a que el negocio reconecte`
-        );
-        await esperarAlCalendario(data.attempt, cita);
-        return;
-      }
-      throw error;
-    }
+      },
+    });
 
     // Como la reserva en vivo: el consentimiento del resumen y el canal de
     // la tool. Antes la cita recuperada nacía sin permiso (nunca se le
@@ -579,8 +488,8 @@ export async function processRetryFailedBookingJob(
           clientPhone: effectiveClientPhone,
           smsConsent,
           createdVia,
-          externalEventId: (result as { id?: string })?.id ?? undefined,
-          ...origenExternoDeLaCita(conexion),
+          externalEventId: copia.externalEventId ?? undefined,
+          ...camposDeLaCopia(copia),
         },
         update: {
           programedAt: startDate,
@@ -590,8 +499,8 @@ export async function processRetryFailedBookingJob(
           clientName: data_.clientName,
           clientPhone: effectiveClientPhone,
           smsConsent,
-          externalEventId: (result as { id?: string })?.id ?? undefined,
-          ...origenExternoDeLaCita(conexion),
+          externalEventId: copia.externalEventId ?? null,
+          ...camposDeLaCopia(copia),
           // Reservar de nuevo tras una cancelación reactiva la fila.
           isCancelled: false,
           cancelledAt: null,
@@ -607,10 +516,11 @@ export async function processRetryFailedBookingJob(
     });
 
     console.log(
-      `[Job] Reserva pendiente confirmada en segundo plano para el lead ${leadId} · evento=${
-        (result as { htmlLink?: string })?.htmlLink ?? "n/d"
-      }`
+      `[Job] Reserva pendiente confirmada en segundo plano para el lead ${leadId} · copia en el calendario: ${copia.copiaEnCalendario ?? "sin calendario"}`
     );
+    if (copia.reintentar && reserva?.id) {
+      await encolarCopiaDeLaCita(reserva.id);
+    }
 
     if (citaCambiada && reserva?.id) {
       await anularLaCitaCambiada({

@@ -311,10 +311,12 @@ describe("contexto_negocio", () => {
         noSugerir: [],
       },
     ]);
+    // La agenda es la de Alhabla; el calendario conectado recibe la copia.
     expect(body.calendario).toEqual({
+      agenda: "Alhabla",
       conectado: true,
       proveedor: "google",
-      estado: "conectado",
+      estado: "agenda de Alhabla, con copia en Google Calendar al día",
     });
     expect(body.faltaPorConfigurar).toEqual([]);
     expect(body.informacion).toBe(
@@ -345,7 +347,7 @@ describe("contexto_negocio", () => {
     ]);
   });
 
-  it("un negocio a medio configurar lista lo que falta", async () => {
+  it("un negocio a medio configurar lista lo que falta, sin contar el calendario (es opcional)", async () => {
     mockedBizFindUnique.mockResolvedValueOnce({
       ...NEGOCIO,
       schedule: null,
@@ -365,17 +367,20 @@ describe("contexto_negocio", () => {
       params: {},
     });
     const body = r.body as Record<string, unknown>;
+    // PLAN-AGENDA-PRINCIPAL.md: sin calendario se apunta igual en la agenda
+    // de Alhabla, así que no es un paso de la puesta en marcha.
     expect(body.faltaPorConfigurar).toEqual([
       "horario",
       "servicios",
       "profesionales",
-      "calendario",
       "número de teléfono de Alhabla",
     ]);
     expect(body.calendario).toEqual({
+      agenda: "Alhabla",
       conectado: false,
       proveedor: null,
-      estado: "sin conectar",
+      estado:
+        "agenda de Alhabla, sin calendario conectado: las citas se apuntan aquí; lo que el negocio apunte en papel o en otro programa no se ve. Conectar Google Calendar, Outlook o el iPhone es opcional, desde el panel.",
     });
     expect(
       (body.negocio as Record<string, unknown>).telefonoDelLocal
@@ -415,7 +420,7 @@ describe("contexto_negocio — «Dar precios»", () => {
 });
 
 describe("contexto_negocio — calendario a medias o caducado", () => {
-  it("distingue una cuenta enlazada sin calendario elegido y una conexión caducada", async () => {
+  it("distingue una cuenta enlazada sin calendario elegido y una conexión caducada, sin dejar de apuntar en la agenda de Alhabla", async () => {
     mockedBizFindUnique.mockResolvedValueOnce({
       ...NEGOCIO,
       calendarProvider: "outlook",
@@ -437,10 +442,16 @@ describe("contexto_negocio — calendario a medias o caducado", () => {
       params: {},
     });
     expect((r.body as { calendario: unknown }).calendario).toEqual({
+      agenda: "Alhabla",
       conectado: false,
       proveedor: "outlook",
-      estado: "a medias: falta elegir el calendario en el panel",
+      estado:
+        "agenda de Alhabla; Outlook Calendar está a medias: falta elegir el calendario en el panel",
     });
+    // A medias no es «falta por configurar»: se apunta igual.
+    expect(
+      (r.body as { faltaPorConfigurar: string[] }).faltaPorConfigurar
+    ).toEqual([]);
 
     mockedBizFindUnique.mockResolvedValueOnce({
       ...NEGOCIO,
@@ -459,9 +470,16 @@ describe("contexto_negocio — calendario a medias o caducado", () => {
       toolName: "contexto_negocio",
       params: {},
     });
+    expect((r.body as { calendario: unknown }).calendario).toEqual({
+      agenda: "Alhabla",
+      conectado: false,
+      proveedor: "google",
+      estado:
+        "agenda de Alhabla; Google Calendar está desconectado: las citas se siguen apuntando, pero no se ve lo que el dueño apunte en él hasta que lo reconecte desde el panel",
+    });
     expect(
-      (r.body as { calendario: { estado: string } }).calendario.estado
-    ).toContain("caducado");
+      (r.body as { faltaPorConfigurar: string[] }).faltaPorConfigurar
+    ).toEqual([]);
   });
 });
 
