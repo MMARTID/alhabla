@@ -52,20 +52,43 @@ export type CitaConservada = {
 };
 
 /**
+ * Los eventos que crea el calendario falso de backend-sim
+ * (src/adapters/calendar/falso/calendarioFalso.ts) llevan este prefijo, y
+ * ningún adaptador real lo usa: Google y Outlook derivan el id del digest en
+ * hexadecimal o los da el proveedor, y CalDAV termina en `@…`.
+ */
+export const PREFIJO_DE_EVENTO_FALSO = "falso";
+const CLAVES_DEL_CALENDARIO_FALSO = "calendario-falso:%";
+
+/**
  * Borra las llamadas simuladas (y en cascada sus transcripciones, citas…)
  * para que no se mezclen con las reales en el historial del panel de dev.
  *
- * Se CONSERVAN las que tienen una cita viva que llegó al calendario
+ * Se CONSERVAN las que tienen una cita viva que llegó a un calendario REAL
  * (`externalEventId` y sin cancelar): borrar la fila dejaría el evento
- * huérfano en el calendario real del negocio. Se devuelven para cancelarlas
- * antes (cancel_appointment simulada o desde el panel) y volver a limpiar.
+ * huérfano en el calendario del negocio. Se devuelven para cancelarlas antes
+ * (cancel_appointment simulada o desde el panel) y volver a limpiar.
+ *
+ * Las del calendario falso sí se borran, y sus eventos salen del almacén del
+ * calendario falso (`claves_temporales`, `calendario-falso:<marca>`) en la
+ * misma transacción, para que agenda_dev no enseñe copias de citas que ya no
+ * existen. Los apuntados «a mano» y los de otras citas se quedan.
  */
 export async function borrarLlamadasSimuladas(
   urlDeBdDeDev: string,
   businessId?: string
-): Promise<{ borradas: number; conservadas: CitaConservada[] }> {
+): Promise<{
+  borradas: number;
+  conservadas: CitaConservada[];
+  eventosFalsosBorrados: number;
+}> {
   const cliente = new pg.Client({ connectionString: urlDeBdDeDev });
   await cliente.connect();
+  const filtro = [
+    `${PREFIJO_DE_LLAMADA_SIMULADA}%`,
+    businessId ?? null,
+    `${PREFIJO_DE_EVENTO_FALSO}%`,
+  ];
   try {
     await cliente.query("BEGIN");
     const conservadas = await cliente.query<{
@@ -80,8 +103,27 @@ export async function borrarLlamadasSimuladas(
           AND ($2::text IS NULL OR c."businessId" = $2)
           AND b."isCancelled" = false
           AND b."externalEventId" IS NOT NULL
+          AND b."externalEventId" NOT LIKE $3
         ORDER BY b."programedAt"`,
-      [`${PREFIJO_DE_LLAMADA_SIMULADA}%`, businessId ?? null]
+      filtro
+    );
+    // Los eventos falsos de las citas que se van a borrar (vivas o no: quitar
+    // uno que ya no está no hace nada), antes de que se vayan en cascada.
+    const eventosFalsos = await cliente.query<{ externalEventId: string }>(
+      `SELECT b."externalEventId"
+         FROM calls c
+         JOIN bookings b ON b."callId" = c.id
+        WHERE c."callId" LIKE $1
+          AND ($2::text IS NULL OR c."businessId" = $2)
+          AND b."externalEventId" LIKE $3
+          AND NOT EXISTS (
+            SELECT 1 FROM bookings v
+             WHERE v."callId" = c.id
+               AND v."isCancelled" = false
+               AND v."externalEventId" IS NOT NULL
+               AND v."externalEventId" NOT LIKE $3
+          )`,
+      filtro
     );
     const borradas = await cliente.query(
       `DELETE FROM calls c
@@ -92,8 +134,13 @@ export async function borrarLlamadasSimuladas(
              WHERE b."callId" = c.id
                AND b."isCancelled" = false
                AND b."externalEventId" IS NOT NULL
+               AND b."externalEventId" NOT LIKE $3
           )`,
-      [`${PREFIJO_DE_LLAMADA_SIMULADA}%`, businessId ?? null]
+      filtro
+    );
+    const eventosFalsosBorrados = await quitarDelCalendarioFalso(
+      cliente,
+      new Set(eventosFalsos.rows.map((fila) => fila.externalEventId))
     );
     await cliente.query("COMMIT");
     return {
@@ -103,6 +150,7 @@ export async function borrarLlamadasSimuladas(
         bookingId: fila.bookingId,
         programedAt: fila.programedAt.toISOString(),
       })),
+      eventosFalsosBorrados,
     };
   } catch (error) {
     await cliente.query("ROLLBACK").catch(() => undefined);
@@ -110,4 +158,47 @@ export async function borrarLlamadasSimuladas(
   } finally {
     await cliente.end();
   }
+}
+
+/**
+ * Quita esos ids de todos los calendarios falsos (cada evento lleva el
+ * digest de su cita, así que solo puede estar en el del negocio). El valor
+ * es un texto JSON guardado como jsonb (almacenTemporal.ts), y la caducidad
+ * no se toca. Devuelve cuántos eventos quitó.
+ */
+async function quitarDelCalendarioFalso(
+  cliente: InstanceType<typeof pg.Client>,
+  ids: Set<string>
+): Promise<number> {
+  if (ids.size === 0) return 0;
+  const calendarios = await cliente.query<{
+    clave: string;
+    valor: string | null;
+  }>(
+    `SELECT "clave", "valor" #>> '{}' AS "valor"
+       FROM "claves_temporales"
+      WHERE "clave" LIKE $1
+      FOR UPDATE`,
+    [CLAVES_DEL_CALENDARIO_FALSO]
+  );
+  let quitados = 0;
+  for (const { clave, valor } of calendarios.rows) {
+    if (!valor) continue;
+    let calendario: { eventos?: { id: string }[] };
+    try {
+      calendario = JSON.parse(valor);
+    } catch {
+      console.error(`[MCP] Calendario falso ilegible en ${clave}: no se toca`);
+      continue;
+    }
+    const eventos = calendario.eventos ?? [];
+    const quedan = eventos.filter((evento) => !ids.has(evento.id));
+    if (quedan.length === eventos.length) continue;
+    quitados += eventos.length - quedan.length;
+    await cliente.query(
+      `UPDATE "claves_temporales" SET "valor" = to_jsonb($2::text) WHERE "clave" = $1`,
+      [clave, JSON.stringify({ ...calendario, eventos: quedan })]
+    );
+  }
+  return quitados;
 }

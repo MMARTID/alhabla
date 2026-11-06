@@ -436,7 +436,7 @@ servidor.registerTool(
   {
     title: "Borrar las llamadas simuladas",
     description:
-      "Borra de la BD de dev las llamadas que creó simular_webhook_telnyx (callId sim-mcp-…), de un negocio o de todos, para que no salgan en el historial del panel. Conserva las que tienen una cita viva en el calendario (borrarla dejaría el evento huérfano) y las devuelve: cancélalas antes y vuelve a llamar.",
+      "Borra de la BD de dev las llamadas que creó simular_webhook_telnyx (callId sim-mcp-…), de un negocio o de todos, para que no salgan en el historial del panel. Conserva las que tienen una cita viva en un calendario REAL (borrarla dejaría el evento huérfano) y las devuelve: cancélalas antes y vuelve a llamar. Las del calendario falso (calendario_falso) sí se borran, y sus eventos salen de ese calendario (eventosFalsosBorrados); los apuntados a mano se quedan.",
     inputSchema: { businessId: z.string().optional() },
     annotations: { destructiveHint: true },
   },
