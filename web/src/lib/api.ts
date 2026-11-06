@@ -68,6 +68,9 @@ export type RegisterInput = {
   password: string;
   isEuropeanUnion: boolean;
   acceptedTerms: boolean;
+  /** Casilla del contrato de tratamiento de datos y la versión que se enseñó. */
+  acceptedDpa: boolean;
+  dpaVersion: string;
   businessType?: string;
 };
 

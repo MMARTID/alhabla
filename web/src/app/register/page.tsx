@@ -13,20 +13,29 @@ import { medirEvento, medirEventoYSeguir } from "@/components/google-analytics";
 import { normalizeBusinessType } from "@/lib/business-type";
 import { buildAppEntryUrl, describeRegisterError } from "@/lib/register";
 import { isPlanId } from "@/lib/billing-navigation";
+import { DPA_VERSION } from "@/lib/dpa";
 
 const TERMINOS_PENDIENTES =
   "Debes aceptar los Términos y Condiciones y la Política de privacidad.";
+
+const DPA_PENDIENTE =
+  "Debes aceptar el contrato de tratamiento de datos (DPA).";
+
+const enlaceLegal =
+  "rounded font-semibold text-morado-tinta underline underline-offset-2 transition hover:text-morado-tinta focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-morado focus-visible:ring-offset-2";
 
 export default function RegisterPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isEuropeanUnion, setIsEuropeanUnion] = useState<boolean | null>(null);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [acceptedDpa, setAcceptedDpa] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [niche, setNiche] = useState<string | null>(null);
   const [plan, setPlan] = useState<string | null>(null);
   const casillaTerminos = useRef<HTMLInputElement>(null);
+  const casillaDpa = useRef<HTMLInputElement>(null);
   const registroEmpezado = useRef(false);
 
   // Abrir /register ya lo cuenta el `page_view`; esto separa a quien empieza
@@ -62,6 +71,11 @@ export default function RegisterPage() {
       setError(TERMINOS_PENDIENTES);
       return;
     }
+    if (!acceptedDpa) {
+      setError(DPA_PENDIENTE);
+      casillaDpa.current?.focus();
+      return;
+    }
 
     setLoading(true);
     setError("");
@@ -71,6 +85,8 @@ export default function RegisterPage() {
         password,
         isEuropeanUnion,
         acceptedTerms,
+        acceptedDpa,
+        dpaVersion: DPA_VERSION,
         businessType: niche ? normalizeBusinessType(niche) : undefined,
       });
       if (!data.pase) {
@@ -129,6 +145,10 @@ export default function RegisterPage() {
               y la{" "}
               <Link href="/legal/privacidad" target="_blank" className="rounded font-semibold text-morado-tinta underline underline-offset-2 transition hover:text-morado-tinta focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-morado focus-visible:ring-offset-2">
                 Política de privacidad
+              </Link>
+              , y el{" "}
+              <Link href="/legal/dpa" target="_blank" className="rounded font-semibold text-morado-tinta underline underline-offset-2 transition hover:text-morado-tinta focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-morado focus-visible:ring-offset-2">
+                contrato de tratamiento de datos (DPA)
               </Link>
               .
             </p>
@@ -223,13 +243,30 @@ export default function RegisterPage() {
                 .
               </span>
             </label>
+            <label className="flex min-h-11 items-start gap-3 py-1.5 text-sm text-tinta-2">
+              <input
+                ref={casillaDpa}
+                type="checkbox"
+                required
+                className="mt-0.5 h-4 w-4 shrink-0 rounded border-linea-fuerte text-morado focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-morado/30"
+                checked={acceptedDpa}
+                onChange={(e) => setAcceptedDpa(e.target.checked)}
+              />
+              <span>
+                Acepto el{" "}
+                <Link href="/legal/dpa" target="_blank" className={enlaceLegal}>
+                  contrato de tratamiento de datos (DPA)
+                </Link>
+                : Alhabla trata por mi cuenta los datos de las personas que llaman a mi negocio.
+              </span>
+            </label>
           </div>
 
           {/* Alto reservado: sin esto, un error real (email ya registrado)
               desplaza el botón justo cuando el usuario reintenta. */}
           <p className="min-h-5 text-sm text-error" role="alert">{error}</p>
 
-          <button type="submit" disabled={loading || !acceptedTerms} className="btn-primary w-full justify-center">
+          <button type="submit" disabled={loading || !acceptedTerms || !acceptedDpa} className="btn-primary w-full justify-center">
             {loading ? "Creando cuenta..." : "Registrarse"}
           </button>
 
