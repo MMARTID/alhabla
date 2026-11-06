@@ -346,7 +346,7 @@ export function buildTelnyxCambioDeIdiomaTool(
         primera_respuesta: {
           type: "string",
           description:
-            "Tu respuesta a eso en su lengua, corta, como se la dirías: si pide algo, una pregunta para seguir (qué servicio, qué día, a qué hora) o para confirmar lo que pide. Sin horas libres, precios ni nada que no hayas comprobado con una herramienta, y sin saludar otra vez.",
+            "Tu respuesta a eso en su lengua, corta, y que acabe siempre en una pregunta: para seguir (qué servicio, qué día, a qué hora) o para confirmar lo que pide («Te lo reservo, ¿verdad?»). Nunca digas que algo queda reservado, cambiado o anulado: eso lo hace tu compañera con sus herramientas cuando conteste. Sin horas libres, precios ni nada que no hayas comprobado con una herramienta, y sin saludar otra vez.",
         },
       },
       required: ["idioma", "lo_que_dice", "primera_respuesta"],
@@ -787,7 +787,7 @@ export function instruccionesDelCambioDeIdioma(
   };
   return `## ${IDIOMAS[cooficial.idioma].nombreEnPrompt.replace(/^./, (letra) => letra.toUpperCase())}
 
-Tu transcripción no entiende el ${lengua} y tu voz no lo habla. Si quien llama habla en ${lengua} (por ejemplo ${ejemplos[cooficial.idioma] ?? "palabras que no tienen sentido en castellano"}), aunque sea una sola frase o mezclada con castellano, o pide que le atiendas en ${lengua}, llama a cambiar_de_idioma con idioma ${cooficial.idioma} en ese mismo turno: sin decir nada antes, sin pedirle que lo repita y sin usar antes ninguna otra herramienta. En lo_que_dice pon su frase bien escrita en ${lengua} y en primera_respuesta lo que le contestarías en ${lengua}. Después no digas nada más: la llamada sigue en ${lengua}. No le digas que le pasas con nadie: para quien llama es la misma recepcionista.
+Tu transcripción no entiende el ${lengua} y tu voz no lo habla. Si quien llama habla en ${lengua} (por ejemplo ${ejemplos[cooficial.idioma] ?? "palabras que no tienen sentido en castellano"}), aunque sea una sola frase o mezclada con castellano, o pide que le atiendas en ${lengua}, llama a cambiar_de_idioma con idioma ${cooficial.idioma} en ese mismo turno: sin decir nada antes, sin pedirle que lo repita y sin usar antes ninguna otra herramienta. En lo_que_dice pon su frase bien escrita en ${lengua} y en primera_respuesta lo que le contestarías en ${lengua}, acabado en una pregunta y sin dar nada por reservado. Después no digas nada más: la llamada sigue en ${lengua}. No le digas que le pasas con nadie: para quien llama es la misma recepcionista.
 
 Con el resto de idiomas que hablas no uses cambiar_de_idioma: contesta tú en el suyo. Si dudas entre italiano y catalán o entre portugués y gallego, y las frases llegan enteras y con sentido en italiano o portugués, es italiano o portugués. Si habla ${otras} (otra lengua que no hablas) y no le entiendes, no uses cambiar_de_idioma: a la segunda vez que no le entiendas, pídele con amabilidad que te lo diga en castellano.`;
 }
@@ -804,7 +804,7 @@ export function instruccionesDeLaCooficial(
   const lengua = IDIOMAS[cooficial.idioma].nombreEnPrompt;
   return `## Idioma de esta llamada
 
-Atiendes en ${lengua}. Si la conversación ya ha empezado (hay mensajes antes del tuyo), quien llama ha hablado en ${lengua} y ya le has contestado al cambiar: sigue en ${lengua} con naturalidad, sin saludar otra vez ni repetir lo que ya se ha dicho, y continúa con lo que ha pedido. Si después habla en castellano u otro de tus idiomas, contesta en el suyo.`;
+Atiendes en ${lengua}. Si la conversación ya ha empezado (hay mensajes antes del tuyo), quien llama ha hablado en ${lengua} y ya le has contestado al cambiar: sigue en ${lengua} con naturalidad, sin saludar otra vez ni repetir lo que ya se ha dicho, y continúa con lo que ha pedido. Nada está reservado, cambiado ni anulado hasta que lo hagas tú con tus herramientas, aunque tu primera frase lo diera a entender. Si después habla en castellano u otro de tus idiomas, contesta en el suyo.`;
 }
 
 export interface BuildTelnyxAssistantPayloadInput {

@@ -8,7 +8,7 @@ exports[`payloads de asistentes (instantáneas) > assistant de la lengua de la z
 
 ## Idioma de esta llamada
 
-Atiendes en catalán. Si la conversación ya ha empezado (hay mensajes antes del tuyo), quien llama ha hablado en catalán y ya le has contestado al cambiar: sigue en catalán con naturalidad, sin saludar otra vez ni repetir lo que ya se ha dicho, y continúa con lo que ha pedido. Si después habla en castellano u otro de tus idiomas, contesta en el suyo.",
+Atiendes en catalán. Si la conversación ya ha empezado (hay mensajes antes del tuyo), quien llama ha hablado en catalán y ya le has contestado al cambiar: sigue en catalán con naturalidad, sin saludar otra vez ni repetir lo que ya se ha dicho, y continúa con lo que ha pedido. Nada está reservado, cambiado ni anulado hasta que lo hagas tú con tus herramientas, aunque tu primera frase lo diera a entender. Si después habla en castellano u otro de tus idiomas, contesta en el suyo.",
   "interruptionSettings": {
     "disable_greeting_interruption": true,
     "start_speaking_plan": {
