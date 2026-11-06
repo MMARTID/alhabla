@@ -2541,6 +2541,27 @@ La separación se apoya por tanto en tres cosas:
    `npx tsx scripts/anclarAudioEnEuropa.ts` (lista) y `--aplicar` (cambia lo que falte). Solo
    fija el audio: el LLM, el STT y el TTS se procesan aparte.
 
+   **La API por Frankfurt: `TELNYX_API_BASE_URL`.** El cliente de Telnyx (`lib/telnyx.ts`) usa el
+   dominio de esa variable. Vacía, `api.telnyx.com` (EE. UU.). Con `https://api.telnyx.eu/v2`,
+   los comandos de llamada (answer, arrancar/parar assistant, supresión de ruido, grabación), el
+   chat con clientes, la inferencia del informe de la llamada y el resto de la API entran por el
+   punto de presencia de Frankfurt. Es lo que recomienda Telnyx para voz con IA en la UE («Regional
+   Endpoints & the EU PoP»). Mismas claves, mismas respuestas y los webhooks no cambian. Antes de
+   activarla se probaron por los dos dominios todas las llamadas de solo lectura que hace el
+   backend (búsqueda y lectura de números, perfiles de mensajería, pedidos, grabaciones, apps,
+   tools, voces, conversaciones y una completion de GLM), con el mismo resultado. WhatsApp no
+   tiene despliegue regional: `getTelnyxWhatsappClient` sigue fijo en `api.telnyx.com`.
+
+   **La garantía de procesamiento en la UE (`privacy_settings.in_transit_data_locality`) no se
+   usa** (laboratorio del 2026-11-06 en dev):
+   - cortó ~5 de cada 7 llamadas con `call.conversation.ended reason=data_locality_unavailable`,
+     también con la API por Frankfurt;
+   - solo deja usar flux, Ultra y GLM;
+   - no hay transcripción ni voz en la UE para catalán, gallego ni euskera.
+
+   Se consultó a support@telnyx.com. El laboratorio y el cambio de assistant por idioma están en la
+   rama `lab/assistant-ue-catalan`.
+
 2. **Tags `env-dev` / `env-prod` en cada número** (desde 2026-09-19). `GET /v2/phone_numbers`
    acepta `filter[tag]`, así que un script puede preguntar por los suyos en vez de mirar la
    cuenta entera. Es la alternativa barata a Managed Accounts. **Desde el 2026-11-06 se pone
