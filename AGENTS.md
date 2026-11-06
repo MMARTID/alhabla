@@ -2529,10 +2529,26 @@ La separación se apoya por tanto en tres cosas:
    | `alhabla-platform-production` | `3048374727065208187` | `https://api.alhabla.ai/webhooks/telnyx` |
    | `alhabla-platform` (desarrollo) | `3046870077287696179` | `https://dev-api.alhabla.ai/webhooks/telnyx` |
 
+   **Audio anclado en Frankfurt (desde el 2026-11-06).** Todas las conexiones de la cuenta (los
+   dos Call Control Apps, las apps TeXML `ai-<assistant>` y las credential connections «Forward
+   Only» y «Default») tienen `anchorsite_override: "Frankfurt, Germany"`
+   (`ANCLAJE_DEL_AUDIO` en `TelnyxAiAdapter.ts`). Antes estaban en «Latency», que deja a Telnyx
+   elegir el sitio. Frankfurt porque la cuenta tiene la localidad de datos en DEU. Lo nuevo nace
+   anclado: `createCallControlApp` lo manda al crear, y `createAssistant` ancla la app TeXML que
+   Telnyx crea con cada assistant (viene en `telephony_settings.default_texml_app_id`; el anclaje
+   sobrevive a los updates del assistant). El SDK 7.29 no tipa Frankfurt en Call Control ni en
+   TeXML, pero la API lo acepta. Para repasar la cuenta:
+   `npx tsx scripts/anclarAudioEnEuropa.ts` (lista) y `--aplicar` (cambia lo que falte). Solo
+   fija el audio: el LLM, el STT y el TTS se procesan aparte.
+
 2. **Tags `env-dev` / `env-prod` en cada número** (desde 2026-09-19). `GET /v2/phone_numbers`
    acepta `filter[tag]`, así que un script puede preguntar por los suyos en vez de mirar la
-   cuenta entera. Es la alternativa barata a Managed Accounts, y hay que **ponerla a mano al
-   comprar un número**: `provisionPhoneNumber` todavía no etiqueta.
+   cuenta entera. Es la alternativa barata a Managed Accounts. **Desde el 2026-11-06 se pone
+   sola**: `provisionPhoneNumber` (al terminar la compra) y `asignarNumeroExistente` llaman a
+   `telnyxAdapter.marcarEntornoDelNumero`, que deja `env-prod` (con `NODE_ENV=production`) o
+   `env-dev`, quita la del otro entorno y conserva las demás tags. En Telnyx `tags` sustituye la
+   lista entera, por eso se lee antes. Si falla, el número sigue activo y queda un
+   `console.error` para ponerla a mano. Los números de antes y los de WhatsApp siguen a mano.
 
    Inventario del 2026-09-19 (**histórico**: ya no cuadra con las BD). A 2026-11-02, +34930453219
    es el número de «El petit salo» en la BD de producción; en dev solo tienen número

@@ -41,6 +41,9 @@ const mockAssistantsChat = vi.fn();
 const mockDial = vi.fn();
 const mockTexmlAppsList = vi.fn();
 const mockTexmlAppsDelete = vi.fn();
+const mockTexmlAppsRetrieve = vi.fn();
+const mockTexmlAppsUpdate = vi.fn();
+const mockCredentialConnectionsUpdate = vi.fn();
 
 const mockTelnyxClient = {
   callControlApplications: {
@@ -95,7 +98,13 @@ const mockTelnyxClient = {
   phoneNumbers: { update: mockPhoneNumbersUpdate },
   recordings: { retrieve: mockRecordingsRetrieve, list: mockRecordingsList },
   textToSpeech: { listVoices: mockListVoices },
-  texmlApplications: { list: mockTexmlAppsList, delete: mockTexmlAppsDelete },
+  texmlApplications: {
+    list: mockTexmlAppsList,
+    delete: mockTexmlAppsDelete,
+    retrieve: mockTexmlAppsRetrieve,
+    update: mockTexmlAppsUpdate,
+  },
+  credentialConnections: { update: mockCredentialConnectionsUpdate },
 };
 
 vi.mock("../../../src/lib/telnyx.js", () => ({
@@ -120,6 +129,56 @@ describe("TelnyxAiAdapter", () => {
   });
 
   describe("createAssistant", () => {
+    it("ancla en Frankfurt la app TeXML que Telnyx crea con el assistant", async () => {
+      mockAssistantsCreate.mockResolvedValue({
+        id: "assistant_123",
+        name: "alhabla-biz1-agent1",
+        instructions: "Eres un asistente",
+        telephony_settings: { default_texml_app_id: "texml_1" },
+      });
+      mockTexmlAppsRetrieve.mockResolvedValue({
+        data: {
+          id: "texml_1",
+          friendly_name: "ai-assistant_123",
+          voice_url: "https://api.telnyx.com/v2/ai/assistants/assistant_123/texml",
+        },
+      });
+
+      await adapter.createAssistant({
+        name: "alhabla-biz1-agent1",
+        instructions: "Eres un asistente",
+      });
+
+      expect(mockTexmlAppsUpdate).toHaveBeenCalledWith("texml_1", {
+        friendly_name: "ai-assistant_123",
+        voice_url: "https://api.telnyx.com/v2/ai/assistants/assistant_123/texml",
+        anchorsite_override: "Frankfurt, Germany",
+      });
+    });
+
+    it("si no puede anclar la app TeXML, devuelve el assistant y lo avisa en el log", async () => {
+      const errorLog = vi.spyOn(console, "error").mockImplementation(() => {});
+      mockAssistantsCreate.mockResolvedValue({
+        id: "assistant_123",
+        name: "alhabla-biz1-agent1",
+        instructions: "Eres un asistente",
+        telephony_settings: { default_texml_app_id: "texml_1" },
+      });
+      mockTexmlAppsRetrieve.mockRejectedValue(new Error("Telnyx caído"));
+
+      const result = await adapter.createAssistant({
+        name: "alhabla-biz1-agent1",
+        instructions: "Eres un asistente",
+      });
+
+      expect(result.id).toBe("assistant_123");
+      expect(mockTexmlAppsUpdate).not.toHaveBeenCalled();
+      expect(errorLog).toHaveBeenCalledWith(
+        expect.stringContaining("No se pudo anclar en Frankfurt, Germany")
+      );
+      errorLog.mockRestore();
+    });
+
     it("crea el assistant y no exige dynamic_variables_webhook_url", async () => {
       mockAssistantsCreate.mockResolvedValue({
         id: "assistant_123",
@@ -438,6 +497,43 @@ describe("TelnyxAiAdapter", () => {
     });
   });
 
+  describe("anclarConexionEnEuropa", () => {
+    it("reescribe el Call Control App con su nombre y webhook y el anclaje nuevo", async () => {
+      mockCallControlAppsRetrieve.mockResolvedValue({
+        data: {
+          id: "cca_1",
+          application_name: "alhabla-platform-production",
+          webhook_event_url: "https://api.alhabla.ai/webhooks/telnyx",
+        },
+      });
+
+      await adapter.anclarConexionEnEuropa("call_control", "cca_1");
+
+      expect(mockCallControlAppsUpdate).toHaveBeenCalledWith("cca_1", {
+        application_name: "alhabla-platform-production",
+        webhook_event_url: "https://api.alhabla.ai/webhooks/telnyx",
+        anchorsite_override: "Frankfurt, Germany",
+      });
+    });
+
+    it("no escribe un Call Control App que no ha podido leer (dejaría el webhook vacío)", async () => {
+      mockCallControlAppsRetrieve.mockResolvedValue({ data: { id: "cca_1" } });
+
+      await expect(
+        adapter.anclarConexionEnEuropa("call_control", "cca_1")
+      ).rejects.toThrow("No se pudo leer");
+      expect(mockCallControlAppsUpdate).not.toHaveBeenCalled();
+    });
+
+    it("en una credential connection solo manda el anclaje", async () => {
+      await adapter.anclarConexionEnEuropa("credential", "cred_1");
+
+      expect(mockCredentialConnectionsUpdate).toHaveBeenCalledWith("cred_1", {
+        anchorsite_override: "Frankfurt, Germany",
+      });
+    });
+  });
+
   describe("createCallControlApp / getCallControlApp", () => {
     it("crea el Call Control App de plataforma y devuelve su id", async () => {
       mockCallControlAppsCreate.mockResolvedValue({
@@ -453,6 +549,7 @@ describe("TelnyxAiAdapter", () => {
       expect(mockCallControlAppsCreate).toHaveBeenCalledWith({
         application_name: "alhabla-platform",
         webhook_event_url: "https://api.alhabla.ai/webhooks/telnyx",
+        anchorsite_override: "Frankfurt, Germany",
       });
     });
 

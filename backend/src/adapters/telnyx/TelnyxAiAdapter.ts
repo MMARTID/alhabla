@@ -128,6 +128,24 @@ export interface CreateTelnyxAssistantInput {
 
 export type { ConversationFlowReq };
 
+/**
+ * Dónde procesa Telnyx el audio de las llamadas. Frankfurt: la cuenta tiene la
+ * localidad de datos en Alemania (DEU), y `in_transit_data_locality` exige el
+ * media anclado en esa región (memoria telnyx-inferencia-en-la-ue). Ojo: solo
+ * fija el audio; el LLM y el STT/TTS van aparte.
+ */
+export const ANCLAJE_DEL_AUDIO = "Frankfurt, Germany" as const;
+
+/**
+ * El SDK 7.29 tipa «Frankfurt, Germany» en las credential connections pero no
+ * en los Call Control ni en las apps TeXML, aunque la API lo acepta en las dos
+ * (creadas y borradas el 2026-11-06 para comprobarlo). Se fuerza el tipo.
+ */
+const ANCLAJE_PARA_EL_SDK =
+  ANCLAJE_DEL_AUDIO as unknown as "Amsterdam, Netherlands";
+
+export type TipoDeConexion = "call_control" | "texml" | "credential";
+
 export interface TelnyxAssistant {
   id: string;
   name: string;
@@ -251,6 +269,26 @@ export class TelnyxAiAdapter {
     const response = await client.ai.assistants.create(
       toAssistantCreatePayload(input)
     );
+    // Telnyx crea con el assistant su app TeXML («ai-<id>») anclada en
+    // «Latency». Existe ya en la respuesta y el anclaje sobrevive a los
+    // updates del assistant (comprobado el 2026-11-06), así que basta con
+    // fijarlo aquí una vez.
+    const appTexmlId = response.telephony_settings?.default_texml_app_id;
+    if (appTexmlId) {
+      try {
+        await this.anclarConexionEnEuropa("texml", appTexmlId);
+      } catch (error) {
+        console.error(
+          `[Telnyx] No se pudo anclar en ${ANCLAJE_DEL_AUDIO} la app TeXML ${appTexmlId} del assistant ${response.id}: ${
+            error instanceof Error ? error.message : String(error)
+          } — su audio irá por «Latency» hasta que se corra scripts/anclarAudioEnEuropa.ts --aplicar`
+        );
+      }
+    } else {
+      console.error(
+        `[Telnyx] El assistant ${response.id} vino sin default_texml_app_id: su app TeXML no se ha anclado en ${ANCLAJE_DEL_AUDIO} (scripts/anclarAudioEnEuropa.ts)`
+      );
+    }
     return toTelnyxAssistant(response);
   }
 
@@ -417,11 +455,99 @@ export class TelnyxAiAdapter {
     const response = await client.callControlApplications.create({
       application_name: input.name,
       webhook_event_url: input.webhookEventUrl,
+      anchorsite_override: ANCLAJE_PARA_EL_SDK,
     });
     if (!response.data?.id) {
       throw new Error("Telnyx no devolvió el id del Call Control App creado");
     }
     return { id: response.data.id };
+  }
+
+  /**
+   * Dónde está anclado el audio de cada conexión de la cuenta: los Call
+   * Control Apps, las apps TeXML (una por assistant) y las credential
+   * connections («Forward Only», «Default»). Para scripts/anclarAudioEnEuropa.ts.
+   */
+  async listarAnclajesDeConexiones(): Promise<
+    Array<{ tipo: TipoDeConexion; id: string; nombre: string; anclaje: string }>
+  > {
+    const client = getTelnyxClient();
+    const conexiones: Array<{
+      tipo: TipoDeConexion;
+      id: string;
+      nombre: string;
+      anclaje: string;
+    }> = [];
+    for await (const app of client.callControlApplications.list({
+      "page[size]": 250,
+    })) {
+      if (!app.id) continue;
+      conexiones.push({
+        tipo: "call_control",
+        id: app.id,
+        nombre: app.application_name ?? "",
+        anclaje: app.anchorsite_override ?? "",
+      });
+    }
+    for await (const app of client.texmlApplications.list({
+      "page[size]": 250,
+    })) {
+      if (!app.id) continue;
+      conexiones.push({
+        tipo: "texml",
+        id: app.id,
+        nombre: app.friendly_name ?? "",
+        anclaje: app.anchorsite_override ?? "",
+      });
+    }
+    for await (const conexion of client.credentialConnections.list({
+      "page[size]": 250,
+    })) {
+      if (!conexion.id) continue;
+      conexiones.push({
+        tipo: "credential",
+        id: conexion.id,
+        nombre: conexion.connection_name ?? "",
+        anclaje: conexion.anchorsite_override ?? "",
+      });
+    }
+    return conexiones;
+  }
+
+  /**
+   * Fija en ANCLAJE_DEL_AUDIO dónde procesa Telnyx el audio de una conexión.
+   * Los updates de Call Control y TeXML exigen nombre y URL aunque no
+   * cambien, así que se leen antes; el resto de campos no se toca (PATCH).
+   */
+  async anclarConexionEnEuropa(tipo: TipoDeConexion, id: string): Promise<void> {
+    const client = getTelnyxClient();
+    if (tipo === "call_control") {
+      const { data } = await client.callControlApplications.retrieve(id);
+      // Sin la app leída no se escribe: un nombre o webhook vacío dejaría a
+      // ese entorno sin llamadas.
+      if (!data?.application_name || !data.webhook_event_url) {
+        throw new Error(`No se pudo leer el Call Control App ${id}`);
+      }
+      await client.callControlApplications.update(id, {
+        application_name: data.application_name,
+        webhook_event_url: data.webhook_event_url,
+        anchorsite_override: ANCLAJE_PARA_EL_SDK,
+      });
+    } else if (tipo === "texml") {
+      const { data } = await client.texmlApplications.retrieve(id);
+      if (!data?.friendly_name || !data.voice_url) {
+        throw new Error(`No se pudo leer la app TeXML ${id}`);
+      }
+      await client.texmlApplications.update(id, {
+        friendly_name: data.friendly_name,
+        voice_url: data.voice_url,
+        anchorsite_override: ANCLAJE_PARA_EL_SDK,
+      });
+    } else {
+      await client.credentialConnections.update(id, {
+        anchorsite_override: ANCLAJE_DEL_AUDIO,
+      });
+    }
   }
 
   async getCallControlApp(id: string): Promise<{
