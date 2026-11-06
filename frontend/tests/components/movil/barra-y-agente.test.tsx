@@ -95,7 +95,8 @@ describe("AgenteMovil", () => {
 
     expect(screen.getByRole("link", { name: /Horario del negocio\s*L–M 9:00–14:00/ })).toHaveAttribute("href", "/agente/horario");
     expect(await screen.findByText("Sin servicios configurados")).toBeInTheDocument();
-    expect(screen.getByText("Sin conectar")).toBeInTheDocument();
+    // Sin calendario conectado, la agenda de Alhabla (PLAN-AGENDA-PRINCIPAL.md).
+    expect(screen.getByText("Agenda de Alhabla")).toBeInTheDocument();
     // Desde el 2026-10-05: el principal, cuántos idiomas habla y la voz.
     expect(await screen.findByText("Español · habla 8 idiomas · Blanca")).toBeInTheDocument();
   });

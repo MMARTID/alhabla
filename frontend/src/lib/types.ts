@@ -522,7 +522,9 @@ export type CalendarListItem = {
 
 export type CalendarProviderId = "google" | "outlook" | "caldav";
 
-/** `Business.modoDeAgenda` (backend/src/lib/modoDeAgenda.ts). */
+/** `Business.modoDeAgenda` (backend/src/lib/modoDeAgenda.ts). Desde
+ * PLAN-AGENDA-PRINCIPAL.md la app ya no lo usa: la agenda es siempre la de
+ * Alhabla. Se borra con la columna en la fase 7. */
 export type ModoDeAgenda = "sin_elegir" | "alhabla" | "externo";
 
 export type ActiveCalendar = {

@@ -117,15 +117,13 @@ export function AgenteMovil({ business }: { business: Business }) {
           icono={CalendarDays}
           titulo="Calendario"
           resumen={
-            calendario.alhabla
-              ? NOMBRE_AGENDA_DE_ALHABLA
-              : calendario.connected
-                ? `${calendario.label}${calendario.accountEmail ? ` · ${calendario.accountEmail}` : ""}`
-                : calendario.expired
-                  ? "Conexión caducada"
-                  : "Sin conectar"
+            calendario.calendario === "al_dia"
+              ? `${NOMBRE_AGENDA_DE_ALHABLA} · con ${calendario.label}`
+              : calendario.calendario === "sin_ver"
+                ? `${NOMBRE_AGENDA_DE_ALHABLA} · sin ver ${calendario.label}`
+                : NOMBRE_AGENDA_DE_ALHABLA
           }
-          pendiente={!calendario.bookable}
+          pendiente={calendario.calendario === "sin_ver"}
         />
         <FilaDeAjuste
           href="/agente/informacion"
