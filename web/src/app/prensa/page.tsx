@@ -21,6 +21,13 @@ export const metadata = metadataDePagina({ ruta, titulo, descripcion });
 
 const desde = plans[0].price;
 
+const CAPTURAS = [
+  { archivo: "alhabla-agenda.png", alt: "Agenda de Alhabla con las citas de la semana de una peluquería", texto: "La agenda de Alhabla: las citas que entran por llamada, con el profesional y el servicio de cada una." },
+  { archivo: "alhabla-llamadas.png", alt: "Historial de llamadas con la reserva creada en cada una", texto: "El historial de llamadas: quién llamó, qué pidió y qué se reservó, con el servicio, el profesional y el precio." },
+  { archivo: "alhabla-profesionales.png", alt: "Configuración de profesionales y de lo que hace cada uno", texto: "Los profesionales del negocio y los servicios que hace cada uno, para repartir las citas por especialidad." },
+  { archivo: "alhabla-comportamiento.png", alt: "Ajustes de tono, objetivo y estilo de respuesta de la recepcionista", texto: "Cómo atiende la recepcionista: el dueño elige el tono de voz, el objetivo principal y lo larga que es cada respuesta." },
+];
+
 export default function PrensaPage() {
   return (
     <PaginaGuia
@@ -116,7 +123,25 @@ export default function PrensaPage() {
         </div>
       </Seccion>
 
-      <Seccion fondo titulo="Temas sobre los que podemos hablar" estrecha>
+      <Seccion fondo titulo="Capturas de la aplicación">
+        <p className="mb-6 max-w-3xl text-base leading-7 text-muted">
+          Cuatro pantallas para ilustrar un artículo. Muestran un negocio de demostración (Peluquería Alhambra), con
+          datos ficticios: no son clientes reales. Se pueden usar libremente citando Alhabla.
+        </p>
+        <div className="grid gap-6 sm:grid-cols-2">
+          {CAPTURAS.map(({ archivo, alt, texto }) => (
+            <figure key={archivo} className="panel flex flex-col gap-4 overflow-hidden p-4">
+              <Image src={`/prensa/${archivo}`} alt={alt} width={1600} height={1000} className="h-auto w-full rounded-xl border border-linea" />
+              <figcaption className="text-sm leading-6 text-muted">{texto}</figcaption>
+              <a href={`/prensa/${archivo}`} download className="btn-secondary h-10 w-fit px-4 text-sm">
+                <Download className="h-4 w-4" aria-hidden="true" /> Descargar PNG
+              </a>
+            </figure>
+          ))}
+        </div>
+      </Seccion>
+
+      <Seccion titulo="Temas sobre los que podemos hablar" estrecha>
         <Texto>
           <ul className="list-disc space-y-2 pl-5">
             <li>Cuántas citas pierde un pequeño negocio por no coger el teléfono y por qué pasa en las horas de más trabajo.</li>
