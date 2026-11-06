@@ -667,7 +667,16 @@ export async function getWhatsappPropio() {
   return data;
 }
 
-/** Lo que devolvió Meta al acabar el alta en coexistencia. */
+/** El enlace a la página de alta de Telnyx (el camino principal). */
+export async function pedirEnlaceWhatsappPropio() {
+  const { data } = await api.post<{
+    url: string;
+    estado: EstadoWhatsappPropio;
+  }>("/business/me/whatsapp-propio/enlace");
+  return data;
+}
+
+/** Lo que devolvió la ventana de Meta abierta en la app (la alternativa). */
 export async function registrarWhatsappPropio(input: {
   wabaId: string;
   phoneNumberId: string;

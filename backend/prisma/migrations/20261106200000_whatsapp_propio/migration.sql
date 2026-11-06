@@ -4,8 +4,11 @@
 CREATE TABLE "whatsapp_numeros_negocio" (
     "id" TEXT NOT NULL,
     "businessId" TEXT NOT NULL,
-    "metaPhoneNumberId" TEXT NOT NULL,
-    "metaWabaId" TEXT NOT NULL,
+    "origen" TEXT NOT NULL DEFAULT 'alojada',
+    "enlaceId" TEXT,
+    "enlaceCaducaAt" TIMESTAMP(3),
+    "metaPhoneNumberId" TEXT,
+    "metaWabaId" TEXT,
     "phoneNumber" TEXT,
     "signupId" TEXT,
     "estado" TEXT NOT NULL,
@@ -21,6 +24,9 @@ CREATE TABLE "whatsapp_numeros_negocio" (
 
 -- CreateIndex
 CREATE UNIQUE INDEX "whatsapp_numeros_negocio_businessId_key" ON "whatsapp_numeros_negocio"("businessId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "whatsapp_numeros_negocio_enlaceId_key" ON "whatsapp_numeros_negocio"("enlaceId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "whatsapp_numeros_negocio_metaPhoneNumberId_key" ON "whatsapp_numeros_negocio"("metaPhoneNumberId");

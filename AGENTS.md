@@ -1872,29 +1872,40 @@ failover for LaLiga blocks.)*
 **Código («Conectar mi WhatsApp», Beta, 2026-11-06).** El WhatsApp Business del propio negocio en
 coexistencia (el dueño sigue en su app y Alhabla habla por la API en el mismo número), solo la fase
 de **conectar y ver el estado**: los mensajes a los clientes siguen saliendo de «Alhabla Reservas»
-(fases 2–3 de `PLAN-WHATSAPP-COEXISTENCIA.md`). Integración propia de Tech Provider, no la página
-alojada de Telnyx (`hostedSignups` ya admite `signup_type: "coexistence"` en el SDK 7.29, pero su
-webhook `whatsapp.waba_added` no dice de qué negocio es; decisión del usuario):
-- **Panel**: Ajustes › Teléfono › «Tu WhatsApp Business» (`frontend/src/components/whatsapp-propio.tsx`,
-  `lib/alta-whatsapp-meta.ts`). Carga el SDK de Facebook solo ahí y solo con el alta disponible, abre
-  `FB.login()` con `config_id`, `extras.setup.solutionID`, `featureType:
+(fases 2–3 de `PLAN-WHATSAPP-COEXISTENCIA.md`). Dos caminos de Tech Provider, los dos con nuestra
+app de Meta enlazada a Telnyx (decisión del usuario: la página de Telnyx delante y la ventana de
+Meta escondida, para no llenar el bloque de botones):
+- **Principal, alta alojada**: «Conectar mi WhatsApp» pide `POST /business/me/whatsapp-propio/enlace`,
+  que crea en Telnyx un enlace a su página (`POST /v2/whatsapp/hosted_signups`, `signup_type:
+  "coexistence"`, caduca a las 24 h) y la abre en otra pestaña (el panel abre la pestaña en el clic y
+  luego la lleva a la URL, para que no la bloquee el navegador). Pedirlo otra vez devuelve el mismo
+  enlace mientras le quede más de media hora. El enlace no lleva el negocio: se guarda su id en
+  `WhatsappNumeroNegocio.enlaceId` (`esperando_alta`), porque según la guía de Telnyx es también el id
+  de la sesión de alta. El panel consulta esa sesión (`/v2/whatsapp/signup/{id}/status`: 404 mientras
+  el dueño no acaba; con `waba_id` pasa a `registrando`), busca el número del WABA en la lista de
+  números de WhatsApp (el que tiene `is_on_biz_app`) y sigue su `coexistence_state`. El webhook
+  `whatsapp.waba_added` (`event_id` = sesión) hace lo mismo aunque el panel esté cerrado. Sin usar y
+  una hora después de caducar ⇒ `enlace_caducado`. **Sin verificar con un alta real** que el id del
+  enlace sea el de la sesión; si no lo es, solo el webhook ataría el alta y habría que preguntar a
+  Telnyx.
+- **Alternativa, plegada** («Otra forma de conectar», solo con `META_WHATSAPP_CONFIG_ID`): la ventana
+  de Meta dentro de la app (`frontend/src/lib/alta-whatsapp-meta.ts`). Carga el SDK de Facebook solo
+  al desplegarla, abre `FB.login()` con `config_id`, `extras.setup.solutionID`, `featureType:
   "whatsapp_business_app_onboarding"` y `sessionInfoVersion: "3"`, y escucha el `postMessage`
   `WA_EMBEDDED_SIGNUP` / `FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING` (`waba_id`, `phone_number_id`).
-  Sin alta disponible ni conexión guardada, el bloque no aparece.
-- **Backend**: `GET`/`POST /business/me/whatsapp-propio` (`modules/whatsapp/propio.ts`). El POST
-  registra en Telnyx (`POST /v2/whatsapp/business_accounts/tech_provider`, `customer_id` = negocio
-  del JWT; no está en el SDK ni en su OpenAPI) y guarda `WhatsappNumeroNegocio` en `registrando`. El
-  GET pone la fila al día con freno (8 s; 5 min si está `active`): sesión de alta
-  (`/v2/whatsapp/signup/{id}/status`, `FAILURE` ⇒ `fallido` con los errores) y, cuando el número
-  aparece en la lista de números de WhatsApp de la cuenta, su `coexistence_state`. Rechaza un
-  `phone_number_id` de Alhabla (`whatsapp_senders`) o de otro negocio.
+  `POST /business/me/whatsapp-propio` lo registra en Telnyx (`POST
+  /v2/whatsapp/business_accounts/tech_provider`, `customer_id` = negocio del JWT; no está en el SDK)
+  y rechaza un `phone_number_id` de Alhabla (`whatsapp_senders`) o de otro negocio.
+- **Panel**: Ajustes › Teléfono › «Tu WhatsApp Business» (`frontend/src/components/whatsapp-propio.tsx`).
+  Sin alta disponible ni conexión guardada, el bloque no aparece. El `GET` pone la fila al día con
+  freno (8 s; 5 min si está `active`) y el panel pregunta cada 10 s mientras está en curso.
 - **Interruptor y datos**: `WHATSAPP_PROPIO_ENABLED` (apagado por defecto y en producción),
-  `META_WHATSAPP_APP_ID` (la app de Tech Provider, no la del login), `META_WHATSAPP_CONFIG_ID` y
-  `META_GRAPH_VERSION`. El `solution_id` sale de `TELNYX_WA_SOLUTION_ID` o de
+  `META_WHATSAPP_APP_ID` (la app de Tech Provider, no la del login), `META_WHATSAPP_CONFIG_ID` (solo la
+  alternativa) y `META_GRAPH_VERSION`. El `solution_id` sale de `TELNYX_WA_SOLUTION_ID` o de
   `GET /v2/whatsapp/foreign_apps` (caché de 10 min). **El 2026-11-06 ese GET devolvía 404**: Telnyx
   aún no ha activado el enlace de nuestra app, así que ningún alta real funciona todavía.
-- Pendiente: webhooks `whatsapp.waba_added` / `whatsapp.account.update` / `message.echo` (hoy todo
-  es por consulta), reconciliador, y enviar desde el número del negocio.
+- Pendiente: webhooks `whatsapp.account.update` / `message.echo` (hoy el estado es por consulta),
+  reconciliador, y enviar desde el número del negocio.
 
 ## Stripe Billing Fields on `Business`
 

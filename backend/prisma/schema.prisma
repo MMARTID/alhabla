@@ -1008,17 +1008,26 @@ model WhatsappNumeroNegocio {
   id                String    @id @default(cuid())
   businessId        String    @unique
   business          Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  /// `phone_number_id` de Meta, del evento FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING.
-  metaPhoneNumberId String    @unique
+  /// alojada (página de alta de Telnyx, el camino principal) | propia
+  /// (ventana de Meta dentro de la app, la alternativa).
+  origen            String    @default("alojada")
+  /// Alta alojada: el enlace de Telnyx (`POST /v2/whatsapp/hosted_signups`).
+  /// Su id es también el de la sesión de alta cuando el dueño la termina.
+  enlaceId          String?   @unique
+  enlaceCaducaAt    DateTime?
+  /// `phone_number_id` de Meta: del evento FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING
+  /// en la propia; en la alojada, cuando el número aparece en Telnyx.
+  metaPhoneNumberId String?   @unique
   /// WABA del negocio en Meta.
-  metaWabaId        String
+  metaWabaId        String?
   /// E.164. Se conoce cuando el número aparece en Telnyx, no al registrar.
   phoneNumber       String?   @unique
-  /// Sesión de alta de Telnyx (`POST /v2/whatsapp/business_accounts/tech_provider`).
+  /// Sesión de alta de Telnyx.
   signupId          String?
-  /// registrando | fallido | el `coexistence_state` de Telnyx (pending_onboarding,
-  /// sync_pending, syncing, sync_complete, active, history_declined,
-  /// sync_deadline_expired, offboarded, disconnected).
+  /// esperando_alta | enlace_caducado | registrando | fallido | el
+  /// `coexistence_state` de Telnyx (pending_onboarding, sync_pending, syncing,
+  /// sync_complete, active, history_declined, sync_deadline_expired,
+  /// offboarded, disconnected).
   estado            String
   /// Lo que Telnyx dio como motivo cuando la sesión de alta falló.
   errores           String[]  @default([])

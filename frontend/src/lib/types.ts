@@ -292,6 +292,8 @@ export type WhatsappOwnerStatus =
  * `coexistence_state` de Telnyx.
  */
 export type EstadoConexionWhatsappPropio =
+  | "esperando_alta"
+  | "enlace_caducado"
   | "registrando"
   | "fallido"
   | "pending_onboarding"
@@ -307,8 +309,11 @@ export type EstadoConexionWhatsappPropio =
 export type EstadoWhatsappPropio = {
   disponible: boolean;
   motivo: "apagado" | "sin_configurar" | "sin_enlace_de_telnyx" | null;
-  /** Lo que necesita `FB.login()` para abrir el alta de Meta. */
-  alta: {
+  /**
+   * La alternativa: lo que necesita `FB.login()` para abrir la ventana de
+   * Meta dentro de la app. El camino principal es el enlace de Telnyx.
+   */
+  altaPropia: {
     appId: string;
     configId: string;
     solutionId: string;
@@ -316,6 +321,7 @@ export type EstadoWhatsappPropio = {
   } | null;
   conexion: {
     estado: EstadoConexionWhatsappPropio | string;
+    origen: "alojada" | "propia" | string;
     phoneNumber: string | null;
     syncDeadline: string | null;
     errores: string[];

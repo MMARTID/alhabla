@@ -6,16 +6,22 @@ import {
   AVISOS_ANTES_DE_CONECTAR,
   WhatsappPropio,
 } from "@/components/whatsapp-propio";
-import { getWhatsappPropio, registrarWhatsappPropio } from "@/lib/api";
+import {
+  getWhatsappPropio,
+  pedirEnlaceWhatsappPropio,
+  registrarWhatsappPropio,
+} from "@/lib/api";
 import type { EstadoWhatsappPropio } from "@/lib/types";
 
 vi.mock("@/lib/api", () => ({
   getWhatsappPropio: vi.fn(),
+  pedirEnlaceWhatsappPropio: vi.fn(),
   registrarWhatsappPropio: vi.fn(),
 }));
 
 const mockedGet = vi.mocked(getWhatsappPropio);
 const mockedRegistrar = vi.mocked(registrarWhatsappPropio);
+const mockedEnlace = vi.mocked(pedirEnlaceWhatsappPropio);
 
 const ALTA = {
   appId: "2349496959195397",
@@ -30,7 +36,7 @@ function estado(
   return {
     disponible: true,
     motivo: null,
-    alta: ALTA,
+    altaPropia: ALTA,
     conexion: null,
     ...cambios,
   };
@@ -48,36 +54,109 @@ function pintar() {
 }
 
 const login = vi.fn();
+const pestana = {
+  closed: false,
+  opener: {} as unknown,
+  location: { href: "" },
+  close: vi.fn(),
+};
+const abrirPestana = vi.fn(() => pestana);
 
 beforeEach(() => {
   vi.clearAllMocks();
+  pestana.opener = {};
+  pestana.location.href = "";
   window.FB = { init: vi.fn(), login };
+  vi.stubGlobal("open", abrirPestana);
 });
 
 afterEach(() => {
   cleanup();
   delete window.FB;
+  vi.unstubAllGlobals();
 });
+
+async function desplegarOtraForma() {
+  await userEvent.click(await screen.findByText("Otra forma de conectar"));
+  const boton = await screen.findByRole("button", {
+    name: /Conectar desde aquí/,
+  });
+  await waitFor(() => expect(boton).toBeEnabled());
+  return boton;
+}
 
 describe("WhatsappPropio", () => {
   it("no pinta nada si el alta no está disponible y no hay conexión", async () => {
     mockedGet.mockResolvedValue(
-      estado({ disponible: false, motivo: "apagado", alta: null })
+      estado({ disponible: false, motivo: "apagado", altaPropia: null })
     );
     const { container } = pintar();
     await waitFor(() => expect(mockedGet).toHaveBeenCalled());
     expect(container).toBeEmptyDOMElement();
   });
 
-  it("antes de conectar cuenta lo que va a pasar y abre el alta de Meta", async () => {
+  it("antes de conectar cuenta lo que va a pasar y abre la página de alta de Telnyx", async () => {
     mockedGet.mockResolvedValue(estado());
+    mockedEnlace.mockResolvedValue({
+      url: "https://acct.fyi?token=eyJ",
+      estado: estado({
+        conexion: {
+          origen: "alojada",
+          estado: "esperando_alta",
+          phoneNumber: null,
+          syncDeadline: null,
+          errores: [],
+          conectadoAt: null,
+          puedeRepetir: false,
+        },
+      }),
+    });
     pintar();
     expect(
       await screen.findByText(AVISOS_ANTES_DE_CONECTAR[1])
     ).toBeInTheDocument();
-    const boton = screen.getByRole("button", { name: /Conectar mi WhatsApp/ });
-    await waitFor(() => expect(boton).toBeEnabled());
-    await userEvent.click(boton);
+    await userEvent.click(
+      screen.getByRole("button", { name: /Conectar mi WhatsApp/ })
+    );
+    expect(abrirPestana).toHaveBeenCalledWith("", "_blank");
+    await waitFor(() =>
+      expect(pestana.location.href).toBe("https://acct.fyi?token=eyJ")
+    );
+    expect(pestana.opener).toBeNull();
+    expect(
+      await screen.findByText(/Termina la conexión en la pestaña de WhatsApp/)
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: /Abre la conexión con WhatsApp/ })
+    ).toHaveAttribute("href", "https://acct.fyi?token=eyJ");
+    expect(
+      screen.getByRole("button", { name: /Abrir la conexión otra vez/ })
+    ).toBeInTheDocument();
+    // Sin desplegar la alternativa no se toca Facebook.
+    expect(login).not.toHaveBeenCalled();
+  });
+
+  it("si el backend no da el enlace, cierra la pestaña y lo dice", async () => {
+    mockedGet.mockResolvedValue(estado());
+    mockedEnlace.mockRejectedValue(new Error("caído"));
+    pintar();
+    await userEvent.click(
+      await screen.findByRole("button", { name: /Conectar mi WhatsApp/ })
+    );
+    await waitFor(() => expect(pestana.close).toHaveBeenCalled());
+    expect(
+      await screen.findByText(/No hemos podido preparar la conexión/)
+    ).toBeInTheDocument();
+  });
+
+  it("la ventana de Facebook queda plegada como otra forma de conectar", async () => {
+    mockedGet.mockResolvedValue(estado());
+    pintar();
+    await screen.findByText("Otra forma de conectar");
+    expect(
+      screen.queryByRole("button", { name: /Conectar desde aquí/ })
+    ).not.toBeInTheDocument();
+    await userEvent.click(await desplegarOtraForma());
     expect(login).toHaveBeenCalledWith(
       expect.any(Function),
       expect.objectContaining({
@@ -90,11 +169,21 @@ describe("WhatsappPropio", () => {
     );
   });
 
+  it("sin configuración de Meta no hay otra forma de conectar", async () => {
+    mockedGet.mockResolvedValue(estado({ altaPropia: null }));
+    pintar();
+    await screen.findByRole("button", { name: /Conectar mi WhatsApp/ });
+    expect(
+      screen.queryByText("Otra forma de conectar")
+    ).not.toBeInTheDocument();
+  });
+
   it("al recibir el fin del alta de Meta lo registra en el backend", async () => {
     mockedGet.mockResolvedValue(estado());
     mockedRegistrar.mockResolvedValue(
       estado({
         conexion: {
+          origen: "alojada",
           estado: "registrando",
           phoneNumber: null,
           syncDeadline: null,
@@ -105,11 +194,7 @@ describe("WhatsappPropio", () => {
       })
     );
     pintar();
-    const boton = await screen.findByRole("button", {
-      name: /Conectar mi WhatsApp/,
-    });
-    await waitFor(() => expect(boton).toBeEnabled());
-    await userEvent.click(boton);
+    await userEvent.click(await desplegarOtraForma());
     act(() => {
       window.dispatchEvent(
         new MessageEvent("message", {
@@ -137,6 +222,7 @@ describe("WhatsappPropio", () => {
     mockedGet.mockResolvedValue(
       estado({
         conexion: {
+          origen: "alojada",
           estado: "active",
           phoneNumber: "+34600111222",
           syncDeadline: null,
@@ -159,6 +245,7 @@ describe("WhatsappPropio", () => {
     mockedGet.mockResolvedValue(
       estado({
         conexion: {
+          origen: "alojada",
           estado: "sync_deadline_expired",
           phoneNumber: "+34600111222",
           syncDeadline: null,
@@ -180,8 +267,9 @@ describe("WhatsappPropio", () => {
       estado({
         disponible: false,
         motivo: "apagado",
-        alta: null,
+        altaPropia: null,
         conexion: {
+          origen: "alojada",
           estado: "disconnected",
           phoneNumber: "+34600111222",
           syncDeadline: null,

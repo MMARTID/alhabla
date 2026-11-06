@@ -12,6 +12,7 @@ import {
 } from "../gestor/panel.js";
 import {
   estadoWhatsappPropio,
+  pedirEnlaceDeAlta,
   registrarWhatsappPropio,
 } from "./propio.js";
 
@@ -19,7 +20,10 @@ const MensajeAlGestorSchema = z
   .object({ texto: z.string().trim().min(1).max(1000) })
   .strict();
 /** Lo que devuelve Meta en FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING: ids numéricos. */
-const IdDeMeta = z.string().trim().regex(/^\d{5,32}$/);
+const IdDeMeta = z
+  .string()
+  .trim()
+  .regex(/^\d{5,32}$/);
 const RegistroWhatsappPropioSchema = z
   .object({ wabaId: IdDeMeta, phoneNumberId: IdDeMeta })
   .strict();
@@ -257,9 +261,7 @@ export async function whatsappRoutes(fastify: FastifyInstance) {
     { preValidation: [fastify.authenticate] },
     async (request: FastifyRequest, reply) => {
       try {
-        return reply.send(
-          await estadoWhatsappPropio(request.user!.businessId)
-        );
+        return reply.send(await estadoWhatsappPropio(request.user!.businessId));
       } catch (error) {
         fastify.log.error(
           { err: error },
@@ -272,6 +274,59 @@ export async function whatsappRoutes(fastify: FastifyInstance) {
     }
   );
 
+  // El camino principal: el enlace a la página de alta de Telnyx, que el
+  // panel abre en otra pestaña. Pedirlo otra vez devuelve el mismo enlace
+  // mientras no esté a punto de caducar.
+  fastify.post(
+    "/business/me/whatsapp-propio/enlace",
+    {
+      preValidation: [fastify.authenticate],
+      config: { rateLimit: { max: 10, timeWindow: "10 minutes" } },
+    },
+    async (request: FastifyRequest, reply) => {
+      const businessId = request.user!.businessId;
+      try {
+        const resultado = await pedirEnlaceDeAlta(businessId);
+        switch (resultado.outcome) {
+          case "no_disponible":
+            return reply.status(503).send({
+              error: "Conectar tu WhatsApp todavía no está disponible.",
+              code: "WHATSAPP_PROPIO_NO_DISPONIBLE",
+              motivo: resultado.motivo,
+            });
+          case "ya_conectado":
+            return reply.status(409).send({
+              error: "Tu WhatsApp ya está conectado.",
+              code: "WHATSAPP_PROPIO_YA_CONECTADO",
+            });
+          case "en_curso":
+            return reply.status(409).send({
+              error:
+                "Tu WhatsApp se está conectando. Espera a que termine antes de empezar otra vez.",
+              code: "WHATSAPP_PROPIO_EN_CURSO",
+            });
+          case "error_de_telnyx":
+            return reply.status(502).send({
+              error:
+                "No hemos podido preparar la conexión. Inténtalo de nuevo en unos minutos.",
+              code: "WHATSAPP_PROPIO_ERROR_PROVEEDOR",
+            });
+          default:
+            return reply.send({ url: resultado.url, estado: resultado.estado });
+        }
+      } catch (error) {
+        fastify.log.error(
+          { err: error, businessId },
+          "[WhatsApp] No se pudo preparar el enlace de alta"
+        );
+        return reply
+          .status(500)
+          .send({ error: "No hemos podido preparar la conexión" });
+      }
+    }
+  );
+
+  // La alternativa: lo que devolvió la ventana de Meta abierta en la app.
   fastify.post(
     "/business/me/whatsapp-propio",
     {

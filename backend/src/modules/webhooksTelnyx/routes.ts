@@ -17,6 +17,7 @@ import {
   handleMessageStatusEvent,
   handleTemplateStatusEvent,
 } from "../whatsapp/webhooks.js";
+import { alAnadirseUnWaba } from "../whatsapp/propio.js";
 import {
   claimVoiceWebhookEvent,
   completeVoiceWebhookEvent,
@@ -104,6 +105,11 @@ export async function webhooksTelnyxRoutes(fastify: FastifyInstance) {
         // las plantillas. Misma firma e idempotencia que la voz.
         case "whatsapp.messages":
           result = await handleWhatsappMessages(payload);
+          break;
+        // «Conectar mi WhatsApp»: terminó una sesión de alta (la alojada
+        // se ata a su negocio por el id del enlace).
+        case "whatsapp.waba_added":
+          result = await alAnadirseUnWaba(payload);
           break;
         case "message.sent":
         case "message.finalized":

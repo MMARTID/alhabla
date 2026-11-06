@@ -41,9 +41,10 @@ vi.mock("@/lib/api", () => ({
   getWhatsappPropio: vi.fn(async () => ({
     disponible: false,
     motivo: "apagado",
-    alta: null,
+    altaPropia: null,
     conexion: null,
   })),
+  pedirEnlaceWhatsappPropio: vi.fn(),
   registrarWhatsappPropio: vi.fn(),
   sendOwnerWhatsappActivation: vi.fn(),
   // Ajustes › Teléfono: estado del desvío, número de Alhabla y comprobación.

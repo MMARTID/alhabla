@@ -12,11 +12,14 @@ del número de WhatsApp Business que el negocio ya usa, sin que el dueño deje d
   § *WhatsApp (Telnyx como BSP de Meta)*, párrafo «Conectar mi WhatsApp». Los datos del alta
   (`appId`, `configId`, `solutionId`) los da el backend, no variables `NEXT_PUBLIC_*`.
 - **Cambio frente a lo verificado el 02-10**: la página alojada de Telnyx ya admite coexistencia
-  (`hostedSignups.create({ signup_type: "coexistence" })`). Se mantiene la integración propia porque
-  lleva `customer_id` y el aviso de la alojada (`whatsapp.waba_added`) no dice de qué negocio es.
+  (`hostedSignups.create({ signup_type: "coexistence" })`) y es el **camino principal**: el botón
+  abre esa página en otra pestaña. La integración propia (`FB.login()` en la app) queda plegada como
+  «Otra forma de conectar». El enlace alojado no lleva el negocio: se ata por su id, que la guía de
+  Telnyx presenta como el de la sesión de alta (sin verificar con un alta real), y por el webhook
+  `whatsapp.waba_added`.
 - **Bloqueo**: `GET /v2/whatsapp/foreign_apps` da 404 con nuestra clave (06-11). Falta que Telnyx
-  active el enlace de la app y crear en Meta la configuración de WhatsApp (`config_id`); sin eso, el
-  bloque no aparece ni en dev.
+  active el enlace de la app; sin eso, el bloque no aparece ni en dev. La alternativa necesita
+  además la configuración de WhatsApp en Meta (`config_id`).
 
 ## Decisión de producto
 

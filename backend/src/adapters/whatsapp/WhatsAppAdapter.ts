@@ -128,6 +128,23 @@ export interface WhatsAppConversationWindow {
   type: string | null;
 }
 
+/** Un enlace de la página de alta de Telnyx (`hosted_signups`). */
+export interface EnlaceDeAlta {
+  id: string;
+  url: string;
+  caducaAt: Date | null;
+}
+
+/** Un número de WhatsApp de la cuenta, con su estado de coexistencia. */
+export interface NumeroEnCoexistencia {
+  phoneNumber: string;
+  phoneNumberId: string | null;
+  wabaId: string | null;
+  coexistenceState: string | null;
+  isOnBizApp: boolean;
+  syncDeadline: Date | null;
+}
+
 export interface WhatsAppWabaPhoneNumber {
   phoneNumber: string;
   metaPhoneNumberId: string | null;
@@ -622,29 +639,67 @@ export class WhatsAppAdapter {
   }
 
   /**
+   * Crea el enlace de la página de alta de Telnyx (`acct.fyi`) para que el
+   * dueño conecte su WhatsApp Business en coexistencia: Telnyx hace el alta
+   * de Meta, el intercambio del código y el registro del WABA. Caduca a las
+   * 24 h. La ruta del SDK no lleva `/v2`: fetch directo.
+   */
+  async crearEnlaceDeAlta(appId: string): Promise<EnlaceDeAlta> {
+    const respuesta = await this.peticionDirecta(
+      "POST",
+      "/whatsapp/hosted_signups",
+      { app_id: appId, signup_type: "coexistence" },
+      `al crear el enlace de alta de la app ${appId}`
+    );
+    const enlace = respuesta === null ? null : leerEnlaceDeAlta(respuesta);
+    if (!enlace) {
+      throw new WhatsAppApiError(
+        `Telnyx no devolvió el enlace de alta de la app ${appId}`,
+        respuesta === null ? 404 : null
+      );
+    }
+    return enlace;
+  }
+
+  /** Un enlace de alta ya creado, para volver a abrirlo. `null` si no existe. */
+  async enlaceDeAlta(id: string): Promise<EnlaceDeAlta | null> {
+    const respuesta = await this.peticionDirecta(
+      "GET",
+      `/whatsapp/hosted_signups/${encodeURIComponent(id)}`,
+      undefined,
+      `al consultar el enlace de alta ${id}`
+    );
+    return respuesta === null ? null : leerEnlaceDeAlta(respuesta);
+  }
+
+  /**
    * Estado de una sesión de alta: `INCOMPLETE` espera el código de Meta,
    * `PENDING` en curso, `SUCCESS` terminada y `FAILURE` parada en `state`.
-   * La ruta del SDK es `/whatsapp/signup/{id}/status` sin `/v2`, así que va
-   * por el cliente normal de Telnyx; pero ese puede apuntar a la UE
-   * (`TELNYX_API_BASE_URL`) y WhatsApp no tiene despliegue regional: fetch
-   * directo a api.telnyx.com.
+   * `null` si Telnyx no la conoce (en el alta alojada, mientras el dueño no
+   * la ha terminado). La ruta del SDK es `/whatsapp/signup/{id}/status` sin
+   * `/v2`, así que va por el cliente normal de Telnyx; pero ese puede apuntar
+   * a la UE (`TELNYX_API_BASE_URL`) y WhatsApp no tiene despliegue regional:
+   * fetch directo a api.telnyx.com.
    */
   async estadoDeAlta(sessionId: string): Promise<{
     status: string | null;
     state: string | null;
+    wabaId: string | null;
     errores: string[];
-  }> {
+  } | null> {
     const respuesta = await this.peticionDirecta(
       "GET",
       `/whatsapp/signup/${encodeURIComponent(sessionId)}/status`,
       undefined,
       `al consultar la sesión de alta ${sessionId}`
     );
-    const data = ((respuesta as { data?: Record<string, unknown> } | null)
-      ?.data ?? {}) as Record<string, unknown>;
+    if (respuesta === null) return null;
+    const data = ((respuesta as { data?: Record<string, unknown> }).data ??
+      {}) as Record<string, unknown>;
     return {
       status: asString(data.status),
       state: asString(data.state),
+      wabaId: asString(data.waba_id),
       errores: Array.isArray(data.errors)
         ? data.errors.filter((e): e is string => typeof e === "string")
         : [],
@@ -653,35 +708,52 @@ export class WhatsAppAdapter {
 
   /**
    * El número de un negocio en coexistencia, por su `phone_number_id` de
-   * Meta (el alta no da el número en E.164). Recorre los números de WhatsApp
-   * de la cuenta, que en la lista ya traen `coexistence_state` y
-   * `sync_deadline`. `null` si aún no está en Telnyx.
+   * Meta (el alta no da el número en E.164). `null` si aún no está en
+   * Telnyx.
    */
-  async numeroPorIdDeMeta(metaPhoneNumberId: string): Promise<{
-    phoneNumber: string;
-    wabaId: string | null;
-    coexistenceState: string | null;
-    isOnBizApp: boolean;
-    syncDeadline: Date | null;
-  } | null> {
+  async numeroPorIdDeMeta(
+    metaPhoneNumberId: string
+  ): Promise<NumeroEnCoexistencia | null> {
+    const numeros = await this.numerosDeWhatsapp(
+      (item) => item.phoneNumberId === metaPhoneNumberId,
+      `al buscar el número ${metaPhoneNumberId} en WhatsApp`
+    );
+    return numeros[0] ?? null;
+  }
+
+  /** Los números de un WABA (el alta alojada solo da el WABA). */
+  async numerosDelWaba(wabaId: string): Promise<NumeroEnCoexistencia[]> {
+    return this.numerosDeWhatsapp(
+      (item) => item.wabaId === wabaId,
+      `al buscar los números del WABA ${wabaId} en WhatsApp`
+    );
+  }
+
+  /**
+   * Recorre los números de WhatsApp de la cuenta, que en la lista ya traen
+   * `coexistence_state` y `sync_deadline`.
+   */
+  private async numerosDeWhatsapp(
+    elegir: (item: NumeroEnCoexistencia) => boolean,
+    contexto: string
+  ): Promise<NumeroEnCoexistencia[]> {
+    const encontrados: NumeroEnCoexistencia[] = [];
     try {
       for await (const item of getTelnyxWhatsappClient().whatsapp.phoneNumbers.list()) {
-        if (item.phone_number_id !== metaPhoneNumberId) continue;
-        if (typeof item.phone_number !== "string") return null;
-        return {
+        if (typeof item.phone_number !== "string") continue;
+        const numero: NumeroEnCoexistencia = {
           phoneNumber: item.phone_number,
+          phoneNumberId: item.phone_number_id ?? null,
           wabaId: item.waba_id ?? null,
           coexistenceState: item.coexistence_state ?? null,
           isOnBizApp: item.is_on_biz_app === true,
           syncDeadline: toDate(item.sync_deadline),
         };
+        if (elegir(numero)) encontrados.push(numero);
       }
-      return null;
+      return encontrados;
     } catch (error) {
-      throw toWhatsAppApiError(
-        error,
-        `al buscar el número ${metaPhoneNumberId} en WhatsApp`
-      );
+      throw toWhatsAppApiError(error, contexto);
     }
   }
 
@@ -813,6 +885,14 @@ function toDate(value: unknown): Date | null {
   if (typeof value !== "string" || value.length === 0) return null;
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function leerEnlaceDeAlta(respuesta: unknown): EnlaceDeAlta | null {
+  const data = (respuesta as { data?: Record<string, unknown> } | null)?.data;
+  const id = asString(data?.id);
+  const url = asString(data?.url);
+  if (!id || !url) return null;
+  return { id, url, caducaAt: toDate(data?.expires_at) };
 }
 
 function asString(value: unknown): string | null {
