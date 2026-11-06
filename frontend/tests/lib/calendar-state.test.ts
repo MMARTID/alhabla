@@ -36,34 +36,19 @@ describe("getCalendarState con activeCalendar (contrato nuevo)", () => {
       expired: false,
       accountEmail: "pelu@icloud.com",
       webUrl: "https://www.icloud.com/calendar/",
-      // Sin `modoDeAgenda` en la respuesta: sin elegir, y se reserva porque
-      // hay calendario conectado.
-      mode: "sin_elegir",
-      alhabla: false,
-      bookable: true,
+      calendario: "al_dia",
     });
   });
 
-  // PLAN-AGENDA-ALHABLA.md: en la agenda de Alhabla se reserva sin calendario
-  // externo, y la conexión que quede de antes no cuenta ni como conectada ni
-  // como caducada.
-  it("agenda de Alhabla: se puede reservar sin calendario, y una conexión antigua no cuenta", () => {
-    const sinCalendario = getCalendarState({
-      calendarProvider: null,
-      activeCalendar: null,
-      modoDeAgenda: "alhabla",
-    });
-    expect(sinCalendario).toMatchObject({
-      mode: "alhabla",
-      alhabla: true,
-      bookable: true,
-      connected: false,
-      expired: false,
-    });
+  // PLAN-AGENDA-PRINCIPAL.md: la agenda es siempre la de Alhabla y el
+  // calendario conectado, un complemento. Ya no hay modo que elegir.
+  it("el calendario conectado como complemento: ninguno, al día o sin ver", () => {
+    expect(
+      getCalendarState({ calendarProvider: null, activeCalendar: null }).calendario
+    ).toBe("ninguno");
 
-    const conConexionCaducada = getCalendarState({
+    const caducado = getCalendarState({
       calendarProvider: "google",
-      modoDeAgenda: "alhabla",
       activeCalendar: {
         provider: "google",
         connected: false,
@@ -73,33 +58,28 @@ describe("getCalendarState con activeCalendar (contrato nuevo)", () => {
         lastError: "invalid_grant",
       },
     });
-    expect(conConexionCaducada).toMatchObject({
-      alhabla: true,
-      bookable: true,
+    expect(caducado).toMatchObject({
+      calendario: "sin_ver",
       connected: false,
-      expired: false,
-      accountEmail: null,
+      expired: true,
+      // La cuenta se sigue enseñando: es la que hay que reconectar.
+      accountEmail: "pelu@gmail.com",
     });
-  });
 
-  it("sin elegir y sin calendario no se reserva; en externo manda la conexión", () => {
-    expect(
-      getCalendarState({ calendarProvider: null, activeCalendar: null, modoDeAgenda: "sin_elegir" })
-    ).toMatchObject({ mode: "sin_elegir", bookable: false });
+    // A medias (Outlook enlazado sin calendario elegido): como si no hubiera.
     expect(
       getCalendarState({
-        calendarProvider: "google",
-        modoDeAgenda: "externo",
+        calendarProvider: "outlook",
         activeCalendar: {
-          provider: "google",
+          provider: "outlook",
           connected: false,
-          calendarId: "primary",
-          accountEmail: null,
-          disconnectedAt: "2026-09-18T10:00:00.000Z",
+          calendarId: null,
+          accountEmail: "pelu@outlook.com",
+          disconnectedAt: null,
           lastError: null,
         },
-      })
-    ).toMatchObject({ mode: "externo", bookable: false, expired: true });
+      }).calendario
+    ).toBe("ninguno");
   });
 
   it("conexión caducada: connected false y expired true", () => {

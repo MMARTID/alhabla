@@ -123,15 +123,13 @@ export function AgendaMovil({ business }: { business: Business }) {
     <div>
       <CabeceraMovil
         titulo="Agenda"
-        subtitulo={calendario.alhabla ? "Todas tus citas, en un solo sitio." : "Las citas que ha reservado tu recepcionista."}
+        subtitulo="Todas tus citas, en un solo sitio."
         accion={
           <>
             <BotonDeBuscar />
-            {calendario.bookable ? (
-              <button type="button" onClick={() => setCreando(true)} aria-label="Nueva cita" className={CLASES_BOTON_REDONDO}>
-                <Plus className="h-5 w-5" aria-hidden="true" />
-              </button>
-            ) : null}
+            <button type="button" onClick={() => setCreando(true)} aria-label="Nueva cita" className={CLASES_BOTON_REDONDO}>
+              <Plus className="h-5 w-5" aria-hidden="true" />
+            </button>
             {calendario.connected ? (
               <a
                 href={calendario.webUrl}
@@ -261,9 +259,9 @@ export function AgendaMovil({ business }: { business: Business }) {
             {indiceAhora === -1 ? <MarcaAhora hora={horaDelNegocio(ahora, timeZone)} /> : null}
           </ol>
           <p className="mt-[18px] text-[13px] leading-[1.55] text-muted">
-            {calendario.alhabla
-              ? "Esta es tu agenda: aquí están todas las citas. Si apuntas alguna fuera, añádela aquí o bloquea esas horas."
-              : `Solo las citas que ha reservado tu recepcionista.${calendario.connected ? ` El resto de tu agenda sigue en ${calendario.label}.` : ""}`}
+            {calendario.connected
+              ? `Esta es tu agenda: aquí están todas tus citas, y también las ves en ${calendario.label}. Lo que apuntes allí cuenta como ocupado.`
+              : "Esta es tu agenda: aquí están todas tus citas. Si apuntas alguna fuera, añádela aquí o bloquea esas horas."}
           </p>
         </>
       )}

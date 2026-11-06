@@ -96,8 +96,9 @@ export function AgenteEscritorio({ business }: { business: Business }) {
     capacidad: "listo",
     servicios: ajustes.isLoading ? "vacio" : servicios > 0 ? "listo" : "pendiente",
     profesionales: ajustes.isLoading ? "vacio" : profesionales > 0 ? "listo" : "pendiente",
-    // Agenda de Alhabla o calendario externo conectado: las dos cuentan.
-    calendario: calendario.bookable ? "listo" : "pendiente",
+    // La agenda de Alhabla viene puesta (PLAN-AGENDA-PRINCIPAL.md): el
+    // calendario solo queda pendiente si uno conectado dejó de verse.
+    calendario: calendario.calendario === "sin_ver" ? "pendiente" : "listo",
     informacion: business.businessDetails?.trim() ? "listo" : "vacio",
     comportamiento: "listo",
   };
@@ -112,7 +113,7 @@ export function AgenteEscritorio({ business }: { business: Business }) {
           hasSchedule: conHorario,
           serviceCount: servicios,
           professionalCount: profesionales,
-          hasCalendar: calendario.bookable,
+          hasCalendar: true,
         })
       )
     : null;

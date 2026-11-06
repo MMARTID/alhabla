@@ -80,40 +80,22 @@ export function buildOperationalStatus({
 }): OperationalStatusItem[] {
   const hasPlan = business.subscriptionStatus === "ACTIVE" || business.subscriptionStatus === "TRIALING";
   const calendarState = getCalendarState(business);
-  const calendarConnected = calendarState.connected;
-  const calendarExpired = calendarState.expired;
   const sinHorario = !horarioConfigurado(business.schedule);
 
-  const sinAgenda = !calendarState.bookable;
-
-  // Sin horario no hay huecos (BUSINESS_HOURS_NOT_CONFIGURED), tampoco en la
-  // agenda de Alhabla; sin agenda donde reservar (ni la de Alhabla ni un
-  // calendario operativo) la recepcionista contesta, toma nota de la
-  // petición y avisa al dueño, pero no da hora ni reserva (voiceTools:
-  // check_availability y book_appointment). Decir «Atendiendo llamadas» a
-  // secas escondía esa diferencia.
-  const causaDeLaAgenda = calendarExpired
-    ? "el calendario se desconectó"
-    : calendarState.mode === "externo"
-      ? "falta conectar el calendario"
-      : "falta elegir dónde reservar";
-  const sinReservas: OperationalStatusItem | null =
-    sinHorario || sinAgenda
-      ? {
-          key: "agent",
-          label: "Recepcionista",
-          icon: Bot,
-          value: `${ATIENDE_SIN_RESERVAR}: ${
-            sinHorario ? (sinAgenda ? "faltan el horario y la agenda" : "falta el horario") : causaDeLaAgenda
-          }`,
-          tone: "warning",
-          action: sinHorario
-            ? { label: "Configurar horario", href: "/agente?section=business-hours" }
-            : { label: calendarExpired ? "Reconectar agenda" : "Elegir agenda", href: "/agente?section=calendar-section" },
-          // Si solo falta la agenda, el aviso ya lo da la señal «Agenda».
-          cubiertoPor: sinHorario ? undefined : "calendar",
-        }
-      : null;
+  // Sin horario no hay huecos (BUSINESS_HOURS_NOT_CONFIGURED): la
+  // recepcionista contesta, toma nota y avisa al dueño, pero no da hora.
+  // La agenda ya no es motivo (PLAN-AGENDA-PRINCIPAL.md): la de Alhabla viene
+  // puesta y reserva aunque el calendario conectado no se vea.
+  const sinReservas: OperationalStatusItem | null = sinHorario
+    ? {
+        key: "agent",
+        label: "Recepcionista",
+        icon: Bot,
+        value: `${ATIENDE_SIN_RESERVAR}: falta el horario`,
+        tone: "warning",
+        action: { label: "Configurar horario", href: "/agente?section=business-hours" },
+      }
+    : null;
 
   const agent: OperationalStatusItem = business.callsSuspendedAt
     ? { key: "agent", label: "Recepcionista", icon: Bot, value: "Suspendida por impago", tone: "error", action: { label: "Regularizar el pago", href: "/ajustes/facturacion" } }
@@ -141,13 +123,14 @@ export function buildOperationalStatus({
         ? { key: "forwarding", label: "Desvío de llamadas", icon: PhoneForwarded, value: NO_COMPROBADO, tone: "unknown" }
         : { key: "forwarding", label: "Desvío de llamadas", icon: PhoneForwarded, value: "Esperando al número", tone: "waiting" };
 
-  const calendar: OperationalStatusItem = calendarState.alhabla
-    ? { key: "calendar", label: "Agenda", icon: CalendarDays, value: NOMBRE_AGENDA_DE_ALHABLA, tone: "ok" }
-    : calendarConnected
-    ? { key: "calendar", label: "Agenda", icon: CalendarDays, value: calendarState.label, tone: "ok" }
-    : calendarExpired
-      ? { key: "calendar", label: "Agenda", icon: CalendarDays, value: "Conexión caducada", tone: "error", action: { label: "Reconectar", href: "/agente?section=calendar-section" } }
-      : { key: "calendar", label: "Agenda", icon: CalendarDays, value: "Sin conectar", tone: "warning", action: { label: "Conectar agenda", href: "/agente?section=calendar-section" } };
+  // La agenda es siempre la de Alhabla; el calendario conectado es un
+  // complemento y solo avisa si dejó de verse (las citas siguen entrando).
+  const calendar: OperationalStatusItem =
+    calendarState.calendario === "sin_ver"
+      ? { key: "calendar", label: "Agenda", icon: CalendarDays, value: `Reservando · sin ver ${calendarState.label}`, tone: "warning", action: { label: "Reconectar", href: "/agente?section=calendar-section" } }
+      : calendarState.calendario === "al_dia"
+        ? { key: "calendar", label: "Agenda", icon: CalendarDays, value: `${NOMBRE_AGENDA_DE_ALHABLA} · con ${calendarState.label}`, tone: "ok" }
+        : { key: "calendar", label: "Agenda", icon: CalendarDays, value: NOMBRE_AGENDA_DE_ALHABLA, tone: "ok" };
 
   return [agent, phoneItem, forwarding, calendar];
 }

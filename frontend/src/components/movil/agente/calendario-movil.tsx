@@ -3,9 +3,9 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
-import { ArrowUpRight, CalendarDays, Check, CircleCheckBig } from "lucide-react";
+import { ArrowUpRight, CalendarDays, Check, CircleCheckBig, TriangleAlert } from "lucide-react";
 import { SiApple, SiGooglecalendar } from "@icons-pack/react-simple-icons";
-import { cambiarModoDeAgenda, getCalendarList, getGoogleCalendarAuthUrl, getMicrosoftCalendarAuthUrl, selectCalendar } from "@/lib/api";
+import { getCalendarList, getGoogleCalendarAuthUrl, getMicrosoftCalendarAuthUrl, quitarCalendarioConectado, selectCalendar } from "@/lib/api";
 import { getCalendarState, NOMBRE_AGENDA_DE_ALHABLA, providerFromReconnectCode } from "@/lib/calendar-state";
 import type { Business, CalendarProviderId } from "@/lib/types";
 import { AppleCalendarConnect } from "@/components/apple-calendar-connect";
@@ -18,10 +18,12 @@ import { FeedDeAgenda } from "@/components/movil/agente/feed-de-agenda";
 type Mensaje = { type: "success" | "error"; message: string } | null;
 
 /**
- * Calendario en el móvil: el estado de la conexión arriba y, debajo, cada
- * acción por separado (cambiar de cuenta, de calendario). Sin conectar, los
- * tres proveedores en tarjetas. La lógica es la de escritorio: OAuth para
- * Google y Outlook, Apple ID y contraseña de aplicación para Apple.
+ * Calendario en el móvil (PLAN-AGENDA-PRINCIPAL.md): arriba, la agenda de
+ * Alhabla, que es la del negocio y no se elige; debajo, el calendario
+ * conectado como complemento (recibe cada cita y avisa de lo que el dueño
+ * apunta en él): conectarlo, cambiar de cuenta o de calendario, reconectarlo
+ * si dejó de verse o quitarlo. OAuth para Google y Outlook, Apple ID y
+ * contraseña de aplicación para Apple.
  */
 export function CalendarioMovil({ business }: { business: Business }) {
   const queryClient = useQueryClient();
@@ -32,35 +34,20 @@ export function CalendarioMovil({ business }: { business: Business }) {
   const [autorizando, setAutorizando] = useState<"google" | "outlook" | null>(null);
   const [selector, setSelector] = useState(false);
   const [formularioApple, setFormularioApple] = useState(false);
+  const [confirmarQuitar, setConfirmarQuitar] = useState(false);
   const conectado = estado.connected && !reconectar;
-  // Modo de agenda (PLAN-AGENDA-ALHABLA.md): elegir la agenda de Alhabla pide
-  // una confirmación en línea, porque desde ese momento la recepcionista solo
-  // ve lo que hay en Alhabla. `verExternos` abre las tarjetas de proveedor
-  // desde el modo alhabla: conectar uno pasa el negocio a `externo` solo.
-  const [confirmarAlhabla, setConfirmarAlhabla] = useState(false);
-  const [verExternos, setVerExternos] = useState(false);
-  const cambiarModo = useMutation({
-    mutationFn: cambiarModoDeAgenda,
-    onSuccess: async (negocio, modo) => {
+  const sinVer = !conectado && (estado.expired || reconectar);
+  const quitar = useMutation({
+    mutationFn: quitarCalendarioConectado,
+    onSuccess: async (negocio) => {
       queryClient.setQueryData(["my-business"], negocio);
-      await queryClient.invalidateQueries({ queryKey: ["onboarding-state"] });
-      setConfirmarAlhabla(false);
-      setVerExternos(false);
-      avisar(
-        modo === "alhabla"
-          ? "Tu recepcionista reserva ya en la agenda de Alhabla."
-          : "Tu recepcionista vuelve a reservar en tu calendario."
-      );
+      await queryClient.invalidateQueries({ queryKey: ["calendar-list"] });
+      setConfirmarQuitar(false);
+      setReconectar(false);
+      setMensaje(null);
+      avisar("Calendario quitado. Tus citas siguen en tu agenda.");
     },
-    onError: (error) => {
-      const codigo = axios.isAxiosError(error) ? error.response?.data?.code : undefined;
-      avisar(
-        codigo === "CALENDAR_NOT_OPERATIVE"
-          ? "Para volver a tu calendario primero tienes que conectarlo."
-          : "No se pudo cambiar el modo de agenda.",
-        "error"
-      );
-    },
+    onError: () => avisar("No se pudo quitar el calendario.", "error"),
   });
 
   const calendarios = useQuery({
@@ -122,10 +109,19 @@ export function CalendarioMovil({ business }: { business: Business }) {
     setMensaje({ type: "success", message: "El calendario de Apple está conectado correctamente." });
   };
 
+  const reconectarProveedor = () => {
+    if (estado.provider === "caldav") {
+      setMensaje(null);
+      setFormularioApple(true);
+      return;
+    }
+    void autorizar(estado.provider);
+  };
+
   return (
     <PantallaDeAjuste
       titulo="Calendario"
-      subtitulo="Tu agenda real: de ahí sale la disponibilidad y ahí se guardan las citas."
+      subtitulo="Tus citas viven en tu agenda. Conecta tu calendario si quieres verlas también allí."
     >
       <div className="flex flex-col gap-3">
         {mensaje ? (
@@ -139,23 +135,22 @@ export function CalendarioMovil({ business }: { business: Business }) {
           </p>
         ) : null}
 
-        {estado.alhabla && !verExternos ? (
-          <>
-            <div className="flex items-center gap-3 rounded-[20px] border border-exito-borde bg-exito-fondo px-4 py-3.5">
-              <CircleCheckBig className="h-6 w-6 shrink-0 text-exito" aria-hidden="true" />
-              <div className="min-w-0">
-                <p className="text-[15px] font-bold text-exito">{NOMBRE_AGENDA_DE_ALHABLA} activa</p>
-                <p className="text-[13px] text-exito">Las citas se guardan solo en Alhabla, sin calendario externo.</p>
-              </div>
-            </div>
-            <p className="px-1 text-sm leading-6 text-muted">
-              Tu recepcionista solo ve las citas que hay en Alhabla. Si apuntas citas en otro sitio, añádelas aquí o bloquea esas horas para que no las ofrezca.
+        {/* La agenda: viene puesta y no se elige. */}
+        <div className="flex items-start gap-3 rounded-[20px] border border-linea bg-superficie px-4 py-3.5">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-lavado text-morado">
+            <CalendarDays className="h-5 w-5" aria-hidden="true" />
+          </span>
+          <div className="min-w-0">
+            <p className="text-[15px] font-bold text-tinta">{NOMBRE_AGENDA_DE_ALHABLA}</p>
+            <p className="text-[13px] leading-5 text-muted">
+              Aquí entran todas tus citas: las de las llamadas, las de WhatsApp y las que apuntas tú.
             </p>
-            <button type="button" onClick={() => setVerExternos(true)} className="btn-secondary w-full">
-              Usar un calendario externo
-            </button>
-          </>
-        ) : conectado ? (
+          </div>
+        </div>
+
+        <p className="mt-2 px-1 text-[13px] font-bold uppercase tracking-wide text-tenue">También en tu calendario</p>
+
+        {conectado ? (
           <>
             <div className="flex items-center gap-3 rounded-[20px] border border-exito-borde bg-exito-fondo px-4 py-3.5">
               <CircleCheckBig className="h-6 w-6 shrink-0 text-exito" aria-hidden="true" />
@@ -164,6 +159,9 @@ export function CalendarioMovil({ business }: { business: Business }) {
                 <p className="truncate text-[13px] text-exito">{estado.accountEmail ?? `Cuenta de ${estado.shortLabel}`}</p>
               </div>
             </div>
+            <p className="px-1 text-sm leading-6 text-muted">
+              Recibe cada cita, y lo que apuntes allí cuenta como ocupado para no pisarlo.
+            </p>
             {estado.provider === "caldav" ? (
               <button type="button" onClick={() => setFormularioApple((actual) => !actual)} className="btn-secondary w-full">
                 {formularioApple ? "Cerrar" : "Cambiar de cuenta"}
@@ -224,35 +222,48 @@ export function CalendarioMovil({ business }: { business: Business }) {
                 })}
               </div>
             ) : null}
-            <ElegirAgendaDeAlhabla
-              variante="boton"
-              confirmando={confirmarAlhabla}
-              pendiente={cambiarModo.isPending}
-              onPedir={() => setConfirmarAlhabla(true)}
-              onCancelar={() => setConfirmarAlhabla(false)}
-              onConfirmar={() => cambiarModo.mutate("alhabla")}
+            <QuitarCalendario
+              etiqueta={estado.shortLabel}
+              confirmando={confirmarQuitar}
+              pendiente={quitar.isPending}
+              onPedir={() => setConfirmarQuitar(true)}
+              onCancelar={() => setConfirmarQuitar(false)}
+              onConfirmar={() => quitar.mutate()}
+            />
+          </>
+        ) : sinVer ? (
+          <>
+            <div className="flex items-start gap-3 rounded-[20px] border border-aviso-borde bg-aviso-fondo px-4 py-3.5">
+              <TriangleAlert className="mt-0.5 h-5 w-5 shrink-0 text-aviso" aria-hidden="true" />
+              <div className="min-w-0">
+                <p className="text-[15px] font-bold text-tinta">Sin ver {estado.label}</p>
+                <p className="text-[13px] leading-5 text-tinta-2">
+                  Tus citas siguen entrando en tu agenda, pero no veo lo que apuntas en {estado.shortLabel}. Reconéctalo y te copio las que hayan entrado.
+                </p>
+              </div>
+            </div>
+            <button type="button" onClick={reconectarProveedor} disabled={autorizando !== null} className="btn-primary w-full">
+              {autorizando ? "Conectando…" : `Reconectar ${estado.shortLabel}`}
+            </button>
+            {formularioApple ? <AppleCalendarConnect onCancel={() => setFormularioApple(false)} onConnected={alConectarApple} /> : null}
+            <QuitarCalendario
+              etiqueta={estado.shortLabel}
+              confirmando={confirmarQuitar}
+              pendiente={quitar.isPending}
+              onPedir={() => setConfirmarQuitar(true)}
+              onCancelar={() => setConfirmarQuitar(false)}
+              onConfirmar={() => quitar.mutate()}
             />
           </>
         ) : (
           <>
-            {estado.alhabla ? (
-              <button type="button" onClick={() => setVerExternos(false)} className="btn-secondary w-full">
-                Volver a la agenda de Alhabla
-              </button>
-            ) : (
-              <ElegirAgendaDeAlhabla
-                variante="tarjeta"
-                confirmando={confirmarAlhabla}
-                pendiente={cambiarModo.isPending}
-                onPedir={() => setConfirmarAlhabla(true)}
-                onCancelar={() => setConfirmarAlhabla(false)}
-                onConfirmar={() => cambiarModo.mutate("alhabla")}
-              />
-            )}
+            <p className="px-1 text-sm leading-6 text-muted">
+              ¿Llevas las citas en Google, Outlook o el iPhone? Conéctalo y verás ahí cada cita.
+            </p>
             <TarjetaDeProveedor
               icono={<SiGooglecalendar className="h-[18px] w-[18px] shrink-0" color="#4285F4" />}
               titulo="Conecta Google Calendar"
-              texto="Reservas automáticas, disponibilidad real y la agenda en el panel."
+              texto="Cada cita aparece en tu Google, y lo que apuntes allí cuenta como ocupado."
               accion={autorizando === "google" ? "Conectando…" : "Conectar"}
               beta
               disabled={autorizando !== null}
@@ -261,7 +272,7 @@ export function CalendarioMovil({ business }: { business: Business }) {
             <TarjetaDeProveedor
               icono={<MicrosoftLogo className="h-[18px] w-[18px] shrink-0" />}
               titulo="Conecta Outlook"
-              texto="Usa Outlook Calendar para sincronizar la agenda del negocio."
+              texto="Cada cita aparece en tu Outlook, y lo que apuntes allí cuenta como ocupado."
               accion={autorizando === "outlook" ? "Conectando…" : "Conectar"}
               disabled={autorizando !== null}
               onClick={() => void autorizar("outlook")}
@@ -334,59 +345,45 @@ function TarjetaDeProveedor({
 }
 
 /**
- * Elegir la agenda de Alhabla (PLAN-AGENDA-ALHABLA.md, decisión D1/D6) con
- * una confirmación en línea: desde ese momento la recepcionista solo ve las
- * citas que hay en Alhabla, y el dueño tiene que saberlo antes de pulsar.
- * Como tarjeta (sin calendario conectado) o como botón discreto (con uno).
+ * Quitar el calendario conectado, con una confirmación en línea: las citas
+ * siguen en la agenda de Alhabla y lo que ya se copió se queda en él.
  */
-function ElegirAgendaDeAlhabla({
-  variante,
+function QuitarCalendario({
+  etiqueta,
   confirmando,
   pendiente,
   onPedir,
   onCancelar,
   onConfirmar,
 }: {
-  variante: "tarjeta" | "boton";
+  etiqueta: string;
   confirmando: boolean;
   pendiente: boolean;
   onPedir: () => void;
   onCancelar: () => void;
   onConfirmar: () => void;
 }) {
-  if (confirmando) {
-    return (
-      <div className="space-y-3 rounded-[20px] border border-aviso-borde bg-aviso-fondo px-4 py-3.5" role="group" aria-label="Confirmar la agenda de Alhabla">
-        <p className="text-[15px] font-bold text-tinta">¿Reservar solo en la agenda de Alhabla?</p>
-        <p className="text-sm leading-6 text-tinta-2">
-          Tu recepcionista solo verá las citas que haya en Alhabla. Si apuntas citas en otro sitio (una libreta, otro programa), tendrás que añadirlas aquí o bloquear esas horas; si no, podría dar una hora que ya tienes ocupada.
-        </p>
-        <div className="flex gap-2">
-          <button type="button" onClick={onConfirmar} disabled={pendiente} className="btn-primary flex-1">
-            {pendiente ? "Guardando…" : "Sí, usar la agenda de Alhabla"}
-          </button>
-          <button type="button" onClick={onCancelar} disabled={pendiente} className="btn-secondary flex-1">
-            Cancelar
-          </button>
-        </div>
-      </div>
-    );
-  }
-  if (variante === "boton") {
+  if (!confirmando) {
     return (
       <button type="button" onClick={onPedir} className="btn-secondary w-full">
-        Reservar solo en la agenda de Alhabla
+        Quitar {etiqueta}
       </button>
     );
   }
   return (
-    <TarjetaDeProveedor
-      icono={<CalendarDays className="h-[18px] w-[18px] shrink-0 text-morado" aria-hidden="true" />}
-      titulo={`Usar la ${NOMBRE_AGENDA_DE_ALHABLA}`}
-      texto="Sin conectar ningún calendario: tu recepcionista reserva aquí y tú ves y apuntas las citas en el panel o por WhatsApp."
-      accion="Elegir"
-      disabled={false}
-      onClick={onPedir}
-    />
+    <div className="space-y-3 rounded-[20px] border border-linea bg-relleno px-4 py-3.5" role="group" aria-label={`Quitar ${etiqueta}`}>
+      <p className="text-[15px] font-bold text-tinta">¿Quitar {etiqueta}?</p>
+      <p className="text-sm leading-6 text-tinta-2">
+        Tus citas siguen en tu agenda. Lo que ya se copió se queda en {etiqueta}, y lo que apuntes allí dejará de contar como ocupado.
+      </p>
+      <div className="flex gap-2">
+        <button type="button" onClick={onConfirmar} disabled={pendiente} className="btn-primary flex-1">
+          {pendiente ? "Quitando…" : "Sí, quitarlo"}
+        </button>
+        <button type="button" onClick={onCancelar} disabled={pendiente} className="btn-secondary flex-1">
+          Cancelar
+        </button>
+      </div>
+    </div>
   );
 }

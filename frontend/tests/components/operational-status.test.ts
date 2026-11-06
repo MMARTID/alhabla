@@ -82,44 +82,31 @@ describe("buildOperationalStatus — recepcionista y suscripción", () => {
   );
 });
 
-// Sin calendario operativo la recepcionista toma nota pero no reserva
-// (voiceTools: check_availability y book_appointment). «Atendiendo llamadas»
-// a secas escondía que el negocio no estaba recibiendo citas.
-describe("buildOperationalStatus — recepcionista sin calendario", () => {
-  it("sin ningún calendario conectado dice que atiende pero no reserva, y manda a elegir agenda", () => {
+// PLAN-AGENDA-PRINCIPAL.md: la agenda de Alhabla viene puesta y reserva
+// aunque no haya calendario conectado o este no se vea. La señal «Agenda»
+// solo avisa si un calendario conectado dejó de verse.
+describe("buildOperationalStatus — la agenda de Alhabla y el calendario conectado", () => {
+  it("sin ningún calendario conectado atiende y reserva, y la señal Agenda dice la agenda de Alhabla", () => {
     const items = senales({ activeCalendar: null });
-    const item = items.find((señal) => señal.key === "agent");
 
-    expect(item?.value).toBe("Atiende, pero no reserva: falta elegir dónde reservar");
-    expect(item?.tone).toBe("warning");
-    expect(item?.action).toMatchObject({
-      label: "Elegir agenda",
-      href: "/agente?section=calendar-section",
+    expect(items.find((item) => item.key === "agent")).toMatchObject({
+      value: "Atendiendo llamadas",
+      tone: "ok",
     });
-    // El aviso ya lo da la señal «Agenda»: el chip no lo cuenta dos veces.
-    expect(item?.cubiertoPor).toBe("calendar");
-    expect(items.find((señal) => señal.key === "calendar")?.tone).toBe("warning");
-  });
-
-  it("en modo calendario externo sin conectar, pide conectarlo", () => {
-    expect(
-      recepcionista({ activeCalendar: null, modoDeAgenda: "externo" })?.value
-    ).toBe("Atiende, pero no reserva: falta conectar el calendario");
-  });
-
-  // PLAN-AGENDA-ALHABLA.md: en la agenda de Alhabla se reserva sin calendario.
-  it("en la agenda de Alhabla atiende y reserva, y la tarjeta Agenda lo dice", () => {
-    const items = senales({ activeCalendar: null, modoDeAgenda: "alhabla" });
-
-    expect(items.find((item) => item.key === "agent")?.value).toBe("Atendiendo llamadas");
     expect(items.find((item) => item.key === "calendar")).toMatchObject({
       value: "Agenda de Alhabla",
       tone: "ok",
     });
   });
 
-  it("con el calendario caducado manda a reconectarlo", () => {
-    const item = recepcionista({
+  it("con un calendario conectado lo nombra junto a la agenda", () => {
+    expect(
+      senales({ activeCalendar: CALENDARIO_CONECTADO }).find((item) => item.key === "calendar")
+    ).toMatchObject({ value: "Agenda de Alhabla · con Google Calendar", tone: "ok" });
+  });
+
+  it("con el calendario caducado sigue reservando y pide reconectarlo, sin alarma", () => {
+    const items = senales({
       activeCalendar: {
         ...CALENDARIO_CONECTADO,
         connected: false,
@@ -128,11 +115,21 @@ describe("buildOperationalStatus — recepcionista sin calendario", () => {
       },
     });
 
-    expect(item?.value).toBe("Atiende, pero no reserva: el calendario se desconectó");
-    expect(item?.action).toMatchObject({ label: "Reconectar agenda" });
+    expect(items.find((item) => item.key === "agent")?.value).toBe("Atendiendo llamadas");
+    expect(items.find((item) => item.key === "calendar")).toMatchObject({
+      value: "Reservando · sin ver Google Calendar",
+      tone: "warning",
+      action: { label: "Reconectar", href: "/agente?section=calendar-section" },
+    });
   });
 
-  it("los estados más graves (impago, sin plan, inactiva) mandan sobre el calendario", () => {
+  it("el modo antiguo ya no cambia nada", () => {
+    expect(
+      recepcionista({ activeCalendar: null, modoDeAgenda: "externo" })?.value
+    ).toBe("Atendiendo llamadas");
+  });
+
+  it("los estados más graves (impago, sin plan, inactiva) siguen mandando", () => {
     expect(
       recepcionista({ activeCalendar: null, subscriptionStatus: "CANCELED" })?.value
     ).toBe("No contesta: sin plan activo");
@@ -162,16 +159,10 @@ describe("buildOperationalStatus — recepcionista sin horario", () => {
   });
 
   // La agenda de Alhabla también necesita el horario para ofrecer huecos.
-  it("en la agenda de Alhabla sin horario tampoco reserva", () => {
-    expect(
-      recepcionista({ schedule: {}, activeCalendar: null, modoDeAgenda: "alhabla" })?.value
-    ).toBe("Atiende, pero no reserva: falta el horario");
-  });
-
-  it("sin horario ni agenda, nombra las dos y manda primero al horario", () => {
+  it("sin horario y sin calendario, solo falta el horario", () => {
     const item = recepcionista({ schedule: {}, activeCalendar: null });
 
-    expect(item?.value).toBe("Atiende, pero no reserva: faltan el horario y la agenda");
+    expect(item?.value).toBe("Atiende, pero no reserva: falta el horario");
     expect(item?.action).toMatchObject({ href: "/agente?section=business-hours" });
   });
 

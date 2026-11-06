@@ -128,7 +128,7 @@ export function PanelEscritorio({
     estado.onboardingQuery.isError ||
     desvioPendiente ||
     !tieneHorario ||
-    !calendario.bookable ||
+    calendario.calendario === "sin_ver" ||
     guiaActiva;
   const llamadas = (llamadasQuery.data?.data ?? []).slice(0, 5);
 
@@ -181,16 +181,14 @@ export function PanelEscritorio({
                   texto="Sin él no hay huecos que ofrecer: tu recepcionista toma nota, pero no reserva citas."
                 />
               ) : null}
-              {!calendario.bookable ? (
+              {/* La agenda viene puesta (PLAN-AGENDA-PRINCIPAL.md): solo se
+                  avisa si un calendario conectado dejó de verse. */}
+              {calendario.calendario === "sin_ver" ? (
                 <TarjetaDeAviso
                   href="/agente?section=calendar-section"
                   icono={CalendarDays}
-                  titulo={calendario.expired ? "Vuelve a conectar tu agenda" : "Elige dónde reservar"}
-                  texto={
-                    calendario.expired
-                      ? `La conexión con ${calendario.label} ha caducado: sin ella no se reservan citas.`
-                      : "Conecta tu calendario o usa la agenda de Alhabla. Hasta entonces, tu recepcionista toma nota pero no reserva citas."
-                  }
+                  titulo={`Vuelve a conectar ${calendario.label}`}
+                  texto={`Tus citas siguen entrando en tu agenda, pero no veo lo que apuntas en ${calendario.label}.`}
                 />
               ) : null}
               {estado.onboardingQuery.data ? <GuiaDeConfiguracion estado={estado.onboardingQuery.data} /> : null}
