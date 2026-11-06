@@ -8,6 +8,10 @@
 //
 // Escribe el resultado como JSON en la última línea, tras `@@RESULTADO@@`.
 // Solo toca conexiones con credenciales `falso:`: nunca un calendario real.
+// Primero cloudTasks, como el servidor: conexion → alertas → cloudTasks →
+// jobs → listaDeEspera → conexion es un ciclo, y empezando por conexion
+// listaDeEspera lee SELECT_CONEXION_DE_CALENDARIO antes de que exista.
+import "../../src/lib/cloudTasks.js";
 import { prisma } from "../../src/lib/prisma.js";
 import {
   calendariosFalsosActivos,
