@@ -399,3 +399,141 @@ describe("WhatsAppAdapter — cta_url (alertas)", () => {
     ).rejects.toThrow("https");
   });
 });
+
+describe("WhatsAppAdapter — alta en coexistencia", () => {
+  const adapter = new WhatsAppAdapter();
+
+  function respuesta(status: number, cuerpo: unknown) {
+    return {
+      ok: status >= 200 && status < 300,
+      status,
+      text: async () => JSON.stringify(cuerpo),
+    };
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    process.env.TELNYX_API_KEY = "KEY";
+  });
+
+  it("registra el WABA con el evento de coexistencia y devuelve la sesión", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      respuesta(200, {
+        data: { session_id: "ses_1", status: "PENDING", waba_id: "123" },
+      })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const sesion = await adapter.registrarAltaEnCoexistencia({
+      wabaId: "123",
+      phoneNumberId: "456",
+      appId: "789",
+      customerId: "biz_1",
+    });
+    expect(sesion).toEqual({ sessionId: "ses_1", status: "PENDING" });
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe(
+      "https://api.telnyx.com/v2/whatsapp/business_accounts/tech_provider"
+    );
+    expect(init.method).toBe("POST");
+    expect(init.headers.Authorization).toBe("Bearer KEY");
+    expect(JSON.parse(init.body)).toEqual({
+      waba_id: "123",
+      phone_number_id: "456",
+      app_id: "789",
+      customer_id: "biz_1",
+      event: "FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING",
+    });
+    expect(init.signal).toBeDefined();
+    vi.unstubAllGlobals();
+  });
+
+  it("un rechazo de Telnyx lanza WhatsAppApiError con el estado", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(respuesta(422, { errors: [{ code: "x" }] }))
+    );
+    const error = await adapter
+      .registrarAltaEnCoexistencia({
+        wabaId: "1",
+        phoneNumberId: "2",
+        appId: "3",
+        customerId: "biz_1",
+      })
+      .catch((e) => e);
+    expect(error).toBeInstanceOf(WhatsAppApiError);
+    expect(error.status).toBe(422);
+    vi.unstubAllGlobals();
+  });
+
+  it("appEnlazada es null mientras Telnyx no tiene el enlace (404)", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(respuesta(404, {})));
+    expect(await adapter.appEnlazada("789")).toBeNull();
+    vi.unstubAllGlobals();
+  });
+
+  it("appEnlazada busca nuestra app entre las enlazadas", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        respuesta(200, {
+          data: [
+            { app_id: "111", solution_id: "otra", enabled: true },
+            { app_id: "789", solution_id: "sol_9", enabled: true },
+          ],
+        })
+      )
+    );
+    expect(await adapter.appEnlazada("789")).toEqual({
+      solutionId: "sol_9",
+      enabled: true,
+    });
+    vi.unstubAllGlobals();
+  });
+
+  it("estadoDeAlta lee estado, paso y errores de la sesión", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      respuesta(200, {
+        data: {
+          status: "FAILURE",
+          state: "SHARE_CREDIT_LINE",
+          errors: ["sin línea de crédito"],
+        },
+      })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    expect(await adapter.estadoDeAlta("ses_1")).toEqual({
+      status: "FAILURE",
+      state: "SHARE_CREDIT_LINE",
+      errores: ["sin línea de crédito"],
+    });
+    expect(fetchMock.mock.calls[0][0]).toBe(
+      "https://api.telnyx.com/v2/whatsapp/signup/ses_1/status"
+    );
+    vi.unstubAllGlobals();
+  });
+
+  it("numeroPorIdDeMeta encuentra el número por su phone_number_id", async () => {
+    async function* numeros() {
+      yield { phone_number: "+34930453218", phone_number_id: "1" };
+      yield {
+        phone_number: "+34600111222",
+        phone_number_id: "456",
+        waba_id: "123",
+        coexistence_state: "syncing",
+        is_on_biz_app: true,
+        sync_deadline: "2026-11-07T12:00:00Z",
+      };
+    }
+    vi.mocked(getTelnyxWhatsappClient).mockReturnValue({
+      whatsapp: { phoneNumbers: { list: () => numeros() } },
+    } as never);
+    expect(await adapter.numeroPorIdDeMeta("456")).toEqual({
+      phoneNumber: "+34600111222",
+      wabaId: "123",
+      coexistenceState: "syncing",
+      isOnBizApp: true,
+      syncDeadline: new Date("2026-11-07T12:00:00Z"),
+    });
+    expect(await adapter.numeroPorIdDeMeta("999")).toBeNull();
+  });
+});

@@ -10,9 +10,18 @@ import {
   historialDelGestor,
   preguntarAlGestor,
 } from "../gestor/panel.js";
+import {
+  estadoWhatsappPropio,
+  registrarWhatsappPropio,
+} from "./propio.js";
 
 const MensajeAlGestorSchema = z
   .object({ texto: z.string().trim().min(1).max(1000) })
+  .strict();
+/** Lo que devuelve Meta en FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING: ids numéricos. */
+const IdDeMeta = z.string().trim().regex(/^\d{5,32}$/);
+const RegistroWhatsappPropioSchema = z
+  .object({ wabaId: IdDeMeta, phoneNumberId: IdDeMeta })
   .strict();
 const DecisionSchema = z
   .object({ decision: z.enum(["confirmar", "cancelar"]) })
@@ -236,6 +245,85 @@ export async function whatsappRoutes(fastify: FastifyInstance) {
         return reply
           .status(500)
           .send({ error: "No se pudo decidir la propuesta" });
+      }
+    }
+  );
+  // «Conectar mi WhatsApp» (Beta): el WhatsApp Business del negocio en
+  // coexistencia (modules/whatsapp/propio.ts). El GET también pone al día el
+  // estado contra Telnyx, con freno, porque el panel lo consulta mientras
+  // sincroniza.
+  fastify.get(
+    "/business/me/whatsapp-propio",
+    { preValidation: [fastify.authenticate] },
+    async (request: FastifyRequest, reply) => {
+      try {
+        return reply.send(
+          await estadoWhatsappPropio(request.user!.businessId)
+        );
+      } catch (error) {
+        fastify.log.error(
+          { err: error },
+          "[WhatsApp] No se pudo cargar el WhatsApp propio del negocio"
+        );
+        return reply
+          .status(500)
+          .send({ error: "No se pudo cargar el estado de tu WhatsApp" });
+      }
+    }
+  );
+
+  fastify.post(
+    "/business/me/whatsapp-propio",
+    {
+      preValidation: [fastify.authenticate],
+      config: { rateLimit: { max: 10, timeWindow: "10 minutes" } },
+    },
+    async (request: FastifyRequest, reply) => {
+      const parsed = RegistroWhatsappPropioSchema.safeParse(request.body);
+      if (!parsed.success) {
+        return reply.status(400).send({ error: parsed.error.errors });
+      }
+      const businessId = request.user!.businessId;
+      try {
+        const resultado = await registrarWhatsappPropio(
+          businessId,
+          parsed.data
+        );
+        switch (resultado.outcome) {
+          case "no_disponible":
+            return reply.status(503).send({
+              error: "Conectar tu WhatsApp todavía no está disponible.",
+              code: "WHATSAPP_PROPIO_NO_DISPONIBLE",
+              motivo: resultado.motivo,
+            });
+          case "ya_conectado":
+            return reply.status(409).send({
+              error: "Tu WhatsApp ya está conectado.",
+              code: "WHATSAPP_PROPIO_YA_CONECTADO",
+            });
+          case "numero_ocupado":
+            return reply.status(409).send({
+              error:
+                "Ese número de WhatsApp ya está conectado a otra cuenta de Alhabla.",
+              code: "WHATSAPP_PROPIO_NUMERO_OCUPADO",
+            });
+          case "error_de_telnyx":
+            return reply.status(502).send({
+              error:
+                "No hemos podido terminar la conexión. Inténtalo de nuevo en unos minutos.",
+              code: "WHATSAPP_PROPIO_ERROR_PROVEEDOR",
+            });
+          default:
+            return reply.send(resultado.estado);
+        }
+      } catch (error) {
+        fastify.log.error(
+          { err: error },
+          `[WhatsApp] No se pudo registrar el WhatsApp propio del negocio ${businessId}`
+        );
+        return reply
+          .status(500)
+          .send({ error: "No se pudo conectar tu WhatsApp" });
       }
     }
   );

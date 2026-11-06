@@ -11,6 +11,7 @@ import {
   Clock3,
   Headset,
   Loader2,
+  MessageCircle,
   PhoneForwarded,
   Save,
   Smartphone,
@@ -34,6 +35,11 @@ import {
   TarjetasDeLinea,
 } from "@/components/tarjetas-de-linea";
 import { WhatsappDueno } from "@/components/whatsapp-dueno";
+import {
+  mostrarWhatsappPropio,
+  useWhatsappPropio,
+  WhatsappPropio,
+} from "@/components/whatsapp-propio";
 import {
   getOnboardingState,
   getPhoneNumberInfo,
@@ -189,6 +195,7 @@ export function AjustesTelefono({ business, hasToken }: AjustesTelefonoProps) {
             numeroDeAlhablaActivo ?? forwarding?.phoneNumber ?? null
           }
         />
+        <TuWhatsappBusiness hasToken={hasToken} />
       </div>
     </section>
   );
@@ -199,12 +206,14 @@ function Bloque({
   icon: Icon,
   titulo,
   descripcion,
+  beta = false,
   children,
 }: {
   id: string;
   icon: LucideIcon;
   titulo: string;
   descripcion: string;
+  beta?: boolean;
   children: ReactNode;
 }) {
   return (
@@ -224,6 +233,11 @@ function Bloque({
             className="text-base font-semibold text-tinta"
           >
             {titulo}
+            {beta ? (
+              <span className="badge-soft ml-2 px-2 py-0.5 align-middle text-[11px]">
+                Beta
+              </span>
+            ) : null}
           </h3>
           <p className="mt-0.5 text-sm leading-6 text-muted">{descripcion}</p>
         </div>
@@ -984,6 +998,27 @@ function TuMovil({
       ) : null}
 
       <WhatsappDueno business={business} hasToken={hasToken} />
+    </Bloque>
+  );
+}
+
+/**
+ * Bloque 4 (Beta): el WhatsApp Business del propio negocio en coexistencia.
+ * Solo aparece con el alta disponible (WHATSAPP_PROPIO_ENABLED y el enlace
+ * de Telnyx) o si ya hay una conexión que enseñar.
+ */
+function TuWhatsappBusiness({ hasToken }: { hasToken: boolean | null }) {
+  const { data } = useWhatsappPropio(hasToken);
+  if (!mostrarWhatsappPropio(data)) return null;
+  return (
+    <Bloque
+      id="whatsapp-propio"
+      icon={MessageCircle}
+      titulo="Tu WhatsApp Business"
+      descripcion="Conecta el WhatsApp que ya usas con tus clientes: tú sigues en tu app y Alhabla trabaja en el mismo número."
+      beta
+    >
+      <WhatsappPropio hasToken={hasToken} />
     </Bloque>
   );
 }

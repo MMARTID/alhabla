@@ -32,6 +32,7 @@ import type {
   PlaceSearchResult,
   CalendarAccountConnected,
   EstadoWhatsappDueno,
+  EstadoWhatsappPropio,
   CambioDelGestor,
   EstadoDelGestor,
   RespuestaDelGestor,
@@ -656,6 +657,25 @@ export async function sendOwnerWhatsappActivation() {
   const { data } = await api.post<
     EstadoWhatsappDueno & { sent: "template" | "link" }
   >("/business/me/whatsapp/activation");
+  return data;
+}
+
+export async function getWhatsappPropio() {
+  const { data } = await api.get<EstadoWhatsappPropio>(
+    "/business/me/whatsapp-propio"
+  );
+  return data;
+}
+
+/** Lo que devolvió Meta al acabar el alta en coexistencia. */
+export async function registrarWhatsappPropio(input: {
+  wabaId: string;
+  phoneNumberId: string;
+}) {
+  const { data } = await api.post<EstadoWhatsappPropio>(
+    "/business/me/whatsapp-propio",
+    input
+  );
   return data;
 }
 

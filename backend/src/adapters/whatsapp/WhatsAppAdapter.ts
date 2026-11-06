@@ -14,6 +14,9 @@ const TELNYX_TRANSCRIPTION_MODEL = "openai/whisper-large-v3-turbo";
 /** La descarga va por fetch directo, sin el timeout del cliente del SDK:
  * sin plazo propio podía dejar colgado el webhook de WhatsApp. */
 const TIEMPO_PARA_DESCARGAR_AUDIO_MS = 10_000;
+/** Llamadas a Telnyx fuera del SDK (alta en coexistencia): el mismo tope
+ * que el cliente del SDK (lib/telnyx.ts). */
+const TIEMPO_PARA_TELNYX_DIRECTO_MS = 10_000;
 
 /** Una nota de voz larga pasa de los 10 s del cliente (un «Request timed
  * out» en producción el 2026-10-12): 30 s, como un turno del chat. */
@@ -545,6 +548,190 @@ export class WhatsAppAdapter {
       return templates;
     } catch (error) {
       throw toWhatsAppApiError(error, "al listar las plantillas del WABA");
+    }
+  }
+
+  /**
+   * La app de Meta enlazada a nuestra cuenta de Telnyx como Tech Provider
+   * (`GET /v2/whatsapp/foreign_apps`): su `solution_id` va en el
+   * `FB.login()` del alta. `null` si Telnyx responde 404, que es lo que
+   * devuelve mientras no ha activado el enlace (verificado el 2026-11-06).
+   * El SDK 7.29 no modela este recurso: fetch directo.
+   */
+  async appEnlazada(
+    appId: string
+  ): Promise<{ solutionId: string | null; enabled: boolean } | null> {
+    const respuesta = await this.peticionDirecta(
+      "GET",
+      "/whatsapp/foreign_apps",
+      undefined,
+      "al consultar la app de Meta enlazada"
+    );
+    if (respuesta === null) return null;
+    const data = (respuesta as { data?: unknown }).data;
+    const apps = (Array.isArray(data) ? data : [data]).filter(
+      (app): app is Record<string, unknown> =>
+        typeof app === "object" && app !== null
+    );
+    const app = apps.find((item) => String(item.app_id ?? "") === appId);
+    if (!app) return null;
+    return {
+      solutionId: asString(app.solution_id),
+      enabled: app.enabled === true,
+    };
+  }
+
+  /**
+   * Registra en Telnyx el WABA de un negocio que acaba el alta de Meta en
+   * coexistencia (`FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING`). Telnyx lo
+   * procesa en segundo plano: devuelve la sesión de alta, que se sigue con
+   * `estadoDeAlta`. `customer_id` es nuestro `businessId`, para encontrar la
+   * sesión en Telnyx. No está en el SDK 7.29 (ni en su OpenAPI): fetch
+   * directo, ruta de la guía «Tech Provider Embedded Signup».
+   */
+  async registrarAltaEnCoexistencia(input: {
+    wabaId: string;
+    phoneNumberId: string;
+    appId: string;
+    customerId: string;
+  }): Promise<{ sessionId: string | null; status: string | null }> {
+    const respuesta = await this.peticionDirecta(
+      "POST",
+      "/whatsapp/business_accounts/tech_provider",
+      {
+        waba_id: input.wabaId,
+        phone_number_id: input.phoneNumberId,
+        app_id: input.appId,
+        customer_id: input.customerId,
+        event: "FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING",
+      },
+      `al registrar el WABA ${input.wabaId}`
+    );
+    if (respuesta === null) {
+      throw new WhatsAppApiError(
+        `Error 404 al registrar el WABA ${input.wabaId} vía Telnyx`,
+        404
+      );
+    }
+    const data = ((respuesta as { data?: Record<string, unknown> }).data ??
+      {}) as Record<string, unknown>;
+    return {
+      sessionId: asString(data.session_id) ?? asString(data.id),
+      status: asString(data.status),
+    };
+  }
+
+  /**
+   * Estado de una sesión de alta: `INCOMPLETE` espera el código de Meta,
+   * `PENDING` en curso, `SUCCESS` terminada y `FAILURE` parada en `state`.
+   * La ruta del SDK es `/whatsapp/signup/{id}/status` sin `/v2`, así que va
+   * por el cliente normal de Telnyx; pero ese puede apuntar a la UE
+   * (`TELNYX_API_BASE_URL`) y WhatsApp no tiene despliegue regional: fetch
+   * directo a api.telnyx.com.
+   */
+  async estadoDeAlta(sessionId: string): Promise<{
+    status: string | null;
+    state: string | null;
+    errores: string[];
+  }> {
+    const respuesta = await this.peticionDirecta(
+      "GET",
+      `/whatsapp/signup/${encodeURIComponent(sessionId)}/status`,
+      undefined,
+      `al consultar la sesión de alta ${sessionId}`
+    );
+    const data = ((respuesta as { data?: Record<string, unknown> } | null)
+      ?.data ?? {}) as Record<string, unknown>;
+    return {
+      status: asString(data.status),
+      state: asString(data.state),
+      errores: Array.isArray(data.errors)
+        ? data.errors.filter((e): e is string => typeof e === "string")
+        : [],
+    };
+  }
+
+  /**
+   * El número de un negocio en coexistencia, por su `phone_number_id` de
+   * Meta (el alta no da el número en E.164). Recorre los números de WhatsApp
+   * de la cuenta, que en la lista ya traen `coexistence_state` y
+   * `sync_deadline`. `null` si aún no está en Telnyx.
+   */
+  async numeroPorIdDeMeta(metaPhoneNumberId: string): Promise<{
+    phoneNumber: string;
+    wabaId: string | null;
+    coexistenceState: string | null;
+    isOnBizApp: boolean;
+    syncDeadline: Date | null;
+  } | null> {
+    try {
+      for await (const item of getTelnyxWhatsappClient().whatsapp.phoneNumbers.list()) {
+        if (item.phone_number_id !== metaPhoneNumberId) continue;
+        if (typeof item.phone_number !== "string") return null;
+        return {
+          phoneNumber: item.phone_number,
+          wabaId: item.waba_id ?? null,
+          coexistenceState: item.coexistence_state ?? null,
+          isOnBizApp: item.is_on_biz_app === true,
+          syncDeadline: toDate(item.sync_deadline),
+        };
+      }
+      return null;
+    } catch (error) {
+      throw toWhatsAppApiError(
+        error,
+        `al buscar el número ${metaPhoneNumberId} en WhatsApp`
+      );
+    }
+  }
+
+  /**
+   * Petición a `https://api.telnyx.com/v2` para lo que el SDK no cubre o
+   * tiene con la ruta mal. `null` en 404; cualquier otro fallo lanza
+   * `WhatsAppApiError` con el estado.
+   */
+  private async peticionDirecta(
+    method: "GET" | "POST",
+    ruta: string,
+    body: Record<string, unknown> | undefined,
+    contexto: string
+  ): Promise<unknown> {
+    const apiKey = process.env.TELNYX_API_KEY;
+    if (!apiKey) {
+      throw new WhatsAppApiError(
+        `TELNYX_API_KEY no está configurada ${contexto}`,
+        null
+      );
+    }
+    let response: Response;
+    try {
+      response = await fetch(`https://api.telnyx.com/v2${ruta}`, {
+        method,
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          ...(body ? { "Content-Type": "application/json" } : {}),
+        },
+        body: body ? JSON.stringify(body) : undefined,
+        signal: AbortSignal.timeout(TIEMPO_PARA_TELNYX_DIRECTO_MS),
+      });
+    } catch (error) {
+      throw toWhatsAppApiError(error, contexto);
+    }
+    if (response.status === 404) return null;
+    const texto = await response.text();
+    if (!response.ok) {
+      throw new WhatsAppApiError(
+        `Error ${response.status} ${contexto} vía Telnyx: ${texto.slice(0, 500)}`,
+        response.status
+      );
+    }
+    try {
+      return texto ? JSON.parse(texto) : {};
+    } catch {
+      throw new WhatsAppApiError(
+        `Respuesta no JSON ${contexto} vía Telnyx`,
+        response.status
+      );
     }
   }
 

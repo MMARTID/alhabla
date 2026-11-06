@@ -38,6 +38,13 @@ vi.mock("@/lib/api", () => ({
   deleteAccount: vi.fn(),
   updateMyBusiness: vi.fn(),
   getOwnerWhatsapp: vi.fn(),
+  getWhatsappPropio: vi.fn(async () => ({
+    disponible: false,
+    motivo: "apagado",
+    alta: null,
+    conexion: null,
+  })),
+  registrarWhatsappPropio: vi.fn(),
   sendOwnerWhatsappActivation: vi.fn(),
   // Ajustes › Teléfono: estado del desvío, número de Alhabla y comprobación.
   getOnboardingState: vi.fn(),

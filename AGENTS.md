@@ -585,7 +585,8 @@ Para probar cambios de estos scripts antes de fusionarlos: un worktree de la ram
 - **Inventario `http://localhost:3005/inventario`** (`backend/mcp/inventario.ts`, `panel/inventario.html`):
   cuentas de dev o de producción en hilos cuenta → número de voz → assistant (con el `systemPrompt`
   en un desplegable) y los dos WhatsApp de plataforma (`whatsapp_senders`: `client` = reservas,
-  `owner` = Gestor; el WhatsApp propio de cada negocio aún no tiene campo). Solo lee id, nombre, plan,
+  `owner` = Gestor; el WhatsApp propio de cada negocio, en Beta, vive en `whatsapp_numeros_negocio` y el
+  inventario aún no lo enseña). Solo lee id, nombre, plan,
   suscripción y números de Telnyx: nada de Stripe, tokens, teléfonos del local o del dueño ni clientes.
   - **Ediciones** (nombre, `active`, `systemPrompt`; el plan lo cambia Stripe) por la API de la app
     como el usuario más antiguo de la cuenta: `PATCH /business/me` y `PATCH /agents/:id` (que marca
@@ -1867,6 +1868,33 @@ Cloudflare (hoy solo `dev-api.alhabla.ai`, el túnel), aunque desde internet res
 `web_fetch`/otro equipo, no con `curl` local. *(Es el bloqueo de IPs de Cloudflare. `alhabla.ai`,
 `www` y `app` van en solo DNS a Vercel desde el 2026-11-05 y ya no les afecta; ver § Cloudflare
 failover for LaLiga blocks.)*
+
+**Código («Conectar mi WhatsApp», Beta, 2026-11-06).** El WhatsApp Business del propio negocio en
+coexistencia (el dueño sigue en su app y Alhabla habla por la API en el mismo número), solo la fase
+de **conectar y ver el estado**: los mensajes a los clientes siguen saliendo de «Alhabla Reservas»
+(fases 2–3 de `PLAN-WHATSAPP-COEXISTENCIA.md`). Integración propia de Tech Provider, no la página
+alojada de Telnyx (`hostedSignups` ya admite `signup_type: "coexistence"` en el SDK 7.29, pero su
+webhook `whatsapp.waba_added` no dice de qué negocio es; decisión del usuario):
+- **Panel**: Ajustes › Teléfono › «Tu WhatsApp Business» (`frontend/src/components/whatsapp-propio.tsx`,
+  `lib/alta-whatsapp-meta.ts`). Carga el SDK de Facebook solo ahí y solo con el alta disponible, abre
+  `FB.login()` con `config_id`, `extras.setup.solutionID`, `featureType:
+  "whatsapp_business_app_onboarding"` y `sessionInfoVersion: "3"`, y escucha el `postMessage`
+  `WA_EMBEDDED_SIGNUP` / `FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING` (`waba_id`, `phone_number_id`).
+  Sin alta disponible ni conexión guardada, el bloque no aparece.
+- **Backend**: `GET`/`POST /business/me/whatsapp-propio` (`modules/whatsapp/propio.ts`). El POST
+  registra en Telnyx (`POST /v2/whatsapp/business_accounts/tech_provider`, `customer_id` = negocio
+  del JWT; no está en el SDK ni en su OpenAPI) y guarda `WhatsappNumeroNegocio` en `registrando`. El
+  GET pone la fila al día con freno (8 s; 5 min si está `active`): sesión de alta
+  (`/v2/whatsapp/signup/{id}/status`, `FAILURE` ⇒ `fallido` con los errores) y, cuando el número
+  aparece en la lista de números de WhatsApp de la cuenta, su `coexistence_state`. Rechaza un
+  `phone_number_id` de Alhabla (`whatsapp_senders`) o de otro negocio.
+- **Interruptor y datos**: `WHATSAPP_PROPIO_ENABLED` (apagado por defecto y en producción),
+  `META_WHATSAPP_APP_ID` (la app de Tech Provider, no la del login), `META_WHATSAPP_CONFIG_ID` y
+  `META_GRAPH_VERSION`. El `solution_id` sale de `TELNYX_WA_SOLUTION_ID` o de
+  `GET /v2/whatsapp/foreign_apps` (caché de 10 min). **El 2026-11-06 ese GET devolvía 404**: Telnyx
+  aún no ha activado el enlace de nuestra app, así que ningún alta real funciona todavía.
+- Pendiente: webhooks `whatsapp.waba_added` / `whatsapp.account.update` / `message.echo` (hoy todo
+  es por consulta), reconciliador, y enviar desde el número del negocio.
 
 ## Stripe Billing Fields on `Business`
 

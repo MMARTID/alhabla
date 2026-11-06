@@ -208,6 +208,7 @@ model Business {
   ownerPendingActions  OwnerPendingAction[]
   ownerChatFeedback    OwnerChatFeedback[]
   clavesTemporales     ClaveTemporal[]
+  whatsappPropio       WhatsappNumeroNegocio?
 
   @@index([ownerWhatsappNumber])
   @@map("businesses")
@@ -994,6 +995,41 @@ model WhatsappSender {
   updatedAt           DateTime  @updatedAt
 
   @@map("whatsapp_senders")
+}
+
+/**
+ * El WhatsApp Business del propio negocio conectado en coexistencia
+ * (PLAN-WHATSAPP-COEXISTENCIA.md § 1): el dueño sigue usando su app y
+ * Alhabla habla por la API en el mismo número. Una por negocio. Beta, fase
+ * de conexión: de momento solo se conecta y se sigue su estado; los
+ * mensajes a los clientes siguen saliendo de «Alhabla Reservas».
+ */
+model WhatsappNumeroNegocio {
+  id                String    @id @default(cuid())
+  businessId        String    @unique
+  business          Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  /// `phone_number_id` de Meta, del evento FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING.
+  metaPhoneNumberId String    @unique
+  /// WABA del negocio en Meta.
+  metaWabaId        String
+  /// E.164. Se conoce cuando el número aparece en Telnyx, no al registrar.
+  phoneNumber       String?   @unique
+  /// Sesión de alta de Telnyx (`POST /v2/whatsapp/business_accounts/tech_provider`).
+  signupId          String?
+  /// registrando | fallido | el `coexistence_state` de Telnyx (pending_onboarding,
+  /// sync_pending, syncing, sync_complete, active, history_declined,
+  /// sync_deadline_expired, offboarded, disconnected).
+  estado            String
+  /// Lo que Telnyx dio como motivo cuando la sesión de alta falló.
+  errores           String[]  @default([])
+  syncDeadline      DateTime?
+  /// Cuándo se preguntó a Telnyx por última vez (freno de consultas).
+  consultadoAt      DateTime?
+  conectadoAt       DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@map("whatsapp_numeros_negocio")
 }
 
 /**

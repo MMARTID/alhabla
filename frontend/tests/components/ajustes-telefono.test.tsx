@@ -39,6 +39,13 @@ vi.mock("@/lib/api", () => ({
   getForwardingCheck: vi.fn(),
   getOnboardingState: vi.fn(),
   getOwnerWhatsapp: vi.fn(),
+  getWhatsappPropio: vi.fn(async () => ({
+    disponible: false,
+    motivo: "apagado",
+    alta: null,
+    conexion: null,
+  })),
+  registrarWhatsappPropio: vi.fn(),
   getPhoneNumberInfo: vi.fn(),
   sendOwnerWhatsappActivation: vi.fn(),
   startForwardingCheck: vi.fn(),

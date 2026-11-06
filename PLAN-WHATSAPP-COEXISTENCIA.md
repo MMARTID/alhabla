@@ -5,6 +5,19 @@ Versión 1 (2026-10-02). Amplía `PLAN-CANAL-DUENO.md` sin sustituirlo: el Whats
 Lo nuevo es una opción, **«Conectar mi WhatsApp»**, para que los mensajes a los clientes salgan
 del número de WhatsApp Business que el negocio ya usa, sin que el dueño deje de usar su app.
 
+## Estado (2026-11-06)
+
+- **Hecho, en Beta y apagado en producción**: el alta («Conectar mi WhatsApp» en Ajustes › Teléfono)
+  y el seguimiento del estado hasta `active` — parte de las fases 1 y 4. Detalle en `AGENTS.md`
+  § *WhatsApp (Telnyx como BSP de Meta)*, párrafo «Conectar mi WhatsApp». Los datos del alta
+  (`appId`, `configId`, `solutionId`) los da el backend, no variables `NEXT_PUBLIC_*`.
+- **Cambio frente a lo verificado el 02-10**: la página alojada de Telnyx ya admite coexistencia
+  (`hostedSignups.create({ signup_type: "coexistence" })`). Se mantiene la integración propia porque
+  lleva `customer_id` y el aviso de la alojada (`whatsapp.waba_added`) no dice de qué negocio es.
+- **Bloqueo**: `GET /v2/whatsapp/foreign_apps` da 404 con nuestra clave (06-11). Falta que Telnyx
+  active el enlace de la app y crear en Meta la configuración de WhatsApp (`config_id`); sin eso, el
+  bloque no aparece ni en dev.
+
 ## Decisión de producto
 
 **Modelo híbrido.** Por defecto, todo sigue saliendo del WABA de Alhabla. El negocio que conecta
