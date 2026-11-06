@@ -124,6 +124,13 @@ export const MAPA_DE_PRODUCT: readonly EntradaDelMapa[] = [
   {
     seccion: SECCION_CAPACIDADES,
     grupo: GRUPO_CAPACIDADES,
+    empiezaPor: /^Agenda de Alhabla \(desde/,
+    ignorar:
+      "Lo dice funcion.calendarios (plans.ts); el bullet cuenta el estado de hoy, que cambia con PLAN-AGENDA-PRINCIPAL.md.",
+  },
+  {
+    seccion: SECCION_CAPACIDADES,
+    grupo: GRUPO_CAPACIDADES,
     empiezaPor: /^Integración de calendario/,
     ignorar:
       "Lo dice funcion.calendarios (plans.ts); el bullet habla del protocolo de iCloud y de caducidad de credenciales.",
@@ -276,6 +283,7 @@ export const MAPA_DE_PRODUCT: readonly EntradaDelMapa[] = [
     "Enfocado al dolor",
     "IA sin complejos",
     "Vender enseñando",
+    "Se vende la faena que se quita",
     "Errores",
     "Estética comprometida",
   ].map((etiqueta): EntradaDelMapa => ({
