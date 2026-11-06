@@ -60,8 +60,11 @@ reserva).
   allí hasta que lo reconecte; al reconectar, se copian las citas que entraron. Es un cambio deliberado
   sobre la regla de septiembre de no reservar sin ver el calendario: se acepta ese riesgo a cambio de no
   perder reservas.
-- **En la web se cuenta como «Agenda incluida»** y, en la portada, como «Siempre disponible, hagas lo
-  que hagas».
+- **Cómo se cuenta (fase 5 del plan):** la agenda se vende desde WhatsApp («Tu agenda en WhatsApp»,
+  «¿Dónde veo mis citas?», «Siempre disponible, hagas lo que hagas», con la escena de las manos
+  ocupadas). Google, Outlook y Apple aparecen en las páginas de venta solo como una franja de iconos
+  («Funciona con lo que ya usas»); qué pasa si un calendario se desconecta se explica en
+  `/integraciones`, no en la portada.
 
 Existe porque en estos sectores **llamada perdida = cita perdida = ingreso perdido**, y el dueño
 no tiene ni recepcionista ni forma de contestar mientras trabaja.
@@ -301,6 +304,12 @@ Gestor» (solo en código), «agenda real», «competitividad», «productividad
   pero sin términos técnicos; se habla como habla el dueño, no como un folleto.
 - **Vender enseñando:** la prueba es el producto funcionando (la llamada, el WhatsApp, el
   «Confirmar»), no la explicación.
+- **Se vende la faena que se quita, no la técnica (06-11-2026).** Quien llega viene a liberarse de
+  trabajo: en las páginas de venta no se habla de caídas, contraseñas, conexiones ni «si falla»; eso se
+  cuenta con honestidad en las páginas de compatibilidad y en las guías. Funciones antes que
+  compatibilidad: las integraciones van en una franja de iconos con subtítulo, nunca como título, FAQ
+  ni fila propia. Escenas del día de la dueña (las manos ocupadas, la camilla, la hora de comer) y
+  frases que diría ella («¿qué tengo mañana?», «apúntame a Javier el viernes a las siete»).
 - **Errores:** en español, accionables y sin culpar al usuario. Los 5xx genéricos del backend
   deben traducirse a algo humano en la interfaz.
 - **Estética comprometida:** SaaS conservadora y profesional para negocios tradicionales
