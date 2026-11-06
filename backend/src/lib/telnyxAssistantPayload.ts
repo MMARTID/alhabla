@@ -1,5 +1,4 @@
 import type {
-  ConversationFlowReq,
   CreateTelnyxAssistantInput,
   HangupTool,
   RespaldoDeTranscripcion,
@@ -12,7 +11,6 @@ import { resolveManagedPromptTimezone } from "./managedAgentPrompt.js";
 import { VARIABLES_DE_LA_LLAMADA_POR_DEFECTO } from "./seccionesDelPrompt.js";
 import type { CooficialDeLaZona, PerfilDeIdiomas } from "./idiomas/resolver.js";
 import { CODIGOS_DE_IDIOMA, IDIOMAS } from "./idiomas/catalogo.js";
-import { IDIOMA_OBLIGATORIO } from "./idiomas/ajustes.js";
 
 /**
  * Nombre estable y determinista del assistant Telnyx de un agente — permite
@@ -23,6 +21,15 @@ export function buildTelnyxAssistantName(
   agentId: string
 ): string {
   return `alhabla-${businessId}-${agentId}`;
+}
+
+/** El del assistant de la lengua cooficial de la zona del agente (tipo
+ * «recepcionista_cooficial», lib/tiposDeAsistente.ts). */
+export function buildTelnyxCooficialAssistantName(
+  businessId: string,
+  agentId: string
+): string {
+  return `alhabla-cooficial-${businessId}-${agentId}`;
 }
 
 /** Lo mismo para el assistant del chat de clientes por WhatsApp del
@@ -297,6 +304,54 @@ export function buildTelnyxChatTools(
     ...definicionesComunes(),
     buildInformarAlNegocioTool(),
   ]);
+}
+
+/** Las lenguas que tienen su propio assistant (las cooficiales: flux no
+ * las entiende ni las voces Ultra las hablan). */
+export const LENGUAS_CON_ASSISTANT_PROPIO = [
+  "ca-ES",
+  "gl-ES",
+  "eu-ES",
+] as const;
+
+/**
+ * La tool `cambiar_de_idioma` (lib/cambioDeIdioma.ts), solo en el assistant
+ * de llamadas de un negocio de zona cooficial. La misma para todos (de la
+ * biblioteca): el backend sabe por la Call a qué assistant cambiar.
+ *
+ * `lo_que_dice` y `primera_respuesta` vienen del laboratorio del 06-11: el
+ * cambio tardaba 9–12 s y el assistant nuevo, con solo el saludo en el
+ * historial, esperaba a que el cliente repitiera lo que ya había pedido. Con
+ * ellas el nuevo arranca diciendo ya su respuesta y sabe qué le pidieron.
+ */
+export function buildTelnyxCambioDeIdiomaTool(
+  baseUrl: string
+): TelnyxWebhookToolInput {
+  return construirToolsDeWebhook(baseUrl, CANAL_DE_TOOLS_DE_VOZ, [
+    {
+      name: "cambiar_de_idioma",
+      description:
+        "Pasa la llamada a tu compañera que habla la lengua cooficial de quien llama (catalán, gallego o euskera), que tu transcripción no entiende y tu voz no habla. Llámala en el mismo turno en que notes que quien llama habla esa lengua (te llega deformada) o lo pide, sin decir nada antes. Es lo último que haces en la llamada: no uses ninguna otra herramienta antes ni después.",
+      properties: {
+        idioma: {
+          type: "string",
+          enum: [...LENGUAS_CON_ASSISTANT_PROPIO],
+          description: "ca-ES catalán, gl-ES gallego, eu-ES euskera.",
+        },
+        lo_que_dice: {
+          type: "string",
+          description:
+            "Lo que acaba de decir quien llama, bien escrito en su lengua: la transcripción te llega deformada, reconstruye la frase con sentido (por ejemplo «Bon dia, voldria hora per tallar-me els cabells demà»).",
+        },
+        primera_respuesta: {
+          type: "string",
+          description:
+            "Tu respuesta a eso en su lengua, corta, como se la dirías: si pide algo, una pregunta para seguir (qué servicio, qué día, a qué hora) o para confirmar lo que pide. Sin horas libres, precios ni nada que no hayas comprobado con una herramienta, y sin saludar otra vez.",
+        },
+      },
+      required: ["idioma", "lo_que_dice", "primera_respuesta"],
+    },
+  ])[0];
 }
 
 /** Las tools de reservar y consultar, iguales en los dos assistants. */
@@ -686,9 +741,9 @@ const AUDIO_DE_FONDO = {
 
 /**
  * La voz de la cooficial de la zona (Marta o Sergio) con el idioma de
- * Soniox: la del nodo «cooficial» del flujo y la de las llamadas de los
- * clientes que hablan en ella, que empiezan ya con esa voz
- * (lib/contextoDeLlamada.ts).
+ * Soniox. Solo queda para contestar a quien habló en ella con la voz
+ * cambiada mientras su agente aún no tiene el assistant de la lengua
+ * (lib/contextoDeLlamada.ts): ese assistant ya la lleva.
  */
 export function vozDeLaCooficial(
   cooficial: Pick<CooficialDeLaZona, "voz" | "iso">
@@ -702,103 +757,46 @@ export function vozDeLaCooficial(
   } as NonNullable<FlowNodeReq["voice_settings"]>;
 }
 
-/** «inglés, francés o alemán». */
-function enumerarConO(palabras: readonly string[]): string {
-  return palabras.length < 2
-    ? palabras.join("")
-    : `${palabras.slice(0, -1).join(", ")} o ${palabras[palabras.length - 1]}`;
+/**
+ * Lo que se añade al prompt del assistant de llamadas de un negocio de zona
+ * cooficial (el de flux y la voz Ultra): cuándo pasar la llamada al de la
+ * lengua. Viene del laboratorio del 06-11 (scripts/laboratorioCambioDeIdioma.ts):
+ * flux deforma el catalán («Vuldemanar hora por tallarme el Skabels…») pero
+ * GLM lo reconoce a la primera. Las palabras de ejemplo, de la lengua de la
+ * zona.
+ */
+export function instruccionesDelCambioDeIdioma(
+  cooficial: Pick<CooficialDeLaZona, "idioma">
+): string {
+  const lengua = IDIOMAS[cooficial.idioma].nombreEnPrompt;
+  const ejemplos: Record<string, string> = {
+    "ca-ES":
+      "«bon dia», «voldria», «demà», «si us plau», «gràcies»; te llega como si fuera italiano o un castellano con palabras raras",
+    "gl-ES":
+      "«bos días», «quería», «mañá», «grazas», «onte»; te llega como si fuera portugués o un castellano con palabras raras",
+    "eu-ES":
+      "«kaixo», «egun on», «eskerrik asko», «bihar», «ordua»; te llega como palabras sin sentido",
+  };
+  return `## ${IDIOMAS[cooficial.idioma].nombreEnPrompt.replace(/^./, (letra) => letra.toUpperCase())}
+
+Tu transcripción no entiende el ${lengua} y tu voz no lo habla. Si quien llama habla en ${lengua} (por ejemplo ${ejemplos[cooficial.idioma] ?? "palabras que no tienen sentido en castellano"}), aunque sea una sola frase o mezclada con castellano, o pide que le atiendas en ${lengua}, llama a cambiar_de_idioma con idioma ${cooficial.idioma} en ese mismo turno: sin decir nada antes, sin pedirle que lo repita y sin usar antes ninguna otra herramienta. En lo_que_dice pon su frase bien escrita en ${lengua} y en primera_respuesta lo que le contestarías en ${lengua}. Después no digas nada más: la llamada sigue en ${lengua}. No le digas que le pasas con nadie: para quien llama es la misma recepcionista.
+
+Con el resto de idiomas que hablas no uses cambiar_de_idioma: contesta tú en el suyo. Si dudas entre italiano y catalán o entre portugués y gallego, y las frases llegan enteras y con sentido en italiano o portugués, es italiano o portugués.`;
 }
 
 /**
- * La cooficial de la zona (lib/idiomas/zona.ts) en un solo assistant: la
- * transcripción (Soniox con su pista) la entiende desde el principio y un
- * nodo solo cambia la voz a la que la habla (Marta o Sergio). Es la
- * variante S del laboratorio con llamadas reales del 2026-10-14: catalán
- * perfecto y los mensajes del cliente guardados, con un segundo más de
- * espera en los turnos con consulta. Cambiar de transcripción en un nodo
- * (flux → Soniox) hacía que Telnyx dejara de guardar los mensajes del
- * cliente, y con flux el catalán llegaba transcrito como italiano.
- *
- * Las aristas son de tipo llm: en voz el modelo las ve como tools
- * `transition__<id>`; en el chat no están y contesta en la cooficial sin
- * más. Al volver al nodo inicial contestó una vez en catalán y castellano a
- * quien ya hablaba inglés: de ahí «solo en el suyo».
- *
- * Llamadas del 04-11 (las de prueba del usuario y AI Tests de Telnyx):
- * - El cambio era un silencio de 3 a 4 s, y de 8 s ese día. Ahora la
- *   primera respuesta en la cooficial empieza por su `fraseAlCambiar`, con
- *   su voz: sonó a los 2 s y siguió contestando. Un nodo `speak` con la
- *   frase sonaba antes, pero cerraba el turno y no contestaba a lo pedido
- *   hasta que el cliente volvía a hablar (4 de 4).
- * - Quien volvía al castellano seguía oyendo catalán: «contéstale en
- *   castellano» sin cambiar de nodo no bastaba. Ahora el castellano también
- *   lleva al nodo inicial, con su voz, si es una frase entera.
+ * Lo que se añade al prompt del assistant de la lengua cooficial: la llamada
+ * le llega empezada (lib/cambioDeIdioma.ts). Su primera frase ya la dijo al
+ * arrancar (la frase del cambio y la respuesta que preparó el de flux), y el
+ * aviso de IA ya se dio en el saludo.
  */
-export function flujoDeLaCooficial(
-  idiomas: Pick<PerfilDeIdiomas, "idiomas" | "cooficialDeLaZona">
-): ConversationFlowReq | null {
-  const cooficial = idiomas.cooficialDeLaZona;
-  if (!cooficial) return null;
+export function instruccionesDeLaCooficial(
+  cooficial: Pick<CooficialDeLaZona, "idioma">
+): string {
   const lengua = IDIOMAS[cooficial.idioma].nombreEnPrompt;
-  const frase = IDIOMAS[cooficial.idioma].fraseAlCambiar;
-  // Los que vuelven al nodo inicial: el castellano, con una frase entera
-  // (una palabra suelta como «vale» la dicen igual en catalán), y el resto.
-  const deVuelta = enumerarConO([
-    "castellano (una frase entera, no una palabra suelta como «vale»)",
-    ...idiomas.idiomas
-      .filter(
-        (idioma) => idioma !== IDIOMA_OBLIGATORIO && idioma !== cooficial.idioma
-      )
-      .map((idioma) => IDIOMAS[idioma].nombreEnPrompt),
-  ]);
-  return {
-    start_node_id: "inicial",
-    nodes: [
-      {
-        type: "prompt",
-        id: "inicial",
-        name: "Inicial",
-        instructions_mode: "append",
-        tools_mode: "append",
-        shared_tool_ids: [],
-        instructions: `## Idioma en este paso\n\nSi quien llama habla en ${lengua} (aunque sea una sola frase o un saludo, mezclado con castellano, o aunque la transcripción llegue con errores, con palabras en ${lengua} mal reconocidas) o pide que le atiendas en ${lengua}, llama a la herramienta transition__a_cooficial en ese mismo turno, sin decir nada antes: la respuesta la darás en ${lengua} justo después. No le digas que le pasas con nadie. Usa transition__a_cooficial solo para eso: nunca para consultar el catálogo, la disponibilidad, dejar un recado ni colgar, que tienen sus propias herramientas. Si no tienes esa herramienta (en el chat no está), no digas que no puedes cambiar de idioma: contéstale directamente en ${lengua}. Contesta solo en el idioma en que te habla, sin repetir la respuesta en otro: si vienes del paso en ${lengua} porque ha cambiado de idioma, contesta solo en el suyo.`,
-      },
-      {
-        type: "prompt",
-        id: "cooficial",
-        name: `En ${lengua}`,
-        instructions_mode: "append",
-        tools_mode: "append",
-        shared_tool_ids: [],
-        instructions: `## Idioma en este paso\n\nDesde ahora habla en ${lengua} con naturalidad.${
-          frase
-            ? ` Empieza tu primera respuesta en ${lengua} con «${frase}» y, en ese mismo turno, contesta a lo que ha pedido; si el saludo ya fue en ${lengua}, sáltate esa frase, y no la repitas después.`
-            : ""
-        } No repitas el saludo ni el aviso de IA ya dados, pero si aún no se ha dicho en ${lengua} que eres una inteligencia artificial (el saludo puede haberlo dicho ya en ${lengua}), dilo brevemente en tu primera frase. Fíjate en el idioma de su última frase: si habla en ${deVuelta}, llama a la herramienta transition__a_inicial en ese mismo turno, sin decir nada antes, y contéstale después solo en su idioma. Usa transition__a_inicial solo para eso.`,
-        voice_settings: vozDeLaCooficial(cooficial),
-      },
-    ],
-    edges: [
-      {
-        id: "a_cooficial",
-        start_node_id: "inicial",
-        target: { type: "node", node_id: "cooficial" },
-        condition: {
-          type: "llm",
-          prompt: `Quien llama habla ${lengua} (aunque la transcripción llegue con errores) o pide hablar en ${lengua}.`,
-        },
-      },
-      {
-        id: "a_inicial",
-        start_node_id: "cooficial",
-        target: { type: "node", node_id: "inicial" },
-        condition: {
-          type: "llm",
-          prompt: `Quien llama habla ${deVuelta}.`,
-        },
-      },
-    ],
-  };
+  return `## Idioma de esta llamada
+
+Atiendes en ${lengua}. Si la conversación ya ha empezado (hay mensajes antes del tuyo), quien llama ha hablado en ${lengua} y ya le has contestado al cambiar: sigue en ${lengua} con naturalidad, sin saludar otra vez ni repetir lo que ya se ha dicho, y continúa con lo que ha pedido. Si después habla en castellano u otro de tus idiomas, contesta en el suyo.`;
 }
 
 export interface BuildTelnyxAssistantPayloadInput {
@@ -819,8 +817,9 @@ export interface BuildTelnyxAssistantPayloadInput {
   /** Lo que el idioma decide del payload (resolverIdiomas, en
    * lib/idiomas/resolver.ts): el motor de transcripción con sus pistas, el
    * idioma en que arranca una voz de Soniox (el del principal, la
-   * cooficial) y la cooficial de la zona, que lleva su nodo
-   * (flujoDeLaCooficial). */
+   * cooficial) y la cooficial de la zona: con ella, el prompt lleva cuándo
+   * pasar la llamada a su assistant (instruccionesDelCambioDeIdioma) y
+   * quien sincroniza añade la tool cambiar_de_idioma a `toolIds`. */
   idiomas: Pick<PerfilDeIdiomas, "transcripcion" | "isoDeLaVoz"> &
     Partial<Pick<PerfilDeIdiomas, "idiomas" | "cooficialDeLaZona">>;
   /** Identificador Telnyx (`Telnyx.<modelo>.<voz>`), de Soniox
@@ -896,7 +895,9 @@ export function buildTelnyxAssistantPayload(
   return {
     name: buildTelnyxAssistantName(input.businessId, input.agentId),
     instructions: adaptManagedPromptForTelnyx(
-      input.instructions,
+      input.idiomas.cooficialDeLaZona
+        ? `${input.instructions.trimEnd()}\n\n${instruccionesDelCambioDeIdioma(input.idiomas.cooficialDeLaZona)}`
+        : input.instructions,
       input.businessName,
       input.timezone
     ),
@@ -1150,12 +1151,43 @@ export function buildTelnyxAssistantPayload(
     dynamicVariables: { ...VARIABLES_DE_LA_LLAMADA_POR_DEFECTO },
     tools,
     ...(input.toolIds ? { toolIds: input.toolIds } : {}),
-    // null y no ausente: un negocio que deja la zona (cambia de dirección)
-    // pierde el nodo al sincronizar.
-    conversationFlow: flujoDeLaCooficial({
-      idiomas: input.idiomas.idiomas ?? [],
-      cooficialDeLaZona: input.idiomas.cooficialDeLaZona ?? null,
-    }),
+    // Sin nodos desde el 2026-11-06: la cooficial de la zona tiene su
+    // assistant. null y no ausente: así los de antes pierden el suyo
+    // («inicial» y «cooficial», que cambiaba la voz) al sincronizar.
+    conversationFlow: null,
+  };
+}
+
+/**
+ * El assistant de la lengua cooficial de la zona de un agente (tipo
+ * «recepcionista_cooficial»): el mismo que el de llamadas (prompt con todos
+ * sus idiomas, tools, telefonía) con la transcripción de Soniox y la voz de
+ * la lengua (Marta o Sergio), como la variante S del 14-10 que atendía
+ * antes toda la llamada: catalán perfecto, con 2–4 s de espera por turno. Sin
+ * cambiar_de_idioma: Soniox entiende también el castellano y la voz lo habla.
+ * Sin saludo propio: lo pone cada llamada (lib/cambioDeIdioma.ts y
+ * handleCallInitiated para quien ya habló en la lengua).
+ */
+export function buildTelnyxCooficialAssistantPayload(
+  input: Omit<BuildTelnyxAssistantPayloadInput, "greeting" | "voice"> & {
+    cooficial: CooficialDeLaZona;
+  }
+): CreateTelnyxAssistantInput {
+  const payload = buildTelnyxAssistantPayload({
+    ...input,
+    instructions: `${input.instructions.trimEnd()}\n\n${instruccionesDeLaCooficial(input.cooficial)}`,
+    greeting: "",
+    voice: input.cooficial.voz.id,
+    idiomas: {
+      transcripcion: input.cooficial.transcripcion,
+      isoDeLaVoz: input.cooficial.iso,
+      idiomas: input.idiomas.idiomas,
+      cooficialDeLaZona: null,
+    },
+  });
+  return {
+    ...payload,
+    name: buildTelnyxCooficialAssistantName(input.businessId, input.agentId),
   };
 }
 

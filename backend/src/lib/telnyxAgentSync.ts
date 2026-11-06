@@ -3,7 +3,9 @@ import { prisma } from "./prisma.js";
 import { telnyxAiAdapter } from "../adapters/telnyx/TelnyxAiAdapter.js";
 import {
   buildTelnyxAssistantPayload,
+  buildTelnyxCambioDeIdiomaTool,
   buildTelnyxChatAssistantPayload,
+  buildTelnyxCooficialAssistantPayload,
   buildTelnyxChatTools,
   buildTelnyxVoiceTools,
   conFraseDeEspera,
@@ -101,10 +103,21 @@ async function loadManagedAssistantConfig(
   };
   // Un prompt por assistant (lib/seccionesDelPrompt.ts): el de las
   // llamadas y el del chat de clientes por WhatsApp.
+  // En una zona cooficial, la lengua la atiende su propio assistant
+  // (buildTelnyxCooficialAssistantPayload): el de llamadas, con flux y la
+  // voz Ultra, no la entiende ni la habla, y su prompt la deja fuera de sus
+  // idiomas (lleva, en cambio, cuándo pasar la llamada).
+  const deLaZona = idiomas.cooficialDeLaZona;
   const systemPrompt = buildManagedAgentPrompt({
     ...entradaDelPrompt,
     canal: "voz",
+    idiomas: deLaZona
+      ? idiomas.idiomas.filter((idioma) => idioma !== deLaZona.idioma)
+      : idiomas.idiomas,
   });
+  const promptDeLaCooficial = deLaZona
+    ? buildManagedAgentPrompt({ ...entradaDelPrompt, canal: "voz" })
+    : null;
   const promptDeChat = buildManagedAgentPrompt({
     ...entradaDelPrompt,
     canal: "chat",
@@ -115,6 +128,7 @@ async function loadManagedAssistantConfig(
     agentSettings,
     idiomas,
     systemPrompt,
+    promptDeLaCooficial,
     promptDeChat,
     transferenciaAlDueno: transferenciaAlDueno.activa
       ? { from: transferenciaAlDueno.origen!, to: transferenciaAlDueno.destino! }
@@ -159,6 +173,11 @@ type AgenteDeRecepcionista = {
   promptManuallyEdited: boolean;
 };
 
+type AgenteConCooficial = AgenteDeRecepcionista & {
+  telnyxCooficialAssistantId: string | null;
+  telnyxCooficialConfigHash: string | null;
+};
+
 /**
  * Nombres de los servicios y profesionales activos: sesgan la transcripción
  * (`keyterm` de deepgram/flux) hacia lo que de verdad se nombra en las
@@ -192,6 +211,9 @@ async function cargarPalabrasClave(
 interface RecursosDeTelnyx {
   toolIdsDeVoz: string[];
   toolIdsDeChat: string[];
+  /** cambiar_de_idioma (lib/cambioDeIdioma.ts), solo en una zona
+   * cooficial. */
+  toolIdDelCambioDeIdioma: string | null;
   insightGroupId: string;
 }
 
@@ -202,7 +224,8 @@ interface RecursosDeTelnyx {
  */
 async function cargarRecursosDeTelnyx(
   baseUrl: string,
-  isoDeLaVoz: string
+  isoDeLaVoz: string,
+  conCambioDeIdioma: boolean
 ): Promise<RecursosDeTelnyx> {
   const comoTelnyx = (tools: ReturnType<typeof buildTelnyxVoiceTools>) =>
     tools.map((tool) => toTelnyxWebhookTool(conFraseDeEspera(tool, isoDeLaVoz)));
@@ -213,9 +236,17 @@ async function cargarRecursosDeTelnyx(
   const toolIdsDeChat = await idsDeToolsCompartidas(
     comoTelnyx(buildTelnyxChatTools(baseUrl))
   );
+  const toolIdDelCambioDeIdioma = conCambioDeIdioma
+    ? (
+        await idsDeToolsCompartidas([
+          toTelnyxWebhookTool(buildTelnyxCambioDeIdiomaTool(baseUrl)),
+        ])
+      )[0]
+    : null;
   return {
     toolIdsDeVoz,
     toolIdsDeChat,
+    toolIdDelCambioDeIdioma,
     insightGroupId: await grupoDeInsightsDeLaRecepcionista(),
   };
 }
@@ -253,11 +284,106 @@ function construirPayloadDeRecepcionista(args: {
     idiomas,
     voice: args.voz,
     boostedKeywords: args.palabrasClave,
-    toolIds: args.recursos.toolIdsDeVoz,
+    toolIds: [
+      ...args.recursos.toolIdsDeVoz,
+      ...(idiomas.cooficialDeLaZona && args.recursos.toolIdDelCambioDeIdioma
+        ? [args.recursos.toolIdDelCambioDeIdioma]
+        : []),
+    ],
     insightGroupId: args.recursos.insightGroupId,
     // Inline, con hangup: lleva los números del negocio.
     transferenciaAlDueno: config.transferenciaAlDueno,
   });
+}
+
+/**
+ * El payload del assistant de la lengua cooficial de la zona del agente, o
+ * null fuera de una zona cooficial. El prompt es el de voz con todos sus
+ * idiomas (o el manual, como en el de llamadas) y las mismas tools de voz,
+ * sin cambiar_de_idioma.
+ */
+function construirPayloadDeLaCooficial(args: {
+  businessId: string;
+  agent: AgenteDeRecepcionista;
+  config: ConfiguracionGestionada;
+  recursos: RecursosDeTelnyx;
+  palabrasClave: string[];
+}): CreateTelnyxAssistantInput | null {
+  const { config } = args;
+  const cooficial = config.idiomas.cooficialDeLaZona;
+  if (!cooficial || !config.promptDeLaCooficial) return null;
+  return buildTelnyxCooficialAssistantPayload({
+    businessId: args.businessId,
+    agentId: args.agent.id,
+    businessName: config.business.name,
+    timezone: config.business.timezone,
+    instructions: args.agent.promptManuallyEdited
+      ? promptManualConSuRegla(
+          args.agent.systemPrompt,
+          config.bloqueDeTransferencia
+        )
+      : config.promptDeLaCooficial,
+    idiomas: config.idiomas,
+    cooficial,
+    boostedKeywords: args.palabrasClave,
+    toolIds: args.recursos.toolIdsDeVoz,
+    insightGroupId: args.recursos.insightGroupId,
+    transferenciaAlDueno: config.transferenciaAlDueno,
+  });
+}
+
+/**
+ * Pone al día el assistant de la lengua de la zona del agente: lo crea si
+ * falta y lo actualiza si cambió su payload. Devuelve lo que guardar en el
+ * Agent. Lanza si Telnyx falla: quien lo llama decide si el de llamadas
+ * sigue (al crear el agente) o se queda como estaba (al sincronizar), para
+ * no dejar el de flux con cambiar_de_idioma y sin a quién cambiar.
+ */
+async function ponerAlDiaLaCooficial(
+  agent: AgenteConCooficial,
+  payload: CreateTelnyxAssistantInput,
+  etiqueta: string
+): Promise<{
+  telnyxCooficialAssistantId: string;
+  telnyxCooficialConfigHash: string;
+}> {
+  const hash = hashConfig(payload);
+  if (!agent.telnyxCooficialAssistantId) {
+    const creado = await telnyxAiAdapter.createAssistant(payload);
+    console.log(
+      `[Agent] Assistant de la lengua de la zona creado para ${etiqueta}: ${creado.id}`
+    );
+    return { telnyxCooficialAssistantId: creado.id, telnyxCooficialConfigHash: hash };
+  }
+  if (agent.telnyxCooficialConfigHash !== hash) {
+    await telnyxAiAdapter.updateAssistant(agent.telnyxCooficialAssistantId, payload);
+  }
+  return {
+    telnyxCooficialAssistantId: agent.telnyxCooficialAssistantId,
+    telnyxCooficialConfigHash: hash,
+  };
+}
+
+/**
+ * Borra el assistant de la lengua de un agente cuyo negocio ya no está en
+ * una zona cooficial (cambió de dirección), con su app TeXML. Sin lanzar:
+ * el de llamadas ya no lo usa; si falla, queda en el log y el id se borra
+ * igual del Agent para no volver a cambiar a él.
+ */
+async function retirarLaCooficial(assistantId: string, etiqueta: string) {
+  try {
+    await telnyxAiAdapter.deleteAssistant(assistantId);
+    await telnyxAiAdapter.deleteTexmlAppOfAssistant(assistantId);
+    console.log(
+      `[Agent] Assistant de la lengua de la zona ${assistantId} borrado (${etiqueta}): el negocio ya no está en una zona cooficial`
+    );
+  } catch (error) {
+    console.error(
+      `[Agent] No se pudo borrar el assistant de la lengua de la zona ${assistantId} (${etiqueta}); queda huérfano en Telnyx y hay que borrarlo a mano: ${
+        error instanceof Error ? error.message : String(error)
+      }`
+    );
+  }
 }
 
 /**
@@ -360,15 +486,17 @@ export async function createTelnyxAssistantForAgent(args: {
 
     const recursos = await cargarRecursosDeTelnyx(
       baseUrl,
-      config.idiomas.isoDeLaVoz
+      config.idiomas.isoDeLaVoz,
+      Boolean(config.idiomas.cooficialDeLaZona)
     );
+    const palabrasClave = await cargarPalabrasClave(args.businessId, client);
     const voz = construirPayloadDeRecepcionista({
       businessId: args.businessId,
       agent,
       config,
       voz: eligibility.voiceId!,
       recursos,
-      palabrasClave: await cargarPalabrasClave(args.businessId, client),
+      palabrasClave,
     });
 
     const assistant = await telnyxAiAdapter.createAssistant(voz);
@@ -407,6 +535,43 @@ export async function createTelnyxAssistantForAgent(args: {
           data: { telnyxSyncError: `Assistant de chat: ${message}` },
         })
         .catch(() => {});
+    }
+
+    // El de la lengua de la zona. Si no sale, el de llamadas atiende igual
+    // (cambiar_de_idioma contesta que siga en castellano) y la siguiente
+    // sincronización lo vuelve a intentar.
+    const deLaCooficial = construirPayloadDeLaCooficial({
+      businessId: args.businessId,
+      agent,
+      config,
+      recursos,
+      palabrasClave,
+    });
+    if (deLaCooficial) {
+      try {
+        const datos = await ponerAlDiaLaCooficial(
+          {
+            ...agent,
+            telnyxCooficialAssistantId: null,
+            telnyxCooficialConfigHash: null,
+          },
+          deLaCooficial,
+          `${args.businessId}/${args.agentId}`
+        );
+        await client.agent.update({ where: { id: args.agentId }, data: datos });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.error(
+          "[Agent] No se pudo crear el assistant de la lengua de la zona; el de llamadas sí (atiende sin cambiar de idioma):",
+          { agentId: args.agentId, businessId: args.businessId, message }
+        );
+        await client.agent
+          .update({
+            where: { id: args.agentId },
+            data: { telnyxSyncError: `Assistant de la lengua de la zona: ${message}` },
+          })
+          .catch(() => {});
+      }
     }
     return { eligible: true, reason: null };
   } catch (error) {
@@ -525,7 +690,8 @@ export async function syncAgentToTelnyx(
       try {
         recursos = await cargarRecursosDeTelnyx(
           baseUrl,
-          config.idiomas.isoDeLaVoz
+          config.idiomas.isoDeLaVoz,
+          Boolean(config.idiomas.cooficialDeLaZona)
         );
       } catch (error) {
         sinRecursos = `No se pudieron preparar las tools compartidas o el grupo de insights de Telnyx: ${
@@ -560,8 +726,57 @@ export async function syncAgentToTelnyx(
           recursos,
         });
         const datos = datosDeSincronizacion({ voz, chat }, agent, config);
+        const etiqueta = `${businessId}/${agent.id}`;
+        // El de la lengua, antes que el de llamadas: si no sale, este se
+        // queda como estaba (sin cambiar_de_idioma, o con un assistant al
+        // que cambiar) y el error queda guardado.
+        const deLaCooficial = construirPayloadDeLaCooficial({
+          businessId,
+          agent,
+          config,
+          recursos,
+          palabrasClave,
+        });
+        let datosDeLaCooficial: {
+          telnyxCooficialAssistantId: string | null;
+          telnyxCooficialConfigHash: string | null;
+        } = {
+          telnyxCooficialAssistantId: agent.telnyxCooficialAssistantId,
+          telnyxCooficialConfigHash: agent.telnyxCooficialConfigHash,
+        };
+        if (deLaCooficial) {
+          try {
+            datosDeLaCooficial = await ponerAlDiaLaCooficial(
+              agent,
+              deLaCooficial,
+              etiqueta
+            );
+            // Recién creado: se guarda ya, por si lo de después falla, para
+            // no crear otro en la siguiente sincronización.
+            if (!agent.telnyxCooficialAssistantId) {
+              await prismaClient.agent.update({
+                where: { id: agent.id },
+                data: datosDeLaCooficial,
+              });
+            }
+          } catch (error) {
+            throw new Error(
+              `Assistant de la lengua de la zona: ${
+                error instanceof Error ? error.message : String(error)
+              }`,
+              { cause: error }
+            );
+          }
+        }
         if (agent.telnyxConfigHash !== datos.telnyxConfigHash) {
           await telnyxAiAdapter.updateAssistant(agent.telnyxAssistantId!, voz);
+        }
+        if (!deLaCooficial && agent.telnyxCooficialAssistantId) {
+          await retirarLaCooficial(agent.telnyxCooficialAssistantId, etiqueta);
+          datosDeLaCooficial = {
+            telnyxCooficialAssistantId: null,
+            telnyxCooficialConfigHash: null,
+          };
         }
         let telnyxChatAssistantId = agent.telnyxChatAssistantId;
         let errorDeChat: string | null = null;
@@ -591,10 +806,11 @@ export async function syncAgentToTelnyx(
           data: errorDeChat
             ? {
                 ...datos,
+                ...datosDeLaCooficial,
                 telnyxChatConfigHash: agent.telnyxChatConfigHash,
                 telnyxSyncError: errorDeChat,
               }
-            : { ...datos, telnyxChatAssistantId },
+            : { ...datos, ...datosDeLaCooficial, telnyxChatAssistantId },
         });
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);

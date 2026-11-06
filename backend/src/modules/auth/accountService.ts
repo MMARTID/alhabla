@@ -183,6 +183,7 @@ export async function deleteAccount(input: {
         select: {
           telnyxAssistantId: true,
           telnyxChatAssistantId: true,
+          telnyxCooficialAssistantId: true,
         },
       },
       calls: {
@@ -233,6 +234,13 @@ export async function deleteAccount(input: {
       await removeExternalResource("el agente de chat de Telnyx", () =>
         telnyxAiAdapter.deleteAssistant(agent.telnyxChatAssistantId!),
       );
+    }
+    // El de la lengua de la zona tiene telefonía: también su app TeXML.
+    if (agent.telnyxCooficialAssistantId) {
+      await removeExternalResource("el agente de la lengua de la zona de Telnyx", () =>
+        telnyxAiAdapter.deleteAssistant(agent.telnyxCooficialAssistantId!),
+      );
+      await removeTexmlAppOfAssistant(business.id, agent.telnyxCooficialAssistantId);
     }
   }
 

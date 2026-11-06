@@ -1,7 +1,11 @@
 import { describe, it, expect } from "vitest";
 import { selectTelnyxInboundAgent } from "../../../src/modules/phone/telnyxInbound.js";
 
-const AGENT = { id: "agent1", telnyxAssistantId: "assistant_1" };
+const AGENT = {
+  id: "agent1",
+  telnyxAssistantId: "assistant_1",
+  telnyxCooficialAssistantId: null,
+};
 
 describe("selectTelnyxInboundAgent", () => {
   it("devuelve el primer agente con assistant Telnyx operativo", () => {

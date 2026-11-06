@@ -29,6 +29,11 @@ import {
 } from "./transcripcion.js";
 import { programarRecuperacionDeTranscripcion } from "../../jobs/recuperarTranscripcion.js";
 import { pedirInformeDeLlamada } from "../../jobs/informeDeLlamada.js";
+import {
+  cambiarDeIdioma,
+  mensajesSembrados,
+  quedanConversaciones,
+} from "../../lib/cambioDeIdioma.js";
 
 /**
  * Envoltorio real verificado en vivo el 2026-09-11 y contra los tipos de
@@ -418,7 +423,11 @@ export async function handleCallInitiated(
           },
           orderBy: { createdAt: "asc" },
           take: 1,
-          select: { id: true, telnyxAssistantId: true },
+          select: {
+            id: true,
+            telnyxAssistantId: true,
+            telnyxCooficialAssistantId: true,
+          },
         },
       },
     });
@@ -474,12 +483,21 @@ export async function handleCallInitiated(
       update: {},
     });
 
+    // Quien habló la última vez en la lengua de la zona empieza ya en su
+    // assistant (Soniox y su voz, lib/cambioDeIdioma.ts), saludado en ella.
+    // Sin él (el agente aún no lo tiene), el de siempre con la voz cambiada.
+    const conLaCooficial = Boolean(
+      contexto?.voz && agent.telnyxCooficialAssistantId
+    );
+    const assistantId = conLaCooficial
+      ? agent.telnyxCooficialAssistantId!
+      : agent.telnyxAssistantId;
     const opciones = contexto
       ? {
           greeting: contexto.saludo,
           dynamicVariables: contexto.variables,
           grabar: contexto.grabar,
-          voiceSettings: contexto.voz,
+          voiceSettings: conLaCooficial ? null : contexto.voz,
         }
       : {};
     try {
@@ -489,10 +507,10 @@ export async function handleCallInitiated(
       // fallos transitorios se reintentan (contestarLlamada.ts).
       await contestarConReintentos({
         callControlId: call_control_id,
-        assistantId: agent.telnyxAssistantId,
+        assistantId,
         businessId: business.id,
         opciones,
-        sinVoz: contexto?.voz
+        sinVoz: contexto?.voz && !conLaCooficial
           ? {
               opciones: {
                 dynamicVariables: contexto.variables,
@@ -510,7 +528,7 @@ export async function handleCallInitiated(
       // intento agotara el tiempo y Telnyx pudiera ejecutarlo: entonces la
       // llamada quizá ya habla con la recepcionista y no se toca.
       console.error(
-        `[Telnyx] No se pudo contestar ${callLabel(call_control_id)} del negocio ${business.id} con el assistant ${agent.telnyxAssistantId} tras ${error.intentos} ${error.intentos === 1 ? "intento" : "intentos"}${error.quizaContestada ? "; un intento agotó el tiempo y puede que Telnyx la contestara, así que no se cuelga" : "; se cuelga"}: ${errorMessage(error.causa)}`
+        `[Telnyx] No se pudo contestar ${callLabel(call_control_id)} del negocio ${business.id} con el assistant ${assistantId} tras ${error.intentos} ${error.intentos === 1 ? "intento" : "intentos"}${error.quizaContestada ? "; un intento agotó el tiempo y puede que Telnyx la contestara, así que no se cuelga" : "; se cuelga"}: ${errorMessage(error.causa)}`
       );
       if (!error.quizaContestada) {
         await telnyxAiAdapter
@@ -525,7 +543,7 @@ export async function handleCallInitiated(
     }
 
     console.log(
-      `[Telnyx] ${callLabel(call_control_id)} contestada con el assistant ${agent.telnyxAssistantId}`
+      `[Telnyx] ${callLabel(call_control_id)} contestada con el assistant ${assistantId}${conLaCooficial ? " (el de la lengua de la zona: quien llama habló en ella la última vez)" : ""}`
     );
     return { success: true };
   } catch (error) {
@@ -649,16 +667,57 @@ export async function handleCallConversationEnded(
       return { success: false };
     }
 
-    await prisma.call.update({
+    // Con un cambio de idioma (lib/cambioDeIdioma.ts) la llamada tiene una
+    // conversación por assistant: se apuntan todas, la duración es la de la
+    // llamada entera y el informe espera a la última.
+    const nueva =
+      conversation_id !== undefined &&
+      !dbCall.conversacionesDeTelnyx.includes(conversation_id);
+    const anotada = await prisma.call.update({
       where: { id: dbCall.id },
       data: {
-        providerConversationId: conversation_id ?? dbCall.providerConversationId,
-        durationSecs:
-          duration_sec !== undefined
-            ? Math.round(duration_sec)
-            : dbCall.durationSecs,
+        providerConversationId:
+          dbCall.providerConversationId ?? conversation_id,
+        ...(nueva ? { conversacionesDeTelnyx: { push: conversation_id } } : {}),
+      },
+      select: {
+        assistantsArrancados: true,
+        conversacionesDeTelnyx: true,
+        startedAt: true,
       },
     });
+    const varias = anotada.assistantsArrancados > 1;
+    const faltan = conversation_id !== undefined && quedanConversaciones(anotada);
+    const durationSecs = varias
+      ? faltan
+        ? dbCall.durationSecs
+        : Math.max(
+            dbCall.durationSecs ?? 0,
+            Math.round((Date.now() - anotada.startedAt.getTime()) / 1000)
+          )
+      : duration_sec !== undefined
+        ? Math.round(duration_sec)
+        : dbCall.durationSecs;
+    if (durationSecs !== dbCall.durationSecs) {
+      await prisma.call.update({
+        where: { id: dbCall.id },
+        data: { durationSecs },
+      });
+    }
+    if (varias) {
+      console.log(
+        `[Telnyx] ${callLabel(call_control_id)}: terminó la conversación ${anotada.conversacionesDeTelnyx.length} de ${anotada.assistantsArrancados} (cambio de idioma)${faltan ? "; el informe, al terminar la última" : ""}`
+      );
+    }
+    // Lo que un assistant arrancado después del primero recibió como
+    // historial: su conversación lo trae repetido al principio. La primera
+    // conversación no lleva nada sembrado.
+    const sembrados =
+      varias &&
+      conversation_id !== undefined &&
+      anotada.conversacionesDeTelnyx.indexOf(conversation_id) > 0
+        ? await mensajesSembrados(dbCall.id)
+        : [];
 
     // Primero los mensajes del propio evento: llegan sin la redacción de
     // datos personales que Telnyx aplica a su copia guardada.
@@ -669,15 +728,18 @@ export async function handleCallConversationEnded(
           role: mensaje.role,
           content: mensaje.content ?? undefined,
           timestamp: mensaje.timestamp,
-        }))
+        })),
+        { sembrados }
       );
       // El informe para el negocio sale de esta transcripción, la que no
       // va redactada (jobs/informeDeLlamada.ts).
-      await pedirInformeDeLlamada({
-        callRowId: dbCall.id,
-        businessId: dbCall.businessId,
-        origen: "el fin de la conversación",
-      });
+      if (!faltan) {
+        await pedirInformeDeLlamada({
+          callRowId: dbCall.id,
+          businessId: dbCall.businessId,
+          origen: "el fin de la conversación",
+        });
+      }
     } else if (conversation_id) {
       // Respaldo: la copia de Telnyx, que sale con marcas <PII:…/> en vez
       // del nombre y el teléfono del cliente. Telnyx puede avisar del fin
@@ -694,17 +756,21 @@ export async function handleCallConversationEnded(
       try {
         guardados = await guardarTranscripcionDeTelnyx(
           dbCall.id,
-          conversation_id
+          conversation_id,
+          { sembrados }
         );
       } catch (err) {
         fallo = errorMessage(err);
       }
       if (guardados > 0) {
-        await pedirInformeDeLlamada({
-          callRowId: dbCall.id,
-          businessId: dbCall.businessId,
-          origen: "la copia redactada de la transcripción",
-        });
+        // Con otra conversación por terminar, el informe sale con la última.
+        if (!faltan) {
+          await pedirInformeDeLlamada({
+            callRowId: dbCall.id,
+            businessId: dbCall.businessId,
+            origen: "la copia redactada de la transcripción",
+          });
+        }
       } else {
         console.warn(
           `[Telnyx] ${callLabel(call_control_id)} terminó sin transcripción (${fallo ? `la descarga falló: ${fallo}` : "Telnyx aún no tiene mensajes"}); se reintenta en unos minutos (${contexto})`
@@ -1094,6 +1160,15 @@ export async function handleTelnyxToolInvocation(input: {
     if (!call) {
       console.error(`[Telnyx Tool] No se encontró la llamada ${callControlId}`);
       return { status: 404, body: { error: "Call not found" } };
+    }
+
+    // No es una tool de voiceTools: para el assistant que la llama y
+    // arranca el de la lengua de la zona (lib/cambioDeIdioma.ts).
+    if (toolName === "cambiar_de_idioma") {
+      return {
+        status: 200,
+        body: await cambiarDeIdioma({ callControlId, params }),
+      };
     }
 
     const result = await executeVoiceTool({

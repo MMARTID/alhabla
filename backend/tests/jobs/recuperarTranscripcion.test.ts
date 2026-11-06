@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 vi.mock("../../src/lib/prisma.js", () => ({
   prisma: {
     call: { findUnique: vi.fn() },
-    transcript: { upsert: vi.fn() },
+    transcript: { upsert: vi.fn(), findUnique: vi.fn() },
   },
 }));
 
@@ -37,6 +37,8 @@ const LLAMADA = {
   id: "cmufcsz4b0006s601kncxcf5m",
   businessId: "biz_infinity",
   transcript: null,
+  assistantsArrancados: 1,
+  conversacionesDeTelnyx: ["conv_1"],
 };
 const JOB = { callId: LLAMADA.id, conversationId: "conv_1" };
 

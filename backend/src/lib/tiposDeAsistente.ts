@@ -1,6 +1,7 @@
 import {
   buildTelnyxAssistantName,
   buildTelnyxChatAssistantName,
+  buildTelnyxCooficialAssistantName,
   buildTelnyxChatTools,
   buildTelnyxVoiceTools,
   CANAL_DE_TOOLS_DE_VOZ,
@@ -29,6 +30,7 @@ import {
 
 export type ClaveDeTipoDeAsistente =
   | "recepcionista"
+  | "recepcionista_cooficial"
   | "recepcionista_chat"
   | "demo"
   | "gestor";
@@ -74,6 +76,24 @@ export const TIPOS_DE_ASISTENTE: Readonly<
     tools: buildTelnyxVoiceTools,
     sincronizacion:
       "lib/telnyxAgentSync.ts (Telnyx, por hash del payload; tools de la biblioteca, lib/toolsCompartidas.ts)",
+  },
+  // Desde el 2026-11-06, en una zona cooficial (lib/idiomas/zona.ts): la
+  // llamada empieza en el de voz (flux, rápido) y el backend cambia a este
+  // si quien llama habla la lengua (lib/cambioDeIdioma.ts). Mismas tools de
+  // la biblioteca que el de voz, sin cambiar_de_idioma.
+  recepcionista_cooficial: {
+    clave: "recepcionista_cooficial",
+    descripcion:
+      "Recepcionista de un negocio de zona cooficial cuando quien llama habla la lengua (catalán, gallego o euskera): Agent.telnyxCooficialAssistantId, con Soniox y la voz de Marta o Sergio. Lo arranca el backend a mitad de llamada (lib/cambioDeIdioma.ts) o al contestar a quien ya habló en ella.",
+    ambito: "por_agente",
+    canales: ["voz"],
+    proveedores: { principal: "telnyx" },
+    canalDeTools: CANAL_DE_TOOLS_DE_VOZ,
+    nombreEnTelnyx: ({ businessId, agentId }) =>
+      buildTelnyxCooficialAssistantName(businessId, agentId),
+    tools: buildTelnyxVoiceTools,
+    sincronizacion:
+      "lib/telnyxAgentSync.ts, junto al de voz del mismo agente (lo crea si falta y lo borra si el negocio deja la zona)",
   },
   // Aparte del de voz desde el 2026-11-04: hasta entonces el mismo assistant
   // atendía las dos cosas y cada pasada del modelo releía las reglas del

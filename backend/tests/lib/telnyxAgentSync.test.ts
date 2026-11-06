@@ -23,6 +23,8 @@ vi.mock("../../src/adapters/telnyx/TelnyxAiAdapter.js", () => ({
   telnyxAiAdapter: {
     createAssistant: vi.fn(),
     updateAssistant: vi.fn(),
+    deleteAssistant: vi.fn(),
+    deleteTexmlAppOfAssistant: vi.fn(),
     listVoices: vi.fn(),
   },
 }));
@@ -414,7 +416,7 @@ describe("createTelnyxAssistantForAgent", () => {
   // del 2026-10-14): con el código postal de Cardedeu, Soniox entiende el
   // catalán desde el principio, atiende la voz Ultra del principal y un nodo
   // cambia a Marta.
-  it("en Cataluña y saludando en español: Soniox con catalán, la voz Ultra, el nodo de Marta y el catalán en el prompt", async () => {
+  it("en Cataluña y saludando en español: el de llamadas con flux, la voz Ultra y cambiar_de_idioma; el catalán, en su assistant con Soniox y Marta", async () => {
     mockedBusinessFindUnique.mockResolvedValue({
       ...BASE_BUSINESS,
       address: "Calle Anselm Clavé, 14",
@@ -422,11 +424,11 @@ describe("createTelnyxAssistantForAgent", () => {
         "INFINITY Hair Salon\nAv. Rei en Jaume, 231, 08440 Cardedeu, Barcelona, Spain",
       agentSettings: DEFAULT_AGENT_SETTINGS,
     } as any);
-    mockedCreateAssistant.mockResolvedValue({
-      id: "assistant_1",
-      name: "alhabla-biz1-agent1",
+    mockedCreateAssistant.mockImplementation(async (payload: any) => ({
+      id: `id-${payload.name}`,
+      name: payload.name,
       instructions: "i",
-    });
+    }));
 
     const result = await createTelnyxAssistantForAgent({
       agentId: "agent1",
@@ -434,26 +436,76 @@ describe("createTelnyxAssistantForAgent", () => {
     });
 
     expect(result.eligible).toBe(true);
-    const payload = mockedCreateAssistant.mock.calls[0][0];
-    expect(payload.greeting).toBe(
+    const [voz, chat, cooficial] = mockedCreateAssistant.mock.calls.map(
+      (llamada) => llamada[0]
+    );
+    expect(chat.name).toBe("alhabla-chat-biz1-agent1");
+    expect(voz.greeting).toBe(
       "Peluquería Ejemplo, te atiende su recepcionista de IA. ¿En qué te ayudo?"
     );
-    expect(payload.voiceSettings).toMatchObject({
+    expect(voz.voiceSettings).toMatchObject({
       voice: "Telnyx.Ultra.isabel",
       expressive_mode: true,
     });
-    expect(payload.transcription).toMatchObject({
+    expect(voz.transcription).toMatchObject({
+      model: "deepgram/flux",
+      language: "multi",
+    });
+    expect(voz.conversationFlow).toBeNull();
+    expect(voz.toolIds).toContain("tool-cambiar_de_idioma");
+    expect(voz.instructions).toContain("cambiar_de_idioma");
+    expect(voz.instructions).toContain("catalán");
+
+    expect(cooficial.name).toBe("alhabla-cooficial-biz1-agent1");
+    expect(cooficial.greeting).toBe("");
+    expect(cooficial.voiceSettings).toMatchObject({
+      voice: "Soniox.tts-rt-v2.Marta",
+      language: "ca",
+    });
+    expect(cooficial.transcription).toMatchObject({
       model: "soniox/stt-rt-v5",
       settings: { language_hints: ["es", "ca"] },
     });
-    expect(payload.conversationFlow?.nodes[1]).toMatchObject({
-      id: "cooficial",
-      voice_settings: { voice: "Soniox.tts-rt-v2.Marta", language: "ca" },
+    expect(cooficial.conversationFlow).toBeNull();
+    expect(cooficial.toolIds).not.toContain("tool-cambiar_de_idioma");
+    expect(cooficial.toolIds).toContain("tool-get_catalog");
+    expect(cooficial.instructions).toContain("Atiendes en catalán");
+    expect(mockedAgentUpdate).toHaveBeenCalledWith({
+      where: { id: "agent1" },
+      data: {
+        telnyxCooficialAssistantId: "id-alhabla-cooficial-biz1-agent1",
+        telnyxCooficialConfigHash: expect.any(String),
+      },
     });
-    expect(payload.instructions).toContain("catalán");
-    expect(mockedAgentUpdate.mock.calls[0][0].data.systemPrompt).toContain(
-      "catalán"
-    );
+  });
+
+  it("si el de la lengua no sale al crear, el de llamadas se queda y el error se guarda", async () => {
+    mockedBusinessFindUnique.mockResolvedValue({
+      ...BASE_BUSINESS,
+      address: "Carrer Major 1, 08440 Cardedeu",
+      agentSettings: DEFAULT_AGENT_SETTINGS,
+    } as any);
+    mockedCreateAssistant.mockImplementation(async (payload: any) => {
+      if (payload.name.startsWith("alhabla-cooficial-")) {
+        throw new Error("Telnyx 422");
+      }
+      return { id: `id-${payload.name}`, name: payload.name, instructions: "i" };
+    });
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    mockedAgentUpdate.mockResolvedValue({} as any);
+
+    const result = await createTelnyxAssistantForAgent({
+      agentId: "agent1",
+      businessId: "biz1",
+    });
+
+    expect(result.eligible).toBe(true);
+    expect(mockedAgentUpdate).toHaveBeenCalledWith({
+      where: { id: "agent1" },
+      data: {
+        telnyxSyncError: "Assistant de la lengua de la zona: Telnyx 422",
+      },
+    });
   });
 
   it("fuera de una zona cooficial, sin nodo (null para borrar uno anterior)", async () => {
@@ -740,6 +792,105 @@ describe("crearAssistantDelNegocio", () => {
 });
 
 describe("syncAgentToTelnyx", () => {
+
+  describe("el assistant de la lengua de la zona", () => {
+    const EN_CATALUNA = {
+      ...BASE_BUSINESS,
+      address: "Carrer Major 1, 08440 Cardedeu",
+      agentSettings: DEFAULT_AGENT_SETTINGS,
+    };
+
+    it("lo crea antes de actualizar el de llamadas y guarda su id enseguida", async () => {
+      mockedBusinessFindUnique.mockResolvedValue(EN_CATALUNA as any);
+      mockedAgentFindMany.mockResolvedValue(agenteSincronizable());
+      mockedCreateAssistant.mockImplementation(async (payload: any) => ({
+        id: `id-${payload.name}`,
+        name: payload.name,
+        instructions: "i",
+      }));
+
+      await syncAgentToTelnyx("biz1");
+
+      const creados = mockedCreateAssistant.mock.calls.map((l) => l[0].name);
+      expect(creados).toContain("alhabla-cooficial-biz1-agent1");
+      expect(
+        mockedCreateAssistant.mock.invocationCallOrder[
+          creados.indexOf("alhabla-cooficial-biz1-agent1")
+        ]
+      ).toBeLessThan(mockedUpdateAssistant.mock.invocationCallOrder[0]);
+      expect(mockedAgentUpdate.mock.calls[0][0]).toEqual({
+        where: { id: "agent1" },
+        data: {
+          telnyxCooficialAssistantId: "id-alhabla-cooficial-biz1-agent1",
+          telnyxCooficialConfigHash: expect.any(String),
+        },
+      });
+      expect(mockedAgentUpdate.mock.calls.at(-1)?.[0].data).toMatchObject({
+        telnyxSyncError: null,
+        telnyxCooficialAssistantId: "id-alhabla-cooficial-biz1-agent1",
+      });
+    });
+
+    it("si falla, el de llamadas se queda como estaba (sin cambiar_de_idioma sin destino)", async () => {
+      mockedBusinessFindUnique.mockResolvedValue(EN_CATALUNA as any);
+      mockedAgentFindMany.mockResolvedValue([
+        {
+          ...agenteSincronizable()[0],
+          telnyxChatAssistantId: "chat_1",
+          telnyxCooficialAssistantId: "cooficial_1",
+          telnyxCooficialConfigHash: "hash-vieja",
+        },
+      ] as any);
+      mockedUpdateAssistant.mockImplementation(async (id: string) => {
+        if (id === "cooficial_1") throw new Error("Telnyx 500");
+        return {} as any;
+      });
+      vi.spyOn(console, "error").mockImplementation(() => {});
+      mockedAgentUpdate.mockResolvedValue({} as any);
+
+      await syncAgentToTelnyx("biz1");
+
+      expect(mockedUpdateAssistant.mock.calls.map((l) => l[0])).toEqual([
+        "cooficial_1",
+      ]);
+      expect(mockedAgentUpdate).toHaveBeenCalledWith({
+        where: { id: "agent1" },
+        data: {
+          telnyxSyncError: "Assistant de la lengua de la zona: Telnyx 500",
+        },
+      });
+    });
+
+    it("lo borra si el negocio ya no está en una zona cooficial", async () => {
+      mockedBusinessFindUnique.mockResolvedValue({
+        ...BASE_BUSINESS,
+        address: "Calle Mayor 1, 28013 Madrid",
+        agentSettings: DEFAULT_AGENT_SETTINGS,
+      } as any);
+      mockedAgentFindMany.mockResolvedValue([
+        {
+          ...agenteSincronizable()[0],
+          telnyxChatAssistantId: "chat_1",
+          telnyxCooficialAssistantId: "cooficial_1",
+          telnyxCooficialConfigHash: "hash",
+        },
+      ] as any);
+      vi.spyOn(console, "log").mockImplementation(() => {});
+
+      await syncAgentToTelnyx("biz1");
+
+      expect(vi.mocked(telnyxAiAdapter.deleteAssistant)).toHaveBeenCalledWith(
+        "cooficial_1"
+      );
+      expect(
+        vi.mocked(telnyxAiAdapter.deleteTexmlAppOfAssistant)
+      ).toHaveBeenCalledWith("cooficial_1");
+      expect(mockedAgentUpdate.mock.calls.at(-1)?.[0].data).toMatchObject({
+        telnyxCooficialAssistantId: null,
+        telnyxCooficialConfigHash: null,
+      });
+    });
+  });
   it("no hace nada si ningún agente tiene telnyxAssistantId todavía", async () => {
     mockedBusinessFindUnique.mockResolvedValue(BASE_BUSINESS as any);
     mockedAgentFindMany.mockResolvedValue([]);

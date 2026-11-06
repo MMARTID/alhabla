@@ -9,6 +9,7 @@ import { errorMessage } from "../lib/logUtils.js";
 import {
   buildTelnyxAssistantName,
   buildTelnyxChatAssistantName,
+  buildTelnyxCooficialAssistantName,
 } from "../lib/telnyxAssistantPayload.js";
 import {
   incorporarPlantillasNuevas,
@@ -176,6 +177,7 @@ export async function telnyxReconcilerJob(): Promise<TelnyxReconcilerResult> {
       businessId: true,
       telnyxSyncError: true,
       telnyxChatAssistantId: true,
+      telnyxCooficialAssistantId: true,
     },
   });
   const errorById = new Map(
@@ -194,6 +196,9 @@ export async function telnyxReconcilerJob(): Promise<TelnyxReconcilerResult> {
   const chatById = new Map(
     agentsAfter.map((agent) => [agent.id, agent.telnyxChatAssistantId])
   );
+  const cooficialById = new Map(
+    agentsAfter.map((agent) => [agent.id, agent.telnyxCooficialAssistantId])
+  );
   for (const agent of agentsBefore) {
     result.agentsChecked++;
 
@@ -211,6 +216,19 @@ export async function telnyxReconcilerJob(): Promise<TelnyxReconcilerResult> {
               id: chatById.get(agent.id)!,
               esperado: buildTelnyxChatAssistantName(agent.businessId, agent.id),
               cual: " de chat",
+            },
+          ]
+        : []),
+      // El de la lengua de la zona, si lo tiene (lib/cambioDeIdioma.ts).
+      ...(cooficialById.get(agent.id)
+        ? [
+            {
+              id: cooficialById.get(agent.id)!,
+              esperado: buildTelnyxCooficialAssistantName(
+                agent.businessId,
+                agent.id
+              ),
+              cual: " de la lengua de la zona",
             },
           ]
         : []),

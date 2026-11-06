@@ -1,5 +1,63 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
+exports[`payloads de asistentes (instantáneas) > assistant de la lengua de la zona (catalán) de esa recepcionista 1`] = `
+{
+  "conversationFlow": null,
+  "greeting": "",
+  "instructions": "Eres la recepcionista de Peluquería Ana.
+
+## Idioma de esta llamada
+
+Atiendes en catalán. Si la conversación ya ha empezado (hay mensajes antes del tuyo), quien llama ha hablado en catalán y ya le has contestado al cambiar: sigue en catalán con naturalidad, sin saludar otra vez ni repetir lo que ya se ha dicho, y continúa con lo que ha pedido. Si después habla en castellano u otro de tus idiomas, contesta en el suyo.",
+  "interruptionSettings": {
+    "disable_greeting_interruption": true,
+    "start_speaking_plan": {
+      "transcription_endpointing_plan": {
+        "on_no_punctuation_seconds": 0.5,
+        "on_number_seconds": 0.5,
+        "on_punctuation_seconds": 0.1,
+      },
+      "wait_seconds": 0.1,
+    },
+  },
+  "name": "alhabla-cooficial-neg_1-ag_1",
+  "transcription": {
+    "fallback_models": [
+      {
+        "language": "multi",
+        "model": "deepgram/nova-3",
+        "settings": {
+          "keyterm": "Corte,Laura",
+          "numerals": true,
+          "smart_format": true,
+        },
+      },
+    ],
+    "language": "auto",
+    "model": "soniox/stt-rt-v5",
+    "settings": {
+      "context": "Corte,Laura",
+      "enable_endpoint_detection": true,
+      "language_hints": [
+        "es",
+        "ca",
+      ],
+      "max_endpoint_delay_ms": 500,
+    },
+  },
+  "voiceSettings": {
+    "background_audio": {
+      "type": "predefined_media",
+      "value": "office",
+      "volume": 0.2,
+    },
+    "expressive_mode": false,
+    "language": "ca",
+    "voice": "Soniox.tts-rt-v2.Marta",
+  },
+}
+`;
+
 exports[`payloads de asistentes (instantáneas) > assistant de la recepcionista con ca-ES como idioma principal 1`] = `
 {
   "greeting": "Perruqueria Anna, t'atén una intel·ligència artificial. En què et puc ajudar?",
@@ -263,78 +321,12 @@ exports[`payloads de asistentes (instantáneas) > assistant de la recepcionista 
 
 exports[`payloads de asistentes (instantáneas) > assistant de la recepcionista que saluda en español en Cataluña 1`] = `
 {
-  "conversationFlow": {
-    "edges": [
-      {
-        "condition": {
-          "prompt": "Quien llama habla catalán (aunque la transcripción llegue con errores) o pide hablar en catalán.",
-          "type": "llm",
-        },
-        "id": "a_cooficial",
-        "start_node_id": "inicial",
-        "target": {
-          "node_id": "cooficial",
-          "type": "node",
-        },
-      },
-      {
-        "condition": {
-          "prompt": "Quien llama habla castellano (una frase entera, no una palabra suelta como «vale»), inglés, francés, alemán, italiano, portugués, neerlandés o ruso.",
-          "type": "llm",
-        },
-        "id": "a_inicial",
-        "start_node_id": "cooficial",
-        "target": {
-          "node_id": "inicial",
-          "type": "node",
-        },
-      },
-    ],
-    "nodes": [
-      {
-        "id": "inicial",
-        "instructions": "## Idioma en este paso
-
-Si quien llama habla en catalán (aunque sea una sola frase o un saludo, mezclado con castellano, o aunque la transcripción llegue con errores, con palabras en catalán mal reconocidas) o pide que le atiendas en catalán, llama a la herramienta transition__a_cooficial en ese mismo turno, sin decir nada antes: la respuesta la darás en catalán justo después. No le digas que le pasas con nadie. Usa transition__a_cooficial solo para eso: nunca para consultar el catálogo, la disponibilidad, dejar un recado ni colgar, que tienen sus propias herramientas. Si no tienes esa herramienta (en el chat no está), no digas que no puedes cambiar de idioma: contéstale directamente en catalán. Contesta solo en el idioma en que te habla, sin repetir la respuesta en otro: si vienes del paso en catalán porque ha cambiado de idioma, contesta solo en el suyo.",
-        "instructions_mode": "append",
-        "name": "Inicial",
-        "shared_tool_ids": [],
-        "tools_mode": "append",
-        "type": "prompt",
-      },
-      {
-        "id": "cooficial",
-        "instructions": "## Idioma en este paso
-
-Desde ahora habla en catalán con naturalidad. Empieza tu primera respuesta en catalán con «Cap problema, et parlo en català.» y, en ese mismo turno, contesta a lo que ha pedido; si el saludo ya fue en catalán, sáltate esa frase, y no la repitas después. No repitas el saludo ni el aviso de IA ya dados, pero si aún no se ha dicho en catalán que eres una inteligencia artificial (el saludo puede haberlo dicho ya en catalán), dilo brevemente en tu primera frase. Fíjate en el idioma de su última frase: si habla en castellano (una frase entera, no una palabra suelta como «vale»), inglés, francés, alemán, italiano, portugués, neerlandés o ruso, llama a la herramienta transition__a_inicial en ese mismo turno, sin decir nada antes, y contéstale después solo en su idioma. Usa transition__a_inicial solo para eso.",
-        "instructions_mode": "append",
-        "name": "En catalán",
-        "shared_tool_ids": [],
-        "tools_mode": "append",
-        "type": "prompt",
-        "voice_settings": {
-          "background_audio": {
-            "type": "predefined_media",
-            "value": "office",
-            "volume": 0.2,
-          },
-          "expressive_mode": false,
-          "language": "ca",
-          "voice": "Soniox.tts-rt-v2.Marta",
-        },
-      },
-    ],
-    "start_node_id": "inicial",
-  },
+  "conversationFlow": null,
   "greeting": "Peluquería Ana, te atiende su recepcionista de IA. ¿En qué te ayudo?",
   "interruptionSettings": {
     "disable_greeting_interruption": true,
+    "interrupt_prediction_threshold": 0.4,
     "start_speaking_plan": {
-      "transcription_endpointing_plan": {
-        "on_no_punctuation_seconds": 0.5,
-        "on_number_seconds": 0.5,
-        "on_punctuation_seconds": 0.1,
-      },
       "wait_seconds": 0.1,
     },
   },
@@ -349,17 +341,25 @@ Desde ahora habla en catalán con naturalidad. Empieza tu primera respuesta en c
           "smart_format": true,
         },
       },
+      {
+        "language": "auto",
+        "model": "soniox/stt-rt-v5",
+        "settings": {
+          "context": "Corte,Laura",
+          "enable_endpoint_detection": true,
+          "max_endpoint_delay_ms": 500,
+        },
+      },
     ],
-    "language": "auto",
-    "model": "soniox/stt-rt-v5",
+    "language": "multi",
+    "model": "deepgram/flux",
     "settings": {
-      "context": "Corte,Laura",
-      "enable_endpoint_detection": true,
-      "language_hints": [
-        "es",
-        "ca",
-      ],
-      "max_endpoint_delay_ms": 500,
+      "eager_eot_threshold": 0.4,
+      "eot_threshold": 0.8,
+      "eot_timeout_ms": 5000,
+      "keyterm": "Corte,Laura",
+      "numerals": true,
+      "smart_format": true,
     },
   },
   "voiceSettings": {
