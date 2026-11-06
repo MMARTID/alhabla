@@ -8,6 +8,14 @@ name: CI
 # eso lo hace deploy-backend.yml (solo backend; la app, la web y growth se
 # despliegan solas vía la integración Git de Vercel). Ver AGENTS.md §
 # Deployment Notes para el resto del pipeline.
+#
+# Por zonas (desde el 2026-11-06): el job «Qué cambia» mira qué carpetas toca
+# el cambio (.github/scripts/zonas-del-ci.sh, el mismo que usa
+# scripts/comprobar-rama.sh en local) y cada job solo corre si le toca. Antes
+# un artículo del blog pasaba también los 5 minutos del backend. Un job que se
+# salta por su `if` cuenta como aprobado en los checks obligatorios de main,
+# así que estos siguen siendo los mismos cuatro. Si «Qué cambia» falla, se
+# corre todo (`needs.cambios.result != 'success'`).
 
 on:
   pull_request:
@@ -19,46 +27,92 @@ on:
   push:
     branches: [main]
 
+permissions:
+  contents: read
+
+# Un push nuevo a un PR cancela la ejecución anterior de ese PR (ya no sirve).
+# Las de etiquetas van aparte: si no, poner `migracion-contract` cancelaría el
+# CI de verdad y los checks obligatorios se quedarían en «cancelado». En main
+# no se cancela nada: cada merge tiene su ejecución.
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}-${{ (github.event.action == 'labeled' || github.event.action == 'unlabeled') && 'etiquetas' || 'codigo' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
-  backend:
-    name: Backend — typecheck, lint, test
+  cambios:
+    name: Qué cambia
     if: github.event.action != 'labeled' && github.event.action != 'unlabeled'
     runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      backend: ${{ steps.zonas.outputs.backend }}
+      conocimiento: ${{ steps.zonas.outputs.conocimiento }}
+      frontend: ${{ steps.zonas.outputs.frontend }}
+      web: ${{ steps.zonas.outputs.web }}
+      growth: ${{ steps.zonas.outputs.growth }}
+      laliga: ${{ steps.zonas.outputs.laliga }}
+      copias: ${{ steps.zonas.outputs.copias }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      # En un PR, lo que el PR cambia respecto a su base; en un push a main,
+      # lo que trae el push (sin `before`, en el primer push, todo).
+      - id: zonas
+        env:
+          BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+          HEAD: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+        run: bash .github/scripts/zonas-del-ci.sh "$BASE" "$HEAD" | tee -a "$GITHUB_OUTPUT"
+
+  backend:
+    name: Backend — typecheck, lint, test
+    needs: cambios
+    # La base de conocimiento de Growth vive en backend/ pero lee PRODUCT.md,
+    # el blog y parte de web/src/lib: un cambio solo ahí pasa la comprobación
+    # del conocimiento y los tests que leen el repo real, no la suite entera.
+    if: >-
+      !cancelled() && github.event.action != 'labeled' && github.event.action != 'unlabeled' &&
+      (needs.cambios.result != 'success' || needs.cambios.outputs.backend == 'true' || needs.cambios.outputs.conocimiento == 'true')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      COMPLETO: ${{ needs.cambios.result != 'success' || needs.cambios.outputs.backend == 'true' }}
     defaults:
       run:
         working-directory: backend
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
-          # La versión de Node vive en .nvmrc, la misma que la imagen de
-          # producción (backend/Dockerfile) y que `engines` en cada package.json.
           node-version-file: .nvmrc
           cache: npm
           cache-dependency-path: backend/package-lock.json
 
       - run: npm ci
-      - run: npm run typecheck
-      - run: npm run lint
-      - run: npm run test
-      # Alhabla Growth: el extractor de conocimiento lee PRODUCT.md, plans.ts y
-      # paginas.ts. Si alguno cambia de forma que el mapa no cubra algo, falla
-      # aquí y no cuando alguien sincroniza. Sin red, sin base de datos y sin
-      # git profundo (el checkout trae el monorepo entero).
+      - if: env.COMPLETO == 'true'
+        run: npm run typecheck
+      - if: env.COMPLETO == 'true'
+        run: npm run lint
+      - if: env.COMPLETO == 'true'
+        run: npm run test
+      - name: Solo los tests que leen el repo (no cambia backend/)
+        if: env.COMPLETO != 'true'
+        run: npm run test:conocimiento
       - run: npm run growth:conocimiento -- --comprobar
 
   integration:
     name: Backend — tests de integración
-    if: github.event.action != 'labeled' && github.event.action != 'unlabeled'
+    needs: cambios
+    if: >-
+      !cancelled() && github.event.action != 'labeled' && github.event.action != 'unlabeled' &&
+      (needs.cambios.result != 'success' || needs.cambios.outputs.backend == 'true' || needs.cambios.outputs.conocimiento == 'true')
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     defaults:
       run:
         working-directory: backend
-    # Estos tests corren contra Postgres DE VERDAD (no mocks): es la
-    # única capa donde se comprueban el esquema real, las transacciones y la
-    # caché de voz. Existían desde hacía tiempo pero no los ejecutaba nadie
-    # salvo a mano, así que un fallo de esquema solo aparecía en producción.
     services:
       postgres:
         image: postgres:15-alpine
@@ -74,47 +128,41 @@ jobs:
           --health-timeout 5s
           --health-retries 12
     env:
-      # En local estas variables salen de backend/.env.test, que está en
-      # .gitignore. `tests/integration/setup.ts` carga ese fichero con dotenv
-      # SIN override, así que lo que se ponga aquí manda y en CI da igual que
-      # el fichero no exista. El puerto es 5432 y no 5433: el 5433 de local
-      # solo evita el choque con el Postgres de Homebrew.
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/alhabla_test
-      # Valores de relleno, no secretos: estos tests no llaman a ningún
-      # servicio externo.
       JWT_SECRET: ci-tests-de-integracion-sin-valor-real
       NODE_ENV: test
+      COMPLETO: ${{ needs.cambios.result != 'success' || needs.cambios.outputs.backend == 'true' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
-          # La versión de Node vive en .nvmrc, la misma que la imagen de
-          # producción (backend/Dockerfile) y que `engines` en cada package.json.
           node-version-file: .nvmrc
           cache: npm
           cache-dependency-path: backend/package-lock.json
 
       - run: npm ci
 
-      # El esquema tiene que existir antes de que los tests limpien tablas.
-      # `migrate deploy` (no `dev`) para aplicar exactamente las migraciones
-      # versionadas, que es lo que corre en producción.
       - run: npx prisma migrate deploy
 
-      - run: npm run test:integration
+      - if: env.COMPLETO == 'true'
+        run: npm run test:integration
+      - name: Solo los de Growth, que leen el repo (no cambia backend/)
+        if: env.COMPLETO != 'true'
+        run: npm run test:integration:conocimiento
 
   diff:
     name: Cambios — migraciones y orden de despliegue
     # Solo en PR: son avisos para quien revisa. En un push a main ya es tarde.
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
-      # cloudbuild.yaml aplica las migraciones ANTES de cambiar el tráfico, así
+      # cloudbuild-migraciones.yaml aplica las migraciones ANTES de cambiar el tráfico, así
       # que durante el despliegue conviven el esquema nuevo y la revisión
       # antigua. Quitar o renombrar una columna en el mismo deploy que el
       # código que deja de usarla rompe esa revisión mientras dura el cambio:
@@ -159,7 +207,7 @@ jobs:
             exit 0
           fi
 
-          echo "::error::Esta migración rompe la revisión antigua mientras dura el despliegue (cloudbuild aplica las migraciones antes de cambiar el tráfico). Si el código que usaba esas columnas YA está desplegado, confírmalo con la etiqueta 'migracion-contract' en el PR o con la línea 'contract-migration: ok' en un commit. Si no, pártelo en dos deploys."
+          echo "::error::Esta migración rompe la revisión antigua mientras dura el despliegue (deploy-backend.yml aplica las migraciones antes de cambiar el tráfico). Si el código que usaba esas columnas YA está desplegado, confírmalo con la etiqueta 'migracion-contract' en el PR o con la línea 'contract-migration: ok' en un commit. Si no, pártelo en dos deploys."
           exit 1
 
       # No bloquea: el riesgo real es bajo y ocasional, pero conviene recordar
@@ -180,8 +228,12 @@ jobs:
 
   worker-laliga:
     name: Infra — Worker de LaLiga
-    if: github.event.action != 'labeled' && github.event.action != 'unlabeled'
+    needs: cambios
+    if: >-
+      !cancelled() && github.event.action != 'labeled' && github.event.action != 'unlabeled' &&
+      (needs.cambios.result != 'success' || needs.cambios.outputs.laliga == 'true')
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     # El Worker que apaga y enciende el proxy de Cloudflare en los bloqueos de
     # LaLiga. No tiene dependencias: sus tests van con el runner de Node. Este
     # job no lo despliega; se sube a mano (README de la carpeta).
@@ -189,46 +241,60 @@ jobs:
       run:
         working-directory: infra/cloudflare/failover-laliga
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
-          # La versión de Node vive en .nvmrc, la misma que la imagen de
-          # producción (backend/Dockerfile) y que `engines` en cada package.json.
           node-version-file: .nvmrc
 
       - run: node --test
 
   copias-compartidas:
     name: Copias compartidas app/web
-    if: github.event.action != 'labeled' && github.event.action != 'unlabeled'
+    needs: cambios
+    if: >-
+      !cancelled() && github.event.action != 'labeled' && github.event.action != 'unlabeled' &&
+      (needs.cambios.result != 'success' || needs.cambios.outputs.copias == 'true')
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     # La app y la web son dos proyectos de Vercel con root propio, así que un
     # componente que usan las dos vive copiado en las dos, sin paquete común.
     # google-analytics.tsx acabó con dos versiones distintas porque nada lo
     # comprobaba. La lista de ficheros vive en el script.
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - run: bash scripts/comprobar-copias-compartidas.sh
 
   frontend:
     name: Frontend — lint, test, build
-    if: github.event.action != 'labeled' && github.event.action != 'unlabeled'
+    needs: cambios
+    if: >-
+      !cancelled() && github.event.action != 'labeled' && github.event.action != 'unlabeled' &&
+      (needs.cambios.result != 'success' || needs.cambios.outputs.frontend == 'true')
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     defaults:
       run:
         working-directory: frontend
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           # La versión de Node vive en .nvmrc, la misma que la imagen de
           # producción (backend/Dockerfile) y que `engines` en cada package.json.
           node-version-file: .nvmrc
           cache: npm
           cache-dependency-path: frontend/package-lock.json
+
+      # La caché de compilación de Next (la receta de su documentación): con
+      # el mismo lock, recompila solo lo que cambia.
+      - uses: actions/cache@v6
+        with:
+          path: frontend/.next/cache
+          key: next-frontend-${{ hashFiles('frontend/package-lock.json') }}-${{ hashFiles('frontend/src/**') }}
+          restore-keys: next-frontend-${{ hashFiles('frontend/package-lock.json') }}-
 
       - run: npm ci
       - run: npm run lint
@@ -249,21 +315,29 @@ jobs:
 
   web:
     name: Web — lint, test, build
-    if: github.event.action != 'labeled' && github.event.action != 'unlabeled'
+    needs: cambios
+    if: >-
+      !cancelled() && github.event.action != 'labeled' && github.event.action != 'unlabeled' &&
+      (needs.cambios.result != 'success' || needs.cambios.outputs.web == 'true')
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     defaults:
       run:
         working-directory: web
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
-          # La versión de Node vive en .nvmrc, la misma que la imagen de
-          # producción (backend/Dockerfile) y que `engines` en cada package.json.
           node-version-file: .nvmrc
           cache: npm
           cache-dependency-path: web/package-lock.json
+
+      - uses: actions/cache@v6
+        with:
+          path: web/.next/cache
+          key: next-web-${{ hashFiles('web/package-lock.json') }}-${{ hashFiles('web/src/**', 'web/content/**') }}
+          restore-keys: next-web-${{ hashFiles('web/package-lock.json') }}-
 
       - run: npm ci
       - run: npm run lint
@@ -284,26 +358,35 @@ jobs:
 
   growth:
     name: Growth — lint, test, build
-    if: github.event.action != 'labeled' && github.event.action != 'unlabeled'
+    needs: cambios
+    if: >-
+      !cancelled() && github.event.action != 'labeled' && github.event.action != 'unlabeled' &&
+      (needs.cambios.result != 'success' || needs.cambios.outputs.growth == 'true')
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     defaults:
       run:
         working-directory: growth
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
-          # La versión de Node vive en .nvmrc, la misma que la imagen de
-          # producción (backend/Dockerfile) y que `engines` en cada package.json.
           node-version-file: .nvmrc
           cache: npm
           cache-dependency-path: growth/package-lock.json
 
+      - uses: actions/cache@v6
+        with:
+          path: growth/.next/cache
+          key: next-growth-${{ hashFiles('growth/package-lock.json') }}-${{ hashFiles('growth/src/**') }}
+          restore-keys: next-growth-${{ hashFiles('growth/package-lock.json') }}-
+
       - run: npm ci
       - run: npm run lint
-      # Incluye la prueba de paridad con backend/src/modules/growth/estados.ts
-      # (el checkout trae el repo entero, así que el fichero está).
+      # Incluye las pruebas de paridad con backend/src/modules/growth/ (el
+      # checkout trae el repo entero, así que los ficheros están; por eso esa
+      # carpeta también activa este job).
       - run: npm run test
       # El dashboard interno de Alhabla Growth (PLAN-GROWTH.md § 8). Sin
       # NEXT_PUBLIC_GROWTH_DEMO: con ella el build de producción FALLA a

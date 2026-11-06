@@ -12,6 +12,13 @@ name: Deploy backend
 # completo del pool/provider y de qué permisos tiene esa SA y por qué, en la
 # memoria de Claude Code "ci-cd-pipeline-setup" y en el runbook de despliegue
 # (notas personales fuera del repo; Second-Brain/ está en .gitignore).
+#
+# Orden (desde el 2026-11-06): los tests y la imagen van A LA VEZ, porque
+# construir la imagen no toca producción; las migraciones y el cambio de
+# tráfico solo cuando han pasado los dos. Antes iban en fila (tests 1 min 45 s
+# y luego imagen y migraciones en un mismo build de 5 min 36 s): ~9 min por
+# deploy. La imagen tiene caché de capas (backend/cloudbuild.yaml) y las
+# migraciones solo instalan el CLI de Prisma (backend/cloudbuild-migraciones.yaml).
 
 on:
   push:
@@ -42,13 +49,14 @@ jobs:
   test:
     name: Test antes de desplegar
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: backend
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           # La versión de Node vive en .nvmrc, la misma que la imagen de
           # producción (backend/Dockerfile) y que `engines` en cada package.json.
@@ -61,34 +69,56 @@ jobs:
       - run: npm run lint
       - run: npm run test
 
-  deploy:
-    name: Build y deploy a Cloud Run
-    needs: test
+  imagen:
+    name: Construir la imagen
+    # A la vez que los tests: solo publica alhabla/backend:<sha>, no toca
+    # producción. Si los tests fallan, la imagen se queda sin desplegar.
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Autenticar contra GCP (Workload Identity Federation)
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: projects/364278302839/locations/global/workloadIdentityPools/github-pool/providers/github-provider
+          service_account: github-actions-ci@project-84381467-a606-4b71-a6e.iam.gserviceaccount.com
+
+      - uses: google-github-actions/setup-gcloud@v3
+
+      - name: Construir y publicar la imagen (con caché de capas)
+        run: bash .github/scripts/cloud-build.sh backend backend/cloudbuild.yaml "_TAG=${{ github.sha }}"
+
+  deploy:
+    name: Migrar y desplegar en Cloud Run
+    needs: [test, imagen]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
     environment: production
     steps:
       # fetch-depth: 0 para poder comparar el diff real del push y decidir si
       # hay que forzar el reconciliador de agentes (ver el último paso).
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
       - id: auth
         name: Autenticar contra GCP (Workload Identity Federation)
-        uses: google-github-actions/auth@v2
+        uses: google-github-actions/auth@v3
         with:
           workload_identity_provider: projects/364278302839/locations/global/workloadIdentityPools/github-pool/providers/github-provider
           service_account: github-actions-ci@project-84381467-a606-4b71-a6e.iam.gserviceaccount.com
 
-      - uses: google-github-actions/setup-gcloud@v2
+      - uses: google-github-actions/setup-gcloud@v3
 
       # Desde el paso a Postgres (PR A), cada instancia abre una conexión
       # propia para el límite de peticiones: 3 conexiones en marcha normal y
       # 4 en el peor caso, contra los 50 de max_connections de Cloud SQL. Solo
       # cabe con como mucho 11 instancias (11 × 4 = 44, más una migración y un
       # proxy, dentro de los 47 huecos no reservados; AGENTS.md § Pool). Se
-      # comprueba ANTES de construir y migrar: si alguien sube el máximo en la
-      # consola, el deploy se para sin haber tocado nada. Vale el menor de los
+      # comprueba ANTES de migrar: si alguien sube el máximo en la consola, el
+      # deploy se para sin haber tocado producción (la imagen ya construida no
+      # cuenta: no sirve tráfico). Vale el menor de los
       # dos máximos, el del servicio (`--max`) y el de la plantilla de la
       # revisión (`--max-instances`); sin ninguno, Cloud Run escala a 100.
       - name: Comprobar el máximo de instancias (presupuesto de conexiones)
@@ -119,46 +149,8 @@ jobs:
           fi
           echo "Máximo efectivo: $EFECTIVO ≤ $MAX_INSTANCIAS"
 
-      - name: Construir y publicar la imagen (cloudbuild.yaml aplica las migraciones de Prisma)
-        working-directory: backend
-        run: |
-          # `gcloud builds submit` (sin --async) intenta hacer streaming del log
-          # del build por defecto — ese streaming exige el rol primitivo Viewer/
-          # Owner del proyecto (no basta con permisos granulares de Cloud Build o
-          # Cloud Logging: se probó roles/logging.viewer y el fallo persistió,
-          # exactamente igual con --suppress-logs). github-actions-ci no tiene
-          # ese rol a propósito (mínimo privilegio), así que el build terminaba
-          # bien en GCP pero el comando `gcloud` salía con exit 1 igualmente.
-          # Solución real: --async (solo crea el build y devuelve su ID, sin
-          # intentar ningún streaming) + sondear nosotros mismos con
-          # `gcloud builds describe`, que solo necesita cloudbuild.builds.get
-          # (ya cubierto por cloudbuild.builds.editor) — verificado en local
-          # antes de este cambio, tres builds reales de prueba.
-          BUILD_ID=$(gcloud builds submit \
-            --project="${{ env.GCP_PROJECT_ID }}" \
-            --config cloudbuild.yaml \
-            --substitutions=_TAG="${{ github.sha }}" \
-            --async \
-            --format='value(id)' \
-            .)
-          echo "Build ID: $BUILD_ID"
-
-          while true; do
-            STATUS=$(gcloud builds describe "$BUILD_ID" --project="${{ env.GCP_PROJECT_ID }}" --format='value(status)')
-            echo "Estado del build: $STATUS"
-            case "$STATUS" in
-              SUCCESS)
-                break
-                ;;
-              FAILURE|INTERNAL_ERROR|TIMEOUT|CANCELLED|EXPIRED)
-                echo "::error::Build $BUILD_ID terminó en $STATUS — ver https://console.cloud.google.com/cloud-build/builds/$BUILD_ID?project=${{ env.GCP_PROJECT_ID }}"
-                exit 1
-                ;;
-              *)
-                sleep 10
-                ;;
-            esac
-          done
+      - name: Aplicar las migraciones de Prisma
+        run: bash .github/scripts/cloud-build.sh backend backend/cloudbuild-migraciones.yaml
 
       # Se captura ANTES de desplegar en vez de deducirla después como "la
       # penúltima": si el deploy falla sin llegar a crear revisión, la
