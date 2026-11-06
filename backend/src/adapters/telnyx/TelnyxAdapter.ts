@@ -15,6 +15,15 @@ export interface AvailableNumber {
 
 export type TelnyxOrderStatus = "pending" | "success" | "failure";
 
+/**
+ * La etiqueta de entorno de los números de Telnyx (AGENTS.md § «Telnyx: qué
+ * es de desarrollo y qué de producción»). Cloud Run corre con
+ * NODE_ENV=production (Dockerfile); backend-dev, con development.
+ */
+export function etiquetaDeEntorno(): "env-prod" | "env-dev" {
+  return process.env.NODE_ENV === "production" ? "env-prod" : "env-dev";
+}
+
 export interface NumberOrderResult {
   orderId: string;
   status: TelnyxOrderStatus;
@@ -136,6 +145,33 @@ export class TelnyxAdapter {
       }
     }
     return null;
+  }
+
+  /**
+   * Deja en el número la etiqueta del entorno que lo usa (`env-prod` o
+   * `env-dev`, ver etiquetaDeEntorno) y quita la del otro, sin tocar las demás
+   * (`whatsapp-sector`, `sector-<tipo>`…). Telnyx no tiene «añadir una tag»:
+   * `tags` sustituye la lista entera, así que se lee la actual y se manda
+   * completa. Las tags no enrutan nada (eso es el `connection_id`); sirven
+   * para filtrar la cuenta, que dev y producción comparten hasta #400. Si ya
+   * estaba bien, no escribe.
+   */
+  async marcarEntornoDelNumero(phoneNumberId: string): Promise<string[]> {
+    const client = getTelnyxClient();
+    const { data } = await client.phoneNumbers.retrieve(phoneNumberId);
+    const actuales = data?.tags ?? [];
+    const entorno = etiquetaDeEntorno();
+    const tags = [
+      ...actuales.filter((tag) => !/^env-/i.test(tag)),
+      entorno,
+    ];
+    const yaEstaba =
+      actuales.length === tags.length &&
+      tags.every((tag) => actuales.includes(tag));
+    if (!yaEstaba) {
+      await client.phoneNumbers.update(phoneNumberId, { tags });
+    }
+    return tags;
   }
 
   async getNumber(

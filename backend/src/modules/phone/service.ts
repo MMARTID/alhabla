@@ -1,5 +1,8 @@
 import { prisma } from "../../lib/prisma.js";
-import { telnyxAdapter } from "../../adapters/telnyx/TelnyxAdapter.js";
+import {
+  etiquetaDeEntorno,
+  telnyxAdapter,
+} from "../../adapters/telnyx/TelnyxAdapter.js";
 import { telnyxAiAdapter } from "../../adapters/telnyx/TelnyxAiAdapter.js";
 import { invalidarCacheDeVoz } from "../../lib/voiceConfigCache.js";
 import { acquireLock, releaseLock } from "../../lib/bookingLock.js";
@@ -32,6 +35,26 @@ function sleep(ms: number) {
  * asynchronous (regulatory review) — if a previous attempt already placed an
  * order, resumes polling that same order instead of purchasing a new one.
  */
+/**
+ * Etiqueta el número con su entorno (`env-prod` / `env-dev`). Las tags no
+ * enrutan llamadas, así que un fallo aquí no puede tumbar una compra ya pagada
+ * ni una asignación: se avisa en el log con lo que hay que hacer a mano.
+ */
+async function marcarEntornoSinFallar(
+  phoneNumberId: string,
+  phoneNumber: string
+): Promise<void> {
+  try {
+    await telnyxAdapter.marcarEntornoDelNumero(phoneNumberId);
+  } catch (err) {
+    console.error(
+      `[Phone] No se pudo poner la etiqueta ${etiquetaDeEntorno()} al número ${phoneNumber} (${phoneNumberId}) en Telnyx: ${
+        err instanceof Error ? err.message : String(err)
+      } — el número funciona, pero hay que ponérsela a mano en el portal`
+    );
+  }
+}
+
 export async function provisionPhoneNumber(businessId: string): Promise<{
   success: boolean;
   phoneNumber?: string;
@@ -348,6 +371,10 @@ export async function provisionPhoneNumber(businessId: string): Promise<{
       },
     });
 
+    if (resolvedPhoneNumberId) {
+      await marcarEntornoSinFallar(resolvedPhoneNumberId, order.phoneNumber);
+    }
+
     // telnyxPhoneNumber forma parte de BusinessVoiceConfig (voiceTools/service.ts,
     // usado como remitente del SMS de aviso de reserva) — sin invalidar, un
     // negocio que ya hubiera hecho alguna llamada de voz antes de comprar su
@@ -547,6 +574,9 @@ export async function asignarNumeroExistente(
     }
 
     await telnyxAiAdapter.setPhoneNumberConnectionId(numero.id, connectionId);
+    // Un número que pasa de dev a producción (o al revés) se lleva la
+    // etiqueta del otro entorno si no se cambia aquí: le pasó al +34930453219.
+    await marcarEntornoSinFallar(numero.id, numero.phoneNumber);
     await prisma.business.update({
       where: { id: businessId },
       data: {
