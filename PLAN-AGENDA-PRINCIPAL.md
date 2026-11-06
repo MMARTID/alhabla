@@ -1,6 +1,7 @@
 # Plan: la agenda de Alhabla como agenda principal
 
-Estado: **fases 1 a 3 en curso** (backend, rama `feat/agenda-principal-backend`, 06-11-2026). Las
+Estado: **fases 1 a 4 hechas, sin desplegar** (06-11-2026): backend en `feat/agenda-principal-backend`, app en
+`feat/agenda-principal-app`. Quedan la prueba de punta a punta en dev, la fase 5 (web) y la 7. Las
 correcciones al implementarlo van marcadas con **[rev]**. Sustituye el «principio de diseño» y los tres modos de
 `PLAN-AGENDA-ALHABLA.md`; lo que ese plan construyó (crear citas desde el panel, bloqueos, ausencias, feed
 iCal) se queda tal cual y pasa a ser de todos los negocios.
@@ -209,6 +210,13 @@ copias pendientes de más de una hora y avisa al dueño una vez (regla 5).
   - fuera el texto «Solo las citas reservadas con Alhabla» (`agenda-escritorio.tsx`);
   - en el detalle de una cita, una línea discreta cuando la copia está pendiente o falló.
 - **`lib/api.ts` y `lib/types.ts`:** fuera la llamada de cambiar modo y el campo.
+- **[rev] Hecho en la PR de la app** (rama `feat/agenda-principal-app`), con dos diferencias:
+  - el estado `copias_pendientes` no está: la app no recibe cuántas copias esperan. Basta con el aviso de
+    WhatsApp del cuarto intento;
+  - en el alta, «En papel o en otro programa» explica cómo pasar lo que ya tiene (desde el panel o por
+    WhatsApp) en vez de abrir «Nueva cita» allí mismo: en ese paso todavía no hay panel.
+  Quitar el calendario necesita `DELETE /calendar/conexion` (backend). `modoDeAgenda` se queda en el tipo
+  hasta la fase 7.
 
 ### Fase 5: marketing con toque humano
 
