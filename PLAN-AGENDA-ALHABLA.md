@@ -1,5 +1,10 @@
 # Plan: Agenda de Alhabla (reservar sin calendario externo)
 
+> **Superado en parte el 06-11-2026 por `PLAN-AGENDA-PRINCIPAL.md`:** la agenda de Alhabla pasa a ser la
+> de todos los negocios y los calendarios externos, un complemento. Desaparecen los tres modos y la regla
+> de no reservar con el calendario caducado. Lo construido aquí (crear desde el panel, bloqueos, ausencias,
+> feed iCal) se mantiene.
+
 Estado: **MVP hecho** (28-10-2026; fases 0 a 4 en las PRs #364–#368; queda la comprobación de
 extremo a extremo en dev tras el despliegue y los extras de «Después»). Origen:
 `docs/auditorias/2026-10-28-auditoria-de-producto.md` (hallazgo 2 y §3). Revisado contra el código el
