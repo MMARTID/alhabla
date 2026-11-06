@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { plans } from "@/lib/plans";
+import { REDES } from "@/lib/redes";
 
 export const siteName = "Alhabla";
 export const defaultTitle = "Alhabla: recepcionista de IA que contesta llamadas y reserva citas";
@@ -36,6 +37,13 @@ export function absoluteUrl(path = "/") {
 
 /** Correo público (el del pie de la web). */
 export const contactEmail = "hola@alhabla.ai";
+/** Alias, por tema, del único buzón de Zoho (admin@): llegan al mismo sitio,
+ * pero se pueden filtrar y, el día que haya equipo, repartir. Una dirección
+ * nueva se crea en Zoho antes de publicarla: si no existe, rebota. */
+export const correoDePrensa = "prensa@alhabla.ai";
+export const correoDeEmpresas = "empresas@alhabla.ai";
+export const correoDeColaboraciones = "colaboraciones@alhabla.ai";
+export const correoDeSeguridad = "seguridad@alhabla.ai";
 
 /**
  * Imagen de Open Graph / Twitter de una página: cada ruta indexable tiene
@@ -94,6 +102,7 @@ export function organizationStructuredData() {
     url: absoluteUrl("/"),
     logo: { "@type": "ImageObject", url: absoluteUrl("/icon.png"), width: 512, height: 512 },
     description: defaultDescription,
+    sameAs: REDES.map(({ url }) => url),
     contactPoint: {
       "@type": "ContactPoint",
       contactType: "customer support",
@@ -141,7 +150,7 @@ export const landingStructuredData = {
       // (la misma lista que «Qué hace distinto» de /llms.txt).
       featureList: [
         "Contesta las llamadas que el negocio no coge, con su número de siempre (desvío)",
-        "Comprueba el hueco en Google Calendar, Outlook, iCloud o la agenda de Alhabla antes de reservar",
+        "Agenda incluida: comprueba el hueco antes de reservar y copia cada cita en Google Calendar, Outlook o iCloud si se conectan",
         "Reparto de citas por especialidad de cada profesional",
         "Confirmación de la cita por WhatsApp y recordatorio con botones (Pro y Scale)",
         "Lista de espera: aviso por WhatsApp si se libera por una cancelación la hora que pidió el cliente",

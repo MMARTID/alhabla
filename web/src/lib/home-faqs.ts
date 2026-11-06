@@ -16,9 +16,9 @@ export const HOME_QUICK_FAQS = [
       "Sí. Cada llamada empieza con el nombre de tu negocio y «te atiende su recepcionista de IA», como pide el Reglamento europeo de IA. Y solo se graba si el cliente da permiso.",
   },
   {
-    question: "¿Necesito conectar un calendario?",
+    question: "¿Dónde veo mis citas?",
     answer:
-      "No. Si usas Google Calendar, Outlook o iCloud, las citas entran ahí. Si no usas ninguno, van a la agenda de Alhabla: la ves en el panel, apuntas citas y ausencias desde ahí o por WhatsApp, y la tienes en el calendario del móvil con un enlace.",
+      "En WhatsApp: pregúntale «¿qué tengo mañana?» y te lo dice, o «apúntame a Javier el viernes a las siete» y lo apunta. También en el panel y en el calendario de tu móvil. Y si ya usas Google Calendar, Outlook o el iPhone, también aparecen ahí.",
   },
   {
     question: "¿En qué idiomas atiende?",

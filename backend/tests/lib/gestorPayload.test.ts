@@ -33,10 +33,14 @@ describe("buildGestorPrompt", () => {
     const prompt = buildGestorPrompt();
     expect(prompt).toContain("## Poner en marcha la recepcionista");
     expect(prompt).toContain("faltaPorConfigurar");
-    expect(prompt).toMatch(
-      /servicios .*personas del equipo.*horario semanal.*calendario/s
+    expect(prompt).toMatch(/servicios .*personas del equipo.*horario semanal/s);
+    // PLAN-AGENDA-PRINCIPAL.md: el calendario ya no es un paso de la puesta
+    // en marcha; la agenda es la de Alhabla y conectarlo es opcional.
+    expect(prompt).not.toMatch(/horario semanal, y calendario/);
+    expect(prompt).toContain(
+      "La agenda es la de Alhabla y las citas se apuntan aquí siempre; conectar Google Calendar, Outlook o el iPhone es opcional"
     );
-    expect(prompt).toContain("no lo puedes conectar tú");
+    expect(prompt).toContain("se hace desde el panel, nunca por aquí");
     expect(prompt).toContain("una sola propuesta");
     expect(prompt).toContain("Una sola propuesta a la vez");
     expect(prompt).toContain("formato HH:MM de 24 horas");

@@ -31,7 +31,10 @@ COPY --from=builder /app/dist ./dist
 COPY prisma ./prisma
 
 EXPOSE 3000
-CMD ["node", "dist/server.js"]   # ← producción usa node
+# Producción usa node, no tsx. El comentario va en su propia línea: al final
+# de la del CMD, BuildKit (buildx, desde el 2026-11-06) no la lee como JSON y
+# la convierte en `/bin/sh -c '["node", …]'`, que no arranca.
+CMD ["node", "dist/server.js"]
 
 # --- IMAGEN DE DESARROLLO (con tsx) ---
 FROM base AS development

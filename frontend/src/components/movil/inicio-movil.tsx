@@ -203,16 +203,14 @@ export function InicioMovil({
           />
         ) : null}
 
-        {!calendario.bookable ? (
+        {/* La agenda de Alhabla viene puesta (PLAN-AGENDA-PRINCIPAL.md): solo
+            se avisa si un calendario conectado dejó de verse. */}
+        {calendario.calendario === "sin_ver" ? (
           <TarjetaDeAviso
             href="/agente/calendario"
             icono={CalendarDays}
-            titulo={calendario.expired ? "Vuelve a conectar tu agenda" : "Elige dónde reservar"}
-            texto={
-              calendario.expired
-                ? `La conexión con ${calendario.label} ha caducado: sin ella no se reservan citas.`
-                : "Conecta tu calendario o usa la agenda de Alhabla. Hasta entonces, tu recepcionista toma nota pero no reserva citas."
-            }
+            titulo={`Vuelve a conectar ${calendario.label}`}
+            texto={`Tus citas siguen entrando en tu agenda, pero no veo lo que apuntas en ${calendario.label}.`}
           />
         ) : null}
 

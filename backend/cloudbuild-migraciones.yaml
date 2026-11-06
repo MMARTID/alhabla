@@ -1,0 +1,68 @@
+# Las migraciones de Prisma contra Cloud SQL, por el Cloud SQL Auth Proxy. Las
+# lanza deploy-backend.yml cuando han pasado los tests y la imagen ya está
+# publicada, y ANTES de desplegar la imagen nueva: evita que el código nuevo
+# corra contra un esquema desactualizado (2026-09-03: las columnas de
+# add_niche_prompt_personalization nunca se aplicaron en producción y rompieron
+# /business/me con P2022 hasta que se corrió `prisma migrate deploy` a mano).
+# Durante el despliegue conviven el esquema nuevo y la revisión antigua: por
+# eso el job «diff» de CI vigila las migraciones destructivas.
+# `prisma migrate deploy` usa un lock de Postgres: es seguro aunque se ejecute
+# más de una vez o a la vez que otro build.
+#
+# Solo el CLI de Prisma, en la versión exacta del package-lock.json: antes se
+# hacía `npm ci` del backend entero (513 paquetes, 77 s) para un paso de 10 s.
+#
+# _ORDEN=status lo comprueba sin aplicar nada (sale con error si hay
+# migraciones pendientes):
+#   gcloud builds submit backend --config backend/cloudbuild-migraciones.yaml --substitutions=_ORDEN=status
+substitutions:
+  _ORDEN: deploy
+steps:
+  # 1. Lo que se descarga e instala, en un paso SIN secretos: `npm install`
+  #    ejecuta los scripts de instalación de paquetes de terceros, y con
+  #    DATABASE_URL en el entorno cualquiera podría leer la cadena de conexión
+  #    de producción. Todo queda en /workspace, que el paso siguiente comparte.
+  #    El binario de cloud-sql-proxy se comprueba contra su SHA-256 antes de
+  #    usarlo (verificado el 2026-10-08 contra el MD5 que publica el bucket de
+  #    Google). Al subir de versión, actualiza URL y hash a la vez.
+  - name: "node:22-alpine"
+    id: herramientas-sin-secretos
+    entrypoint: "sh"
+    args:
+      - "-c"
+      - |
+        set -e
+        apk add --no-cache curl
+        mkdir -p /workspace/.migraciones
+        curl -sSL -o /workspace/.migraciones/cloud-sql-proxy \
+          https://storage.googleapis.com/cloud-sql-connectors/cloud-sql-proxy/v2.25.4/cloud-sql-proxy.linux.amd64
+        echo "b780c0d2c445ffd5d2fdba0925f2722c19fcd0d2c27c538e85713732698561f2  /workspace/.migraciones/cloud-sql-proxy" | sha256sum -c -
+        chmod +x /workspace/.migraciones/cloud-sql-proxy
+        VERSION=$$(node -p "require('./package-lock.json').packages['node_modules/prisma'].version")
+        cd /workspace/.migraciones
+        echo '{"private": true}' > package.json
+        npm install --no-audit --no-fund --loglevel=error "prisma@$$VERSION"
+
+  # 2. Con DATABASE_URL, ya sin instalar nada.
+  - name: "node:22-alpine"
+    id: migraciones
+    entrypoint: "sh"
+    args:
+      - "-c"
+      - |
+        set -e
+        mkdir -p /cloudsql
+        /workspace/.migraciones/cloud-sql-proxy --unix-socket=/cloudsql \
+          project-84381467-a606-4b71-a6e:europe-west1:alhabla-db &
+        SOCKET=/cloudsql/project-84381467-a606-4b71-a6e:europe-west1:alhabla-db/.s.PGSQL.5432
+        for i in $$(seq 1 15); do
+          [ -S "$$SOCKET" ] && break
+          sleep 1
+        done
+        [ -S "$$SOCKET" ]
+        /workspace/.migraciones/node_modules/.bin/prisma migrate ${_ORDEN} --schema prisma/schema.prisma
+    secretEnv: ["DATABASE_URL"]
+availableSecrets:
+  secretManager:
+    - versionName: projects/project-84381467-a606-4b71-a6e/secrets/DATABASE_URL/versions/latest
+      env: "DATABASE_URL"

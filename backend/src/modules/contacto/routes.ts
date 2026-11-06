@@ -6,6 +6,10 @@ import { solicitudDeContactoEmail } from "../../lib/emailTemplates.js";
 
 /** Buzón del equipo: el mismo que la web publica como contacto. */
 export const BUZON_DE_CONTACTO = "hola@alhabla.ai";
+/** Cadenas y franquicias: el mismo buzón de Zoho, con su alias para filtrarlas
+ * (la web lo publica en /planes y /contacto). */
+export const BUZON_DE_EMPRESAS = "empresas@alhabla.ai";
+const SEDES_DE_EMPRESA: readonly string[] = ["5+", "franquicia"];
 
 /**
  * Lo que puede tardar una persona en escribir y reenviar si se equivoca,
@@ -111,7 +115,14 @@ export const contactoRoutes: FastifyPluginAsync = async (fastify) => {
         // El id de la tarea es también la clave de envío único: una segunda
         // entrega de Cloud Tasks no repite el correo.
         await enqueueEmailJob(
-          { fromAlias: "support", toAddress: BUZON_DE_CONTACTO, subject, html },
+          {
+            fromAlias: "support",
+            toAddress: SEDES_DE_EMPRESA.includes(datos.sedes)
+              ? BUZON_DE_EMPRESAS
+              : BUZON_DE_CONTACTO,
+            subject,
+            html,
+          },
           `contacto-${randomUUID()}`
         );
       } catch (error) {

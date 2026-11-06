@@ -556,13 +556,6 @@ export class CalendarService {
       idempotencyKey?: string;
     }
   ): Promise<EventoCreado> {
-    // Agenda de Alhabla (PLAN-AGENDA-ALHABLA.md): la cita vive solo en
-    // Postgres. No hay evento que crear, y así los cinco caminos que
-    // reservan (voz, Gestor, lista de espera, reintento, panel) siguen
-    // llamando aquí antes de escribir el Booking sin tener que distinguir.
-    if ("agendaPropia" in input.conexion && input.conexion.agendaPropia) {
-      return { id: null, htmlLink: null };
-    }
     const activa = exigirConexionActiva(input.conexion, "reservar");
     const startTime = new Date(input.startDateTime);
     const endTime = new Date(

@@ -14,7 +14,7 @@ import { IconoMicrosoft } from "../iconos-de-calendario";
 const ruta = "/integraciones/outlook";
 const titulo = "Outlook y Microsoft 365 con tu recepcionista";
 const descripcion =
-  "Conecta tu calendario de Outlook, Hotmail o Microsoft 365: tu recepcionista de IA mira tus horas libres y deja ahí cada cita que reserva por teléfono.";
+  "Tus citas de Alhabla, también en tu Outlook, Hotmail o Microsoft 365: cada cita aparece ahí y lo que apuntes tú cuenta como ocupado.";
 
 export const metadata = metadataDePagina({ ruta, titulo, descripcion });
 
@@ -65,7 +65,7 @@ export default function OutlookPage() {
         {
           question: "¿Tengo que volver a conectarlo cada cierto tiempo?",
           answer:
-            "No. Solo si revocas el permiso o un administrador lo retira; entonces el panel te pide reconectar.",
+            "No. Solo si revocas el permiso o un administrador lo retira: tus citas siguen entrando en tu agenda, te avisamos y el panel te pide reconectarlo.",
         },
         {
           question: "Tenemos un calendario compartido. ¿Puedo elegirlo?",

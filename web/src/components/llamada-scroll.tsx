@@ -105,7 +105,7 @@ function pasosDe(g: GuionRelato): [PasoCopy, PasoCopy, PasoCopy] {
       titulo: "Busca hueco en tu agenda.",
       texto:
         g.pasos?.llamada[1] ??
-        "Antes de ofrecer una hora mira tu horario y tu agenda: tu calendario de Google, Outlook o iCloud, o la de Alhabla si no usas ninguno. Nunca te monta dos citas a la vez.",
+        "Antes de ofrecer una hora mira tu horario, tu equipo y tu agenda. Nunca te monta dos citas a la vez.",
       detalles: [
         "Cuenta lo que dura el servicio y descarta lo ocupado y los huecos cortos",
         "Elige al profesional adecuado; si la hora está ocupada, propone el siguiente hueco libre",

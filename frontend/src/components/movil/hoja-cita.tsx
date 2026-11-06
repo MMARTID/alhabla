@@ -224,7 +224,6 @@ export function HojaCita({
                   <button
                     type="button"
                     onClick={() => setModo("mover")}
-                    disabled={!calendario.bookable}
                     className="btn-secondary flex-1 px-3"
                   >
                     <CalendarClock className="h-[18px] w-[18px]" aria-hidden="true" />
@@ -239,9 +238,6 @@ export function HojaCita({
                     Cancelar cita
                   </button>
                 </div>
-              ) : null}
-              {!pasada && !calendario.bookable ? (
-                <p className="mt-2 text-[13px] leading-5 text-muted">Para mover citas desde aquí, elige la agenda de Alhabla o conecta tu calendario.</p>
               ) : null}
               {calendario.connected ? (
                 <a

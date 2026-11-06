@@ -21,11 +21,21 @@ export const metadata = metadataDePagina({ ruta, titulo, descripcion });
 type Novedad = { titulo: string; texto: string };
 const MESES: { mes: string; fecha: string; novedades: Novedad[] }[] = [
   {
+    mes: "Noviembre de 2026",
+    fecha: "2026-11",
+    novedades: [
+      {
+        titulo: "Tu agenda, desde la primera llamada",
+        texto: "Ya no hay que elegir dónde van las citas. Entran en tu agenda desde el primer día y la llevas por WhatsApp. Si usas Google Calendar, Outlook o el iPhone, también las ves ahí.",
+      },
+    ],
+  },
+  {
     mes: "Octubre de 2026",
     fecha: "2026-10",
     novedades: [
       {
-        titulo: "La agenda de Alhabla: conectar un calendario es opcional",
+        titulo: "La agenda de Alhabla: conectar un calendario pasa a ser opcional",
         texto: "Si no usas Google Calendar, Outlook ni iCloud, la recepcionista reserva en la agenda de Alhabla. Desde el panel apuntas citas nuevas, bloqueas horas y marcas la ausencia de alguien del equipo.",
       },
       {

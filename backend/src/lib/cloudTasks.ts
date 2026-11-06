@@ -1,5 +1,5 @@
 import { CloudTasksClient } from "@google-cloud/tasks";
-import { InformeDeLlamadaJob, ProcessRecordingJob, RecordarRecadoJob, RecuperarTranscripcionJob, ReportUsageJob, RetryFailedBookingJob, RevisarEscaladaJob, SendEmailJob, SendSmsJob, SendWhatsappJob } from "./jobTypes.js";
+import { CopiaDeLaCitaJob, InformeDeLlamadaJob, ProcessRecordingJob, RecordatorioDeCalendarioJob, VolcadoDeLaAgendaJob, RecordarRecadoJob, RecuperarTranscripcionJob, ReportUsageJob, RetryFailedBookingJob, RevisarEscaladaJob, SendEmailJob, SendSmsJob, SendWhatsappJob } from "./jobTypes.js";
 import { processRecordingJob } from "../jobs/processRecording.js";
 import { processRetryFailedBookingJob } from "../jobs/retryFailedBooking.js";
 import { processSendEmailJob } from "../jobs/sendEmail.js";
@@ -111,6 +111,98 @@ export async function enqueueRetryBookingJob(
   await enqueueCloudTask({
     queue: "retry-failed-booking",
     path: "/internal/jobs/retry-failed-booking",
+    payload,
+    taskId,
+    scheduleTime,
+  });
+}
+
+/** Los tres jobs de la agenda principal (PLAN-AGENDA-PRINCIPAL.md) van por la
+ * cola de `retry-failed-booking`: reprograman sus propios reintentos con
+ * `scheduleTime`, así que su política de Cloud Tasks (4 intentos) solo cubre
+ * un fallo inesperado del propio job. En dev se ejecutan en línea (el módulo
+ * se importa al vuelo: depende de este fichero), salvo los programados a
+ * futuro, que solo dejan constancia como el reintento de reserva. */
+async function enDevOProgramado(
+  scheduleTime: Date | undefined,
+  descripcion: string,
+  ejecutar: () => Promise<unknown>
+): Promise<boolean> {
+  if (IS_PRODUCTION) return false;
+  if (scheduleTime && scheduleTime.getTime() > Date.now() + 1_000) {
+    console.log(
+      `[Job] ${descripcion} programado para ${scheduleTime.toISOString()} (no se ejecuta ahora, no hay Cloud Tasks en dev)`
+    );
+    return true;
+  }
+  await ejecutar();
+  return true;
+}
+
+export async function enqueueCopiaDeLaCitaJob(
+  payload: CopiaDeLaCitaJob,
+  taskId?: string,
+  scheduleTime?: Date
+): Promise<void> {
+  const enDev = await enDevOProgramado(
+    scheduleTime,
+    `Copia de la cita ${payload.bookingId} (intento ${payload.attempt ?? 1})`,
+    async () => {
+      const { sincronizarCopiaDeLaCita } =
+        await import("../modules/calendar/copiaDeLaCita.js");
+      await sincronizarCopiaDeLaCita(payload);
+    }
+  );
+  if (enDev) return;
+  await enqueueCloudTask({
+    queue: "retry-failed-booking",
+    path: "/internal/jobs/copiar-cita-al-calendario",
+    payload,
+    taskId,
+    scheduleTime,
+  });
+}
+
+export async function enqueueVolcadoDeLaAgendaJob(
+  payload: VolcadoDeLaAgendaJob,
+  taskId?: string
+): Promise<void> {
+  const enDev = await enDevOProgramado(
+    undefined,
+    `Volcado de la agenda del negocio ${payload.businessId}`,
+    async () => {
+      const { volcarAgendaAlCalendario } =
+        await import("../modules/calendar/copiaDeLaCita.js");
+      await volcarAgendaAlCalendario(payload);
+    }
+  );
+  if (enDev) return;
+  await enqueueCloudTask({
+    queue: "retry-failed-booking",
+    path: "/internal/jobs/volcar-agenda-al-calendario",
+    payload,
+    taskId,
+  });
+}
+
+export async function enqueueRecordatorioDeCalendarioJob(
+  payload: RecordatorioDeCalendarioJob,
+  taskId: string,
+  scheduleTime: Date
+): Promise<void> {
+  const enDev = await enDevOProgramado(
+    scheduleTime,
+    `Recordatorio del calendario desconectado del negocio ${payload.businessId}`,
+    async () => {
+      const { recordarCalendarioDesconectado } =
+        await import("../modules/whatsapp/alertas.js");
+      await recordarCalendarioDesconectado(payload);
+    }
+  );
+  if (enDev) return;
+  await enqueueCloudTask({
+    queue: "retry-failed-booking",
+    path: "/internal/jobs/recordar-calendario-desconectado",
     payload,
     taskId,
     scheduleTime,

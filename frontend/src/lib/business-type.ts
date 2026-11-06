@@ -99,8 +99,9 @@ export const BUSINESS_TYPE_ONBOARDING_TEXTS: Record<
     services: OnboardingStepTexts;
     team: OnboardingStepTexts & { employeeLabel: string };
     calendar: OnboardingStepTexts & {
-      /** Junto a «Configurar calendario después»: qué pasa si se
-       * salta el paso (auditoría de producto del 28-10, hallazgo 2). */
+      /** Bajo «En papel o en otro programa»: cómo pasar a la agenda lo que
+       * ya tiene apuntado (PLAN-AGENDA-PRINCIPAL.md: la agenda viene
+       * puesta; el nombre de la clave es histórico). */
       sinCalendario: string;
     };
   }
@@ -118,10 +119,10 @@ export const BUSINESS_TYPE_ONBOARDING_TEXTS: Record<
       employeeLabel: "Estilistas / peluqueros",
     },
     calendar: {
-      heading: "Conecta el calendario de tu peluquería",
-      subheading: "Tu recepcionista consultará disponibilidad y reservará citas directamente en tu agenda. Elige el calendario que usas a diario.",
-      cta: "Conectar calendario",
-      sinCalendario: "Si lo dejas para después, tu recepcionista atiende y toma nota de lo que te piden, pero no reserva citas. Puedes conectar tu calendario o activar la agenda de Alhabla cuando quieras en Agente › Calendario.",
+      heading: "Tu agenda ya está lista",
+      subheading: "Tu recepcionista reservará citas en ella desde la primera llamada. ¿Tienes ya citas apuntadas en otro sitio?",
+      cta: "Seguir",
+      sinCalendario: "Cuando entres en el panel, apunta tus próximas citas o bloquea los días que ya tienes llenos. También puedes decírselo a tu asistente por WhatsApp.",
     },
   },
   barberia: {
@@ -137,10 +138,10 @@ export const BUSINESS_TYPE_ONBOARDING_TEXTS: Record<
       employeeLabel: "Barberos",
     },
     calendar: {
-      heading: "Conecta el calendario de tu barbería",
-      subheading: "Tu recepcionista consultará huecos y reservará cortes y barbas directamente en tu agenda. Elige el calendario que usas a diario.",
-      cta: "Conectar calendario",
-      sinCalendario: "Si lo dejas para después, tu recepcionista atiende y toma nota de lo que te piden, pero no reserva cortes ni barbas. Puedes conectar tu calendario o activar la agenda de Alhabla cuando quieras en Agente › Calendario.",
+      heading: "Tu agenda ya está lista",
+      subheading: "Tu recepcionista reservará cortes y barbas en ella desde la primera llamada. ¿Tienes ya citas apuntadas en otro sitio?",
+      cta: "Seguir",
+      sinCalendario: "Cuando entres en el panel, apunta tus próximas citas o bloquea los días que ya tienes llenos. También puedes decírselo a tu asistente por WhatsApp.",
     },
   },
   "centro-de-estetica": {
@@ -156,10 +157,10 @@ export const BUSINESS_TYPE_ONBOARDING_TEXTS: Record<
       employeeLabel: "Esteticistas / terapeutas",
     },
     calendar: {
-      heading: "Conecta el calendario de tu centro de estética",
-      subheading: "Tu recepcionista consultará disponibilidad y reservará tratamientos directamente en tu agenda. Elige el calendario que usas a diario.",
-      cta: "Conectar calendario",
-      sinCalendario: "Si lo dejas para después, tu recepcionista atiende y toma nota de lo que te piden, pero no reserva tratamientos. Puedes conectar tu calendario o activar la agenda de Alhabla cuando quieras en Agente › Calendario.",
+      heading: "Tu agenda ya está lista",
+      subheading: "Tu recepcionista reservará tratamientos en ella desde la primera llamada. ¿Tienes ya citas apuntadas en otro sitio?",
+      cta: "Seguir",
+      sinCalendario: "Cuando entres en el panel, apunta tus próximas citas o bloquea los días que ya tienes llenos. También puedes decírselo a tu asistente por WhatsApp.",
     },
   },
   "salon-de-unas": {
@@ -175,10 +176,10 @@ export const BUSINESS_TYPE_ONBOARDING_TEXTS: Record<
       employeeLabel: "Técnicas de uñas",
     },
     calendar: {
-      heading: "Conecta el calendario de tu salón de uñas",
-      subheading: "Tu recepcionista consultará huecos y reservará manicuras y pedicuras directamente en tu agenda. Elige el calendario que usas a diario.",
-      cta: "Conectar calendario",
-      sinCalendario: "Si lo dejas para después, tu recepcionista atiende y toma nota de lo que te piden, pero no reserva manicuras ni pedicuras. Puedes conectar tu calendario o activar la agenda de Alhabla cuando quieras en Agente › Calendario.",
+      heading: "Tu agenda ya está lista",
+      subheading: "Tu recepcionista reservará manicuras y pedicuras en ella desde la primera llamada. ¿Tienes ya citas apuntadas en otro sitio?",
+      cta: "Seguir",
+      sinCalendario: "Cuando entres en el panel, apunta tus próximas citas o bloquea los días que ya tienes llenos. También puedes decírselo a tu asistente por WhatsApp.",
     },
   },
   fisioterapia: {
@@ -194,10 +195,10 @@ export const BUSINESS_TYPE_ONBOARDING_TEXTS: Record<
       employeeLabel: "Fisioterapeutas",
     },
     calendar: {
-      heading: "Conecta el calendario de tu clínica de fisioterapia",
-      subheading: "Tu recepcionista consultará huecos y reservará sesiones directamente en tu agenda. Elige el calendario que usas a diario.",
-      cta: "Conectar calendario",
-      sinCalendario: "Si lo dejas para después, tu recepcionista atiende y toma nota de lo que te piden, pero no reserva sesiones. Puedes conectar tu calendario o activar la agenda de Alhabla cuando quieras en Agente › Calendario.",
+      heading: "Tu agenda ya está lista",
+      subheading: "Tu recepcionista reservará sesiones en ella desde la primera llamada. ¿Tienes ya citas apuntadas en otro sitio?",
+      cta: "Seguir",
+      sinCalendario: "Cuando entres en el panel, apunta tus próximas citas o bloquea los días que ya tienes llenos. También puedes decírselo a tu asistente por WhatsApp.",
     },
   },
   "pestanas-y-cejas": {
@@ -213,10 +214,10 @@ export const BUSINESS_TYPE_ONBOARDING_TEXTS: Record<
       employeeLabel: "Técnicas de pestañas",
     },
     calendar: {
-      heading: "Conecta el calendario de tu estudio",
-      subheading: "Tu recepcionista consultará disponibilidad y reservará citas directamente en tu agenda. Elige el calendario que usas a diario.",
-      cta: "Conectar calendario",
-      sinCalendario: "Si lo dejas para después, tu recepcionista atiende y toma nota de lo que te piden, pero no reserva citas. Puedes conectar tu calendario o activar la agenda de Alhabla cuando quieras en Agente › Calendario.",
+      heading: "Tu agenda ya está lista",
+      subheading: "Tu recepcionista reservará citas en ella desde la primera llamada. ¿Tienes ya citas apuntadas en otro sitio?",
+      cta: "Seguir",
+      sinCalendario: "Cuando entres en el panel, apunta tus próximas citas o bloquea los días que ya tienes llenos. También puedes decírselo a tu asistente por WhatsApp.",
     },
   },
   "spa-y-masajes": {
@@ -232,10 +233,10 @@ export const BUSINESS_TYPE_ONBOARDING_TEXTS: Record<
       employeeLabel: "Masajistas / terapeutas",
     },
     calendar: {
-      heading: "Conecta el calendario de tu centro",
-      subheading: "Tu recepcionista consultará disponibilidad y reservará tratamientos directamente en tu agenda. Elige el calendario que usas a diario.",
-      cta: "Conectar calendario",
-      sinCalendario: "Si lo dejas para después, tu recepcionista atiende y toma nota de lo que te piden, pero no reserva tratamientos. Puedes conectar tu calendario o activar la agenda de Alhabla cuando quieras en Agente › Calendario.",
+      heading: "Tu agenda ya está lista",
+      subheading: "Tu recepcionista reservará tratamientos en ella desde la primera llamada. ¿Tienes ya citas apuntadas en otro sitio?",
+      cta: "Seguir",
+      sinCalendario: "Cuando entres en el panel, apunta tus próximas citas o bloquea los días que ya tienes llenos. También puedes decírselo a tu asistente por WhatsApp.",
     },
   },
   "peluqueria-canina": {
@@ -251,10 +252,10 @@ export const BUSINESS_TYPE_ONBOARDING_TEXTS: Record<
       employeeLabel: "Peluqueros caninos",
     },
     calendar: {
-      heading: "Conecta el calendario de tu peluquería canina",
-      subheading: "Tu recepcionista consultará disponibilidad y reservará citas directamente en tu agenda. Elige el calendario que usas a diario.",
-      cta: "Conectar calendario",
-      sinCalendario: "Si lo dejas para después, tu recepcionista atiende y toma nota de lo que te piden, pero no reserva citas. Puedes conectar tu calendario o activar la agenda de Alhabla cuando quieras en Agente › Calendario.",
+      heading: "Tu agenda ya está lista",
+      subheading: "Tu recepcionista reservará citas en ella desde la primera llamada. ¿Tienes ya citas apuntadas en otro sitio?",
+      cta: "Seguir",
+      sinCalendario: "Cuando entres en el panel, apunta tus próximas citas o bloquea los días que ya tienes llenos. También puedes decírselo a tu asistente por WhatsApp.",
     },
   },
   other: {
@@ -270,10 +271,10 @@ export const BUSINESS_TYPE_ONBOARDING_TEXTS: Record<
       employeeLabel: "Profesionales",
     },
     calendar: {
-      heading: "Conecta tu calendario",
-      subheading: "Tu recepcionista consultará disponibilidad y reservará citas directamente en tu agenda. Elige el calendario que usas a diario.",
-      cta: "Conectar calendario",
-      sinCalendario: "Si lo dejas para después, tu recepcionista atiende y toma nota de lo que te piden, pero no reserva citas. Puedes conectar tu calendario o activar la agenda de Alhabla cuando quieras en Agente › Calendario.",
+      heading: "Tu agenda ya está lista",
+      subheading: "Tu recepcionista reservará citas en ella desde la primera llamada. ¿Tienes ya citas apuntadas en otro sitio?",
+      cta: "Seguir",
+      sinCalendario: "Cuando entres en el panel, apunta tus próximas citas o bloquea los días que ya tienes llenos. También puedes decírselo a tu asistente por WhatsApp.",
     },
   },
 };

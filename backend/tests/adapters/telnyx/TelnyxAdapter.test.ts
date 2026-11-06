@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import Telnyx from "telnyx";
 import { TelnyxAdapter } from "../../../src/adapters/telnyx/TelnyxAdapter.js";
 
@@ -17,6 +17,7 @@ const mockNumberOrdersRetrieve = vi.fn();
 const mockPhoneNumbersDelete = vi.fn();
 const mockPhoneNumbersRetrieve = vi.fn();
 const mockPhoneNumbersList = vi.fn();
+const mockPhoneNumbersUpdate = vi.fn();
 const mockBalanceRetrieve = vi.fn();
 
 const mockTelnyxClient = {
@@ -29,6 +30,7 @@ const mockTelnyxClient = {
     delete: mockPhoneNumbersDelete,
     retrieve: mockPhoneNumbersRetrieve,
     list: mockPhoneNumbersList,
+    update: mockPhoneNumbersUpdate,
   },
   balance: { retrieve: mockBalanceRetrieve },
 };
@@ -43,6 +45,49 @@ describe("TelnyxAdapter", () => {
   beforeEach(() => {
     adapter = new TelnyxAdapter();
     vi.clearAllMocks();
+  });
+
+  describe("marcarEntornoDelNumero", () => {
+    const entornoOriginal = process.env.NODE_ENV;
+    afterEach(() => {
+      process.env.NODE_ENV = entornoOriginal;
+    });
+
+    it("cambia la etiqueta del otro entorno por la suya y conserva las demás", async () => {
+      process.env.NODE_ENV = "production";
+      mockPhoneNumbersRetrieve.mockResolvedValue({
+        data: { id: "pn_1", tags: ["env-dev", "whatsapp-sector"] },
+      });
+
+      const tags = await adapter.marcarEntornoDelNumero("pn_1");
+
+      expect(tags).toEqual(["whatsapp-sector", "env-prod"]);
+      expect(mockPhoneNumbersUpdate).toHaveBeenCalledWith("pn_1", {
+        tags: ["whatsapp-sector", "env-prod"],
+      });
+    });
+
+    it("no escribe si el número ya tiene su etiqueta", async () => {
+      process.env.NODE_ENV = "development";
+      mockPhoneNumbersRetrieve.mockResolvedValue({
+        data: { id: "pn_1", tags: ["env-dev"] },
+      });
+
+      await adapter.marcarEntornoDelNumero("pn_1");
+
+      expect(mockPhoneNumbersUpdate).not.toHaveBeenCalled();
+    });
+
+    it("pone la etiqueta a un número sin ninguna", async () => {
+      process.env.NODE_ENV = "development";
+      mockPhoneNumbersRetrieve.mockResolvedValue({ data: { id: "pn_1" } });
+
+      await adapter.marcarEntornoDelNumero("pn_1");
+
+      expect(mockPhoneNumbersUpdate).toHaveBeenCalledWith("pn_1", {
+        tags: ["env-dev"],
+      });
+    });
   });
 
   describe("checkHealth", () => {

@@ -1,0 +1,6 @@
+# Avisos de seguridad de Alhabla (RFC 9116). Si encuentras una vulnerabilidad en
+# alhabla.ai, app.alhabla.ai o api.alhabla.ai, escríbenos antes de publicarla.
+Contact: mailto:seguridad@alhabla.ai
+Expires: 2027-11-01T00:00:00.000Z
+Preferred-Languages: es, en
+Canonical: https://alhabla.ai/.well-known/security.txt

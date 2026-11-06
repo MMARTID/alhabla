@@ -19,12 +19,12 @@ import {
   marcarCalendarioDesconectado,
   nuncaConectoCalendario,
   origenDeCalendario,
-  origenExternoDeLaCita,
-  puedeReservar,
   persistirCredencialesRotadas,
+  quitarCalendarioConectado,
   resolverConexionDeCalendario,
   SELECT_CONEXION_DE_CALENDARIO,
   serializarBusiness,
+  tieneCalendarioConectado,
   usaCalendarioExterno,
 } from "../../../src/modules/calendar/conexion.js";
 import {
@@ -41,12 +41,19 @@ vi.mock("../../../src/lib/prisma.js", () => ({
   prisma: {
     business: {
       findUnique: vi.fn(),
+      findUniqueOrThrow: vi.fn(),
       update: vi.fn(),
     },
     calendarConnection: {
       updateMany: vi.fn(),
+      deleteMany: vi.fn(),
     },
   },
+}));
+
+// El volcado al conectar (import dinámico desde guardarConexionDeCalendario).
+vi.mock("../../../src/modules/calendar/copiaDeLaCita.js", () => ({
+  encolarVolcadoDeLaAgenda: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock("../../../src/modules/whatsapp/alertas.js", () => ({
@@ -377,7 +384,6 @@ describe("resolverConexionDeCalendario", () => {
       businessId: null,
       calendarIdConfigurado: null,
       marcadaConectada: null,
-      agendaPropia: false,
     });
   });
 });
@@ -541,10 +547,12 @@ describe("marcarCalendarioDesconectado", () => {
     const { alertarCalendarioDesconectado } = await import(
       "../../../src/modules/whatsapp/alertas.js"
     );
+    // Con el instante de la desconexión, que programa el recordatorio a 7 días.
     expect(alertarCalendarioDesconectado).toHaveBeenCalledWith({
       businessId: "biz_1",
       proveedor: "Google Calendar",
       providerId: "google",
+      desconectadoEn: expect.any(Date),
     });
   });
 
@@ -684,6 +692,51 @@ describe("guardarConexionDeCalendario", () => {
       },
     });
     expect(del).toHaveBeenCalledWith("voice_config:biz_1");
+  });
+
+  // PLAN-AGENDA-PRINCIPAL.md, fase 2: conectar pone el calendario al día con
+  // la agenda de Alhabla; guardarlo a medias todavía no.
+  it("al conectar encola el volcado de la agenda; a medias, no", async () => {
+    const { encolarVolcadoDeLaAgenda } = await import(
+      "../../../src/modules/calendar/copiaDeLaCita.js"
+    );
+    await guardarConexionDeCalendario("biz_1", {
+      provider: "google",
+      calendarId: "primary",
+      conectado: true,
+    });
+    expect(encolarVolcadoDeLaAgenda).toHaveBeenCalledWith("biz_1");
+
+    vi.mocked(encolarVolcadoDeLaAgenda).mockClear();
+    await guardarConexionDeCalendario("biz_1", {
+      provider: "outlook",
+      credenciales: { provider: "outlook", refreshToken: "rt" },
+      conectado: false,
+    });
+    expect(encolarVolcadoDeLaAgenda).not.toHaveBeenCalled();
+  });
+
+  it("si no se puede encolar el volcado, la conexión se guarda igual y queda en el log", async () => {
+    const { encolarVolcadoDeLaAgenda } = await import(
+      "../../../src/modules/calendar/copiaDeLaCita.js"
+    );
+    vi.mocked(encolarVolcadoDeLaAgenda).mockRejectedValueOnce(
+      new Error("Cloud Tasks caído")
+    );
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const business = await guardarConexionDeCalendario("biz_1", {
+      provider: "google",
+      calendarId: "primary",
+      conectado: true,
+    });
+
+    expect(business).toEqual({ id: "biz_1" });
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.stringContaining("No se pudo encolar el volcado"),
+      expect.any(Error)
+    );
+    errorSpy.mockRestore();
   });
 
   it("handleCallback: Google con refresh token y calendario 'primary'", async () => {
@@ -1120,7 +1173,9 @@ describe("nuncaConectoCalendario y codigoDeCalendarioNoOperativo", () => {
 });
 
 // PLAN-AGENDA-ALHABLA.md, fase 1: el modo de agenda.
-describe("agenda de Alhabla: resolver, puedeReservar y origen externo", () => {
+// PLAN-AGENDA-PRINCIPAL.md: el modo de agenda ya no decide nada. La conexión
+// se resuelve igual en cualquier modo y el calendario es un complemento.
+describe("agenda principal: el modo ya no cambia la conexión", () => {
   const conGoogle = (modoDeAgenda: string | null) => ({
     ...negocioConConexiones("google", [
       filaDeConexion("google", { refreshToken: "refresh_token" }),
@@ -1128,48 +1183,27 @@ describe("agenda de Alhabla: resolver, puedeReservar y origen externo", () => {
     modoDeAgenda,
   });
 
-  it("en modo alhabla la conexión se ignora: sin credenciales, agendaPropia y se puede reservar", () => {
+  it("en modo alhabla la conexión ya no se ignora: se lee y se copia en ella", () => {
     const c = resolverConexionDeCalendario(conGoogle("alhabla"));
-    expect(c.agendaPropia).toBe(true);
-    expect(c.credentials).toBeNull();
-    expect(conexionOperativa(c)).toBe(false);
-    expect(usaCalendarioExterno(c)).toBe(false);
-    expect(puedeReservar(c)).toBe(true);
-    expect(origenExternoDeLaCita(c)).toEqual({
-      externalCalendarProvider: null,
-      externalCalendarId: null,
-    });
-  });
-
-  it("con el proveedor forzado (cancelar una cita antigua) la conexión real sigue ahí", () => {
-    const c = resolverConexionDeCalendario(conGoogle("alhabla"), {
-      provider: "google",
-    });
-    expect(c.agendaPropia).toBe(false);
     expect(c.credentials).not.toBeNull();
     expect(conexionOperativa(c)).toBe(true);
+    expect(usaCalendarioExterno(c)).toBe(true);
+    expect(tieneCalendarioConectado(c)).toBe(true);
   });
 
-  it("en externo (o sin modo) manda la conexión: operativa reserva, caducada no", () => {
-    const operativa = resolverConexionDeCalendario(conGoogle("externo"));
-    expect(operativa.agendaPropia).toBe(false);
-    expect(puedeReservar(operativa)).toBe(true);
-    expect(origenExternoDeLaCita(operativa)).toEqual({
-      externalCalendarProvider: "google",
-      externalCalendarId: "primary",
-    });
-
-    const caducada = resolverConexionDeCalendario({
-      ...negocioConConexiones("google", [
+  it("tieneCalendarioConectado: con fila (aunque caducada) sí; sin fila, no", () => {
+    const caducada = resolverConexionDeCalendario(
+      negocioConConexiones("google", [
         filaDeConexion("google", { refreshToken: null, connected: false }),
-      ]),
-      modoDeAgenda: "externo",
-    });
-    expect(puedeReservar(caducada)).toBe(false);
+      ])
+    );
+    expect(conexionOperativa(caducada)).toBe(false);
+    expect(tieneCalendarioConectado(caducada)).toBe(true);
 
-    const sinModo = resolverConexionDeCalendario(negocioConConexiones("google", []));
-    expect(sinModo.agendaPropia).toBe(false);
-    expect(puedeReservar(sinModo)).toBe(false);
+    const sinFila = resolverConexionDeCalendario(
+      negocioConConexiones("google", [])
+    );
+    expect(tieneCalendarioConectado(sinFila)).toBe(false);
   });
 });
 
@@ -1230,6 +1264,35 @@ describe("cambiarModoDeAgenda", () => {
     expect(r.ok).toBe(true);
     expect(mockedBusinessUpdate).toHaveBeenCalledWith(
       expect.objectContaining({ data: { modoDeAgenda: "externo" } })
+    );
+  });
+});
+
+describe("quitarCalendarioConectado", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    reiniciarAlmacenEnMemoria();
+  });
+
+  it("borra las filas del negocio, invalida la caché de voz y devuelve el negocio", async () => {
+    vi.mocked(prisma.calendarConnection.deleteMany).mockResolvedValue({
+      count: 1,
+    } as never);
+    vi.mocked(prisma.business.findUniqueOrThrow).mockResolvedValue({
+      id: "biz_1",
+      calendarConnections: [],
+    } as never);
+    await almacenEnMemoria.guardarClave("voice_config:biz_1", "{}", 60_000);
+    almacenEnMemoria.borrarClave.mockClear();
+
+    const business = await quitarCalendarioConectado("biz_1");
+
+    expect(prisma.calendarConnection.deleteMany).toHaveBeenCalledWith({
+      where: { businessId: "biz_1" },
+    });
+    expect(business).toEqual({ id: "biz_1", calendarConnections: [] });
+    expect(almacenEnMemoria.borrarClave).toHaveBeenCalledWith(
+      "voice_config:biz_1"
     );
   });
 });

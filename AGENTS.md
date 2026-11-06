@@ -624,7 +624,8 @@ Para probar cambios de estos scripts antes de fusionarlos: un worktree de la ram
   - Cada escritura, también las rechazadas, va a `~/Library/Logs/alhabla-dev/inventario.log` (el
     prompt, solo su tamaño).
 - **Vistas previas de las sesiones** (`.claude/launch.json`): `:3101` (app) y `:3102` (web), contra
-  el backend fijo, y `growth-dev` en `:3103` (Growth en modo demostración, sin backend ni Google); el login con Google no funciona ahí (sus URIs de redirección son las de `:3001`).
+  el backend fijo; `app-rama` (`:3111`) y `web-rama` (`:3112`) sirven el worktree que elija
+  `vista_previa_rama` (`scripts/dev/vista-previa-rama.sh`), y `growth-dev` en `:3103` (Growth en modo demostración, sin backend ni Google); el login con Google no funciona ahí (sus URIs de redirección son las de `:3001`).
   `panel-dev` levanta el panel de la rama en `:3105` (el fijo de `:3005` no se toca).
 - **MCP:** `estado_dev` y `ver_en_dev` hacen lo mismo que el panel desde una sesión, sin `git` fuera
   de su worktree.
@@ -644,12 +645,14 @@ checkout PRINCIPAL aunque se lance desde un worktree (`git rev-parse --git-commo
 | `consultar_bd_prod` | SQL contra Cloud SQL `alhabla-db` / `alhabla` por Cloud SQL Auth Proxy (`--gcloud-auth`, lo arranca el MCP) | Rol `alhabla_lectura`: solo `pg_read_all_data`, `default_transaction_read_only`, `statement_timeout` 30 s y `CONNECTION LIMIT 2` (presupuesto de conexiones de Cloud SQL); contraseña en Secret Manager `DB_LECTURA_PASSWORD`. Más la misma transacción READ ONLY |
 | `generar_jwt_dev` | JWT de un usuario de dev (por email o negocio), mismo payload que `createToken` (`tv` = `tokenVersion`) (`mcp/sesionDeDev.ts`) | Solo con el `JWT_SECRET` y la BD de dev |
 | `llamar_api_dev` | Una petición a la API de dev (:3000) o de backend-sim (:3010) con la sesión de un usuario de dev (por email o negocio), sin copiar JWT: estado, ms y respuesta | La ruta resuelta tiene que quedarse en esa base de localhost; JWT de 10 minutos |
-| `entrar_en_app_dev` | Enlace a la app de dev (:3001) ya dentro de un negocio y en la pantalla pedida (`destino`): guarda en `claves_temporales` de dev un pase de un solo uso como el del registro (10 min) y lo canjea `/auth/entrar`, que acepta un `destino` interno (`rutaInterna` de `lib/login-next.ts`) | El JWT nunca va en la URL; un solo uso; solo la BD de dev |
+| `entrar_en_app_dev` | Enlace a la app de dev (:3001; `puerto` 3101 para la vista previa de la sesión o 3111 para `app-rama`) ya dentro de un negocio y en la pantalla pedida (`destino`): guarda en `claves_temporales` de dev un pase de un solo uso como el del registro (10 min) y lo canjea `/auth/entrar`, que acepta un `destino` interno (`rutaInterna` de `lib/login-next.ts`) | El JWT nunca va en la URL; un solo uso; solo la BD de dev |
 | `simular_webhook_telnyx` | POST firmado Ed25519 a `/webhooks/telnyx…` de `backend-sim` (:3010). Con `businessId` crea una fila de `calls` NUEVA (`sim-mcp-<uuid>`) y pone `x-alhabla-call-control-id`; para seguir la misma conversación se pasa su `callControlId` (una cita por llamada: `bookings.callId` es único) | Solo localhost y la ruta YA RESUELTA dentro de `/webhooks/telnyx` (un `../` no sale); firma con `TELNYX_PRIVATE_KEY_SIMULACION`, que ningún otro backend acepta |
-| `simular_conversacion` | Varios pasos seguidos sobre la MISMA llamada simulada (canal `voz`) o del Gestor (canal `gestor`: `/webhooks/telnyx/gestor/<tool>` con `x-alhabla-business` y `x-alhabla-role: owner`). `{{nombre}}` en un cuerpo toma el último valor con ese nombre que devolvió un paso anterior (`{{availabilityToken}}`, `{{bookingId}}`); un `book_appointment` sin token ni `startDateTime` toma el del último `check_availability`. Devuelve cada paso, las citas y reservas pendientes que dejó la llamada y los envíos simulados (`mcp/conversacionSimulada.ts`) | Las de `simular_webhook_telnyx`; máximo 20 pasos |
+| `simular_conversacion` | Varios pasos seguidos sobre la MISMA llamada simulada (canal `voz`) o del Gestor (canal `gestor`: `/webhooks/telnyx/gestor/<tool>` con `x-alhabla-business` y `x-alhabla-role: owner`). `{{nombre}}` en un cuerpo toma el último valor con ese nombre que devolvió un paso anterior (`{{availabilityToken}}`, `{{bookingId}}`); un `book_appointment` sin token ni `startDateTime` toma el del último `check_availability`. Si un paso devuelve `pregunta_de_grabacion` (la primera consulta de cada llamada retiene lo comprobado hasta que se contesta), espera los 2 s que exige el backend y contesta con `preferencia_de_grabacion` (`respuestaDeGrabacion`: `acepta` por defecto, `rechaza` o `no_contestar`), como un paso `automatico`. Devuelve cada paso, las citas (con `copiaEnCalendario`) y reservas pendientes que dejó la llamada y los envíos simulados (`mcp/conversacionSimulada.ts`) | Las de `simular_webhook_telnyx`; máximo 20 pasos |
 | `backend_sim` | De qué carpeta, rama y commit corre backend-sim y cuántos commits de backend va por detrás de `main`; `levantar` sin rama lo pone en el último main (las herramientas, actualizadas antes) y con rama o nº de PR en `~/.alhabla-sim` (worktree detached solo para él, sin `node_modules`: usa los de la imagen); `reiniciar` (schema nuevo), `reconstruir` (dependencias nuevas; `levantar` lo hace solo si cambia el lock) y `parar`. Al levantar aplica las migraciones de ese código a la BD de dev (`mcp/backendSim.ts`) | Solo ramas ya subidas a origin; no toca `~/.alhabla-sim` si tiene cambios a mano |
 | `ver_envios_simulados` | Los WhatsApp, SMS y correos que `backend-sim` NO envió (`ENVIOS_SIMULADOS=1`) y solo registró en su log: canal, destino y detalle, para comprobar que una tool simulada avisó a quien tocaba. Filtros `desde` (`30m` por defecto), `canal`, `destino` y `limite`; lee `docker logs` de `alhabla_backend_sim` | Solo lectura |
-| `borrar_llamadas_simuladas` | Borra las `sim-mcp-…` (de un negocio o de todas) para que no salgan en el historial del panel | Conserva y devuelve las que tienen una cita viva con evento en el calendario: borrarla dejaría el evento huérfano |
+| `calendario_falso` | El calendario falso de backend-sim (`CALENDARIOS_FALSOS=1`, `src/adapters/calendar/falso/calendarioFalso.ts`) para probar de punta a punta la agenda de Alhabla y sus copias sin un Google real (`PLAN-AGENDA-PRINCIPAL.md`): `conectar` (por el camino real, que vuelca la agenda), `estado` ok/caido/revocado, `apuntar`, `mover` y `borrar` eventos como el dueño, `copiar` (el job de copia ya), `volcar`, `recordar` (el de los 7 días) y `quitar`. Corre `scripts/sim/calendarioFalso.ts` DENTRO de `alhabla_backend_sim` (`mcp/calendarioFalso.ts`) | Solo conexiones con credenciales `falso:`; el falso no existe fuera de backend-sim ni en producción |
+| `agenda_dev` | Las citas de un negocio de dev con el estado de su copia (`copiaEnCalendario`, intentos, error), la conexión, las reservas pendientes y, con el calendario falso, sus eventos y los descuadres (activas sin evento, eventos de canceladas, a otra hora, que ya no están, apuntados a mano) | Solo lectura |
+| `borrar_llamadas_simuladas` | Borra las `sim-mcp-…` (de un negocio o de todas) para que no salgan en el historial del panel | Conserva y devuelve las que tienen una cita viva con evento en un calendario real: borrarla dejaría el evento huérfano. Las del calendario falso (eventos `falso…`) sí se borran, y sus eventos salen de `calendario-falso:<marca>` en la misma transacción |
 | `describir_tabla` | Tablas de dev o prod con su modelo de Prisma y filas aproximadas; con `tabla` (nombre real o modelo: `Booking`), columnas con tipo/NULL/defecto, índices y claves foráneas (`mcp/esquema.ts`) | Las mismas que `consultar_bd_*`; en prod, consultas una tras otra (el rol de lectura admite 2 conexiones) |
 | `ver_logs_prod` | Cloud Logging de `alhabla-api` en orden: busca a la vez en `textPayload` (`console.*`) y `jsonPayload.msg`/`err.message` (Fastify), quita «incoming request»/«request completed»; `soloErrores` mira stderr y el nivel de pino (`console.error` no trae `severity`). Devuelve el filtro usado (`mcp/logsDeProd.ts`) | Solo lectura con las credenciales de gcloud del Mac; fechas validadas antes de entrar al filtro y textos escapados |
 | `ver_peticiones_prod` | Peticiones HTTP (método, estado, ruta, latencia, revisión), por defecto sin `/health`, `/internal/` ni OPTIONS | Igual |
@@ -665,6 +668,23 @@ checkout PRINCIPAL aunque se lance desde un worktree (`git rev-parse --git-commo
 | `ver_assistant_telnyx` | GET del assistant (por id o por el agente del negocio, dev o prod): modelo, saludo, tools con URL y timeout, voz, transcripción, variables, nodos del flujo, grabación; `buscar` dice dónde aparece un texto en toda la configuración (`mcp/telnyx.ts`) | Solo GET; la clave (dev: `.env`; prod: Secret Manager `TELNYX_API_KEY`) nunca sale en la respuesta |
 | `ver_conversacion_telnyx` | Mensajes en orden con las tools llamadas y lo que devolvieron, por `conversationId`, por llamada (`calls.providerConversationId`), la del Gestor (`businesses.ownerConversationId`) o la del chat de un cliente (`client_conversations`) | Igual; lee hasta 1.000 mensajes (los más recientes) |
 | `lanzar_job_prod` | `gcloud scheduler jobs run` de `telnyx-reconciler`, `cleanup-zombie-calls` o `retry-stuck-recordings`, espera su intento (hasta 2 min) y devuelve resultado y logs (`mcp/jobsDeProd.ts`) | Lista cerrada: no lanza los que mandan correos o WhatsApp, borran grabaciones o datos de Growth, suspenden cuentas ni reportan a Stripe |
+| `vista_previa_rama` | Elige el worktree (por ruta o rama) que sirven `app-rama` (:3111) y `web-rama` (:3112) de `.claude/launch.json`, que lanzan `scripts/dev/vista-previa-rama.sh`: `preview_start` arranca las vistas previas en el checkout de la sesión, y así una sesión del checkout principal ve su worktree sin editar `launch.json`. Instala las dependencias que falten; el script carga el `.env.local` del checkout principal en el entorno del proceso (no lo copia) (`mcp/vistaPreviaRama.ts`) | Solo worktrees de este repo (`git worktree list`); escribe `~/Library/Caches/alhabla-dev/vista-previa-rama` |
+| `fallos_ci` | De un PR o una rama subida, las ejecuciones de GitHub Actions de su último commit y, de cada job en rojo, el paso y solo lo que explica el fallo: el bloque de fallos de vitest (sin el stderr de los tests que pasan ni el código que enseña) o las líneas de error de tsc, eslint, next build o bash y el final del paso (`mcp/fallosDeCi.ts`) | Solo lectura con el `gh` del Mac |
+
+**Instrucciones, ramas y CI (desde 2026-11-06).** El servidor manda unas `instructions`
+(`mcp/instruccionesDev.ts`) que Claude Code pone en el prompt de sistema de cada sesión: qué herramienta
+va con qué tarea, porque las herramientas llegan diferidas (solo el nombre) y sin eso una sesión nueva no
+sabe por dónde empezar. Claude Code las corta a 2 KB; `tests/mcp/probar.test.ts` arranca el servidor
+como Claude Code y exige que quepan y que nombren todas las herramientas registradas (una herramienta
+nueva sin su entrada ahí rompe CI). `npm run mcp:probar -- <herramienta> '<json>'` (desde `backend/`,
+`mcp/probar.ts`) arranca el servidor de ESE checkout por stdio y llama a una herramienta: sin argumentos
+lista, con solo el nombre la describe, `@fichero.json` para cuerpos largos y `--servidor
+growth/servidorGrowth` para el otro MCP. Con `ALHABLA_MCP_PRUEBA=1` (lo pone la CLI) el servidor no pone
+al día `~/.alhabla-mcp` al arrancar. Lo que corre dentro de backend-sim sigue siendo el código desde el que
+se levantó (`backend_sim levantar <rama>`). Antes de abrir un PR, `scripts/comprobar-rama.sh` corre en
+local lo que CI va a mirar y solo lo que toca el diff (`--rapido` sin builds ni integración, `--todo`,
+`--solo backend,web`); los de integración van contra `alhabla_test` con un cerrojo, porque la comparten
+todas las sesiones.
 
 `listar_tools_voz` saca las tools de la recepcionista (`buildTelnyxVoiceTools`) y, con `canal: "gestor"`,
 las del Gestor (`buildGestorTools`); los avisos de cuerpo valen para las dos.
@@ -1182,7 +1202,7 @@ de abajo (`procesarInformeFinal`, combinar informes, la revisión de escaladas) 
   `espera-<leadId>-<epochSeg>` (una por OFERTA). Resultados: `avisado | en_oferta | nadie |
   sin_plantilla | error`. `reservarDesdeListaDeEspera` («Sí, resérvala») calca
   `retryFailedBooking`: lock por negocio, relectura del lead dentro del lock, `fuera_de_plazo` ≠
-  `ocupado`, no reserva a ciegas (`calendario_caido`), evento con `buildCalendarIdempotencyKey`
+  `ocupado`, reserva aunque el calendario esté caído o caducado (copia pendiente, `PLAN-AGENDA-PRINCIPAL.md`), evento con `buildCalendarIdempotencyKey`
   (`lib/calendarIdempotency.ts`, compartido con voz y el job) con `distintivo =
   inboundMessageId` (una clave por TOQUE: tras un `error` con el evento deshecho, la misma clave
   haría que Google devolviera el evento CANCELADO como éxito ante el 409 — reserva invisible y
@@ -1842,11 +1862,10 @@ eliminar (`10015`).
 **Otros datos útiles.** Los MDR (`GET /v2/detail_records?filter[record_type]=messaging`) solo
 registran salientes (hay entregas reales de WhatsApp al móvil del usuario desde el 15-09); los
 entrantes no aparecen ahí. Precio de modelos y catálogo: `GET /v2/ai/models` (ver plan). Desde
-el Mac del usuario no se llega por HTTP a los hosts de `alhabla.ai` proxied por Cloudflare
-(`dev-api.alhabla.ai`, `alhabla.ai`), aunque desde internet responden: probar con
-`web_fetch`/otro equipo, no con `curl` local. *(Es el bloqueo de IPs de Cloudflare durante los
-partidos de LaLiga. Desde el 11-10 el Worker `alhabla-failover-laliga` quita el proxy de
-`alhabla.ai`, `www` y `app` mientras dura, pero no el de `api` ni `dev-api`; ver § Cloudflare
+el Mac del usuario, durante los partidos de LaLiga, no se llega por HTTP a los hosts proxied por
+Cloudflare (hoy solo `dev-api.alhabla.ai`, el túnel), aunque desde internet responden: probar con
+`web_fetch`/otro equipo, no con `curl` local. *(Es el bloqueo de IPs de Cloudflare. `alhabla.ai`,
+`www` y `app` van en solo DNS a Vercel desde el 2026-11-05 y ya no les afecta; ver § Cloudflare
 failover for LaLiga blocks.)*
 
 ## Stripe Billing Fields on `Business`
@@ -1940,7 +1959,7 @@ que además quita `calendarConnections` (lleva las credenciales). Es la única m
 un `Business` al cliente; las rutas cargan las filas con `INCLUDE_CONEXIONES`. Fijado en
 `tests/modules/businesses/me.test.ts`.
 
-Historial (expand/contract, porque `cloudbuild.yaml` migra antes del cambio de tráfico y la revisión
+Historial (expand/contract, porque `cloudbuild-migraciones.yaml` migra antes del cambio de tráfico y la revisión
 anterior sigue sirviendo unos minutos contra el schema nuevo): PR #77 creó la tabla con backfill y
 escribía las columnas antiguas en espejo; PR #78 retiró el espejo y las columnas del schema Prisma
 (el cliente ya no las selecciona) sin borrarlas de la BD; y, una vez desplegado ese código, la migración
@@ -1993,7 +2012,7 @@ aplicada en la base de datos. Esto es un artefacto exclusivo de tener un
 proceso Node de larga duración en dev (`docker-compose.yml` lo arranca con
 `sh -c "npx prisma generate && npm run dev"`, una sola vez); **no ocurre en
 producción** — cada deploy construye una imagen nueva (`prisma generate` en
-el build, ver Dockerfile stage `builder`) y `cloudbuild.yaml` aplica
+el build, ver Dockerfile stage `builder`) y `cloudbuild-migraciones.yaml` aplica
 `prisma migrate deploy` contra Cloud SQL *antes* de que `gcloud run deploy`
 publique esa imagen, así que el proceso que sirve tráfico siempre arranca ya
 con el cliente y el esquema en el mismo commit — nunca hay un proceso vivo
@@ -2178,7 +2197,7 @@ extra-minutes price to subscriptions created before it existed), invoked after a
    - Retries a `book_appointment` that failed during a live call for a probably-transient reason (`BOOK_APPOINTMENT_FAILED`, `CALENDAR_TIMEOUT`, `CALENDAR_RATE_LIMITED`, or an unclassified error) — enqueued by `capturePendingBookingLead`/`enqueueRetryFailedBooking` in `voiceTools/service.ts`. Not enqueued for `*_RECONNECT_REQUIRED` failures, since retrying doesn't help until the business reconnects the calendar manually.
    - Loads the pending booking from the `Lead` row (`type: "pending_booking"`) by `leadId`, re-fetches the business's calendar tokens fresh (never trusts stale tokens from the original failed attempt), calls `calendarService.bookAppointment()` again, and on success creates the `Booking` row and sets `Lead.resolvedAt`.
    - Cloud Tasks queue `retry-failed-booking`: 4 attempts, exponential backoff 30s base (the caller already hung up — there's no live request waiting, so a few minutes of backoff is fine).
-   - **Calendar disconnected:** the job reschedules itself every 6 h, up to 8 times (two days), instead of throwing. A `*_RECONNECT_REQUIRED` raised by `bookAppointment` inside the job marks the calendar disconnected and takes the same path — the lead is no longer closed, so it books itself once the owner reconnects.
+   - **Calendar (since 2026-11-06, `PLAN-AGENDA-PRINCIPAL.md`):** the job no longer waits for the calendar. It books in the Alhabla agenda and copies to the connected calendar with `intentarCopiaDeLaCita` (pending copy + `copiar-cita-al-calendario` if the calendar fails). Leads saved as pending by the calendar before this change book themselves the next time the job runs. The old «every 6 h, up to 8 times» reschedule (`esperarAlCalendario`) is gone.
    - **How it ends (2026-10-21):** before, a lead the job could no longer book was closed in silence (`abandonLead`), and the client had been told «he tomado nota de tu solicitud para confirmártela». Now:
      - a real loss (slot taken, outside business hours, past or outside the booking window) closes the lead and calls `avisarReservaPerdida`: WhatsApp to the owner with the reason in plain words and the client's phone to call them, or the email `finalDeReservaPendienteEmail` (`reserva-perdida-<lead>`);
      - after the 8 retries with the calendar still disconnected, the lead stays pending and `avisarReintentosAgotados` sends the «La apunté yo / Reintentar / Reconectar» buttons with the plain lead id, or the email (`reserva-agotada-<lead>`);
@@ -2510,10 +2529,26 @@ La separación se apoya por tanto en tres cosas:
    | `alhabla-platform-production` | `3048374727065208187` | `https://api.alhabla.ai/webhooks/telnyx` |
    | `alhabla-platform` (desarrollo) | `3046870077287696179` | `https://dev-api.alhabla.ai/webhooks/telnyx` |
 
+   **Audio anclado en Frankfurt (desde el 2026-11-06).** Todas las conexiones de la cuenta (los
+   dos Call Control Apps, las apps TeXML `ai-<assistant>` y las credential connections «Forward
+   Only» y «Default») tienen `anchorsite_override: "Frankfurt, Germany"`
+   (`ANCLAJE_DEL_AUDIO` en `TelnyxAiAdapter.ts`). Antes estaban en «Latency», que deja a Telnyx
+   elegir el sitio. Frankfurt porque la cuenta tiene la localidad de datos en DEU. Lo nuevo nace
+   anclado: `createCallControlApp` lo manda al crear, y `createAssistant` ancla la app TeXML que
+   Telnyx crea con cada assistant (viene en `telephony_settings.default_texml_app_id`; el anclaje
+   sobrevive a los updates del assistant). El SDK 7.29 no tipa Frankfurt en Call Control ni en
+   TeXML, pero la API lo acepta. Para repasar la cuenta:
+   `npx tsx scripts/anclarAudioEnEuropa.ts` (lista) y `--aplicar` (cambia lo que falte). Solo
+   fija el audio: el LLM, el STT y el TTS se procesan aparte.
+
 2. **Tags `env-dev` / `env-prod` en cada número** (desde 2026-09-19). `GET /v2/phone_numbers`
    acepta `filter[tag]`, así que un script puede preguntar por los suyos en vez de mirar la
-   cuenta entera. Es la alternativa barata a Managed Accounts, y hay que **ponerla a mano al
-   comprar un número**: `provisionPhoneNumber` todavía no etiqueta.
+   cuenta entera. Es la alternativa barata a Managed Accounts. **Desde el 2026-11-06 se pone
+   sola**: `provisionPhoneNumber` (al terminar la compra) y `asignarNumeroExistente` llaman a
+   `telnyxAdapter.marcarEntornoDelNumero`, que deja `env-prod` (con `NODE_ENV=production`) o
+   `env-dev`, quita la del otro entorno y conserva las demás tags. En Telnyx `tags` sustituye la
+   lista entera, por eso se lee antes. Si falla, el número sigue activo y queda un
+   `console.error` para ponerla a mano. Los números de antes y los de WhatsApp siguen a mano.
 
    Inventario del 2026-09-19 (**histórico**: ya no cuadra con las BD). A 2026-11-02, +34930453219
    es el número de «El petit salo» en la BD de producción; en dev solo tienen número
@@ -2903,17 +2938,66 @@ Lo que el plan dejó fuera del código (rescatado al archivarlo en `docs/histori
 - **Switching calendars:** `GET /calendar/calendars` lists the calendars of the connected account (Google `calendarList`, Microsoft Graph or a CalDAV `PROPFIND`) with `{ provider, selectedCalendarId, calendars: [{ id, name, primary }] }`; `POST /calendar/select` with `{ calendarId }` switches the active calendar for any of the three. The `/agente` calendar section uses both for its "Cambiar de calendario" picker.
 - `getUpcomingEvents` normalizes events from all three providers into a common format.
 - If credentials stop working (Google/Graph `invalid_grant`, CalDAV 401/403), the backend throws a `CalendarBusinessError` with code `GOOGLE_CALENDAR_RECONNECT_REQUIRED`, `OUTLOOK_CALENDAR_RECONNECT_REQUIRED` or `CALDAV_CALENDAR_RECONNECT_REQUIRED`. The frontend should prompt the user to reconnect.
-- **Appointment booking** (`book_appointment` webhook handler) works with all three providers. It creates the calendar event and persists a `Booking` row with `professionalId`, `serviceIds` and `durationMinutes` (duration recalculated server-side from the verified services). If no `professionalId` is provided, it selects `availableProfessionals[0]` from `checkAvailability` (specialist first, then the least-loaded that day; never a "no sugerir").
+- **Appointment booking** (`book_appointment` webhook handler) works with or without a connected calendar (see "Agenda de Alhabla y calendarios conectados" below): it copies the appointment to the connected calendar if there is one and always persists a `Booking` row with `professionalId`, `serviceIds` and `durationMinutes` (duration recalculated server-side from the verified services). If no `professionalId` is provided, it selects `availableProfessionals[0]` from `checkAvailability` (specialist first, then the least-loaded that day; never a "no sugerir").
 
-### Modo de agenda y agenda de Alhabla (`PLAN-AGENDA-ALHABLA.md`, desde 2026-10-28, PRs #364–#367)
+### Agenda de Alhabla y calendarios conectados (`PLAN-AGENDA-PRINCIPAL.md`, desde 2026-11-06)
 
-- **`Business.modoDeAgenda`** (`sin_elegir` | `alhabla` | `externo`, `lib/modoDeAgenda.ts`): dónde se reservan las citas. **El modo se elige, no se deduce.** Conectar un calendario (`guardarConexionDeCalendario` con `conectado: true`) pasa el negocio a `externo`; el dueño elige `alhabla` desde el alta o desde `/agente › Calendario` (`PATCH /business/me/agenda/modo`, que a `externo` solo vuelve con una conexión operativa, 409 `CALENDAR_NOT_OPERATIVE`). Una conexión caducada **nunca** pasa el negocio a `alhabla`: un `externo` caducado sigue sin reservar (regla de la auditoría de septiembre).
-- **`sin_elegir` (sin calendario): la recepcionista atiende y toma nota, pero no reserva.** `check_availability` no ofrece hora (`available: false` con `CALENDAR_NOT_CONNECTED` si nunca hubo conexión, o el `<P>_CALENDAR_RECONNECT_REQUIRED` del proveedor si caducó) y manda llamar igualmente a `book_appointment`, que guarda el `Lead` pendiente con ese código y responde al cliente sin nombrar a Google. `avisosNegocio.motivoDeFallo` y `lib/llamadas.ts` de la app distinguen los dos códigos. `nuncaConectoCalendario` / `codigoDeCalendarioNoOperativo` viven en `calendar/conexion.ts`.
-- **`alhabla`: la regla vive en la conexión resuelta.** `resolverConexionDeCalendario` marca `agendaPropia` cuando el modo es `alhabla` y no se fuerza proveedor, y deja `credentials` a null: la conexión externa que quede se ignora para leer ocupación y crear eventos sin tocar `usaCalendarioExterno` ni `getBusyIntervals`. Con proveedor forzado (cancelar o mover una cita antigua con `externalEventId`) la conexión real sigue ahí. **`puedeReservar(c) = c.agendaPropia || conexionOperativa(c)`** es lo que deciden `book_appointment`, el Gestor, la lista de espera y el reintento; `conexionOperativa` a secas queda para quien necesita la conexión de verdad. `calendarService.bookAppointment` devuelve `{ id: null, htmlLink: null }` con `agendaPropia` antes de `exigirConexionActiva`, así que los cinco caminos que reservan siguen llamándolo y escriben el `Booking` sin evento; `origenExternoDeLaCita(c)` deja `externalCalendarProvider`/`externalCalendarId` a null. La caché de voz acepta la entrada sin conexión confirmada en modo `alhabla`; el contexto del Gestor dice «agenda de Alhabla»; el paso `calendar` del onboarding se da por hecho.
+La agenda de Alhabla es **la** agenda del negocio; Google, Outlook y Apple son complementos que reciben una
+copia de cada cita y le cuentan a la recepcionista lo que el dueño apunta en ellos. Sustituye al «modo de
+agenda» de `PLAN-AGENDA-ALHABLA.md` (28-10, PRs #364–#367).
+
+- **Siempre se puede reservar.** El calendario conectado no decide si se reserva ni si se ofrece hora: ni
+  sin conectar, ni caducado, ni caído (decisiones D2 y D3 del plan; revierte a propósito la regla de
+  septiembre de no reservar a ciegas). Siguen mandando horario, festivos, ausencias, capacidad, las citas de
+  Alhabla y el cerrojo por negocio. Desaparecieron `puedeReservar`, `agendaPropia` y `origenExternoDeLaCita`
+  (`calendar/conexion.ts`), la salida «toma nota» de `check_availability`, los `Lead` pendientes por el
+  calendario en `book_appointment` (`CALENDAR_NOT_CONNECTED`, `*_RECONNECT_REQUIRED`, `CALENDAR_UNAVAILABLE`,
+  error al crear el evento), los rechazos del Gestor (`MOTIVO_SIN_CALENDARIO`, `MOTIVO_CALENDARIO_ILEGIBLE`,
+  `calendario_desconectado`, `calendario_rechaza`), los estados `sin_calendario` / `calendario_caido` de la
+  lista de espera y la espera al calendario del reintento (`esperarAlCalendario`). El `Lead` pendiente queda
+  para fallos que no son del calendario (cerrojo, error al guardar). `avisosNegocio.motivoDeFallo` conserva
+  los códigos viejos para los `Lead` que ya existían.
+- **La copia** (`calendar/copiaDeLaCita.ts`): `intentarCopiaDeLaCita` se llama en los cinco caminos que
+  reservan (voz y chat, Gestor y panel, lista de espera, reintento) y **nunca lanza**. Devuelve lo que se
+  guarda en el `Booking`: `copiaEnCalendario` (`null` sin calendario; `"pendiente"`, `"hecha"` o `"fallida"`),
+  `copiaIntentos`, `copiaError` y el origen del evento. Con la conexión caducada la copia queda `pendiente` sin
+  gastar intentos; un `invalid_grant` marca el calendario desconectado; cualquier otro error la deja
+  `pendiente` y el llamador encola `encolarCopiaDeLaCita` tras guardar el `Booking`. Una cita que se mueve y
+  cuya copia nueva no entra conserva su evento viejo (`externalEventId`) con la copia `pendiente`, y el job lo
+  sustituye.
+- **Jobs** (los tres por la cola `retry-failed-booking`, con sus propios reintentos por `scheduleTime`; en dev
+  en línea salvo los programados a futuro):
+  - `/internal/jobs/copiar-cita-al-calendario` (`sincronizarCopiaDeLaCita`): borra el evento viejo si lo hay,
+    crea el nuevo con la clave `copia:<bookingId>:<inicio>:<duración>` y deja la copia `hecha`. Esperas de 1, 5,
+    30, 120, 360, 720 y 1.440 min; al cuarto intento avisa al dueño (`alertarCopiasPendientes`, una vez al día) y
+    al séptimo la deja `fallida` con un `console.error` «COPIA FALLIDA». Con la conexión caducada no gasta intento.
+  - `/internal/jobs/volcar-agenda-al-calendario` (`volcarAgendaAlCalendario`): lo encola
+    `guardarConexionDeCalendario` al conectar o reconectar; copia las citas futuras sin evento y las
+    `pendiente`/`fallida`, 150 por pasada. Las que tienen evento en otro calendario se quedan donde están.
+  - `/internal/jobs/recordar-calendario-desconectado` (`whatsapp/alertas.ts`, `recordarCalendarioDesconectado`):
+    lo programa `alertarCalendarioDesconectado` a 7 días de la desconexión; solo avisa si sigue desconectado
+    desde la misma vez.
+- **Un solo sentido** (regla 4). Lo que el dueño cambia en su calendario no vuelve a Alhabla, y
+  `checkAvailability` lo refleja: una cita de Alhabla bloquea **siempre** su hora (ya no se «libera» si su
+  evento desaparece, ni pasa a la hora del evento). El evento que es copia de una cita se descarta solo si
+  coincide en hora (±1 min) o si la copia está `pendiente`; si no, ocupa también ese sitio.
+  `calendarAvailabilityKnown` y `calendarOrigin` quedan como parámetros sin efecto hasta la fase 7. El
+  evento lleva al final «Esta cita la gestiona Alhabla. Para moverla o cancelarla, …»
+  (`eventoDeCalendario.ts`).
+- **Avisos al dueño**: `alertaCalendario` («he perdido la conexión con tu …: tus citas siguen entrando en tu
+  agenda…»), `recordatorioCalendario` y `alertaCopiasPendientes` (`whatsapp/mensajes.ts`), todos por la
+  plantilla `alerta_operativa_negocio`, que lleva el texto como parámetro.
+- **Gestor**: `contexto_negocio` devuelve `calendario.agenda = "Alhabla"` y un `estado` que dice si hay copia
+  al día; `faltaPorConfigurar` ya no incluye el calendario, y el prompt (`lib/gestorPayload.ts`) tampoco lo
+  cuenta como paso de configuración. El paso `calendar` del onboarding se da siempre por hecho.
+- **Quitar el calendario**: `DELETE /calendar/conexion` (`quitarCalendarioConectado`) borra las filas de `calendar_connections` del negocio; la agenda sigue igual y los eventos ya copiados se quedan en su calendario.
+- **Sin llamada que vincular**: `book_appointment` responde `BOOKING_CALL_NOT_FOUND` y no confirma nada (antes, con calendario, quedaba solo el evento en Google y la recepcionista la daba por reservada).
+- **Transitorio hasta la fase 7**: `Business.modoDeAgenda` (`lib/modoDeAgenda.ts`) y
+  `PATCH /business/me/agenda/modo` siguen existiendo solo para la app anterior; no deciden nada.
 - **Crear desde el panel** (`bookings/citasDelPanel.ts`): `POST /business/me/bookings`, `/bloqueos` y `/absences` reutilizan `añadir_cita`, `bloquear_franja` y `marcar_ausencia` del Gestor con `meta.origen = "panel"` (`MetaDeEjecucion`); la cita del panel lleva `createdVia: "owner_panel"` y la misma Call sintética con prefijo `whatsapp:gestor:` (no cuenta como llamada). Sin aviso al cliente desde «Nueva cita» (decisión D4). En la app, `components/agenda/nueva-cita.tsx` (tres pestañas) desde el botón «Nueva cita» del escritorio y el «+» del móvil, solo cuando `bookable`.
 - **Feed iCal de solo lectura** (`modules/agenda/routes.ts`, `lib/feedIcal.ts`): `Business.icalToken` (32 bytes hex, único, nunca serializado con el Business). `GET /agenda/:token.ics` público con límite de 30/min busca el negocio solo por el token (404 igual para mal formado y para inexistente), ventana −30/+120 días, canceladas de los últimos 30 días con `STATUS:CANCELLED`, ausencias como «No está: …», `?pro=` filtrado por negocio, cabeceras `noindex` y `Cache-Control: private, max-age=300`. `GET`/`POST` (`renovar`)/`DELETE /business/me/agenda/feed` desde «Ver tu agenda en el móvil» (`movil/agente/feed-de-agenda.tsx`). Datos mínimos: servicio, nombre del cliente y profesional; nunca el teléfono.
-- **App:** `getCalendarState` (`frontend/src/lib/calendar-state.ts`) expone `mode`, `alhabla` y `bookable`; en `alhabla` una conexión antigua no cuenta ni como conectada ni como caducada. `bookable` decide «Mover» (escritorio y móvil, incluido arrastrar), las tarjetas «Elige dónde reservar», el estado operativo («Atiende, pero no reserva» / «Agenda de Alhabla») y el checklist de `/agente`.
-- **Qué no es:** no sincroniza en dos sentidos (lo que el dueño apunte en su móvil no vuelve a Alhabla), no importa calendarios ajenos (Booksy, Treatwell) y no hay página de reservas para el cliente final.
+- **App (hasta la fase 4 de `PLAN-AGENDA-PRINCIPAL.md`, que la cambia):** `getCalendarState` (`frontend/src/lib/calendar-state.ts`) expone `mode`, `alhabla` y `bookable`; en `alhabla` una conexión antigua no cuenta ni como conectada ni como caducada. `bookable` decide «Mover» (escritorio y móvil, incluido arrastrar), las tarjetas «Elige dónde reservar», el estado operativo («Atiende, pero no reserva» / «Agenda de Alhabla») y el checklist de `/agente`.
+- **Qué no es:** no sincroniza en dos sentidos (lo que el dueño apunte o cambie en su calendario o su móvil no vuelve a Alhabla), no importa calendarios ajenos (Booksy, Treatwell) y no hay página de reservas para el cliente final.
 
 ### Arquitectura por adaptadores (`backend/src/adapters/calendar/`, desde 2026-09-18)
 
@@ -4259,10 +4343,14 @@ landings de sector compartían el 55–58 % del texto de `<main>`. Desde el 2026
   mide, para cada par de páginas del sitemap, qué parte del texto de `<main>` de la más corta aparece en
   la otra (secuencias de 5 palabras). Falla con 0,50 (`UMBRAL=0.4` para ser más estricto). Corre en el
   job «Web — lint, test, build» del CI.
-- **Vistas previas de Vercel**: los proyectos `alhabla-web` y `alhabla-frontend` tienen como «Ignored Build
-  Step» `git diff --quiet HEAD^ HEAD -- .`: solo construyen si el ÚLTIMO commit toca su carpeta. Si lo último
-  que se sube a una rama es un merge de `main` que no toca `web/`, la vista previa sale «Canceled by Ignored
-  Build Step» aunque la PR cambie la web (PR #335). Para tener vista previa, que el último commit toque `web/`.
+- **Vistas previas de Vercel**: los tres proyectos (`alhabla-web`, `alhabla-frontend` y, desde el 2026-11-06,
+  `alhabla-growth`, que antes se construía en cada push) se saltan el build si su carpeta no cambia desde el
+  último despliegue bueno de esa rama: `ignoreCommand` en `<carpeta>/vercel.json` (versionado; manda sobre
+  el «Ignored Build Step» del panel) compara con `VERCEL_GIT_PREVIOUS_SHA` y, sin él, construye. Antes era
+  `git diff --quiet HEAD^ HEAD -- .`, que solo miraba el ÚLTIMO commit: un push de varios commits en el que
+  solo el primero tocaba `web/` no se publicaba, y una rama cuyo último commit era un merge de `main` salía
+  «Canceled by Ignored Build Step» (PR #335). La cuenta es Hobby: **un build a la vez** entre los tres
+  proyectos, y uno que se salta también ocupa la cola unos segundos.
 - **IndexNow**: `npm run seo:indexnow` (o `-- /ruta /otra`) avisa a Bing/Yandex de las URLs del sitemap
   de producción con la clave de `web/public/36dd951327300353ad396b40d72dbd75.txt`. Google no usa
   IndexNow: para Google, Search Console.
@@ -4276,9 +4364,33 @@ landings de sector compartían el 55–58 % del texto de `<main>`. Desde el 2026
   `seo:similitud`), growth (`lint`/`test`/`build` plus the check that the demo sentinel is not in
   the build), the shared-copies check (`scripts/comprobar-copias-compartidas.sh`, job «Copias
   compartidas app/web») and the LaLiga Worker; `diff` runs on pull requests only. Required checks
-  on `main` (branch protection, checked 2026-11-02): «Backend — typecheck, lint, test», «Backend —
-  tests de integración», «Frontend — lint, test, build» and «Web — lint, test, build».
-  Test-only, never deploys.
+  on `main` (branch protection, checked 2026-11-06): «Backend — typecheck, lint, test», «Backend —
+  tests de integración», «Frontend — lint, test, build» and «Web — lint, test, build»; since
+  2026-11-06 the branch no longer has to be **up to date** with `main` (`strict: false`, the
+  user's decision): each merged PR forced every other open PR to merge `main` and rerun everything,
+  and auto-merge waited until someone pressed «Update branch». Every PR is still tested merged
+  with the `main` of its run, and the push run on `main` plus the deploy's own tests catch the
+  rare clash of two PRs that pass apart. Test-only, never deploys.
+  - **By zones (since 2026-11-06).** The first job, «Qué cambia», runs
+    `.github/scripts/zonas-del-ci.sh <base> <head>` (the PR against its base, a push against
+    `before`) and every other job runs only if its zone changed: `backend`, `conocimiento`
+    (what the Growth knowledge base reads outside `backend/`: `PRODUCT.md`, `web/content/blog`,
+    `web/src/lib/{plans,paginas,comparativas}.ts`, `web/src/lib/sectores/`,
+    `growth/agentes/reglas/`), `frontend`, `web`, `growth` (also `backend/src/modules/growth/`,
+    which its parity tests read), `laliga` and `copias`. A change to the CI itself, those scripts
+    or `.nvmrc` runs everything, and so does a failure of «Qué cambia»
+    (`needs.cambios.result != 'success'`). A job skipped by its `if` counts as passed for the
+    required checks, so they did not change. A knowledge-only change (a blog post) runs the backend
+    jobs in a light mode: `npm run test:conocimiento` (the unit tests that read the real repo,
+    ~8 s) and `npm run test:integration:conocimiento` (`tests/integration/growth`, ~20 s) instead
+    of the full suites (~2 min and ~3 min 20 s). Before, a blog post ran everything; the knowledge
+    check is still needed — PR #434 (docs only) failed on two new `PRODUCT.md` bullets.
+    `scripts/comprobar-rama.sh` uses the same zones script, so the local check runs what CI will.
+  - Also since 2026-11-06: `concurrency` cancels a PR's superseded run (label events go in their
+    own group, so adding `migracion-contract` never cancels the real run), `permissions:
+    contents: read`, a `timeout-minutes` per job, actions on their current majors (`checkout@v7`,
+    `setup-node@v7`, `cache@v6`: v4 ran on the deprecated Node 20) and the Next build cache
+    (`.next/cache`, keyed on the lockfile and the sources) in frontend, web and growth.
   - The **integration** job (added 2026-09-19) runs `npm run test:integration` against real
     a Postgres service container, after `npx prisma migrate deploy` creates the schema.
     That suite existed for a while but **nothing ran it** — only the unit tests were gated, so the
@@ -4288,12 +4400,12 @@ landings de sector compartían el 55–58 % del texto de `<main>`. Desde el 2026
     port 5432 where local uses 5433: that 5433 only exists to dodge Homebrew's Postgres, which
     holds `127.0.0.1:5432` on the dev machine and answers `P1010` to these credentials.
   - The **Infra — Worker de LaLiga** job (added 2026-10-11) runs `node --test` in
-    `infra/cloudflare/failover-laliga`, the Cloudflare Worker that turns the proxy off and on
-    during LaLiga's IP blocks. It has no dependencies and deploys nothing: the Worker is
+    `infra/cloudflare/failover-laliga`, the Cloudflare Worker that turned the proxy off and on
+    during LaLiga's IP blocks (idle since the webs went DNS-only on 2026-11-05). It has no dependencies and deploys nothing: the Worker is
     uploaded by hand (that folder's README). Not a required check.
   - The **diff** job (pull requests only, added 2026-09-19) reads the PR's own diff rather than
     the code:
-    - **Destructive migrations fail the PR.** `cloudbuild.yaml` applies migrations *before*
+    - **Destructive migrations fail the PR.** `cloudbuild-migraciones.yaml` applies migrations *before*
       traffic switches, so during a deploy the new schema coexists with the old revision. A
       `DROP COLUMN`/`DROP TABLE`/`RENAME`/`SET NOT NULL` shipped alongside the code that stopped
       using the column breaks that old revision while the switch happens — the expand/contract
@@ -4304,10 +4416,22 @@ landings de sector compartían el 55–58 % del texto de `<main>`. Desde el 2026
       merge while the backend still has to build, migrate and roll out a revision, so a frontend
       that depends on something new can be live first. It never blocks — the window is short and
       the risk occasional.
-- **`.github/workflows/deploy-backend.yml`** — on push to `main` only: a `test` job (same backend
-  checks, kept as an independent pre-deploy gate on purpose, not just a dependency on `ci.yml`)
-  must pass before the `deploy` job runs `gcloud builds submit --config cloudbuild.yaml
-  --substitutions=_TAG=<commit sha>` then `gcloud run deploy alhabla-api --image=...:<sha>` and
+- **`.github/workflows/deploy-backend.yml`** — on push to `main` only (`backend/**` or the
+  workflow). Since 2026-11-06 the `test` job (same backend checks, kept as an independent
+  pre-deploy gate on purpose, not just a dependency on `ci.yml`) and the `imagen` job run **at
+  the same time**: building the image touches nothing in production. `imagen` runs
+  `.github/scripts/cloud-build.sh backend backend/cloudbuild.yaml "_TAG=<commit sha>"` (submit
+  `--async` and poll, because streaming the log needs the project Viewer role that
+  `github-actions-ci` lacks on purpose). The image build uses **buildx with a registry layer
+  cache** (`alhabla/backend-cache:buildx`, `mode=max`, buildkit pulling Docker Hub through
+  `mirror.gcr.io`): with the same lockfile the two `npm ci` of the Dockerfile come from the cache;
+  the Artifact Registry cleanup policy (prefix `backend`, older than 7 days) keeps it small. Only
+  when both pass does the `deploy` job («Migrar y desplegar en Cloud Run») check the max
+  instances, apply the migrations with `backend/cloudbuild-migraciones.yaml` (only the Prisma CLI
+  at the lockfile's exact version, installed in a step **without** `DATABASE_URL` because
+  `npm install` runs third-party install scripts; then the proxy and `prisma migrate deploy` in a
+  step that has it; `_ORDEN=status` checks without applying), and runs
+  `gcloud run deploy alhabla-api --image=...:<sha>` and
   `gcloud run services update-traffic alhabla-api --to-latest` (after an automatic rollback the
   service stays pinned to the old revision, and the next deploy would otherwise create a revision
   with no traffic while `/health` answered from the old one and the workflow went green), then
@@ -4356,9 +4480,12 @@ landings de sector compartían el 55–58 % del texto de `<main>`. Desde el 2026
   every project: `alhabla-frontend` (Root Directory `frontend`, domain `app.alhabla.ai`),
   `alhabla-web` (Root Directory `web`, domains `alhabla.ai` + `www` → 308 to `alhabla.ai`) and,
   since 2026-10-30, `alhabla-growth` (Root Directory `growth`, `growth.alhabla.ai`, DNS-only;
-  § Alhabla Growth). The first two were split on 2026-09-21 (`docs/historico/PLAN-APP-DOMINIO.md`). DNS lives in Cloudflare (proxied CNAMEs to the
-  project's `*.vercel-dns-017.com` target; see «Cloudflare failover for LaLiga blocks» below for
-  who turns that proxy off and on). `alhabla.ai` answers every app route with a permanent
+  § Alhabla Growth). The first two were split on 2026-09-21 (`docs/historico/PLAN-APP-DOMINIO.md`). DNS lives in Cloudflare: **DNS-only** CNAMEs
+  (grey cloud) to the project's `*.vercel-dns-017.com` target since 2026-11-05, so Vercel serves
+  every web directly with its own Let's Encrypt certificates. They were proxied until then;
+  Vercel recommends against a reverse proxy in front of it, and the proxy was exactly what
+  LaLiga's blocks took down (see «Cloudflare failover for LaLiga blocks» below). Do not turn the
+  proxy back on. `alhabla.ai` answers every app route with a permanent
   redirect to `app.alhabla.ai` (308: `permanent: true` in `web/next.config.mjs`; checked with
   `curl -I` on 2026-11-02), which is what keeps the Meta template URL buttons
   (`alhabla.ai/ajustes/{{1}}`) and old emails working. Backend URLs: `APP_URL`
@@ -4405,7 +4532,9 @@ landings de sector compartían el 55–58 % del texto de `<main>`. Desde el 2026
 - **`backend/cloudbuild.yaml` gained a `_TAG` substitution** (default `latest`) so CI can tag each
   deploy with the commit SHA instead of always overwriting `:latest` — avoids ambiguity if two
   builds ever overlap. Manual builds (`gcloud builds submit --config cloudbuild.yaml .` with no
-  `--substitutions`) are unaffected, still publish `:latest` exactly as before.
+  `--substitutions`) still publish `:latest`, but since 2026-11-06 they **no longer migrate**:
+  a manual deploy also needs `gcloud builds submit --config cloudbuild-migraciones.yaml .` before
+  `gcloud run deploy`.
 
 - The `backend/Dockerfile` has 5 stages: `base`, `deps`, `builder`, `runtime`, `development`.
 - Production image runs `node dist/server.js` (compiled output).
@@ -4497,6 +4626,12 @@ keeps at least one Cloud Run instance warm most of the time — fewer cold start
 callers, at the cost of a few thousand trivial requests a day.
 
 ### Cloudflare failover for LaLiga blocks (Worker `alhabla-failover-laliga`)
+
+> **Idle since 2026-11-05.** `alhabla.ai`, `www` and `app` were switched to DNS-only by hand that
+> day (Cloudflare API, `proxied:false`, TTL auto), with no marca in KV. Per its own rules a
+> DNS-only record without a marca is «turned off by a human» and the Worker never touches it, so
+> it keeps running but has nothing to switch. What follows describes how it worked while the
+> webs were proxied; retiring it (Worker, KV, folder and CI job) is a separate decision.
 
 - **The problem.** During LaLiga matches Spanish ISPs block Cloudflare IPs by court order
   (`188.114.96.x`/`97.x`; on Movistar also `2a06:98c1:3120::`/`3121::`). With the proxy on,

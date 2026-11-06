@@ -188,29 +188,36 @@ describe("InicioMovil", () => {
     expect(within(hoja).getByRole("link", { name: "Configurar horario" })).toHaveAttribute("href", "/agente/horario");
   });
 
-  it("sin agenda, «Atiende, pero no reserva» no suma un segundo aviso", async () => {
+  // PLAN-AGENDA-PRINCIPAL.md: sin calendario conectado la agenda de Alhabla
+  // reserva; no hay nada que avisar.
+  it("sin calendario conectado atiende y reserva, sin avisos de agenda", async () => {
+    conCliente(<InicioMovil business={{ ...negocio, activeCalendar: null }} avisoDeCalendario={null} />);
+
+    // Solo la cita sin reservar: ni la agenda ni la recepcionista avisan.
+    const chip = await screen.findByRole("button", { name: "Estado del servicio: 1 aviso" });
+    expect(screen.queryByRole("link", { name: /Vuelve a conectar/ })).not.toBeInTheDocument();
+    await userEvent.click(chip);
+    const hoja = await screen.findByRole("dialog", { name: "Estado del servicio" });
+    expect(within(hoja).getByText("Atendiendo llamadas")).toBeInTheDocument();
+  });
+
+  it("con el calendario caducado sigue reservando y pide reconectarlo", async () => {
     conCliente(
       <InicioMovil
-        business={{ ...negocio, activeCalendar: { ...negocio.activeCalendar!, connected: false } }}
+        business={{
+          ...negocio,
+          activeCalendar: {
+            ...negocio.activeCalendar!,
+            connected: false,
+            disconnectedAt: "2026-10-20T10:00:00Z",
+          },
+        }}
         avisoDeCalendario={null}
       />
     );
 
-    // La cita sin reservar y la agenda: la recepcionista no cuenta aparte.
+    expect(await screen.findByRole("link", { name: /Vuelve a conectar/ })).toBeInTheDocument();
     const chip = await screen.findByRole("button", { name: "Estado del servicio: 2 avisos" });
-    await userEvent.click(chip);
-    const hoja = await screen.findByRole("dialog", { name: "Estado del servicio" });
-    expect(within(hoja).getByText("Atiende, pero no reserva: falta elegir dónde reservar")).toBeInTheDocument();
-  });
-
-  it("en la agenda de Alhabla, sin calendario externo, atiende y reserva", async () => {
-    conCliente(
-      <InicioMovil business={{ ...negocio, activeCalendar: null, modoDeAgenda: "alhabla" }} avisoDeCalendario={null} />
-    );
-
-    // Solo la cita sin reservar: ni la agenda ni la recepcionista avisan.
-    const chip = await screen.findByRole("button", { name: "Estado del servicio: 1 aviso" });
-    expect(screen.queryByRole("link", { name: /Elige dónde reservar/ })).not.toBeInTheDocument();
     await userEvent.click(chip);
     const hoja = await screen.findByRole("dialog", { name: "Estado del servicio" });
     expect(within(hoja).getByText("Atendiendo llamadas")).toBeInTheDocument();

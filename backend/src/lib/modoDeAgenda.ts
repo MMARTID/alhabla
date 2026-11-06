@@ -1,17 +1,12 @@
 /**
- * Modo de agenda del negocio (PLAN-AGENDA-ALHABLA.md): dónde se reservan las
- * citas. El modo se ELIGE, no se deduce: una conexión caducada nunca pasa
- * el negocio a `alhabla`, y conectar un calendario lo pasa a `externo`.
+ * Modo de agenda del negocio (PLAN-AGENDA-ALHABLA.md, 28-10-2026). Desde
+ * PLAN-AGENDA-PRINCIPAL.md (06-11-2026) YA NO DECIDE NADA: la agenda de
+ * Alhabla es la de todos los negocios y el calendario conectado, un
+ * complemento que recibe una copia de cada cita (calendar/copiaDeLaCita.ts).
+ * La columna `Business.modoDeAgenda` y este fichero se mantienen solo para la
+ * app anterior y se borran en la fase 7 del plan.
  *
- * - `sin_elegir`: sin calendario. La recepcionista atiende y toma nota, pero
- *   no da hora ni reserva (fase 0).
- * - `alhabla`: reserva solo en nuestra base de datos. La conexión externa que
- *   pudiera quedar se ignora (calendar/conexion.ts, `agendaPropia`).
- * - `externo`: reserva en Google, Outlook o iCloud, con la regla de siempre
- *   (nunca a ciegas: sin conexión operativa no se reserva).
- *
- * La regla de «¿se puede reservar?» vive en `puedeReservar` de
- * calendar/conexion.ts, porque necesita la conexión resuelta.
+ * Valores históricos: `sin_elegir`, `alhabla`, `externo`.
  */
 
 export const MODOS_DE_AGENDA = ["sin_elegir", "alhabla", "externo"] as const;

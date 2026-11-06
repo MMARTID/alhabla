@@ -508,7 +508,7 @@ describe("cita de WhatsApp movida desde el panel y cancelada por el cliente (iCl
         cancelledBy: "client_chat",
         etiqueta: ETIQUETA_CHAT,
       })
-    ).toEqual({ resultado: "cancelada" });
+    ).toEqual({ resultado: "cancelada", quitadaDelCalendario: true });
     anotar("21-09 10:58:25 cancela cmub4dk6v (client_chat)");
 
     // 21-09 10:58:28 — la cita del caso (cmub4tmbc), 100 min. La hora
@@ -621,7 +621,7 @@ describe("cita de WhatsApp movida desde el panel y cancelada por el cliente (iCl
       cancelledBy: final.cancelledBy,
       externalEventId: final.externalEventId,
     });
-    expect(cancelacion).toEqual({ resultado: "cancelada" });
+    expect(cancelacion).toEqual({ resultado: "cancelada", quitadaDelCalendario: true });
     expect(final.isCancelled).toBe(true);
     // Lo que el dueño no debería volver a ver: ningún evento en iCloud.
     expect(icloud.hrefs()).toEqual([]);
@@ -723,7 +723,7 @@ describe("cita de WhatsApp movida desde el panel y cancelada por el cliente (iCl
     anotar("06-10 09:14:40 cancela (iCloud renombra)", {
       resultado: cancelacion.resultado,
     });
-    expect(cancelacion).toEqual({ resultado: "cancelada" });
+    expect(cancelacion).toEqual({ resultado: "cancelada", quitadaDelCalendario: true });
     expect(icloud.hrefs()).toEqual([]);
     // Buscado en la hora de la cita al cancelar (07-10 08:45–10:25Z, ±1 día).
     expect(peticionesAlCancelar).toEqual([
@@ -817,7 +817,7 @@ describe("cita de WhatsApp movida desde el panel y cancelada por el cliente (iCl
       externalEventId: final.externalEventId,
     });
 
-    expect(cancelacion).toEqual({ resultado: "cancelada" });
+    expect(cancelacion).toEqual({ resultado: "cancelada", quitadaDelCalendario: true });
     expect(
       (reactivacion as Awaited<ReturnType<typeof executeVoiceTool>> | null)
         ?.result?.success

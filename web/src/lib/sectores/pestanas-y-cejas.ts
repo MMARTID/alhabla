@@ -122,7 +122,7 @@ export const pestanasYCejas: SectorLanding = {
       question:
         "Muchas citas me llegan por Instagram. ¿Se pisan con las del teléfono?",
       answer:
-        "No, si las apuntas en tu agenda: Google Calendar, Outlook, iCloud o la de Alhabla, en el panel. La recepcionista la mira antes de dar hora y no ofrece lo ocupado. Con Instagram no se conecta.",
+        "No, si las tienes en tu agenda: díselo a tu asistente por WhatsApp («apúntame a Sara el lunes a las cuatro, relleno») o hazlo en el panel. La recepcionista la mira antes de dar hora y no ofrece lo ocupado. Con Instagram no se conecta.",
     },
     {
       question: "¿Guarda la ficha de cada clienta, con la curva y el grosor?",

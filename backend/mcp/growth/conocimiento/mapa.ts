@@ -124,9 +124,24 @@ export const MAPA_DE_PRODUCT: readonly EntradaDelMapa[] = [
   {
     seccion: SECCION_CAPACIDADES,
     grupo: GRUPO_CAPACIDADES,
-    empiezaPor: /^Integración de calendario/,
+    empiezaPor: /^Agenda de Alhabla incluida/,
     ignorar:
-      "Lo dice funcion.calendarios (plans.ts); el bullet habla del protocolo de iCloud y de caducidad de credenciales.",
+      "Lo dice funcion.agenda_incluida (plans.ts); el bullet trae fechas y el enlace de solo lectura.",
+  },
+  {
+    seccion: SECCION_CAPACIDADES,
+    grupo: GRUPO_CAPACIDADES,
+    empiezaPor: /^Calendario conectado como complemento/,
+    // PLAN-AGENDA-PRINCIPAL.md: la agenda de Alhabla es la del negocio y el
+    // calendario, un complemento. Antes salía de plans.ts, que ya no habla
+    // de calendarios (fase 5: funciones antes que compatibilidad).
+    destino: {
+      tipo: "funcion",
+      clave: "funcion.calendarios",
+      huella: "c4683ce45516",
+      texto:
+        "Agenda incluida, conectada a Google Calendar, Outlook o iCloud si el negocio quiere: cada cita se copia ahí.",
+    },
   },
   {
     seccion: SECCION_CAPACIDADES,
@@ -276,6 +291,7 @@ export const MAPA_DE_PRODUCT: readonly EntradaDelMapa[] = [
     "Enfocado al dolor",
     "IA sin complejos",
     "Vender enseñando",
+    "Se vende la faena que se quita",
     "Errores",
     "Estética comprometida",
   ].map((etiqueta): EntradaDelMapa => ({
@@ -453,8 +469,8 @@ export const MAPA_DE_FEATURES_DE_PLANES: readonly EntradaDeFeatureDePlan[] = [
   },
   {
     plan: "inicio",
-    empiezaPor: /^Reservas en tu calendario/,
-    clave: "funcion.calendarios",
+    empiezaPor: /^Tu agenda en WhatsApp/,
+    clave: "funcion.agenda_incluida",
   },
   {
     plan: "inicio",

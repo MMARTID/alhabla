@@ -63,6 +63,7 @@ function evento(ruta: string): BeforeSendEvent {
 
 beforeEach(() => {
   document.cookie = "alhabla_analitica=; Path=/; Max-Age=0";
+  document.cookie = "alhabla_cookies=; Path=/; Max-Age=0";
   document.cookie = "_ga=; Path=/; Max-Age=0";
   window.history.replaceState(null, "", "/planes?token=secreto");
   window.dataLayer = undefined;
@@ -84,7 +85,12 @@ describe("consentimiento de analítica", () => {
     expect(estado.filtrar).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "Rechazar cookies" }));
-    expect(document.cookie).toContain("alhabla_analitica=rechazada");
+    expect(document.cookie).toContain("alhabla_cookies=medicion:0");
+    // Sin píxel (no hay NEXT_PUBLIC_META_PIXEL_ID) solo hay una finalidad:
+    // ni panel ni botón «Configurar» en el aviso.
+    expect(
+      screen.queryByRole("button", { name: /Configurar por finalidad/ })
+    ).not.toBeInTheDocument();
     expect(estado.alCargar).toBeNull();
     expect(
       screen.getByRole("button", { name: "Configurar cookies" })
@@ -143,7 +149,7 @@ describe("consentimiento de analítica", () => {
     (ruta) => {
       // La visita aceptó la analítica en otra página; el editor del blog es
       // interno: ni scripts de medición ni aviso de cookies.
-      document.cookie = "alhabla_analitica=aceptada; Path=/";
+      document.cookie = "alhabla_cookies=medicion:1; Path=/";
       estado.ruta = ruta;
       const { container } = render(comoEnLaWeb());
       expect(container).toBeEmptyDOMElement();
@@ -284,6 +290,7 @@ describe("aviso aplazado hasta el primer scroll (la web)", () => {
   });
 
   it("con la elección ya hecha no hay nada que aplazar: sale el botón para cambiarla", async () => {
+    // La cookie de antes de separar finalidades también cuenta como elección.
     document.cookie = "alhabla_analitica=rechazada; Path=/";
     render(conAvisoAplazado());
 

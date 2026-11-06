@@ -122,6 +122,18 @@ describe("POST /contacto", () => {
     const [correo] = mockedEnqueueEmailJob.mock.calls[0];
     expect(correo.html).toContain("Franquicia");
     expect(correo.html).not.toContain("tel:");
+    // Cadenas y franquicias llegan por su alias, para poder filtrarlas.
+    expect(correo.toAddress).toBe("empresas@alhabla.ai");
+  });
+
+  it("cinco o más sedes también van a empresas@alhabla.ai", async () => {
+    const { app } = await crearApp();
+
+    const respuesta = await enviar(app, { ...SOLICITUD, sedes: "5+" });
+
+    expect(respuesta.statusCode).toBe(200);
+    const [correo] = mockedEnqueueEmailJob.mock.calls[0];
+    expect(correo.toAddress).toBe("empresas@alhabla.ai");
   });
 
   it("rechaza con 400 y mensajes en español lo que no vale", async () => {

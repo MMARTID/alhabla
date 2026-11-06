@@ -9,16 +9,16 @@ import {
   ventanaDeLaCita,
 } from "../calendar/borradoDeEvento.js";
 import {
-  origenExternoDeLaCita,
-  puedeReservar,
-  marcarCalendarioDesconectado,
   origenDeCalendario,
   resolverConexionDeCalendario,
   SELECT_CONEXION_DE_CALENDARIO,
-  usaCalendarioExterno,
   type ConexionResuelta,
 } from "../calendar/conexion.js";
-import { proveedorDesdeErrorDeReconexion } from "../../adapters/calendar/errors.js";
+import {
+  camposDeLaCopia,
+  encolarCopiaDeLaCita,
+  intentarCopiaDeLaCita,
+} from "../calendar/copiaDeLaCita.js";
 import {
   checkAvailability,
   computeAvailabilityLookaheadMs,
@@ -554,8 +554,6 @@ export type EstadoDeReserva =
   | "fuera_de_plazo"
   | "pasada"
   | "cerrado"
-  | "sin_calendario"
-  | "calendario_caido"
   | "lock"
   | "error";
 
@@ -638,13 +636,8 @@ export async function reservarDesdeListaDeEspera(input: {
     );
     return { estado: "error" };
   }
+  // El calendario conectado solo recibe la copia (PLAN-AGENDA-PRINCIPAL.md).
   const conexion = resolverConexionDeCalendario(business);
-  if (!puedeReservar(conexion)) {
-    console.warn(
-      `[WhatsApp] ${etiqueta}: el negocio ${businessId} no tiene calendario operativo (${conexion.provider}); no se reserva a ciegas`
-    );
-    return { estado: "sin_calendario" };
-  }
 
   const catalogo = await verificarCatalogo(businessId, data);
 
@@ -689,12 +682,6 @@ export async function reservarDesdeListaDeEspera(input: {
       startDate,
       data.durationMinutes
     );
-    if (usaCalendarioExterno(conexion) && !externo.calendarAvailabilityKnown) {
-      console.warn(
-        `[WhatsApp] ${etiqueta}: no se pudo leer el calendario ${conexion.provider} del negocio ${businessId}; no se reserva a ciegas`
-      );
-      return { estado: "calendario_caido" };
-    }
     const disponibilidad = await checkAvailability({
       businessId,
       schedule: business.schedule,
@@ -724,10 +711,11 @@ export async function reservarDesdeListaDeEspera(input: {
       input.contactName ??
       "Cliente de la lista de espera";
 
-    let evento: { id?: string } | undefined;
-    try {
-      evento = (await calendarService.bookAppointment({
-        conexion,
+    const copia = await intentarCopiaDeLaCita({
+      conexion,
+      businessId,
+      log: { prefijo: "[WhatsApp]", etiqueta },
+      evento: {
         clientName,
         startDateTime: data.startDateTime,
         durationMinutes: data.durationMinutes,
@@ -748,24 +736,9 @@ export async function reservarDesdeListaDeEspera(input: {
           durationMinutes: data.durationMinutes,
           distintivo: input.inboundMessageId,
         }),
-      })) as { id?: string } | undefined;
-    } catch (error) {
-      const proveedorRoto = proveedorDesdeErrorDeReconexion(error);
-      if (proveedorRoto) {
-        await marcarCalendarioDesconectado(
-          businessId,
-          proveedorRoto,
-          { modo: "revocar" },
-          { prefijo: "[WhatsApp]" }
-        );
-        return { estado: "sin_calendario" };
-      }
-      console.error(
-        `[WhatsApp] ${etiqueta}: el calendario ${conexion.provider} del negocio ${businessId} no aceptó la reserva del lead ${lead.id}: ${errorMessage(error)}`
-      );
-      return { estado: "calendario_caido" };
-    }
-    eventoCreado = evento?.id;
+      },
+    });
+    eventoCreado = copia.externalEventId ?? undefined;
 
     const now = new Date();
     let bookingId: string;
@@ -805,7 +778,7 @@ export async function reservarDesdeListaDeEspera(input: {
             smsConsent: true,
             createdVia: "whatsapp_lista_espera",
             externalEventId: eventoCreado ?? undefined,
-            ...origenExternoDeLaCita(conexion),
+            ...camposDeLaCopia(copia),
           },
           update: {
             programedAt: startDate,
@@ -814,8 +787,8 @@ export async function reservarDesdeListaDeEspera(input: {
             serviceIds: catalogo.serviceIds,
             clientName,
             clientPhone: from,
-            externalEventId: eventoCreado ?? undefined,
-            ...origenExternoDeLaCita(conexion),
+            externalEventId: eventoCreado ?? null,
+            ...camposDeLaCopia(copia),
             isCancelled: false,
             cancelledAt: null,
             cancelledBy: null,
@@ -888,6 +861,7 @@ export async function reservarDesdeListaDeEspera(input: {
     console.log(
       `[WhatsApp] ${etiqueta}: reserva ${bookingId} creada desde la lista de espera (lead ${lead.id}, negocio ${businessId})`
     );
+    if (copia.reintentar) await encolarCopiaDeLaCita(bookingId);
 
     // Fuera de la sección crítica lógica, pero aún con el lock: rápido y sin lanzar.
     await avisarNuevaReserva({

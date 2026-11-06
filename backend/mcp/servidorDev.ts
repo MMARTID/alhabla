@@ -12,8 +12,15 @@ import { simularConversacion } from "./conversacionSimulada.js";
 import { diagnosticarMcp, recordarCommitAlArrancar } from "./diagnostico.js";
 import { cargarEnv, urlDeBdDeDev, variable } from "./entorno.js";
 import { leerEnviosSimulados } from "./enviosSimulados.js";
+import {
+  ACCIONES_DEL_CALENDARIO_FALSO,
+  agendaDeNegocio,
+  manejarCalendarioFalso,
+} from "./calendarioFalso.js";
 import { describirTabla } from "./esquema.js";
 import { estadoDeProd } from "./estadoDeProd.js";
+import { fallosDeCi } from "./fallosDeCi.js";
+import { INSTRUCCIONES_DE_DEV } from "./instruccionesDev.js";
 import {
   JOBS_QUE_NO,
   JOBS_QUE_SE_PUEDEN_LANZAR,
@@ -43,6 +50,7 @@ import {
   llamarApiDeDev,
 } from "./sesionDeDev.js";
 import { trazaDeLlamada } from "./trazaDeLlamada.js";
+import { elegirVistaPrevia } from "./vistaPreviaRama.js";
 import {
   BASE_DEV,
   BASE_TELNYX_SIMULACION,
@@ -86,6 +94,12 @@ import {
  * - lanzar_job_prod: solo los jobs del Scheduler que se pueden repetir.
  * - estado_dev / ver_en_dev: el entorno de desarrollo fijo
  *   (scripts/dev/entorno.sh): qué enseña y ponerlo en otra rama.
+ * - vista_previa_rama: qué worktree sirven app-rama/web-rama (:3111/:3112).
+ * - fallos_ci: por qué está en rojo el CI de un PR o una rama.
+ *
+ * Las instructions del servidor (instruccionesDev.ts) dicen qué herramienta
+ * va con qué tarea; `npm run mcp:probar` (probar.ts) llama a las de una rama
+ * antes de fusionarla.
  *
  * Lo de producción y Telnyx enmascara los teléfonos salvo que se pida lo
  * contrario (privacidad.ts).
@@ -96,7 +110,10 @@ import {
  * stdout es el canal del protocolo: todo log va a stderr.
  */
 
-const servidor = new McpServer({ name: "alhabla-dev", version: "1.0.0" });
+const servidor = new McpServer(
+  { name: "alhabla-dev", version: "1.0.0" },
+  { instructions: INSTRUCCIONES_DE_DEV }
+);
 
 const esquemaDeConsulta = {
   sql: z
@@ -223,7 +240,7 @@ servidor.registerTool(
   {
     title: "Entrar en la app de dev como un negocio",
     description:
-      "Un enlace a la app de dev (http://localhost:3001) que abre la sesión de un usuario de la BD de dev (por email o por negocio) y lleva a la pantalla pedida (destino, por defecto el panel «/»). Usa un pase de un solo uso como el del registro (válido 10 minutos, una vez): el JWT no va en la URL. Para dárselo al usuario o abrirlo en el navegador integrado.",
+      "Un enlace a la app de dev (http://localhost:3001) que abre la sesión de un usuario de la BD de dev (por email o por negocio) y lleva a la pantalla pedida (destino, por defecto el panel «/»). Usa un pase de un solo uso como el del registro (válido 10 minutos, una vez): el JWT no va en la URL. Para dárselo al usuario o abrirlo en el navegador integrado. puerto: 3001 la app fija (por defecto), 3101 la vista previa de la sesión (frontend-dev), 3111 la de una rama (app-rama, vista_previa_rama).",
     inputSchema: {
       email: z.string().optional(),
       businessId: z.string().optional(),
@@ -231,14 +248,24 @@ servidor.registerTool(
         .string()
         .optional()
         .describe("Ruta de la app: /, /agenda, /llamadas, /ajustes…"),
+      puerto: z
+        .union([z.literal(3001), z.literal(3101), z.literal(3111)])
+        .optional()
+        .describe("3001 fija (por defecto), 3101 vista previa, 3111 rama"),
     },
     annotations: { readOnlyHint: false, destructiveHint: false },
   },
-  ({ email, businessId, destino }) =>
+  ({ email, businessId, destino, puerto }) =>
     conErrores(async () => {
       const url = urlDeBdDeDev(cargarEnv());
       const usuario = await buscarUsuarioDeDev(url, { email, businessId });
-      const enlace = await crearEnlaceDeEntradaDeDev(url, usuario, destino);
+      const enlace = await crearEnlaceDeEntradaDeDev(
+        url,
+        usuario,
+        destino,
+        10,
+        puerto
+      );
       return {
         usuario: { email: usuario.email, businessId: usuario.businessId },
         ...enlace,
@@ -332,7 +359,7 @@ servidor.registerTool(
   {
     title: "Simular una conversación entera",
     description:
-      "Varias tools seguidas sobre la MISMA llamada simulada (canal voz: crea una llamada de businessId, o sigue callControlId) o del Gestor (canal gestor, con businessId), en orden, contra backend-sim. En el cuerpo de un paso, «{{nombre}}» se sustituye por el último valor con ese nombre que devolvió un paso anterior (p. ej. {{availabilityToken}}, {{bookingId}}, {{professionalId}}); y un book_appointment sin availabilityToken ni startDateTime toma el del último check_availability. Devuelve cada paso (cuerpo enviado, estado, ms, avisos y respuesta), las citas y reservas pendientes que dejó la llamada en la BD de dev y los WhatsApp/SMS/correos que backend-sim no envió. Las citas van al calendario real del negocio: al acabar, cancélalas y borrar_llamadas_simuladas.",
+      "Varias tools seguidas sobre la MISMA llamada simulada (canal voz: crea una llamada de businessId, o sigue callControlId) o del Gestor (canal gestor, con businessId), en orden, contra backend-sim. En el cuerpo de un paso, «{{nombre}}» se sustituye por el último valor con ese nombre que devolvió un paso anterior (p. ej. {{availabilityToken}}, {{bookingId}}, {{professionalId}}); y un book_appointment sin availabilityToken ni startDateTime toma el del último check_availability. Si un paso de voz devuelve pregunta_de_grabacion (la primera consulta de cada llamada), contesta solo como quien llama tras 2 s con preferencia_de_grabacion (respuestaDeGrabacion: acepta por defecto, rechaza o no_contestar), que trae lo comprobado y su availabilityToken; sale como paso «automatico». Devuelve cada paso (cuerpo enviado, estado, ms, avisos y respuesta), las citas y reservas pendientes que dejó la llamada en la BD de dev (con el estado de su copia en el calendario) y los WhatsApp/SMS/correos que backend-sim no envió. Las citas van al calendario del negocio (el falso, con calendario_falso): al acabar, borrar_llamadas_simuladas.",
     inputSchema: {
       canal: z.enum(["voz", "gestor"]).optional().describe("Por defecto voz"),
       businessId: z.string().optional(),
@@ -357,6 +384,12 @@ servidor.registerTool(
         .boolean()
         .optional()
         .describe("Corta en el primer paso con HTTP de error o success:false"),
+      respuestaDeGrabacion: z
+        .enum(["acepta", "rechaza", "no_contestar"])
+        .optional()
+        .describe(
+          "Voz: qué contesta quien llama a pregunta_de_grabacion. Por defecto acepta (se recuerda para ese teléfono)"
+        ),
     },
   },
   (opciones) =>
@@ -431,7 +464,7 @@ servidor.registerTool(
   {
     title: "Borrar las llamadas simuladas",
     description:
-      "Borra de la BD de dev las llamadas que creó simular_webhook_telnyx (callId sim-mcp-…), de un negocio o de todos, para que no salgan en el historial del panel. Conserva las que tienen una cita viva en el calendario (borrarla dejaría el evento huérfano) y las devuelve: cancélalas antes y vuelve a llamar.",
+      "Borra de la BD de dev las llamadas que creó simular_webhook_telnyx (callId sim-mcp-…), de un negocio o de todos, para que no salgan en el historial del panel. Conserva las que tienen una cita viva en un calendario REAL (borrarla dejaría el evento huérfano) y las devuelve: cancélalas antes y vuelve a llamar. Las del calendario falso (calendario_falso) sí se borran, y sus eventos salen de ese calendario (eventosFalsosBorrados); los apuntados a mano se quedan.",
     inputSchema: { businessId: z.string().optional() },
     annotations: { destructiveHint: true },
   },
@@ -707,6 +740,85 @@ servidor.registerTool(
     })
 );
 
+servidor.registerTool(
+  "calendario_falso",
+  {
+    title: "Calendario falso de backend-sim",
+    description:
+      "Maneja el calendario falso de backend-sim (CALENDARIOS_FALSOS=1) para probar de punta a punta la agenda de Alhabla y la copia de las citas en el calendario conectado sin tocar un Google de verdad (PLAN-AGENDA-PRINCIPAL.md). Corre DENTRO de alhabla_backend_sim, con su código y su BD. Acciones: conectar (businessId, proveedor google|outlook|caldav: conecta un calendario falso por el camino real, que vuelca la agenda), estado (sin `estado` lo enseña; con ok|caido|revocado lo cambia: caido lanza un error cualquiera, revocado el de reconexión), apuntar (inicio, fin o duracionMinutos, titulo: lo que el dueño apunta a mano), mover (eventId, inicio) y borrar (eventId), como si lo hiciera el dueño en Google; copiar (businessId o bookingId: el job de copia ahora, que en dev no corre solo si estaba programado), volcar (el volcado al conectar), recordar (el recordatorio de los 7 días, ya) y quitar. Devuelve la conexión, los eventos y los logs de la acción. Las alertas al dueño no salen (ENVIOS_SIMULADOS): ver_envios_simulados.",
+    inputSchema: {
+      accion: z.enum(ACCIONES_DEL_CALENDARIO_FALSO),
+      businessId: z.string().optional(),
+      bookingId: z.string().optional(),
+      proveedor: z.enum(["google", "outlook", "caldav"]).optional(),
+      estado: z.enum(["ok", "caido", "revocado"]).optional(),
+      eventId: z.string().optional(),
+      inicio: z.string().optional().describe("ISO 8601 con zona"),
+      fin: z.string().optional(),
+      duracionMinutos: z.number().int().min(5).max(600).optional(),
+      titulo: z.string().optional(),
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false },
+  },
+  ({ accion, ...entrada }) =>
+    conErrores(() => manejarCalendarioFalso(accion, entrada))
+);
+
+servidor.registerTool(
+  "agenda_dev",
+  {
+    title: "Agenda de un negocio de dev con sus copias",
+    description:
+      "Las citas de un negocio de dev (desde hace diasAtras días) con el estado de su copia en el calendario conectado (copiaEnCalendario: null, pendiente, hecha, fallida; intentos y error), la conexión de calendario, las reservas pendientes sin resolver y, si el negocio usa el calendario falso de backend-sim, sus eventos y lo que no cuadra: citas activas sin evento, eventos de citas canceladas, eventos a otra hora que su cita (movidos «en Google»), citas cuyo evento ya no está y eventos apuntados a mano. Solo lectura.",
+    inputSchema: {
+      businessId: z.string(),
+      diasAtras: z.number().int().min(0).max(60).optional(),
+    },
+    annotations: { readOnlyHint: true },
+  },
+  ({ businessId, diasAtras }) =>
+    conErrores(() =>
+      agendaDeNegocio(urlDeBdDeDev(cargarEnv()), { businessId, diasAtras })
+    )
+);
+
+servidor.registerTool(
+  "vista_previa_rama",
+  {
+    title: "Vista previa de un worktree",
+    description:
+      "Elige el worktree (por ruta o por rama) que sirven las vistas previas app-rama (http://localhost:3111) y web-rama (:3112) de .claude/launch.json, sin editar launch.json: preview_start arranca las vistas previas en el checkout de la sesión, y así una sesión del checkout principal ve el código de su worktree. Instala sus dependencias si faltan (npm ci, hasta unos minutos) y deja que el script cargue el .env.local del checkout principal. Las dos van contra el backend fijo (:3000) y la BD de dev. Sin objetivo, dice cuál está elegido y qué worktrees hay. Después: preview_start con name app-rama o web-rama (preview_stop antes si ya corría), y entrar_en_app_dev con puerto 3111.",
+    inputSchema: {
+      objetivo: z
+        .string()
+        .optional()
+        .describe("Ruta absoluta de un worktree (o de una carpeta suya) o su rama"),
+      piezas: z
+        .array(z.enum(["app", "web"]))
+        .min(1)
+        .optional()
+        .describe("Qué preparar; por defecto las dos"),
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false },
+  },
+  (entrada) => conErrores(() => elegirVistaPrevia(entrada))
+);
+
+servidor.registerTool(
+  "fallos_ci",
+  {
+    title: "Por qué falla el CI",
+    description:
+      "Las ejecuciones de GitHub Actions del último commit de un PR (pr) o de una rama subida (rama), y de cada job en rojo el paso que falló y, del log, solo lo que lo explica: el bloque de fallos de vitest (test, error y línea, sin el stderr de los tests que pasan) o las líneas de error de tsc, eslint, next build o bash, y el final del paso. Dice también lo que sigue en curso. Solo lectura, con el gh del Mac.",
+    inputSchema: {
+      pr: z.number().int().positive().optional(),
+      rama: z.string().optional(),
+    },
+    annotations: { readOnlyHint: true },
+  },
+  (entrada) => conErrores(() => fallosDeCi(entrada))
+);
+
 registrarHerramientasDeProd(servidor);
 
 process.on("exit", pararProxy);
@@ -722,4 +834,6 @@ console.error("[MCP] alhabla-dev listo");
 // Lo que este proceso tiene cargado, y la copia fija al día para la próxima
 // sesión (el código nuevo de un proceso ya arrancado no se recarga).
 await recordarCommitAlArrancar();
-actualizarHerramientasEnSegundoPlano();
+// Desde `npm run mcp:probar` (mcp/probar.ts) no: podría recrear backend-sim a
+// mitad de la prueba de una rama.
+if (process.env.ALHABLA_MCP_PRUEBA !== "1") actualizarHerramientasEnSegundoPlano();

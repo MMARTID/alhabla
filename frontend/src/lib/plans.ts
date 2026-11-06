@@ -27,11 +27,11 @@ export const plans: readonly Plan[] = [
     minutes: 200,
     extraPerMinute: 0.3,
     description: "Para que no se te escape ninguna llamada desde el primer día.",
-    summary: "3 profesionales · reservas en tu calendario o en la agenda de Alhabla · 200 minutos incluidos",
+    summary: "3 profesionales · tu agenda en WhatsApp · 200 minutos incluidos",
     features: [
       "Contesta tus llamadas a cualquier hora, también en festivos",
       "Habla español y 7 idiomas más, y el catalán, euskera o gallego de tu zona",
-      "Reservas en tu calendario de Google, Outlook o iCloud, o en la agenda de Alhabla si no usas ninguno",
+      "Tu agenda en WhatsApp, en el panel y en el móvil",
       "Tu asistente por WhatsApp: horarios, precios, citas y ausencias, con tu «Confirmar»",
       "Hasta 3 profesionales en tu agenda",
       "Confirmación de cita por WhatsApp al cliente",

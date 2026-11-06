@@ -6,6 +6,11 @@ import {
   borrarLlamadasSimuladas,
   crearLlamadaSimulada,
 } from "../../../mcp/llamadasSimuladas.js";
+import {
+  guardarCalendarioFalso,
+  leerCalendarioFalso,
+  type EventoFalso,
+} from "../../../src/adapters/calendar/falso/calendarioFalso.js";
 
 const url = process.env.DATABASE_URL!;
 
@@ -70,7 +75,11 @@ describe("borrarLlamadasSimuladas", () => {
     await crearLlamadaSimulada(url, negocio.id);
 
     const resultado = await borrarLlamadasSimuladas(url);
-    expect(resultado).toEqual({ borradas: 2, conservadas: [] });
+    expect(resultado).toEqual({
+      borradas: 2,
+      conservadas: [],
+      eventosFalsosBorrados: 0,
+    });
     expect((await prisma.call.findMany()).map((l) => l.id)).toEqual([real.id]);
   });
 
@@ -102,7 +111,69 @@ describe("borrarLlamadasSimuladas", () => {
     expect(await borrarLlamadasSimuladas(url, uno.id)).toEqual({
       borradas: 1,
       conservadas: [],
+      eventosFalsosBorrados: 0,
     });
     expect((await prisma.call.findMany()).map((l) => l.callId)).toEqual([delOtro]);
+  });
+
+  it("borra las del calendario falso y quita sus eventos, no los demás", async () => {
+    const negocio = await createTestBusiness();
+    const otro = await createTestBusiness({ name: "Barbería" });
+    const evento = (id: string, origen: EventoFalso["origen"]): EventoFalso => ({
+      id,
+      summary: id,
+      description: "",
+      inicio: "2026-10-20T09:00:00.000Z",
+      fin: "2026-10-20T09:30:00.000Z",
+      origen,
+    });
+    await guardarCalendarioFalso(`falso:${negocio.id}`, {
+      estado: "caido",
+      eventos: [
+        evento("falsoaaa", "alhabla"),
+        evento("falsoccc", "alhabla"),
+        evento("amano1", "a_mano"),
+      ],
+    });
+    await guardarCalendarioFalso(`falso:${otro.id}`, {
+      estado: "ok",
+      eventos: [evento("falsoddd", "alhabla")],
+    });
+    // Viva con evento falso, cancelada con evento falso y viva con uno real.
+    await citaPara(await crearLlamadaSimulada(url, negocio.id), {
+      externalEventId: "falsoaaa",
+    });
+    await citaPara(await crearLlamadaSimulada(url, negocio.id), {
+      isCancelled: true,
+      externalEventId: "falsobbb",
+    });
+    const real = await crearLlamadaSimulada(url, negocio.id);
+    const citaReal = await citaPara(real, { externalEventId: "abc123" });
+    // Una cita del otro negocio con evento falso: no se toca con businessId.
+    const delOtro = await crearLlamadaSimulada(url, otro.id);
+    await citaPara(delOtro, { externalEventId: "falsoddd" });
+
+    const resultado = await borrarLlamadasSimuladas(url, negocio.id);
+    expect(resultado).toEqual({
+      borradas: 2,
+      conservadas: [
+        {
+          callId: real,
+          bookingId: citaReal.id,
+          programedAt: "2026-10-20T09:00:00.000Z",
+        },
+      ],
+      eventosFalsosBorrados: 1,
+    });
+    expect((await prisma.call.findMany()).map((l) => l.callId).sort()).toEqual(
+      [real, delOtro].sort()
+    );
+    // Se va el de la cita borrada; se quedan el de otra cita, el apuntado a
+    // mano, el estado del calendario y el calendario del otro negocio.
+    expect(await leerCalendarioFalso(`falso:${negocio.id}`)).toEqual({
+      estado: "caido",
+      eventos: [evento("falsoccc", "alhabla"), evento("amano1", "a_mano")],
+    });
+    expect((await leerCalendarioFalso(`falso:${otro.id}`)).eventos).toHaveLength(1);
   });
 });

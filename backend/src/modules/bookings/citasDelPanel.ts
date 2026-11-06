@@ -5,8 +5,6 @@ import { prisma } from "../../lib/prisma.js";
 import { cancelarReserva } from "./cancelacion.js";
 import {
   ACCIONES_DE_AGENDA,
-  MOTIVO_CALENDARIO_ILEGIBLE,
-  MOTIVO_SIN_CALENDARIO,
   PREFIJO_DE_CALL_DEL_GESTOR,
   instanteLocal,
   moverReserva,
@@ -43,15 +41,10 @@ const AvisarBodySchema = z.object({
   tipo: z.enum(["cambio", "cancelacion"]),
 });
 
-const TEXTO_SIN_CALENDARIO =
-  "Para apuntar o mover citas desde aquí, elige la agenda de Alhabla o conecta tu calendario.";
-const TEXTO_CALENDARIO_ILEGIBLE =
-  "Ahora mismo no se puede leer tu calendario. Inténtalo en un rato.";
-
-/** Los motivos del Gestor que no sirven tal cual en el panel. */
+/** Los motivos del Gestor que no sirven tal cual en el panel. Desde
+ * PLAN-AGENDA-PRINCIPAL.md ninguno habla del calendario (nunca impide
+ * apuntar), así que hoy pasan tal cual; se deja el punto de traducción. */
 function enPalabrasDelPanel(motivo: string): string {
-  if (motivo === MOTIVO_SIN_CALENDARIO) return TEXTO_SIN_CALENDARIO;
-  if (motivo === MOTIVO_CALENDARIO_ILEGIBLE) return TEXTO_CALENDARIO_ILEGIBLE;
   return motivo;
 }
 
@@ -66,16 +59,6 @@ const TEXTOS_DE_FALLO: Record<
     status: 409,
     texto:
       "La agenda está guardando otra reserva en este momento. Vuelve a intentarlo en unos segundos.",
-  },
-  calendario_desconectado: {
-    status: 409,
-    texto:
-      "Tu calendario ha dejado de responder y hay que volver a conectarlo. La cita sigue como estaba.",
-  },
-  calendario_rechaza: {
-    status: 502,
-    texto:
-      "Tu calendario no ha aceptado la nueva hora. La cita sigue como estaba; inténtalo en un rato.",
   },
   cancelada_entre_medias: {
     status: 409,
@@ -95,16 +78,14 @@ async function zonaDelNegocio(businessId: string): Promise<string> {
   return negocio?.timezone || "Europe/Madrid";
 }
 
-/** «Tu calendario ya está al día» solo tiene sentido con calendario externo;
- * en la agenda de Alhabla (PLAN-AGENDA-ALHABLA.md) la cita vive aquí. */
-async function dondeQuedaLaCita(businessId: string): Promise<string> {
-  const negocio = await prisma.business.findUnique({
-    where: { id: businessId },
-    select: { modoDeAgenda: true },
-  });
-  return negocio?.modoDeAgenda === "alhabla"
-    ? "Tu agenda ya está al día."
-    : "Tu calendario ya está al día.";
+/** Lo que se dice tras mover una cita: «Tu calendario ya está al día» solo
+ * si su copia en el calendario conectado está hecha
+ * (PLAN-AGENDA-PRINCIPAL.md); si no, la cita está bien en la agenda y su
+ * copia, si hay calendario, se pone al día sola. */
+function dondeQuedaLaCita(copia: string | null): string {
+  return copia === "hecha"
+    ? "Tu agenda y tu calendario ya están al día."
+    : "Tu agenda ya está al día.";
 }
 
 /**
@@ -205,7 +186,7 @@ export async function citasDelPanelRoutes(fastify: FastifyInstance) {
         const con = r.asignado ? ` con ${r.asignado.name}` : "";
         return reply.send({
           ok: true,
-          mensaje: `Cita movida al ${formatearCita(r.start, timezone)}${con}. ${await dondeQuedaLaCita(businessId)}`,
+          mensaje: `Cita movida al ${formatearCita(r.start, timezone)}${con}. ${dondeQuedaLaCita(r.copia)}`,
           cita: {
             id: r.cita.id,
             programedAt: r.start.toISOString(),
@@ -258,9 +239,9 @@ export async function citasDelPanelRoutes(fastify: FastifyInstance) {
           mensaje:
             r.resultado === "ya_cancelada"
               ? "Esa cita ya estaba cancelada."
-              : (await dondeQuedaLaCita(businessId)).startsWith("Tu agenda")
-                ? "Cita cancelada."
-                : "Cita cancelada y quitada de tu calendario.",
+              : r.quitadaDelCalendario
+                ? "Cita cancelada y quitada de tu calendario."
+                : "Cita cancelada.",
           avisoAlCliente:
             r.resultado === "cancelada"
               ? await avisoPosible(businessId, timezone, id, "cancelacion")

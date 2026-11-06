@@ -37,9 +37,34 @@ teléfono — pero es quien juzga si el producto funciona.
 
 La promesa va primero: **que ningún negocio pierda una llamada**. Alhabla es un asistente de IA
 para negocios con cita, con dos papeles. **La recepcionista** atiende a los clientes del negocio
-por teléfono y WhatsApp, responde sus preguntas y reserva la cita en su agenda (la Agenda de
-Alhabla o su Google, Outlook o Apple/iCloud). **Tu asistente** trabaja para el dueño: él le habla
-por WhatsApp o desde el panel web, y ella se encarga.
+por teléfono y WhatsApp, responde sus preguntas y reserva la cita en la agenda de Alhabla, que viene
+incluida (y que se conecta, si el negocio quiere, a su Google Calendar, Outlook o Apple/iCloud).
+**Tu asistente** trabaja para el dueño: él le habla por WhatsApp o desde el panel web, y ella se
+encarga.
+
+### La agenda: incluida, y los calendarios como complemento (decisión del 06-11-2026)
+
+La agenda de Alhabla es **la** agenda del negocio, no una opción más entre Google, Outlook y Apple.
+Lo decidió el fundador el 06-11-2026 y está en producción desde ese día (`PLAN-AGENDA-PRINCIPAL.md`,
+PRs #435 y #436); sustituye al «modo de agenda» de `PLAN-AGENDA-ALHABLA.md`, en el que el dueño
+elegía dónde se reservaba.
+
+- **Reserva desde el primer día**, sin conectar nada. El alta ya no pregunta «¿dónde llevas tu
+  agenda?», sino «tu agenda ya está lista, ¿llevas citas en otro sitio?».
+- **El calendario conectado es un complemento con dos papeles:** recibe una copia de cada cita y le
+  cuenta a la recepcionista lo que el dueño apunta a mano, para no pisarlo.
+- **Un solo sentido.** Las citas se crean, mueven y cancelan en Alhabla (llamada, WhatsApp o panel);
+  lo que se apunte en Google solo ocupa el hueco.
+- **Una contraseña caducada no cuesta una cita.** Si el calendario se desconecta o se cae un rato, la
+  recepcionista sigue reservando en Alhabla y avisa al dueño por WhatsApp de que no ve lo que apunte
+  allí hasta que lo reconecte; al reconectar, se copian las citas que entraron. Es un cambio deliberado
+  sobre la regla de septiembre de no reservar sin ver el calendario: se acepta ese riesgo a cambio de no
+  perder reservas.
+- **Cómo se cuenta (fase 5 del plan):** la agenda se vende desde WhatsApp («Tu agenda en WhatsApp»,
+  «¿Dónde veo mis citas?», «Siempre disponible, hagas lo que hagas», con la escena de las manos
+  ocupadas). Google, Outlook y Apple aparecen en las páginas de venta solo como una franja de iconos
+  («Funciona con lo que ya usas»); qué pasa si un calendario se desconecta se explica en
+  `/integraciones`, no en la portada.
 
 Existe porque en estos sectores **llamada perdida = cita perdida = ingreso perdido**, y el dueño
 no tiene ni recepcionista ni forma de contestar mientras trabaja.
@@ -83,10 +108,10 @@ Lo que un producto vecino no podría copiar honestamente:
   prompt le obliga a consultar `get_catalog` y a comprobar el hueco con `check_availability`
   (horario, capacidad, ausencias y calendario), y `book_appointment` vuelve a comprobarlo bajo un
   cerrojo por negocio, así que dos llamadas por el mismo hueco dejan una sola cita. Ojo: el
-  `availabilityToken` solo lo exige el esquema de la tool, no el servidor. Si el calendario no
-  responde, la cita queda pendiente, el dueño recibe un WhatsApp con botones («La apunté yo»,
-  «Reintentar», «Reconectar») y se reintenta cada 6 h durante 48 h: nunca se reserva a ciegas. La
-  agenda del negocio es la fuente de verdad, no una promesa que luego hay que repasar a mano.
+  `availabilityToken` solo lo exige el esquema de la tool, no el servidor. Si el calendario conectado
+  no responde o se desconecta, la cita entra igual en la agenda de Alhabla y lo que se reintenta es
+  su copia en el calendario; el dueño se entera por WhatsApp. La agenda de Alhabla es la fuente de
+  verdad, no una promesa que luego hay que repasar a mano.
 - **Vertical, no constructor genérico de agentes.** Cinco nichos españoles con plantillas de
   servicios, instrucciones por sector y textos de onboarding propios
   (`backend/src/lib/businessType.ts`). Una peluquería y una clínica de fisioterapia no leen ni
@@ -170,13 +195,17 @@ a Telnyx.
 - **Alta guiada:** el registro empieza en la web pública (`alhabla.ai/register`) y entra en la
   app con un pase de un solo uso; dentro de la app sigue Google Places → nicho → servicios →
   equipo → calendario → checkout de Stripe. Los pasos intermedios se pueden saltar y completar
-  después en `/agente`. El checkout es obligatorio para terminar el registro.
+  después en `/agente`. El checkout es obligatorio para terminar el registro. El paso del calendario
+  no es una elección: la agenda ya está y solo se pregunta si hay citas en otro sitio (conectar
+  Google, Outlook o Apple, o apuntarlas y bloquear días).
 - **Escena de configuración:** a menudo desde el móvil o un portátil, de pie, entre cliente y
   cliente. El tiempo disponible es corto y interrumpible.
 - **Uso diario:** poco y breve. Se entra al panel a mirar llamadas, transcripciones, resultados
   y próximas citas. No es una herramienta de uso continuo ni un puesto de trabajo.
-- **Herramientas que el negocio ya tiene:** Google Calendar, Outlook o Apple/iCloud como agenda,
-  su número de teléfono actual, y el teléfono como canal principal de reserva.
+- **Herramientas que el negocio ya tiene:** su número de teléfono actual, el teléfono como canal
+  principal de reserva y una agenda que puede ser Google Calendar, Outlook, Apple/iCloud, papel o un
+  programa sin API para nosotros (Booksy, Treatwell, Fresha). Por eso Alhabla trae la suya: no depende
+  de que el negocio tenga una conectable.
 - **Evaluación antes de comprar:** demo de voz pública en el navegador (requiere micrófono y
   WebRTC, vía Telnyx) y la calculadora de llamadas perdidas.
 - **Comercial:** prueba de 7 días y suscripción Stripe, precios sin IVA (desde el 2026-10-16).
@@ -210,8 +239,13 @@ a Telnyx.
 - Número de España (Telnyx) aprovisionado automáticamente tras el checkout.
 - Registro de llamadas con transcripción, grabación y clasificación de resultado.
 - Horario de negocio, catálogo de servicios, profesionales y capacidad de reserva.
-- Integración de calendario con Google, Outlook y Apple/iCloud (CalDAV), incluido el aviso de
-  reconexión cuando el refresh token o la contraseña de aplicación caduca.
+- Agenda de Alhabla incluida, la de todos los negocios desde el 06-11-2026: citas, bloqueos y
+  ausencias desde el panel o por WhatsApp, y un enlace de solo lectura para verla en el calendario
+  del móvil.
+- Calendario conectado como complemento: Google, Outlook y Apple/iCloud (CalDAV) reciben una copia
+  de cada cita y lo que el dueño apunta ahí cuenta como ocupado. Si se desconecta, la recepcionista
+  sigue reservando y el dueño recibe un aviso y un recordatorio a los 7 días; al reconectar se
+  copian las citas que entraron.
 - Reparto de citas por especialidad: cada profesional tiene un nivel por servicio (especialista /
   lo hace / no sugerir) que el agente usa para recomendar una vez, sin descartar al resto.
 - Tu asistente: el dueño administra por WhatsApp servicios y precios (crear, cambiar, retirar),
@@ -231,8 +265,9 @@ a Telnyx.
 **Terminología del producto** (visible al usuario)
 
 Se dice «recepcionista» o «recepcionista de IA» (en los titulares, siempre «de IA»), «tu asistente»,
-«llamadas», «citas», «servicios», «profesionales», «horario», «minutos incluidos», «ausencia» y
-«lista de espera». Nunca «recepcionista virtual», «recepcionista de voz», «agente de voz», «el
+«llamadas», «citas», «servicios», «profesionales», «horario», «minutos incluidos», «ausencia»,
+«lista de espera», «agenda de Alhabla», «agenda incluida» y «tu calendario conectado» (Google,
+Outlook o Apple, como complemento). Nunca «recepcionista virtual», «recepcionista de voz», «agente de voz», «el
 Gestor» (solo en código), «agenda real», «competitividad», «productividad», «LLM», «modelo»,
 «prompt», «orquestador», «webhook», «API» ni el nombre de ningún proveedor (Telnyx…).
 
@@ -269,6 +304,12 @@ Gestor» (solo en código), «agenda real», «competitividad», «productividad
   pero sin términos técnicos; se habla como habla el dueño, no como un folleto.
 - **Vender enseñando:** la prueba es el producto funcionando (la llamada, el WhatsApp, el
   «Confirmar»), no la explicación.
+- **Se vende la faena que se quita, no la técnica (06-11-2026).** Quien llega viene a liberarse de
+  trabajo: en las páginas de venta no se habla de caídas, contraseñas, conexiones ni «si falla»; eso se
+  cuenta con honestidad en las páginas de compatibilidad y en las guías. Funciones antes que
+  compatibilidad: las integraciones van en una franja de iconos con subtítulo, nunca como título, FAQ
+  ni fila propia. Escenas del día de la dueña (las manos ocupadas, la camilla, la hora de comer) y
+  frases que diría ella («¿qué tengo mañana?», «apúntame a Javier el viernes a las siete»).
 - **Errores:** en español, accionables y sin culpar al usuario. Los 5xx genéricos del backend
   deben traducirse a algo humano en la interfaz.
 - **Estética comprometida:** SaaS conservadora y profesional para negocios tradicionales
@@ -319,8 +360,10 @@ producto funcionando (demo, transcripción real, la calculadora), no fabricar pr
    recepcionista vive en `/agente`; la identidad, seguridad y administración de la cuenta viven
    en `/ajustes`. No mezclar ambos mundos: separar «cómo atiende mi recepcionista» de «cómo
    protejo y gestiono mi cuenta» reduce la carga cognitiva.
-3. **La agenda del negocio manda.** El producto nunca inventa disponibilidad ni promete un hueco
-   que no existe; verificar antes de reservar es innegociable.
+3. **La agenda de Alhabla manda, y nunca inventa un hueco.** Cada hora se comprueba contra el horario,
+   los festivos, las ausencias, la capacidad y las citas antes de darla; eso es innegociable. Lo que el
+   dueño apunta en su calendario conectado también cuenta, cuando se puede leer: si un día no se
+   puede, la recepcionista sigue reservando y el dueño lo sabe (decisión del 06-11-2026).
 4. **Vender lo que cambia en el día de la dueña, no la tecnología.** El vocabulario, la prueba y las
    expectativas se plantean en términos del negocio, no de la tecnología.
 5. **España primero, sin cerrarse la puerta.** Se optimiza sin reservas para español de España,

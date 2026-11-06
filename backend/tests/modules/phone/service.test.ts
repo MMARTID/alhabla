@@ -38,7 +38,9 @@ vi.mock("../../../src/adapters/telnyx/TelnyxAdapter.js", () => ({
     getNumberOrder: vi.fn(),
     getNumberByPhoneNumber: vi.fn(),
     getNumber: vi.fn(),
+    marcarEntornoDelNumero: vi.fn(),
   },
+  etiquetaDeEntorno: () => "env-dev",
 }));
 
 // El lock de aprovisionamiento va por acquireLock/releaseLock
@@ -156,6 +158,66 @@ describe("provisionPhoneNumber", () => {
         }),
       })
     );
+  });
+
+  it("etiqueta el número comprado con su entorno, por el id real del número", async () => {
+    mockedBusinessFindUnique.mockResolvedValue({
+      id: businessId,
+      phoneNumberStatus: "pending",
+      telnyxPhoneNumber: null,
+      telnyxNumberOrderId: null,
+    } as any);
+    mockedSearchAvailableNumbers.mockResolvedValue([
+      { phoneNumber: "+34886020712", region: "PONTEVEDRA" },
+    ]);
+    mockedPurchaseNumber.mockResolvedValue({
+      orderId: "order_123",
+      status: "success",
+      phoneNumber: "+34886020712",
+      phoneNumberId: "linea_del_pedido",
+    });
+    mockedGetNumberByPhoneNumber.mockResolvedValue({
+      id: "pn_real",
+      phoneNumber: "+34886020712",
+      status: "active",
+    });
+
+    await provisionPhoneNumber(businessId);
+
+    expect(telnyxAdapter.marcarEntornoDelNumero).toHaveBeenCalledWith(
+      "pn_real"
+    );
+  });
+
+  it("si no se puede etiquetar, la compra sigue activa y lo avisa en el log", async () => {
+    const errorLog = vi.spyOn(console, "error").mockImplementation(() => {});
+    mockedBusinessFindUnique.mockResolvedValue({
+      id: businessId,
+      phoneNumberStatus: "pending",
+      telnyxPhoneNumber: null,
+      telnyxNumberOrderId: null,
+    } as any);
+    mockedSearchAvailableNumbers.mockResolvedValue([
+      { phoneNumber: "+34886020712", region: "PONTEVEDRA" },
+    ]);
+    mockedPurchaseNumber.mockResolvedValue({
+      orderId: "order_123",
+      status: "success",
+      phoneNumber: "+34886020712",
+      phoneNumberId: "pn_123",
+    });
+    vi.mocked(telnyxAdapter.marcarEntornoDelNumero).mockRejectedValue(
+      new Error("Telnyx caído")
+    );
+
+    const result = await provisionPhoneNumber(businessId);
+
+    expect(result).toMatchObject({ success: true, status: "active" });
+    expect(mockedSyncAgentToTelnyx).toHaveBeenCalledWith(businessId);
+    expect(errorLog).toHaveBeenCalledWith(
+      expect.stringContaining("No se pudo poner la etiqueta env-dev")
+    );
+    errorLog.mockRestore();
   });
 
   it("falla con un mensaje claro si falta el Call Control App de Telnyx", async () => {
@@ -681,6 +743,10 @@ describe("asignarNumeroExistente", () => {
     expect(telnyxAiAdapter.setPhoneNumberConnectionId).toHaveBeenCalledWith(
       numero.id,
       "cca_test"
+    );
+    // Un número que viene del otro entorno cambia de etiqueta al asignarse.
+    expect(telnyxAdapter.marcarEntornoDelNumero).toHaveBeenCalledWith(
+      numero.id
     );
     expect(mockedBusinessUpdate).toHaveBeenCalledWith({
       where: { id: businessId },

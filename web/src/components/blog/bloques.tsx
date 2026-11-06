@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 import {
   ArrowRight,
   Check,
@@ -201,6 +202,41 @@ export function Pasos({
   );
 }
 
+// Una respuesta de «Preguntas frecuentes» admite enlaces `[texto](destino)`
+// (una ruta del sitio o una URL https): a la fuente oficial o a otro artículo.
+// Google recibe el texto plano; el lector, el enlace.
+const ENLACE_EN_RESPUESTA = /\[([^\]]+)\]\((\/[^)\s]*|https:\/\/[^)\s]+)\)/g;
+
+/** La respuesta tal como va en el FAQPage: sin el marcado de los enlaces. */
+export function respuestaSinEnlaces(respuesta: string): string {
+  return respuesta.replace(ENLACE_EN_RESPUESTA, "$1");
+}
+
+function respuestaConEnlaces(respuesta: string): ReactNode[] {
+  const partes: ReactNode[] = [];
+  let desde = 0;
+  for (const m of respuesta.matchAll(ENLACE_EN_RESPUESTA)) {
+    const inicio = m.index ?? 0;
+    if (inicio > desde) partes.push(respuesta.slice(desde, inicio));
+    const [, texto, destino] = m;
+    const clase = "font-medium text-[#6d28d9] underline underline-offset-2 hover:text-[#8b5cf6]";
+    partes.push(
+      destino.startsWith("/") ? (
+        <Link key={inicio} href={destino} className={clase}>
+          {texto}
+        </Link>
+      ) : (
+        <a key={inicio} href={destino} className={clase} rel="noopener">
+          {texto}
+        </a>
+      )
+    );
+    desde = inicio + m[0].length;
+  }
+  if (desde < respuesta.length) partes.push(respuesta.slice(desde));
+  return partes;
+}
+
 export function Faq({
   preguntas = [],
 }: {
@@ -218,7 +254,7 @@ export function Faq({
             __html: JSON.stringify({
               "@context": "https://schema.org",
               ...buildFaqPageStructuredData(
-                preguntas.map((p) => ({ question: p.pregunta, answer: p.respuesta }))
+                preguntas.map((p) => ({ question: p.pregunta, answer: respuestaSinEnlaces(p.respuesta) }))
               ),
             }).replace(/</g, "\\u003c"),
           }}
@@ -235,7 +271,7 @@ export function Faq({
               +
             </span>
           </summary>
-          <p className="mt-3 text-sm leading-6 text-muted">{p.respuesta}</p>
+          <p className="mt-3 text-sm leading-6 text-muted">{respuestaConEnlaces(p.respuesta)}</p>
         </details>
       ))}
     </div>

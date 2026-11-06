@@ -86,7 +86,7 @@ beforeEach(() => {
 
 describe("cancelarReserva", () => {
   it("update condicional: la segunda llamada (P2025) devuelve ya_cancelada sin borrar evento, avisar ni tocar la lista de espera", async () => {
-    expect(await cancelarReserva(ENTRADA)).toEqual({ resultado: "cancelada" });
+    expect(await cancelarReserva(ENTRADA)).toMatchObject({ resultado: "cancelada" });
     expect(mockedUpdate).toHaveBeenCalledWith({
       where: { id: "booking_1", isCancelled: false },
       data: {
@@ -113,7 +113,11 @@ describe("cancelarReserva", () => {
   });
 
   it("borra el evento externo con la conexión con la que se creó; si falla, la cita queda cancelada y loguea negocio, proveedor y evento", async () => {
-    await cancelarReserva(ENTRADA);
+    // El panel dice «quitada de tu calendario» solo si de verdad se borró.
+    expect(await cancelarReserva(ENTRADA)).toEqual({
+      resultado: "cancelada",
+      quitadaDelCalendario: true,
+    });
     expect(mockedCancelEvent).toHaveBeenCalledWith({
       conexion: expect.objectContaining({
         provider: "outlook",
@@ -129,7 +133,10 @@ describe("cancelarReserva", () => {
     );
 
     mockedCancelEvent.mockRejectedValue(new Error("Graph 500"));
-    expect(await cancelarReserva(ENTRADA)).toEqual({ resultado: "cancelada" });
+    expect(await cancelarReserva(ENTRADA)).toEqual({
+      resultado: "cancelada",
+      quitadaDelCalendario: false,
+    });
     expect(console.error).toHaveBeenCalledWith(
       expect.stringMatching(/booking_1.*biz_1.*evt_1.*outlook.*Graph 500/)
     );
@@ -154,7 +161,7 @@ describe("cancelarReserva", () => {
       externalEventId: "evt_nuevo",
     } as never);
 
-    expect(await cancelarReserva(ENTRADA)).toEqual({ resultado: "cancelada" });
+    expect(await cancelarReserva(ENTRADA)).toMatchObject({ resultado: "cancelada" });
 
     expect(mockedFindFirst).toHaveBeenCalledTimes(1);
     expect(mockedFindFirst).toHaveBeenCalledWith(
@@ -191,7 +198,10 @@ describe("cancelarReserva", () => {
       estado: 404,
     });
 
-    expect(await cancelarReserva(ENTRADA)).toEqual({ resultado: "cancelada" });
+    expect(await cancelarReserva(ENTRADA)).toEqual({
+      resultado: "cancelada",
+      quitadaDelCalendario: false,
+    });
 
     expect(console.warn).toHaveBeenCalledWith(
       "[Booking] boton cliente in_1: el calendario respondió 404 al borrar el evento evt_1 de la cita booking_1 del negocio biz_1 (outlook): o lo borró el dueño o sigue vivo en otra dirección"
@@ -227,7 +237,7 @@ describe("cancelarReserva", () => {
         externalEventId: "evt_de_la_reactivacion",
       } as never);
 
-    expect(await cancelarReserva(ENTRADA)).toEqual({ resultado: "cancelada" });
+    expect(await cancelarReserva(ENTRADA)).toMatchObject({ resultado: "cancelada" });
 
     expect(mockedFindFirst).toHaveBeenCalledTimes(1);
     expect(mockedFindFirst.mock.invocationCallOrder[0]).toBeLessThan(
@@ -281,7 +291,7 @@ describe("cancelarReserva", () => {
     // Un fallo del aviso o de la lista de espera no tumba la cancelación.
     mockedAvisar.mockRejectedValue(new Error("Telnyx"));
     mockedListaDeEspera.mockRejectedValue(new Error("BD"));
-    expect(await cancelarReserva(ENTRADA)).toEqual({ resultado: "cancelada" });
+    expect(await cancelarReserva(ENTRADA)).toMatchObject({ resultado: "cancelada" });
   });
 
   it("reserva de otro negocio ⇒ no_encontrada", async () => {

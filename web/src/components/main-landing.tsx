@@ -10,6 +10,7 @@ import { HeroHilos } from "@/components/hero-hilos";
 import { SiteHeader } from "@/components/site-header";
 import { Reveal } from "@/components/scroll-reveal";
 import { EnMarchaSection } from "@/components/en-marcha-section";
+import { FuncionaConLoQueUsas } from "@/components/funciona-con-lo-que-usas";
 import { EscenasDeOficio } from "@/components/escenas-de-oficio";
 import { CalculadoraCompacta } from "@/components/herramientas/calculadora-compacta";
 import { EnTuNegocioScroll } from "@/components/en-tu-negocio";
@@ -92,7 +93,7 @@ export function MainLanding() {
           </div>
           <div className="entrada-hero" style={{ "--entrada-retardo": "0.18s", "--entrada-y": "12px" } as CSSProperties}>
             <p className="flex flex-wrap justify-center gap-x-5 gap-y-2 text-sm font-medium text-[#3f3f46]">
-              {["Tu número de siempre", "Con tu calendario o sin él", "Sin permanencia"].map((item) => <span key={item} className="inline-flex items-center gap-1.5"><Check className="h-4 w-4 text-[#8b5cf6]" aria-hidden="true" />{item}</span>)}
+              {["Tu número de siempre", "Tu agenda en WhatsApp", "Sin permanencia"].map((item) => <span key={item} className="inline-flex items-center gap-1.5"><Check className="h-4 w-4 text-[#8b5cf6]" aria-hidden="true" />{item}</span>)}
             </p>
           </div>
         </div>
@@ -121,6 +122,8 @@ export function MainLanding() {
       <WhatsAppClientesSection />
 
       <EnMarchaSection />
+
+      <FuncionaConLoQueUsas ubicacion="portada" />
 
       {/*
         Sectores justo encima del precio (2026-09-26, a petición del

@@ -131,10 +131,10 @@ export const PAGINAS: readonly PaginaIndexable[] = [
     ["/recepcionista-ia-en-euskera", "Atención en euskera", "Atiende en euskera batua o en castellano, según hable quien llama; en Euskadi se activa sola y en Navarra la eliges tú.", "funciones", "2026-10-29"],
     ["/recepcionista-ia-en-gallego", "Atención en gallego", "En Galicia atiende en gallego a quien llama en gallego, y en castellano a quien prefiere el castellano.", "funciones", "2026-10-29"],
     // Integraciones: solo lo que Alhabla hace de verdad (AGENTS.md § Calendar Integration).
-    ["/integraciones", "Integraciones", "No tienes que cambiar de agenda: Google Calendar, Outlook o iCloud, o la agenda de Alhabla si no usas ninguno.", "integraciones", "2026-10-29"],
-    ["/integraciones/google-calendar", "Google Calendar", "Reserva en tu Google Calendar con permisos mínimos y respeta lo que ya tienes apuntado.", "integraciones", "2026-10-29"],
-    ["/integraciones/outlook", "Outlook", "Conecta tu calendario de Outlook o Microsoft 365 y elige en cuál entran las citas.", "integraciones", "2026-10-29"],
-    ["/integraciones/icloud", "Calendario de Apple (iCloud)", "Con tu Apple ID y una contraseña de aplicación, las citas entran en el calendario de tu iPhone.", "integraciones", "2026-10-29"],
+    ["/integraciones", "Integraciones", "La agenda viene incluida, y se conecta a tu Google Calendar, Outlook o iPhone si los usas.", "integraciones", "2026-11-06"],
+    ["/integraciones/google-calendar", "Google Calendar", "Tus citas, también en tu Google Calendar, con permisos mínimos; lo que apuntes ahí cuenta como ocupado.", "integraciones", "2026-11-06"],
+    ["/integraciones/outlook", "Outlook", "Tus citas, también en tu Outlook o Microsoft 365, en el calendario que elijas.", "integraciones", "2026-11-06"],
+    ["/integraciones/icloud", "Calendario de Apple (iCloud)", "Tus citas, también en el calendario de tu iPhone, con tu Apple ID y una contraseña de aplicación.", "integraciones", "2026-11-06"],
     ["/integraciones/whatsapp", "WhatsApp", "Confirmaciones y recordatorios por WhatsApp; tus clientes cambian o cancelan su cita contestando, sin bajarse nada.", "integraciones", "2026-10-29"],
     // Desvío por operador: datos de la ayuda oficial de cada uno (consultada el 2026-10-20).
     ["/desvio-de-llamadas", "Desvío de llamadas", "Cómo desviar a tu recepcionista de IA las llamadas que no coges, operador por operador, en móvil y en fijo.", "desvio", "2026-10-29"],
@@ -174,7 +174,7 @@ export const PAGINAS: readonly PaginaIndexable[] = [
     // Empresa.
     ["/sobre-alhabla", "Sobre Alhabla", "Quién está detrás, por qué existe Alhabla y su regla: con tus clientes manda Alhabla; con tu agenda mandas tú.", "empresa", "2026-10-29"],
     ["/prensa", "Prensa", "Datos, logotipos, capturas y contacto para periodistas.", "empresa", "2026-10-29"],
-    ["/novedades", "Novedades", "Lo que ha cambiado en Alhabla mes a mes: la agenda de Alhabla, tu asistente, idiomas y precios.", "empresa", "2026-10-29"],
+    ["/novedades", "Novedades", "Lo que ha cambiado en Alhabla mes a mes: la agenda incluida, tu asistente, idiomas y precios.", "empresa", "2026-11-06"],
   ]),
   {
     ruta: "/blog",

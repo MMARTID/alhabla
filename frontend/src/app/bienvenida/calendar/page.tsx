@@ -3,12 +3,12 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PasoDelAlta } from "@/components/paso-del-alta";
-import { CalendarDays, ChevronDown, ChevronRight, LoaderCircle } from "lucide-react";
+import { CalendarDays, ChevronDown, ChevronRight, LoaderCircle, NotebookPen } from "lucide-react";
 import { SiApple, SiGooglecalendar } from "@icons-pack/react-simple-icons";
 import { AppleCalendarConnect } from "@/components/apple-calendar-connect";
 import { BetaPill } from "@/components/beta-pill";
 import { MicrosoftLogo } from "@/components/brand-icons";
-import { cambiarModoDeAgenda, getGoogleCalendarAuthUrl, getMicrosoftCalendarAuthUrl } from "@/lib/api";
+import { getGoogleCalendarAuthUrl, getMicrosoftCalendarAuthUrl } from "@/lib/api";
 import { consumePendingPlan, isPlanId } from "@/lib/billing-navigation";
 import { saveRegistrationNextStep } from "@/lib/registration-next-step";
 import { BUSINESS_TYPE_ONBOARDING_TEXTS, isBusinessType } from "@/lib/business-type";
@@ -17,7 +17,7 @@ import type { BusinessType } from "@/lib/types";
 export default function RegisterBusinessCalendarPage() {
   const router = useRouter();
   const [businessType, setBusinessType] = useState<BusinessType>("other");
-  const [loading, setLoading] = useState<"google" | "outlook" | "alhabla" | null>(null);
+  const [loading, setLoading] = useState<"google" | "outlook" | null>(null);
   const [error, setError] = useState("");
   const [hasPlaceSchedule, setHasPlaceSchedule] = useState(false);
   // Vuelta de Google/Microsoft con el calendario ya conectado: se redirige
@@ -27,6 +27,10 @@ export default function RegisterBusinessCalendarPage() {
   // iCloud no sale de la página: Apple ID + contraseña de aplicación en un
   // formulario que se despliega bajo su tarjeta (el mismo que en /agente).
   const [formularioApple, setFormularioApple] = useState(false);
+  // «Tu agenda ya está lista» (PLAN-AGENDA-PRINCIPAL.md): el paso ya no elige
+  // dónde se reserva. Pregunta si hay citas apuntadas en otro sitio: en un
+  // calendario que se puede conectar, en papel u otro programa, o en ninguno.
+  const [donde, setDonde] = useState<"calendario" | "papel" | null>(null);
 
   useEffect(() => {
     const token =
@@ -90,21 +94,6 @@ export default function RegisterBusinessCalendarPage() {
     }
   };
 
-  // Agenda de Alhabla (PLAN-AGENDA-ALHABLA.md, D1): la cuarta tarjeta del
-  // paso. Se ofrece aquí, que es donde se abandonaba el alta sin calendario.
-  const elegirAgendaDeAlhabla = async () => {
-    setLoading("alhabla");
-    setError("");
-    try {
-      await cambiarModoDeAgenda("alhabla");
-      setRedirigiendo(true);
-      redirectToFinalStep();
-    } catch {
-      setLoading(null);
-      setError("No se pudo activar la agenda de Alhabla. Inténtalo de nuevo.");
-    }
-  };
-
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get("completed") === "true") {
@@ -135,9 +124,9 @@ export default function RegisterBusinessCalendarPage() {
         {redirigiendo ? (
           <p role="status" className="mt-8 flex items-center justify-center gap-2 rounded-2xl border border-exito-borde bg-exito-fondo px-4 py-4 text-sm font-medium text-exito">
             <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />
-            {loading === "alhabla" ? "Agenda de Alhabla activada." : "Calendario conectado."} Te llevamos al siguiente paso…
+            Te llevamos al siguiente paso…
           </p>
-        ) : (
+        ) : donde === "calendario" ? (
         <>
         <div className="mt-8 space-y-4">
           <button
@@ -152,7 +141,7 @@ export default function RegisterBusinessCalendarPage() {
             </div>
             <div className="flex-1">
               <p className="font-semibold text-tinta">Google Calendar</p>
-              <p className="text-sm text-muted">Conecta tu agenda de Google para reservar citas.</p>
+              <p className="text-sm text-muted">Cada cita aparece en tu Google, y lo que apuntes allí cuenta como ocupado.</p>
             </div>
             {loading === "google" ? (
               <LoaderCircle className="h-5 w-5 animate-spin text-muted" aria-label="Conectando" />
@@ -172,7 +161,7 @@ export default function RegisterBusinessCalendarPage() {
             </div>
             <div className="flex-1">
               <p className="font-semibold text-tinta">Outlook / Microsoft 365</p>
-              <p className="text-sm text-muted">Conecta tu agenda de Microsoft para reservar citas.</p>
+              <p className="text-sm text-muted">Cada cita aparece en tu Outlook, y lo que apuntes allí cuenta como ocupado.</p>
             </div>
             {loading === "outlook" ? (
               <LoaderCircle className="h-5 w-5 animate-spin text-muted" aria-label="Conectando" />
@@ -211,55 +200,87 @@ export default function RegisterBusinessCalendarPage() {
               }}
             />
           ) : null}
-
-          <button
-            type="button"
-            onClick={() => void elegirAgendaDeAlhabla()}
-            disabled={loading !== null}
-            className="flex w-full items-center gap-4 rounded-2xl border border-linea bg-superficie p-5 text-left transition duration-200 hover:border-morado hover:bg-relleno focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-morado focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-lavado text-morado">
-              <CalendarDays className="h-6 w-6" aria-hidden="true" />
-            </div>
-            <div className="flex-1">
-              <p className="font-semibold text-tinta">Usar la agenda de Alhabla</p>
-              <p className="text-sm text-muted">Sin conectar nada: tu recepcionista reserva aquí y tú ves y apuntas las citas en el panel o por WhatsApp. Solo verá las citas que haya en Alhabla.</p>
-            </div>
-            {loading === "alhabla" ? (
-              <LoaderCircle className="h-5 w-5 animate-spin text-muted" aria-label="Activando" />
-            ) : (
-              <ChevronRight className="h-5 w-5 text-muted" aria-hidden="true" />
-            )}
-          </button>
         </div>
 
         {error && <p role="alert" className="mt-4 text-sm text-error">{error}</p>}
 
         <div className="mt-8 space-y-3">
+          <button type="button" onClick={() => setDonde(null)} disabled={loading !== null} className="btn-secondary w-full">
+            Volver
+          </button>
           <button
             type="button"
             onClick={() => redirectToFinalStep()}
             disabled={loading !== null}
-            aria-describedby="aviso-sin-calendario"
-            className="btn-secondary w-full"
+            className="w-full text-center text-sm font-semibold text-muted underline-offset-4 hover:underline"
           >
-            Configurar calendario después
+            Lo conecto más tarde
           </button>
-          {/* Sin calendario la recepcionista contesta y toma nota, pero no da
-              hora ni reserva (voiceTools, fase 0 de PLAN-AGENDA-ALHABLA.md).
-              Quien se lo salte tiene que saberlo antes, no en la primera
-              llamada. El texto va por sector (business-type.ts) y recuerda
-              las dos salidas: conectar el calendario o la agenda de Alhabla. */}
-          <p
-            id="aviso-sin-calendario"
-            className="text-center text-xs leading-5 text-muted"
-          >
-            {texts.calendar.sinCalendario}
-          </p>
         </div>
         </>
+        ) : donde === "papel" ? (
+          <div className="mt-8 space-y-4">
+            <div className="flex items-start gap-3 rounded-2xl border border-linea bg-relleno p-5">
+              <NotebookPen className="mt-0.5 h-5 w-5 shrink-0 text-morado" aria-hidden="true" />
+              <p className="text-sm leading-6 text-tinta-2">{texts.calendar.sinCalendario}</p>
+            </div>
+            <button type="button" onClick={() => redirectToFinalStep()} className="btn-primary w-full">
+              {texts.calendar.cta}
+            </button>
+            <button type="button" onClick={() => setDonde(null)} className="btn-secondary w-full">
+              Volver
+            </button>
+          </div>
+        ) : (
+          <div className="mt-8 space-y-4">
+            <OpcionDelAlta
+              icono={<CalendarDays className="h-6 w-6" aria-hidden="true" />}
+              titulo="En Google Calendar, Outlook o el iPhone"
+              texto="Lo conectas en un minuto y verás ahí cada cita."
+              onClick={() => setDonde("calendario")}
+            />
+            <OpcionDelAlta
+              icono={<NotebookPen className="h-6 w-6" aria-hidden="true" />}
+              titulo="En papel o en otro programa"
+              texto="Te contamos cómo pasar a tu agenda lo que ya tienes."
+              onClick={() => setDonde("papel")}
+            />
+            <OpcionDelAlta
+              icono={<ChevronRight className="h-6 w-6" aria-hidden="true" />}
+              titulo="No, empiezo aquí"
+              texto="Tus citas entrarán en tu agenda desde la primera llamada."
+              onClick={() => redirectToFinalStep()}
+            />
+          </div>
         )}
       </div>
     </main>
+  );
+}
+
+function OpcionDelAlta({
+  icono,
+  titulo,
+  texto,
+  onClick,
+}: {
+  icono: React.ReactNode;
+  titulo: string;
+  texto: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex w-full items-center gap-4 rounded-2xl border border-linea bg-superficie p-5 text-left transition duration-200 hover:border-morado hover:bg-relleno focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-morado focus-visible:ring-offset-2"
+    >
+      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-lavado text-morado">{icono}</div>
+      <div className="flex-1">
+        <p className="font-semibold text-tinta">{titulo}</p>
+        <p className="text-sm text-muted">{texto}</p>
+      </div>
+      <ChevronRight className="h-5 w-5 text-muted" aria-hidden="true" />
+    </button>
   );
 }

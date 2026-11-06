@@ -159,7 +159,6 @@ export function DetalleDeCita({
               <button
                 type="button"
                 onClick={() => setMoviendoFormulario(true)}
-                disabled={!calendario.bookable}
                 className="btn-secondary h-10 flex-1 px-3"
               >
                 <CalendarClock className="h-4 w-4" aria-hidden="true" />
@@ -175,9 +174,6 @@ export function DetalleDeCita({
               </button>
             </div>
           )}
-          {!calendario.bookable ? (
-            <p className="mt-2 text-xs leading-5 text-muted">Para mover citas desde aquí, elige la agenda de Alhabla o conecta tu calendario.</p>
-          ) : null}
         </div>
       ) : null}
 

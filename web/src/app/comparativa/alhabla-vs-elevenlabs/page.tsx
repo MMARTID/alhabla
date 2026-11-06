@@ -80,7 +80,7 @@ export default function VsElevenlabsPage() {
       relacionadas={[
         { href: "/comparativa", titulo: "Todas las comparativas", texto: "Retell AI, Vapi, Bland AI y Synthflow." },
         { href: "/agenda-por-whatsapp", titulo: "Tu asistente por WhatsApp", texto: "Una ausencia a mediodía, resuelta escribiendo." },
-        { href: "/integraciones", titulo: "Calendarios", texto: "Google, Outlook, iCloud o la agenda de Alhabla." },
+        { href: "/integraciones", titulo: "Calendarios", texto: "La agenda incluida, conectada a Google, Outlook o iCloud." },
       ]}
       cierre="Tu número de siempre contestado en español, y cada cita confirmada por WhatsApp."
     >

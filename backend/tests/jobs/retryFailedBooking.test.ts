@@ -1,10 +1,12 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { filaDeConexion } from "../helpers/conexionDeCalendario.js";
 import {
+  enqueueCopiaDeLaCitaJob,
   enqueueEmailJob,
   enqueueRetryBookingJob,
 } from "../../src/lib/cloudTasks.js";
 import {
+  avisarCitaRecuperada,
   avisarReintentosAgotados,
   avisarReservaPerdida,
 } from "../../src/modules/whatsapp/avisosNegocio.js";
@@ -32,11 +34,18 @@ import { anularLaCitaCambiada } from "../../src/modules/bookings/reservaModifica
 vi.mock("../../src/lib/cloudTasks.js", () => ({
   enqueueRetryBookingJob: vi.fn(),
   enqueueEmailJob: vi.fn(),
+  // La copia de la cita (calendar/copiaDeLaCita.ts, real aquí) y el
+  // recordatorio que programa la alerta de calendario desconectado.
+  enqueueCopiaDeLaCitaJob: vi.fn(),
+  enqueueVolcadoDeLaAgendaJob: vi.fn(),
+  enqueueRecordatorioDeCalendarioJob: vi.fn(),
 }));
 vi.mock("../../src/modules/whatsapp/avisosNegocio.js", () => ({
   avisarCitaRecuperada: vi.fn().mockResolvedValue({ via: "interactivo" }),
   avisarReservaPerdida: vi.fn().mockResolvedValue({ via: "interactivo" }),
   avisarReintentosAgotados: vi.fn().mockResolvedValue({ via: "interactivo" }),
+  // La alerta de calendario desconectado (marcarCalendarioDesconectado).
+  avisarAlerta: vi.fn().mockResolvedValue({ via: "interactivo" }),
 }));
 vi.mock("../../src/modules/whatsapp/mensajesCliente.js", () => ({
   programarMensajesAlCliente: vi
@@ -94,6 +103,8 @@ vi.mock(
 
 const mockedLeadFindUnique = vi.mocked(prisma.lead.findUnique);
 const mockedEnqueueRetryBookingJob = vi.mocked(enqueueRetryBookingJob);
+const mockedEnqueueCopia = vi.mocked(enqueueCopiaDeLaCitaJob);
+const mockedAvisarCitaRecuperada = vi.mocked(avisarCitaRecuperada);
 const mockedLeadUpdate = vi.mocked(prisma.lead.update);
 const mockedCallFindUnique = vi.mocked(prisma.call.findUnique);
 const mockedBusinessFindUnique = vi.mocked(prisma.business.findUnique);
@@ -235,31 +246,59 @@ describe("processRetryFailedBookingJob", () => {
     );
   });
 
-  it("reprograma el reintento, sin gastarlo, si Google sigue sin reconectar", async () => {
+  // PLAN-AGENDA-PRINCIPAL.md: el calendario conectado ya no decide si se
+  // reserva. Antes, con Google desconectado, el job se reprogramaba cada 6 h
+  // y a los dos días avisaba de reintentos agotados; ahora la cita entra en
+  // la agenda de Alhabla y su copia espera a que el dueño reconecte.
+  it("con Google desconectado ya no reprograma a 6 h: reserva con la copia pendiente, sin llamar al calendario", async () => {
     mockedLeadFindUnique.mockResolvedValue(buildLead() as any);
     mockedCallFindUnique.mockResolvedValue({ businessId: "biz_1" } as any);
     mockedBusinessFindUnique.mockResolvedValue(
       buildBusiness({
-        calendarConnections: [filaDeConexion("google", { refreshToken: null })],
+        calendarConnections: [
+          filaDeConexion("google", { refreshToken: null, connected: false }),
+        ],
       }) as any
     );
 
-    // Ya no lanza: lanzar gastaba los cuatro reintentos de Cloud Tasks en
-    // minutos mientras el negocio tardaba días en reconectar, y el lead se
-    // quedaba pendiente para siempre sin que nadie volviera a intentarlo.
     await expect(
       processRetryFailedBookingJob({ leadId })
     ).resolves.toBeUndefined();
-    expect(mockedBookAppointment).not.toHaveBeenCalled();
 
-    const [payload, taskId, scheduleTime] =
-      mockedEnqueueRetryBookingJob.mock.calls[0];
-    expect(payload).toEqual({ leadId, attempt: 1 });
-    expect(taskId).toBe(`retry-failed-booking-${leadId}-1`);
-    expect((scheduleTime as Date).getTime()).toBeGreaterThan(Date.now());
+    expect(mockedBookAppointment).not.toHaveBeenCalled();
+    expect(mockedEnqueueRetryBookingJob).not.toHaveBeenCalled();
+    const { create, update } = mockUpsert.mock.calls[0][0];
+    expect(create).toEqual(
+      expect.objectContaining({
+        callId: "call_1",
+        externalEventId: undefined,
+        copiaEnCalendario: "pendiente",
+        copiaError: "calendario desconectado",
+        copiaIntentos: 0,
+        externalCalendarProvider: null,
+        externalCalendarId: null,
+      })
+    );
+    expect(update).toEqual(
+      expect.objectContaining({
+        externalEventId: null,
+        copiaEnCalendario: "pendiente",
+        copiaIntentos: 0,
+      })
+    );
+    expect(mockLeadUpdate).toHaveBeenCalledWith({
+      where: { id: leadId },
+      data: { resolvedAt: expect.any(Date) },
+    });
+    // Con la conexión caducada no se gasta ningún intento de copia: la hace
+    // el volcado al reconectar.
+    expect(mockedEnqueueCopia).not.toHaveBeenCalled();
+    expect(mockedAvisarCitaRecuperada).toHaveBeenCalledWith(
+      expect.objectContaining({ businessId: "biz_1", leadId })
+    );
   });
 
-  it("deja de reprogramar cuando se agota el plazo con el calendario desconectado", async () => {
+  it("un reintento viejo (attempt 8) con el calendario desconectado ya no avisa de reintentos agotados: reserva", async () => {
     mockedLeadFindUnique.mockResolvedValue(buildLead() as any);
     mockedCallFindUnique.mockResolvedValue({ businessId: "biz_1" } as any);
     mockedBusinessFindUnique.mockResolvedValue(
@@ -270,24 +309,21 @@ describe("processRetryFailedBookingJob", () => {
 
     await processRetryFailedBookingJob({ leadId, attempt: 8 });
 
-    // El lead sigue sin resolver: aparece en el panel y en el resumen
-    // semanal. Y ahora el dueño se entera (antes no se avisaba a nadie).
+    expect(vi.mocked(avisarReintentosAgotados)).not.toHaveBeenCalled();
     expect(mockedEnqueueRetryBookingJob).not.toHaveBeenCalled();
     expect(mockedBookAppointment).not.toHaveBeenCalled();
-    expect(mockedLeadUpdate).not.toHaveBeenCalled();
-    expect(vi.mocked(avisarReintentosAgotados)).toHaveBeenCalledWith(
+    expect(mockUpsert).toHaveBeenCalledWith(
       expect.objectContaining({
-        businessId: "biz_1",
-        leadId,
-        clientName: "Ana García",
-        clientPhone: "+34600123456",
-        startDateTime: new Date(pendingBookingData.startDateTime),
-        email: expect.any(Function),
+        create: expect.objectContaining({ copiaEnCalendario: "pendiente" }),
       })
     );
+    expect(mockLeadUpdate).toHaveBeenCalledWith({
+      where: { id: leadId },
+      data: { resolvedAt: expect.any(Date) },
+    });
   });
 
-  it("reprograma también si Outlook es el proveedor y sigue sin reconectar", async () => {
+  it("con Outlook desconectado tampoco reprograma: reserva con la copia pendiente", async () => {
     mockedLeadFindUnique.mockResolvedValue(buildLead() as any);
     mockedCallFindUnique.mockResolvedValue({ businessId: "biz_1" } as any);
     mockedBusinessFindUnique.mockResolvedValue(
@@ -301,7 +337,38 @@ describe("processRetryFailedBookingJob", () => {
 
     await processRetryFailedBookingJob({ leadId });
 
-    expect(mockedEnqueueRetryBookingJob).toHaveBeenCalledTimes(1);
+    expect(mockedEnqueueRetryBookingJob).not.toHaveBeenCalled();
+    expect(mockedBookAppointment).not.toHaveBeenCalled();
+    expect(mockUpsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({ copiaEnCalendario: "pendiente" }),
+      })
+    );
+    expect(mockLeadUpdate).toHaveBeenCalled();
+  });
+
+  it("sin ningún calendario conectado reserva sin copia (copiaEnCalendario null)", async () => {
+    mockedLeadFindUnique.mockResolvedValue(buildLead() as any);
+    mockedCallFindUnique.mockResolvedValue({ businessId: "biz_1" } as any);
+    mockedBusinessFindUnique.mockResolvedValue(
+      buildBusiness({ calendarConnections: [] }) as any
+    );
+
+    await processRetryFailedBookingJob({ leadId });
+
+    expect(mockedBookAppointment).not.toHaveBeenCalled();
+    expect(mockUpsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({
+          externalEventId: undefined,
+          copiaEnCalendario: null,
+          copiaError: null,
+          externalCalendarProvider: null,
+        }),
+      })
+    );
+    expect(mockLeadUpdate).toHaveBeenCalled();
+    expect(mockedEnqueueCopia).not.toHaveBeenCalled();
   });
 
   it("reserva con Google, guarda la reserva y marca el lead como resuelto", async () => {
@@ -341,10 +408,28 @@ describe("processRetryFailedBookingJob", () => {
         update: expect.objectContaining({ clientName: "Ana García" }),
       })
     );
+    // Con el calendario operativo la copia sale en el momento, como antes.
+    expect(mockUpsert.mock.calls[0][0].create).toEqual(
+      expect.objectContaining({
+        externalEventId: "gcal_event_1",
+        copiaEnCalendario: "hecha",
+        copiaError: null,
+        copiaIntentos: 0,
+        externalCalendarProvider: "google",
+        externalCalendarId: "primary",
+      })
+    );
+    expect(mockUpsert.mock.calls[0][0].update).toEqual(
+      expect.objectContaining({
+        externalEventId: "gcal_event_1",
+        copiaEnCalendario: "hecha",
+      })
+    );
     expect(mockLeadUpdate).toHaveBeenCalledWith({
       where: { id: leadId },
       data: { resolvedAt: expect.any(Date) },
     });
+    expect(mockedEnqueueCopia).not.toHaveBeenCalled();
   });
 
   it("reserva con Outlook cuando el negocio usa ese proveedor", async () => {
@@ -377,7 +462,7 @@ describe("processRetryFailedBookingJob", () => {
     );
   });
 
-  it("no reserva a ciegas si el calendario externo sigue sin poder leerse: lanza para que Cloud Tasks reintente", async () => {
+  it("con el calendario ilegible ya no lanza: decide la agenda de Alhabla y reserva", async () => {
     mockedLeadFindUnique.mockResolvedValue(buildLead() as any);
     mockedCallFindUnique.mockResolvedValue({ businessId: "biz_1" } as any);
     mockedBusinessFindUnique.mockResolvedValue(buildBusiness() as any);
@@ -387,19 +472,31 @@ describe("processRetryFailedBookingJob", () => {
       calendarAvailabilityKnown: false,
     } as any);
 
-    await expect(processRetryFailedBookingJob({ leadId })).rejects.toThrow(
-      "Calendario ilegible"
+    await expect(
+      processRetryFailedBookingJob({ leadId })
+    ).resolves.toBeUndefined();
+
+    expect(mockedCheckAvailability).toHaveBeenCalledWith(
+      expect.objectContaining({ calendarAvailabilityKnown: false })
     );
-    expect(mockedBookAppointment).not.toHaveBeenCalled();
-    expect(mockUpsert).not.toHaveBeenCalled();
-    expect(mockLeadUpdate).not.toHaveBeenCalled();
+    // La copia se intenta igual: leer y escribir son llamadas distintas.
+    expect(mockedBookAppointment).toHaveBeenCalledTimes(1);
+    expect(mockUpsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({ copiaEnCalendario: "hecha" }),
+      })
+    );
+    expect(mockLeadUpdate).toHaveBeenCalledWith({
+      where: { id: leadId },
+      data: { resolvedAt: expect.any(Date) },
+    });
     expect(mockedReleaseBookingLock).toHaveBeenCalledWith(
       "biz_1",
       "lock-token"
     );
   });
 
-  it("propaga el error de bookAppointment sin marcar el lead como resuelto", async () => {
+  it("si el calendario no acepta el evento, la cita queda reservada con la copia pendiente, el lead se resuelve y se encola la copia", async () => {
     mockedLeadFindUnique.mockResolvedValue(buildLead() as any);
     mockedCallFindUnique.mockResolvedValue({ businessId: "biz_1" } as any);
     mockedBusinessFindUnique.mockResolvedValue(buildBusiness() as any);
@@ -407,10 +504,42 @@ describe("processRetryFailedBookingJob", () => {
       new Error("Calendario de Google no responde")
     );
 
-    await expect(processRetryFailedBookingJob({ leadId })).rejects.toThrow(
-      "Calendario de Google no responde"
+    // Antes el error se propagaba y el lead seguía pendiente.
+    await expect(
+      processRetryFailedBookingJob({ leadId })
+    ).resolves.toBeUndefined();
+
+    const { create, update } = mockUpsert.mock.calls[0][0];
+    expect(create).toEqual(
+      expect.objectContaining({
+        externalEventId: undefined,
+        copiaEnCalendario: "pendiente",
+        copiaError: "Calendario de Google no responde",
+        copiaIntentos: 0,
+        externalCalendarProvider: null,
+      })
     );
-    expect(mockLeadUpdate).not.toHaveBeenCalled();
+    expect(update).toEqual(
+      expect.objectContaining({
+        externalEventId: null,
+        copiaEnCalendario: "pendiente",
+      })
+    );
+    expect(mockLeadUpdate).toHaveBeenCalledWith({
+      where: { id: leadId },
+      data: { resolvedAt: expect.any(Date) },
+    });
+    // La copia se encola con el id del Booking ya guardado.
+    expect(mockedEnqueueCopia).toHaveBeenCalledTimes(1);
+    const [payload, taskId, scheduleTime] = mockedEnqueueCopia.mock.calls[0];
+    expect(payload).toEqual({ bookingId: "booking_1", attempt: 1 });
+    expect(taskId).toMatch(/^copia-de-la-cita-booking_1-1-\d+$/);
+    expect((scheduleTime as Date).getTime()).toBeGreaterThan(Date.now());
+    expect(mockedEnqueueCopia.mock.invocationCallOrder[0]).toBeGreaterThan(
+      mockedTransaction.mock.invocationCallOrder[0]
+    );
+    expect(mockedEnqueueRetryBookingJob).not.toHaveBeenCalled();
+    expect(mockedAvisarCitaRecuperada).toHaveBeenCalled();
   });
 
   it("filtra service/professional por businessId al resolver nombres — el Lead puede traer ids sin verificar", async () => {
@@ -582,7 +711,7 @@ describe("processRetryFailedBookingJob", () => {
     expect(lockOrder).toBeLessThan(idempotencyCheckOrder);
   });
 
-  it("marca el calendario como desconectado y deja la cita esperando a que reconecte si bookAppointment falla por reconexión requerida", async () => {
+  it("marca el calendario como desconectado y reserva con la copia pendiente si bookAppointment falla por reconexión requerida", async () => {
     mockedLeadFindUnique.mockResolvedValue(buildLead() as any);
     mockedCallFindUnique.mockResolvedValue({ businessId: "biz_1" } as any);
     mockedBusinessFindUnique.mockResolvedValue(buildBusiness() as any);
@@ -596,9 +725,8 @@ describe("processRetryFailedBookingJob", () => {
       )
     );
 
-    // Sin este catch específico (antes no existía), el job simplemente
-    // fallaba en bucle contra una conexión que no iba a arreglarse sola,
-    // sin que la conexión reflejara nunca la rotura.
+    // La conexión rechazada se marca desconectada (intentarCopiaDeLaCita) y
+    // la cita entra igual en la agenda de Alhabla.
     await expect(
       processRetryFailedBookingJob({ leadId })
     ).resolves.toBeUndefined();
@@ -619,15 +747,23 @@ describe("processRetryFailedBookingJob", () => {
     expect(almacenEnMemoria.borrarClave).toHaveBeenCalledWith(
       "voice_config:biz_1"
     );
-    // Antes el lead se cerraba aquí y la cita se perdía aunque el dueño
-    // reconectara al rato: ahora espera como cualquier cita con el
-    // calendario desconectado.
-    expect(mockedLeadUpdate).not.toHaveBeenCalled();
-    expect(mockedEnqueueRetryBookingJob).toHaveBeenCalledWith(
-      { leadId, attempt: 1 },
-      `retry-failed-booking-${leadId}-1`,
-      expect.any(Date)
+    // Antes la cita esperaba con reintentos cada 6 h: ahora queda reservada
+    // y la copia la hace el volcado al reconectar (no se encola).
+    expect(mockUpsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({
+          externalEventId: undefined,
+          copiaEnCalendario: "pendiente",
+          copiaError: "calendario desconectado",
+        }),
+      })
     );
+    expect(mockLeadUpdate).toHaveBeenCalledWith({
+      where: { id: leadId },
+      data: { resolvedAt: expect.any(Date) },
+    });
+    expect(mockedEnqueueRetryBookingJob).not.toHaveBeenCalled();
+    expect(mockedEnqueueCopia).not.toHaveBeenCalled();
     expect(vi.mocked(avisarReservaPerdida)).not.toHaveBeenCalled();
   });
 

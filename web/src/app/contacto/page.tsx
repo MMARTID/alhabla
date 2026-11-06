@@ -8,6 +8,8 @@ import {
   absoluteUrl,
   buildBreadcrumbStructuredData,
   contactEmail,
+  correoDeEmpresas,
+  correoDePrensa,
   ogImages,
   siteName,
   websiteId,
@@ -115,6 +117,20 @@ export default function ContactoPage() {
                       className="rounded font-semibold text-morado-tinta underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-morado"
                     >
                       {contactEmail}
+                    </a>
+                    . Si sois una cadena o una franquicia,{" "}
+                    <a
+                      href={`mailto:${correoDeEmpresas}`}
+                      className="rounded font-semibold text-morado-tinta underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-morado"
+                    >
+                      {correoDeEmpresas}
+                    </a>
+                    ; si escribes para un medio,{" "}
+                    <a
+                      href={`mailto:${correoDePrensa}`}
+                      className="rounded font-semibold text-morado-tinta underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-morado"
+                    >
+                      {correoDePrensa}
                     </a>
                     .
                   </p>

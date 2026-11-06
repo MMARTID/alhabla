@@ -87,7 +87,7 @@ export default function SobrePage() {
           <ListaCheck
             items={[
               "Nunca se hace pasar por una persona: lo dice en la primera frase de cada llamada.",
-              "Nunca reserva a ciegas: si no puede comprobar tu agenda, no da la hora.",
+              "Nunca se inventa un hueco: mira tu horario, tu equipo y tus citas antes de dar una hora.",
               "Nunca graba sin permiso: si el cliente dice que no, no se guarda el audio.",
               "Nunca cambia tu agenda por su cuenta: lo que le pides a tu asistente espera a que pulses «Confirmar».",
               "Nunca manda publicidad a tus clientes en nombre de tu negocio.",

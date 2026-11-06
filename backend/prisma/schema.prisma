@@ -748,6 +748,16 @@ model Booking {
   // solo porque su evento no existe en el calendario recién seleccionado.
   externalCalendarProvider String?
   externalCalendarId       String?
+  // Copia de la cita en el calendario conectado (PLAN-AGENDA-PRINCIPAL.md,
+  // regla 3: primero la cita, después la copia). null = no había calendario
+  // conectado al reservar; "pendiente" = el calendario todavía no refleja la
+  // cita (no respondió, estaba caducado o la cita se movió y falta mover el
+  // evento: si queda `externalEventId`, es el evento viejo que hay que
+  // sustituir); "hecha"; "fallida" = se agotaron los reintentos. Lo resuelve
+  // calendar/copiaDeLaCita.ts.
+  copiaEnCalendario        String?
+  copiaIntentos            Int           @default(0)
+  copiaError               String?
   createdAt                DateTime      @default(now())
   programedAt              DateTime
   durationMinutes          Int           @default(30)
@@ -783,6 +793,7 @@ model Booking {
 
   @@index([professionalId])
   @@index([externalCalendarProvider, externalCalendarId])
+  @@index([copiaEnCalendario])
   // La disponibilidad (camino crítico de una llamada de voz), la agenda del
   // panel y el resumen semanal filtran y ordenan por estas fechas; hasta
   // ahora ninguna tenía índice.
