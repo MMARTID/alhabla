@@ -326,7 +326,7 @@ async function medir(desde: string | undefined): Promise<void> {
     console.log(
       (llamada.transcript?.fullText ?? "(ninguna)")
         .split("\n")
-        .filter((linea) => /^(user|assistant): \S/.test(linea))
+        .filter((linea) => /^(user|assistant): *\S/.test(linea))
         .map((linea) => `    ${linea.slice(0, 160)}`)
         .join("\n")
     );

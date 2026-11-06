@@ -769,6 +769,14 @@ export function instruccionesDelCambioDeIdioma(
   cooficial: Pick<CooficialDeLaZona, "idioma">
 ): string {
   const lengua = IDIOMAS[cooficial.idioma].nombreEnPrompt;
+  // Las otras cooficiales: en el laboratorio del 06-11, un cliente en
+  // euskera en un negocio de Barcelona tuvo nueve turnos de «no te
+  // entiendo» y acabó en el assistant del catalán.
+  const otras = LENGUAS_CON_ASSISTANT_PROPIO.filter(
+    (idioma) => idioma !== cooficial.idioma
+  )
+    .map((idioma) => IDIOMAS[idioma].nombreEnPrompt)
+    .join(" o ");
   const ejemplos: Record<string, string> = {
     "ca-ES":
       "«bon dia», «voldria», «demà», «si us plau», «gràcies»; te llega como si fuera italiano o un castellano con palabras raras",
@@ -781,7 +789,7 @@ export function instruccionesDelCambioDeIdioma(
 
 Tu transcripción no entiende el ${lengua} y tu voz no lo habla. Si quien llama habla en ${lengua} (por ejemplo ${ejemplos[cooficial.idioma] ?? "palabras que no tienen sentido en castellano"}), aunque sea una sola frase o mezclada con castellano, o pide que le atiendas en ${lengua}, llama a cambiar_de_idioma con idioma ${cooficial.idioma} en ese mismo turno: sin decir nada antes, sin pedirle que lo repita y sin usar antes ninguna otra herramienta. En lo_que_dice pon su frase bien escrita en ${lengua} y en primera_respuesta lo que le contestarías en ${lengua}. Después no digas nada más: la llamada sigue en ${lengua}. No le digas que le pasas con nadie: para quien llama es la misma recepcionista.
 
-Con el resto de idiomas que hablas no uses cambiar_de_idioma: contesta tú en el suyo. Si dudas entre italiano y catalán o entre portugués y gallego, y las frases llegan enteras y con sentido en italiano o portugués, es italiano o portugués.`;
+Con el resto de idiomas que hablas no uses cambiar_de_idioma: contesta tú en el suyo. Si dudas entre italiano y catalán o entre portugués y gallego, y las frases llegan enteras y con sentido en italiano o portugués, es italiano o portugués. Si habla ${otras} (otra lengua que no hablas) y no le entiendes, no uses cambiar_de_idioma: a la segunda vez que no le entiendas, pídele con amabilidad que te lo diga en castellano.`;
 }
 
 /**
