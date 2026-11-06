@@ -24,8 +24,15 @@ export function getTelnyxClient(): Telnyx {
   // negocio. Quien necesite reintentar una operación idempotente lo hace de
   // forma explícita. timeout acota además cuánto puede ocupar una instancia
   // de Cloud Run esperando a Telnyx.
-  client = new Telnyx({ apiKey, maxRetries: 0, timeout: TELNYX_TIMEOUT_MS });
-  console.log("[Telnyx] Client initialized");
+  // TELNYX_API_BASE_URL=https://api.telnyx.eu/v2 manda las peticiones al
+  // punto de presencia de Frankfurt (docs de Telnyx «Regional Endpoints & the
+  // EU PoP» y «Data Residency FAQ»: la configuración de voz con IA en la UE
+  // usa api.telnyx.eu para la Voice API). Sin ella, el del SDK
+  // (api.telnyx.com, EE. UU.). Mismas claves y mismas respuestas. WhatsApp
+  // no tiene despliegue regional y va siempre por su propio cliente.
+  const baseURL = process.env.TELNYX_API_BASE_URL?.trim() || undefined;
+  client = new Telnyx({ apiKey, maxRetries: 0, timeout: TELNYX_TIMEOUT_MS, baseURL });
+  console.log(`[Telnyx] Client initialized${baseURL ? ` (${baseURL})` : ""}`);
 
   return client;
 }
