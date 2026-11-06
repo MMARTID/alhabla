@@ -15,7 +15,7 @@ import { IconoApple } from "../iconos-de-calendario";
 const ruta = "/integraciones/icloud";
 const titulo = "Citas en el calendario del iPhone con tu recepcionista";
 const descripcion =
-  "Conecta el Calendario de Apple (iCloud) con tu Apple ID y una contraseña de aplicación: las citas que reserva tu recepcionista de IA salen en tu iPhone.";
+  "Tus citas de Alhabla, también en el calendario de tu iPhone: conecta el Calendario de Apple (iCloud) con tu Apple ID y una contraseña de aplicación.";
 
 export const metadata = metadataDePagina({ ruta, titulo, descripcion });
 
@@ -132,7 +132,8 @@ export default function IcloudPage() {
           </p>
           <p>
             Para cortarle el acceso, borra la contraseña «Alhabla» en account.apple.com. Ojo: si cambias la contraseña
-            de tu Apple ID, Apple anula todas las de aplicación y tendrás que generar otra.
+            de tu Apple ID, Apple anula todas las de aplicación y tendrás que generar otra. Mientras tanto tus citas
+            siguen entrando en tu agenda de Alhabla; al reconectar, copiamos en el iPhone las que hayan entrado.
           </p>
         </Texto>
       </Seccion>

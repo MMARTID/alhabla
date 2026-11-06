@@ -116,7 +116,7 @@ export const barberia: SectorLanding = {
     {
       question: "¿Respeta las citas que me entran por otra app?",
       answer:
-        "Si esa app las copia en el calendario que conectas (Google, Outlook o iCloud), sí: antes de dar una hora lo mira y no ofrece lo que ya está ocupado. Con otras apps de reservas no se conecta directamente.",
+        "Sí, si las tienes en tu agenda: díselas a tu asistente por WhatsApp («el sábado a las doce tengo a Rubén») o apúntalas en el panel, y esa hora ya no se ofrece. Si esa app las copia en tu Google Calendar, Outlook o iCloud, conéctalo y las verá solo.",
     },
     {
       question: "¿Qué dice si le preguntan precios?",

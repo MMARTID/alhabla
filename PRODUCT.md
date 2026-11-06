@@ -45,9 +45,9 @@ encarga.
 ### La agenda: incluida, y los calendarios como complemento (decisión del 06-11-2026)
 
 La agenda de Alhabla es **la** agenda del negocio, no una opción más entre Google, Outlook y Apple.
-Lo decidió el fundador el 06-11-2026; el plan es `PLAN-AGENDA-PRINCIPAL.md` (por implementar: hasta
-entonces rige el «modo de agenda» de `PLAN-AGENDA-ALHABLA.md`, en el que el dueño elige dónde se
-reserva).
+Lo decidió el fundador el 06-11-2026 y está en producción desde ese día (`PLAN-AGENDA-PRINCIPAL.md`,
+PRs #435 y #436); sustituye al «modo de agenda» de `PLAN-AGENDA-ALHABLA.md`, en el que el dueño
+elegía dónde se reservaba.
 
 - **Reserva desde el primer día**, sin conectar nada. El alta ya no pregunta «¿dónde llevas tu
   agenda?», sino «tu agenda ya está lista, ¿llevas citas en otro sitio?».
@@ -108,12 +108,10 @@ Lo que un producto vecino no podría copiar honestamente:
   prompt le obliga a consultar `get_catalog` y a comprobar el hueco con `check_availability`
   (horario, capacidad, ausencias y calendario), y `book_appointment` vuelve a comprobarlo bajo un
   cerrojo por negocio, así que dos llamadas por el mismo hueco dejan una sola cita. Ojo: el
-  `availabilityToken` solo lo exige el esquema de la tool, no el servidor. **Hoy**, si el calendario
-  conectado no responde, la cita queda pendiente, el dueño recibe un WhatsApp con botones («La apunté
-  yo», «Reintentar», «Reconectar») y se reintenta cada 6 h durante 48 h. **Con la agenda principal**
-  (decisión del 06-11-2026, arriba), la cita entra igual en la agenda de Alhabla y lo que se reintenta
-  es la copia en el calendario. La agenda de Alhabla es la fuente de verdad, no una promesa que luego
-  hay que repasar a mano.
+  `availabilityToken` solo lo exige el esquema de la tool, no el servidor. Si el calendario conectado
+  no responde o se desconecta, la cita entra igual en la agenda de Alhabla y lo que se reintenta es
+  su copia en el calendario; el dueño se entera por WhatsApp. La agenda de Alhabla es la fuente de
+  verdad, no una promesa que luego hay que repasar a mano.
 - **Vertical, no constructor genérico de agentes.** Cinco nichos españoles con plantillas de
   servicios, instrucciones por sector y textos de onboarding propios
   (`backend/src/lib/businessType.ts`). Una peluquería y una clínica de fisioterapia no leen ni
@@ -197,9 +195,9 @@ a Telnyx.
 - **Alta guiada:** el registro empieza en la web pública (`alhabla.ai/register`) y entra en la
   app con un pase de un solo uso; dentro de la app sigue Google Places → nicho → servicios →
   equipo → calendario → checkout de Stripe. Los pasos intermedios se pueden saltar y completar
-  después en `/agente`. El checkout es obligatorio para terminar el registro. Con la agenda principal,
-  el paso del calendario deja de ser una elección: la agenda ya está y solo se pregunta si hay citas
-  en otro sitio (conectar Google, Outlook o Apple, o apuntarlas y bloquear días).
+  después en `/agente`. El checkout es obligatorio para terminar el registro. El paso del calendario
+  no es una elección: la agenda ya está y solo se pregunta si hay citas en otro sitio (conectar
+  Google, Outlook o Apple, o apuntarlas y bloquear días).
 - **Escena de configuración:** a menudo desde el móvil o un portátil, de pie, entre cliente y
   cliente. El tiempo disponible es corto y interrumpible.
 - **Uso diario:** poco y breve. Se entra al panel a mirar llamadas, transcripciones, resultados
@@ -241,11 +239,13 @@ a Telnyx.
 - Número de España (Telnyx) aprovisionado automáticamente tras el checkout.
 - Registro de llamadas con transcripción, grabación y clasificación de resultado.
 - Horario de negocio, catálogo de servicios, profesionales y capacidad de reserva.
-- Agenda de Alhabla (desde el 28-10-2026): citas, bloqueos y ausencias desde el panel o por
-  WhatsApp, y un enlace de solo lectura para verla en el calendario del móvil.
-- Integración de calendario con Google, Outlook y Apple/iCloud (CalDAV), incluido el aviso de
-  reconexión cuando el refresh token o la contraseña de aplicación caduca. Hoy es un modo que el
-  dueño elige; con la agenda principal pasa a ser un complemento (copia y bloqueo).
+- Agenda de Alhabla incluida, la de todos los negocios desde el 06-11-2026: citas, bloqueos y
+  ausencias desde el panel o por WhatsApp, y un enlace de solo lectura para verla en el calendario
+  del móvil.
+- Calendario conectado como complemento: Google, Outlook y Apple/iCloud (CalDAV) reciben una copia
+  de cada cita y lo que el dueño apunta ahí cuenta como ocupado. Si se desconecta, la recepcionista
+  sigue reservando y el dueño recibe un aviso y un recordatorio a los 7 días; al reconectar se
+  copian las citas que entraron.
 - Reparto de citas por especialidad: cada profesional tiene un nivel por servicio (especialista /
   lo hace / no sugerir) que el agente usa para recomendar una vez, sin descartar al resto.
 - Tu asistente: el dueño administra por WhatsApp servicios y precios (crear, cambiar, retirar),

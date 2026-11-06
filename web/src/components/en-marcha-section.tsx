@@ -6,9 +6,11 @@ import { TRIAL_REASSURANCE } from "@/lib/plans";
 
 /**
  * Puesta en marcha (2026-09-26): responde a «¿es difícil?» justo antes del
- * precio, con los tres pasos reales del alta (negocio → dónde van las citas
- * → desvío). Conectar un calendario es opcional desde el 2026-10-28: sin él,
- * las citas van a la agenda de Alhabla. Sin tiempos inventados.
+ * precio, con los tres pasos reales del alta (negocio → la agenda → desvío).
+ * Desde PLAN-AGENDA-PRINCIPAL.md la agenda viene puesta: no hay que elegir
+ * dónde van las citas, y conectar Google es un extra que no se vende aquí
+ * (lo cuenta la franja «Funciona con lo que ya usas»). Sin tiempos
+ * inventados.
  */
 const PASOS = [
   {
@@ -17,9 +19,9 @@ const PASOS = [
       "Lo buscas en Google y Alhabla rellena los datos básicos. Eliges tu sector y partes de sus servicios habituales; solo ajustas precios, duraciones y quién hace cada cosa.",
   },
   {
-    titulo: "Eliges dónde van las citas",
+    titulo: "Tu agenda ya viene puesta",
     texto:
-      "En tu Google Calendar, Outlook o iCloud, donde ya las miras tú. Y si no usas ninguno, en la agenda de Alhabla, que también ves en el calendario del móvil.",
+      "Desde la primera llamada, cada cita queda apuntada. La ves en el panel, en el calendario del móvil y en WhatsApp, donde también se la pides: «apúntame a Javier el viernes a las siete».",
   },
   {
     titulo: "Activas el desvío",

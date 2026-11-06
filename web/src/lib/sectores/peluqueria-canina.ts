@@ -143,7 +143,7 @@ export const peluqueriaCanina: SectorLanding = {
     {
       question: "Trabajo sola con una mesa. ¿Me sirve?",
       answer:
-        "Sí, y es donde más se nota, porque no hay nadie más que descuelgue. Con una sola persona en el equipo nunca te da dos perros a la misma hora: solo ofrece lo que está libre en tu agenda, sea Google, Outlook, iCloud o la de Alhabla.",
+        "Sí, y es donde más se nota, porque no hay nadie más que descuelgue. Con una sola persona en el equipo nunca te da dos perros a la misma hora: solo ofrece lo que está libre en tu agenda, y tú la llevas desde el móvil, por WhatsApp, entre baño y baño.",
     },
   ],
 

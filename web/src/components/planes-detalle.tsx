@@ -25,7 +25,7 @@ const FILAS: Fila[] = [
   { concepto: "Atención 24 horas, todos los días", valores: [true, true, true] },
   { concepto: "Tu asistente: horarios, precios y citas por WhatsApp", valores: [true, true, true] },
   { concepto: "Si falta alguien: te ayuda a recolocar sus citas y a avisar a cada cliente", valores: [true, true, true] },
-  { concepto: "Reserva en Google, Outlook, iCloud o en la agenda de Alhabla", valores: [true, true, true] },
+  { concepto: "Tu agenda en WhatsApp, el panel y el móvil", valores: [true, true, true] },
   { concepto: "Reparto por especialidad", valores: [true, true, true] },
   { concepto: "Confirmación de la cita por WhatsApp", valores: [true, true, true] },
   { concepto: "Avisos al dueño por WhatsApp, con botones para resolverlos", valores: [true, true, true] },

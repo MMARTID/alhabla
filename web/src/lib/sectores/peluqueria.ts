@@ -112,9 +112,9 @@ export const peluqueria: SectorLanding = {
 
   faqs: [
     {
-      question: "¿Tengo que cambiar de agenda?",
+      question: "¿Dónde veo mis citas?",
       answer:
-        "No. Si llevas las citas en Google Calendar, Outlook o iCloud, reserva ahí y respeta lo que ya está ocupado. Si no usas ninguno, reserva en la agenda de Alhabla, que ves en el panel y en el calendario del móvil.",
+        "En WhatsApp: pregúntale «¿qué tengo mañana?» y te lo dice, o «apúntame a Lucía el jueves a las cinco para mechas» y lo apunta. También en el panel y en el calendario de tu móvil. Y si ya usas Google Calendar, Outlook o el iPhone, también aparecen ahí.",
     },
     {
       question: "¿Mis clientas siguen llamando al número de siempre?",

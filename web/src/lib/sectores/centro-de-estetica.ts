@@ -116,7 +116,7 @@ export const centroDeEstetica: SectorLanding = {
     {
       question: "¿Tengo que dejar mi programa de citas?",
       answer:
-        "No. Alhabla no se conecta con tu programa: mira el calendario que conectes (Google, Outlook o iCloud), y si tu programa copia ahí las citas, no ofrece esas horas. Si no usas ninguno, reserva en la agenda de Alhabla, que ves en el panel.",
+        "No. Tu recepcionista reserva en tu agenda, y lo que entre por tu programa se lo cuentas a tu asistente por WhatsApp o lo apuntas en el panel, para que no dé esas horas. Si tu programa copia sus citas en Google Calendar, Outlook o iCloud, conéctalo y lo tendrá en cuenta solo.",
     },
     {
       question: "¿Y si llaman de noche, con el centro cerrado?",

@@ -135,7 +135,7 @@ export const fisioterapia: SectorLanding = {
     {
       question: "¿Puedo seguir con mi programa de gestión clínica?",
       answer:
-        "Sí, aunque Alhabla no se conecta con él: mira tu Google Calendar, Outlook o iCloud. Si tu programa vuelca ahí sus citas, la recepcionista no ofrece esas horas.",
+        "Sí. Tu recepcionista reserva en tu agenda, y lo que tengas en tu programa se lo pasas a tu asistente por WhatsApp («el martes de 10 a 12 tengo pacientes de mutua») o lo bloqueas en el panel. Si tu programa vuelca sus citas en Google Calendar, Outlook o iCloud, conéctalo y lo verá solo.",
     },
     {
       question: "¿Puede reservar todas las sesiones de un tratamiento?",

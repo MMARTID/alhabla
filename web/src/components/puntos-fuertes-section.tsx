@@ -1,4 +1,4 @@
-import { CalendarX2, Headphones, MessageSquareText, Store } from "lucide-react";
+import { Clock, Headphones, MessageSquareText, Store } from "lucide-react";
 
 import { Reveal } from "@/components/scroll-reveal";
 
@@ -23,11 +23,13 @@ const OTRAS = [
     texto:
       "Cuando le preguntan algo que no está en tus datos, toma un recado con el nombre y el teléfono del cliente y te lo pasa. Nada de respuestas improvisadas.",
   },
+  // PLAN-AGENDA-PRINCIPAL.md, fase 5: se vende la faena que se quita, no la
+  // técnica (antes: «Si tu calendario falla, no reserva a ciegas»).
   {
-    Icono: CalendarX2,
-    titulo: "Si tu calendario falla, no reserva a ciegas",
+    Icono: Clock,
+    titulo: "Siempre disponible, hagas lo que hagas",
     texto:
-      "Si tu calendario no contesta, no da la hora por buena: la cita queda pendiente y te llega un WhatsApp para resolverla con un toque.",
+      "Estés cortando, con alguien en la camilla o comiendo: ella coge el teléfono, da la hora y te deja la cita apuntada. Tú lo miras en WhatsApp cuando tengas un hueco.",
   },
 ] as const;
 

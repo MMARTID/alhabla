@@ -240,8 +240,8 @@ export default function PrivacidadPage() {
           Solo la usamos para leer y escribir en el calendario que eliges.
         </p>
         <p>
-          Si en lugar de conectar un calendario eliges la agenda de Alhabla, las citas se guardan únicamente en nuestros
-          sistemas. Puedes activar desde el panel un enlace de solo lectura (formato iCal) para verla en el calendario
+          Las citas se guardan en la agenda de Alhabla, en nuestros sistemas; si conectas un calendario, además se
+          copian en él. Puedes activar desde el panel un enlace de solo lectura (formato iCal) para verla en el calendario
           de tu móvil o de Google: ese enlace equivale a una contraseña, incluye el servicio, el nombre del cliente y la
           persona que atiende, nunca el teléfono, y el proveedor de calendario al que lo añadas (por ejemplo, Google)
           lo descargará a sus servidores periódicamente. Puedes cambiarlo o desactivarlo cuando quieras desde el panel;

@@ -53,7 +53,7 @@ export const ALHABLA = {
   aparte: `Solo el minuto extra, ${MINUTO_EXTRA}. Número, calendario, WhatsApp e idiomas van incluidos`,
   numero: "Incluido: un número español al que desvías el tuyo, sin cambiar de número",
   idiomas: "Español de España y siete idiomas más; catalán, euskera o gallego según la zona del negocio",
-  calendarios: "Google, Outlook o iCloud, conectados directamente; o la agenda de Alhabla si no usas ninguno",
+  calendarios: "Agenda incluida, que llevas también por WhatsApp; cada cita se copia en tu Google, Outlook o iCloud si los usas",
   whatsappCliente: "Sí: confirma cada cita por WhatsApp y el cliente puede escribir para cambiarla o cancelarla. En Pro y Scale, también el recordatorio",
   asistente: "Sí: tu asistente, en todos los planes. Ningún cambio se aplica sin tu «Confirmar»",
 } as const;

@@ -1,7 +1,8 @@
 # Plan: la agenda de Alhabla como agenda principal
 
-Estado: **fases 1 a 4 hechas, sin desplegar** (06-11-2026): backend en `feat/agenda-principal-backend`, app en
-`feat/agenda-principal-app`. Quedan la prueba de punta a punta en dev, la fase 5 (web) y la 7. Las
+Estado (06-11-2026): **fases 1 a 4 en producción** (backend #435, app #436), probadas de punta a punta en dev con
+el calendario falso de backend-sim. **Fase 5 (web)** en la rama `feat/agenda-principal-web`, pendiente del visto
+bueno de los textos propuestos. Queda la 7. Las
 correcciones al implementarlo van marcadas con **[rev]**. Sustituye el «principio de diseño» y los tres modos de
 `PLAN-AGENDA-ALHABLA.md`; lo que ese plan construyó (crear citas desde el panel, bloqueos, ausencias, feed
 iCal) se queda tal cual y pasa a ser de todos los negocios.
@@ -327,6 +328,19 @@ una copia. No debería cambiar.
 
 **Cómo se cierra:** todo lo «propuesto» se enseña al fundador con capturas de cada superficie, en móvil y
 escritorio, antes de publicar. Pasa también la auditoría de parecido entre páginas de CI.
+
+**[rev] Al hacerlo:**
+- Las landings de sector no tenían «¿Necesito conectar un calendario?», sino una duda propia de cada oficio
+  (Instagram, el programa de gestión, otra app). Se conserva la pregunta de cada una y se reescribe la
+  respuesta con el tono nuevo: la agenda y WhatsApp primero, con un ejemplo de frase del oficio, y Google
+  como media frase final. Solo la de peluquería («¿Tengo que cambiar de agenda?») pasa a «¿Dónde veo mis
+  citas?».
+- También cambian, con la misma regla: el relato de la portada (`llamada-scroll.tsx`), las comparativas,
+  `/prensa`, la imagen OG de `/integraciones`, el `featureList` de `seo.ts`, `/legal/privacidad` (las citas
+  se guardan siempre en Alhabla) y cinco artículos del blog.
+- Base de conocimiento de Growth (`mcp/growth/conocimiento/mapa.ts`): `funcion.calendarios`, que usa la
+  Ficha de Alhabla, sale ahora de la viñeta de PRODUCT.md «Calendario conectado como complemento»; la línea
+  nueva de los planes es `funcion.agenda_incluida`.
 
 ### Fase 6: documentación
 

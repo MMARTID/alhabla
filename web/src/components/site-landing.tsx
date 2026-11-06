@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowRight, Plus } from "lucide-react";
 import { EnTuNegocioScroll } from "@/components/en-tu-negocio";
+import { FuncionaConLoQueUsas } from "@/components/funciona-con-lo-que-usas";
 import { GestorSimulacionSection } from "@/components/gestor-simulacion";
 import { CalculadoraCompacta } from "@/components/herramientas/calculadora-compacta";
 import { LandingHero } from "@/components/landing-hero";
@@ -107,6 +108,8 @@ export function SiteLanding({ sector }: { sector: SectorLanding }) {
       </div>
 
       <OficioDelSector oficio={sector.oficio} acento={acento} />
+
+      <FuncionaConLoQueUsas ubicacion={sector.slug} />
 
       {/* Su cuenta antes del precio: con sus llamadas y su precio de cita,
           qué plan se paga con cuántas citas. */}
