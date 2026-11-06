@@ -22,6 +22,7 @@
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "test:integration:watch": "vitest --config vitest.integration.config.ts",
     "growth:conocimiento": "node --import tsx mcp/growth/conocimiento/cli.ts",
+    "mcp:probar": "tsx mcp/probar.ts",
     "growth:token": "node --import tsx scripts/growth/crearToken.ts"
   },
   "keywords": [

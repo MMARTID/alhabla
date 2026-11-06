@@ -14,6 +14,18 @@
       "port": 3102
     },
     {
+      "name": "app-rama",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": ["scripts/dev/vista-previa-rama.sh", "app"],
+      "port": 3111
+    },
+    {
+      "name": "web-rama",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": ["scripts/dev/vista-previa-rama.sh", "web"],
+      "port": 3112
+    },
+    {
       "name": "growth-dev",
       "runtimeExecutable": "sh",
       "runtimeArgs": ["-c", "cd growth && NEXT_PUBLIC_GROWTH_DEMO=1 exec npx next dev -p 3103"],

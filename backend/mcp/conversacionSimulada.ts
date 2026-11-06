@@ -85,6 +85,30 @@ export function completarReserva(
   return cuerpo;
 }
 
+/**
+ * Cómo contesta «quien llama» a la pregunta de grabación que check_availability
+ * hace en la primera consulta de una llamada (voiceTools/service.ts,
+ * conPreguntaDeGrabacion): con ella, lo comprobado (el availabilityToken) no
+ * llega hasta que se llama a preferencia_de_grabacion, así que sin contestar
+ * el book_appointment siguiente no tiene token. «no_contestar» deja la
+ * pregunta sin respuesta, para probar justo eso.
+ */
+export type RespuestaDeGrabacion = "acepta" | "rechaza" | "no_contestar";
+
+/** Lo mínimo que el backend acepta entre la pregunta y la respuesta
+ * (MS_MINIMOS_PARA_CONTESTAR_A_LA_GRABACION, 2 s): antes, la toma por una
+ * respuesta inventada en el mismo turno y no la guarda. */
+export const ESPERA_ANTES_DE_CONTESTAR_A_LA_GRABACION_MS = 2_200;
+
+/** ¿La respuesta de este paso hace la pregunta de grabación? */
+export function preguntaDeGrabacionDe(respuesta: unknown): string | null {
+  const pregunta = (respuesta as { result?: { pregunta_de_grabacion?: unknown } })
+    ?.result?.pregunta_de_grabacion;
+  return typeof pregunta === "string" ? pregunta : null;
+}
+
+const esperar = (ms: number) => new Promise((hecho) => setTimeout(hecho, ms));
+
 /** Lo que un paso fallido tiene que cortar: HTTP de error o success:false. */
 function pasoFallido(status: number, respuesta: unknown): boolean {
   if (status >= 400) return true;
@@ -104,6 +128,8 @@ export async function simularConversacion({
   callControlId,
   pasos,
   pararSiFalla = false,
+  respuestaDeGrabacion = "acepta",
+  esperaDeGrabacionMs = ESPERA_ANTES_DE_CONTESTAR_A_LA_GRABACION_MS,
 }: {
   urlDeBdDeDev: string;
   clavePrivada: string;
@@ -115,6 +141,10 @@ export async function simularConversacion({
   callControlId?: string;
   pasos: PasoDeConversacion[];
   pararSiFalla?: boolean;
+  /** Voz: cómo contesta a la pregunta de grabación (por defecto acepta). */
+  respuestaDeGrabacion?: RespuestaDeGrabacion;
+  /** Solo para los tests. */
+  esperaDeGrabacionMs?: number;
 }) {
   if (canal === "gestor" && !businessId) {
     throw new Error("[MCP] El Gestor necesita businessId");
@@ -175,6 +205,35 @@ export async function simularConversacion({
       respuesta,
     });
     if (fallido && pararSiFalla) break;
+
+    // La pregunta de grabación: se contesta como quien llama (después de los
+    // 2 s que tarda en oírla), y la respuesta trae lo comprobado.
+    const pregunta = canal === "voz" ? preguntaDeGrabacionDe(respuesta) : null;
+    const siguienteContesta = pasos[indice + 1]?.tool === "preferencia_de_grabacion";
+    if (pregunta && llamada && respuestaDeGrabacion !== "no_contestar" && !siguienteContesta) {
+      await esperar(esperaDeGrabacionMs);
+      const cuerpoDeGrabacion = { acepta: respuestaDeGrabacion === "acepta" };
+      const antesDeContestar = Date.now();
+      const contestada = await enviarWebhookTelnyx({
+        ruta: "/webhooks/telnyx/tools/preferencia_de_grabacion",
+        cuerpo: cuerpoDeGrabacion,
+        clavePrivada,
+        callControlId: llamada,
+      });
+      recogerValores(contestada.respuesta, memoria);
+      const contestadaFallida = pasoFallido(contestada.status, contestada.respuesta);
+      resultados.push({
+        paso: indice + 1,
+        automatico: `Contesta a la pregunta de grabación («${pregunta}»): ${respuestaDeGrabacion}`,
+        tool: "preferencia_de_grabacion",
+        cuerpo: cuerpoDeGrabacion,
+        status: contestada.status,
+        ms: Date.now() - antesDeContestar,
+        ...(contestadaFallida ? { fallido: true } : {}),
+        respuesta: contestada.respuesta,
+      });
+      if (contestadaFallida && pararSiFalla) break;
+    }
   }
 
   return {
@@ -199,7 +258,7 @@ async function comoQuedoLaLlamada(urlDeBdDeDev: string, callId: string) {
       urlDeBdDeDev,
       `SELECT b.id, b."clientName", to_char((b."programedAt" AT TIME ZONE 'UTC') AT TIME ZONE coalesce(n.timezone, 'Europe/Madrid'), 'YYYY-MM-DD HH24:MI') AS "horaLocal",
               b."durationMinutes", b."isCancelled", b."externalEventId" IS NOT NULL AS "enCalendario",
-              b."createdVia"
+              b."copiaEnCalendario", b."createdVia"
          FROM bookings b
          JOIN calls c ON c.id = b."callId"
          JOIN businesses n ON n.id = c."businessId"

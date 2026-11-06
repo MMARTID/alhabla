@@ -121,6 +121,7 @@ npm run lint           # eslint src
 npm run typecheck      # tsc --noEmit
 npm run prisma:migrate # migraciones en dev
 npm run prisma:studio  # :5555
+npm run mcp:probar -- <herramienta> '<json>'  # una herramienta de alhabla-dev con el código de esta rama
 
 cd frontend && npm run dev   # la app, Next.js :3001
 cd web && npm run dev        # la web pública, Next.js :3002
@@ -129,6 +130,7 @@ cd growth && npm run dev:demo  # con datos de prueba, sin backend ni Google (sol
 
 docker compose --profile dev up   # backend + postgres + cloudflared (desde la raíz)
 scripts/backend-sim.sh            # backend-sim :3010, destino de los webhooks de Telnyx simulados (también desde un worktree)
+scripts/comprobar-rama.sh         # antes del PR: lo que CI va a mirar, solo en lo que toca el diff (--rapido, --todo)
 
 scripts/dev/instalar.sh           # una vez en el Mac: entorno de desarrollo fijo al iniciar sesión
 scripts/dev/entorno.sh estado     # qué enseña el entorno fijo y qué responde
@@ -147,6 +149,8 @@ commit» que solo existe ahí. Reglas para las sesiones:
   ocupes `:3001`/`:3002`: tus vistas previas (`.claude/launch.json`) van a `:3101`/`:3102` contra el
   backend fijo. Si el panel o `estado_dev` dicen `backendFueraDeSitio`, alguien lo hizo: devuélvelo
   con `ver_en_dev`.
+- Para ver un worktree desde una sesión de otro checkout, no edites `launch.json`: MCP
+  `vista_previa_rama` y `preview_start` de `app-rama` (`:3111`) o `web-rama` (`:3112`).
 - El dashboard de Growth (`growth/`) no se sirve en el entorno fijo: su vista previa es
   `growth-dev` (`:3103`, en modo demostración, sin backend ni Google).
 - Para que el usuario vea tu cambio **antes de fusionar**: push de la rama y MCP `ver_en_dev` (o el
