@@ -32,6 +32,7 @@ import type {
   PlaceSearchResult,
   CalendarAccountConnected,
   EstadoWhatsappDueno,
+  EstadoWhatsappPropio,
   CambioDelGestor,
   EstadoDelGestor,
   RespuestaDelGestor,
@@ -656,6 +657,34 @@ export async function sendOwnerWhatsappActivation() {
   const { data } = await api.post<
     EstadoWhatsappDueno & { sent: "template" | "link" }
   >("/business/me/whatsapp/activation");
+  return data;
+}
+
+export async function getWhatsappPropio() {
+  const { data } = await api.get<EstadoWhatsappPropio>(
+    "/business/me/whatsapp-propio"
+  );
+  return data;
+}
+
+/** El enlace a la página de alta de Telnyx (el camino principal). */
+export async function pedirEnlaceWhatsappPropio() {
+  const { data } = await api.post<{
+    url: string;
+    estado: EstadoWhatsappPropio;
+  }>("/business/me/whatsapp-propio/enlace");
+  return data;
+}
+
+/** Lo que devolvió la ventana de Meta abierta en la app (la alternativa). */
+export async function registrarWhatsappPropio(input: {
+  wabaId: string;
+  phoneNumberId: string;
+}) {
+  const { data } = await api.post<EstadoWhatsappPropio>(
+    "/business/me/whatsapp-propio",
+    input
+  );
   return data;
 }
 

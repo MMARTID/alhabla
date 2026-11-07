@@ -286,6 +286,50 @@ export type WhatsappOwnerStatus =
   | "sin_whatsapp"
   | "baja";
 
+/**
+ * «Conectar mi WhatsApp» (Beta): el WhatsApp Business del negocio en
+ * coexistencia. `estado` es `registrando`, `fallido` o el
+ * `coexistence_state` de Telnyx.
+ */
+export type EstadoConexionWhatsappPropio =
+  | "esperando_alta"
+  | "enlace_caducado"
+  | "registrando"
+  | "fallido"
+  | "pending_onboarding"
+  | "sync_pending"
+  | "syncing"
+  | "sync_complete"
+  | "active"
+  | "history_declined"
+  | "sync_deadline_expired"
+  | "offboarded"
+  | "disconnected";
+
+export type EstadoWhatsappPropio = {
+  disponible: boolean;
+  motivo: "apagado" | "sin_configurar" | "sin_enlace_de_telnyx" | null;
+  /**
+   * La alternativa: lo que necesita `FB.login()` para abrir la ventana de
+   * Meta dentro de la app. El camino principal es el enlace de Telnyx.
+   */
+  altaPropia: {
+    appId: string;
+    configId: string;
+    solutionId: string;
+    graphVersion: string;
+  } | null;
+  conexion: {
+    estado: EstadoConexionWhatsappPropio | string;
+    origen: "alojada" | "propia" | string;
+    phoneNumber: string | null;
+    syncDeadline: string | null;
+    errores: string[];
+    conectadoAt: string | null;
+    puedeRepetir: boolean;
+  } | null;
+};
+
 export type EstadoWhatsappDueno = {
   ownerWhatsappNumber: string | null;
   status: WhatsappOwnerStatus;

@@ -16,6 +16,14 @@ import type { Business, EstadoWhatsappDueno } from "@/lib/types";
 
 vi.mock("@/lib/api", () => ({
   getOwnerWhatsapp: vi.fn(),
+  getWhatsappPropio: vi.fn(async () => ({
+    disponible: false,
+    motivo: "apagado",
+    altaPropia: null,
+    conexion: null,
+  })),
+  pedirEnlaceWhatsappPropio: vi.fn(),
+  registrarWhatsappPropio: vi.fn(),
   sendOwnerWhatsappActivation: vi.fn(),
   updateMyBusiness: vi.fn(),
 }));
