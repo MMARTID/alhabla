@@ -518,6 +518,99 @@ describe("profesionales — niveles por servicio", () => {
   });
 });
 
+// Idiomas que habla cada profesional además del castellano
+// (lib/idiomasDelEquipo.ts, 07-11): la lista completa reemplaza a la anterior.
+describe("profesionales — idiomas", () => {
+  let fastify: ReturnType<typeof Fastify>;
+  const mockedProfessionalCount = vi.mocked(prisma.professional.count);
+
+  function guardado(idiomas: string[] | undefined) {
+    return {
+      id: "prof_1",
+      name: "Laura",
+      active: true,
+      createdAt: new Date("2026-11-07T10:00:00Z"),
+      updatedAt: new Date("2026-11-07T10:00:00Z"),
+      ...(idiomas === undefined ? {} : { idiomas }),
+      serviceLinks: [],
+    } as any;
+  }
+
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    mockedGetBookingSettingsBusinessFindUnique.mockResolvedValue({ plan: "pro", stripePriceId: null } as any);
+    mockedProfessionalCount.mockResolvedValue(0);
+    fastify = Fastify();
+    fastify.decorate("authenticate", async (request: any) => {
+      request.user = { businessId: "biz_1" };
+    });
+    await fastify.register(bookingSettingsRoutes);
+  });
+
+  it("al crear guarda los idiomas sin repetir y en el orden del catálogo", async () => {
+    mockTransactionProfessionalCreate.mockResolvedValue(guardado(["en-GB", "ca-ES"]));
+
+    const response = await fastify.inject({
+      method: "POST",
+      url: "/professionals",
+      payload: { name: "Laura", idiomas: ["ca-ES", "en-GB", "ca-ES"] },
+    });
+
+    expect(response.statusCode).toBe(201);
+    expect(mockTransactionProfessionalCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ idiomas: ["en-GB", "ca-ES"] }),
+      })
+    );
+    expect(response.json()).toMatchObject({ idiomas: ["en-GB", "ca-ES"] });
+  });
+
+  it("al editar, [] deja solo el castellano; sin el campo no se tocan", async () => {
+    mockedProfessionalFindFirst.mockResolvedValue({ id: "prof_1", businessId: "biz_1", active: true } as any);
+    mockTransactionProfessionalUpdate.mockResolvedValue(guardado([]));
+
+    const vaciar = await fastify.inject({
+      method: "PATCH",
+      url: "/professionals/prof_1",
+      payload: { idiomas: [] },
+    });
+    expect(vaciar.statusCode).toBe(200);
+    expect(mockTransactionProfessionalUpdate).toHaveBeenLastCalledWith(
+      expect.objectContaining({ data: { idiomas: [] } })
+    );
+
+    await fastify.inject({
+      method: "PATCH",
+      url: "/professionals/prof_1",
+      payload: { name: "Laura" },
+    });
+    expect(mockTransactionProfessionalUpdate).toHaveBeenLastCalledWith(
+      expect.objectContaining({ data: { name: "Laura" } })
+    );
+  });
+
+  it("rechaza con 400 el castellano o un idioma que no está en el catálogo", async () => {
+    for (const idiomas of [["es-ES"], ["zh-CN"]]) {
+      const response = await fastify.inject({
+        method: "POST",
+        url: "/professionals",
+        payload: { name: "Laura", idiomas },
+      });
+      expect(response.statusCode).toBe(400);
+    }
+    expect(mockTransactionProfessionalCreate).not.toHaveBeenCalled();
+  });
+
+  it("una fila sin la columna se lee sin idiomas", async () => {
+    mockedProfessionalFindFirst.mockResolvedValue(guardado(undefined));
+
+    const response = await fastify.inject({ method: "GET", url: "/professionals/prof_1" });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({ idiomas: [] });
+  });
+});
+
 describe("ausencias del panel — GET /absences y DELETE /absences/:id", () => {
   let fastify: ReturnType<typeof Fastify>;
 

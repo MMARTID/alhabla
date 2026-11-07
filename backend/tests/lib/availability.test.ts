@@ -26,7 +26,14 @@ const mockedBookingFindMany = vi.mocked(prisma.booking.findMany);
 // `serviceIds` crea filas ESPECIALISTA (lo que significaba la casilla antes
 // de existir el nivel); `noSugerir` crea filas NO_SUGERIR. Sin fila = lo hace.
 function givenProfessionals(
-  professionals: Array<{ id: string; name: string; serviceIds: string[]; noSugerir?: string[] }>
+  professionals: Array<{
+    id: string;
+    name: string;
+    serviceIds: string[];
+    noSugerir?: string[];
+    /** Idiomas que habla además del castellano (Professional.idiomas). */
+    idiomas?: string[];
+  }>
 ) {
   mockedProfessionalFindMany.mockResolvedValue(
     professionals.map((p) => ({
@@ -34,6 +41,7 @@ function givenProfessionals(
       businessId,
       name: p.name,
       active: true,
+      idiomas: p.idiomas ?? [],
       createdAt: new Date(),
       updatedAt: new Date(),
       serviceLinks: [
@@ -1315,5 +1323,220 @@ describe("checkAvailability — hueco más cercano, antes o después (buscarTamb
         }),
       })
     );
+  });
+});
+
+// Idiomas del equipo (lib/idiomasDelEquipo.ts, decisión del usuario del
+// 2026-11-07): la cita va primero a quien habla el idioma de quien llama,
+// después al especialista y después a quien tenga menos citas ese día. Si a
+// esa hora no hay libre nadie que lo hable, viene también enSuIdioma.
+describe("checkAvailability — idioma de quien llama", () => {
+  const base = {
+    businessId,
+    schedule: DEFAULT_BUSINESS_SCHEDULE,
+    timezone: europeMadrid,
+    bookingCapacity: 5,
+    startDateTime: "2026-08-10T10:00:00+02:00",
+    durationMinutes: 30,
+    serviceIds: ["corte"],
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(prisma.professionalAbsence.findMany).mockResolvedValue([]);
+  });
+
+  it("el idioma manda sobre el nivel y la carga: va con quien lo habla", async () => {
+    givenProfessionals([
+      { id: "ana", name: "Ana", serviceIds: ["corte"] },
+      { id: "bea", name: "Bea", serviceIds: [], idiomas: ["en-GB"] },
+    ]);
+    // Bea, además, tiene más citas ese día.
+    givenBookings([
+      { programedAt: new Date("2026-08-10T06:00:00Z"), professionalId: "bea" },
+    ]);
+
+    const result = await checkAvailability({ ...base, idioma: "en-GB" });
+
+    expect(result.available).toBe(true);
+    if (result.available) {
+      expect(result.availableProfessionals.map((p) => p.id)).toEqual(["bea", "ana"]);
+      expect(result.hablantesIds).toEqual(["bea"]);
+      expect(result.specialistIds).toEqual(["ana"]);
+      expect(result.enSuIdioma).toBeUndefined();
+    }
+  });
+
+  it("con el castellano o sin idioma, el reparto de siempre", async () => {
+    givenProfessionals([
+      { id: "ana", name: "Ana", serviceIds: ["corte"] },
+      { id: "bea", name: "Bea", serviceIds: [], idiomas: ["en-GB"] },
+    ]);
+    givenBookings([]);
+
+    for (const idioma of ["es-ES", undefined, null, "xx-XX"]) {
+      const result = await checkAvailability({ ...base, idioma });
+      expect(result.available).toBe(true);
+      if (result.available) {
+        expect(result.availableProfessionals.map((p) => p.id)).toEqual(["ana", "bea"]);
+        expect(result.hablantesIds).toBeUndefined();
+        expect(result.enSuIdioma).toBeUndefined();
+      }
+    }
+  });
+
+  it("si nadie del equipo habla su idioma, el reparto de siempre y sin enSuIdioma", async () => {
+    givenProfessionals([
+      { id: "ana", name: "Ana", serviceIds: ["corte"] },
+      { id: "bea", name: "Bea", serviceIds: [], idiomas: ["fr-FR"] },
+    ]);
+    givenBookings([]);
+
+    const result = await checkAvailability({ ...base, idioma: "ca-ES" });
+
+    expect(result.available).toBe(true);
+    if (result.available) {
+      expect(result.availableProfessionals.map((p) => p.id)).toEqual(["ana", "bea"]);
+      expect(result.enSuIdioma).toBeUndefined();
+    }
+  });
+
+  it("si a esa hora quien lo habla está ocupado, da la hora con quien esté y enSuIdioma con el hueco más cercano", async () => {
+    givenProfessionals([
+      { id: "laura", name: "Laura", serviceIds: [], idiomas: ["ca-ES"] },
+      { id: "marta", name: "Marta", serviceIds: [] },
+    ]);
+    // Laura, de 10:00 a 10:30 (hora de Madrid).
+    givenBookings([
+      { programedAt: new Date("2026-08-10T08:00:00Z"), professionalId: "laura" },
+    ]);
+
+    const result = await checkAvailability({ ...base, idioma: "ca-ES" });
+
+    expect(result.available).toBe(true);
+    if (result.available) {
+      expect(result.availableProfessionals).toEqual([{ id: "marta", name: "Marta" }]);
+      expect(result.hablantesIds).toBeUndefined();
+      expect(result.enSuIdioma).toEqual({
+        startDateTime: "2026-08-10T08:30:00.000Z",
+        availableProfessionals: [{ id: "laura", name: "Laura" }],
+      });
+    }
+  });
+
+  it("enSuIdioma también busca hacia atrás si se pide (buscarTambienAntes)", async () => {
+    givenProfessionals([
+      { id: "laura", name: "Laura", serviceIds: [], idiomas: ["ca-ES"] },
+      { id: "marta", name: "Marta", serviceIds: [] },
+    ]);
+    // Laura, de 10:00 a 11:30: libre a las 9:30, antes que a las 11:30.
+    givenBookings([
+      {
+        programedAt: new Date("2026-08-10T08:00:00Z"),
+        professionalId: "laura",
+        durationMinutes: 90,
+      },
+    ]);
+
+    const result = await checkAvailability({
+      ...base,
+      idioma: "ca-ES",
+      buscarTambienAntes: { noAntesDe: new Date("2026-08-10T06:00:00Z") },
+    });
+
+    expect(result.available).toBe(true);
+    if (result.available) {
+      expect(result.enSuIdioma?.startDateTime).toBe("2026-08-10T07:30:00.000Z");
+    }
+  });
+
+  it("«no sugerir» sigue fuera aunque sea quien habla su idioma", async () => {
+    givenProfessionals([
+      { id: "aprendiz", name: "Marta", serviceIds: [], noSugerir: ["corte"], idiomas: ["en-GB"] },
+      { id: "laura", name: "Laura", serviceIds: [] },
+    ]);
+    givenBookings([]);
+
+    const result = await checkAvailability({ ...base, idioma: "en-GB" });
+
+    expect(result.available).toBe(true);
+    if (result.available) {
+      expect(result.availableProfessionals).toEqual([{ id: "laura", name: "Laura" }]);
+      expect(result.enSuIdioma).toBeUndefined();
+    }
+  });
+
+  it("si pide a alguien por su nombre, manda su elección: sin enSuIdioma", async () => {
+    givenProfessionals([
+      { id: "laura", name: "Laura", serviceIds: [], idiomas: ["en-GB"] },
+      { id: "marta", name: "Marta", serviceIds: [] },
+    ]);
+    givenBookings([]);
+
+    const result = await checkAvailability({
+      ...base,
+      idioma: "en-GB",
+      professionalId: "marta",
+    });
+
+    expect(result.available).toBe(true);
+    if (result.available) {
+      expect(result.availableProfessionals).toEqual([{ id: "marta", name: "Marta" }]);
+      expect(result.enSuIdioma).toBeUndefined();
+    }
+  });
+
+  it("si la hora no está libre y la alternativa iría con quien no lo habla, viene también enSuIdioma", async () => {
+    givenProfessionals([
+      { id: "ana", name: "Ana", serviceIds: [], idiomas: ["en-GB"] },
+      { id: "bea", name: "Bea", serviceIds: [] },
+    ]);
+    // A las 10:00 las dos ocupadas; Bea queda libre a las 10:30 y Ana a las 11:00.
+    givenBookings([
+      { programedAt: new Date("2026-08-10T08:00:00Z"), professionalId: "bea" },
+      {
+        programedAt: new Date("2026-08-10T08:00:00Z"),
+        professionalId: "ana",
+        durationMinutes: 60,
+      },
+    ]);
+
+    const result = await checkAvailability({ ...base, idioma: "en-GB" });
+
+    expect(result.available).toBe(false);
+    if (!result.available) {
+      expect(result.code).toBe("ALL_PROFESSIONALS_BUSY");
+      expect(result.suggestedNextSlot).toEqual({
+        startDateTime: "2026-08-10T08:30:00.000Z",
+        availableProfessionals: [{ id: "bea", name: "Bea" }],
+      });
+      expect(result.enSuIdioma).toEqual({
+        startDateTime: "2026-08-10T09:00:00.000Z",
+        availableProfessionals: [{ id: "ana", name: "Ana" }],
+      });
+    }
+  });
+
+  it("si la alternativa ya va con quien lo habla, no hay enSuIdioma", async () => {
+    givenProfessionals([
+      { id: "ana", name: "Ana", serviceIds: [], idiomas: ["en-GB"] },
+      { id: "bea", name: "Bea", serviceIds: [] },
+    ]);
+    // Las dos ocupadas a las 10:00 y libres a las 10:30: va con Ana.
+    givenBookings([
+      { programedAt: new Date("2026-08-10T08:00:00Z"), professionalId: "bea" },
+      { programedAt: new Date("2026-08-10T08:00:00Z"), professionalId: "ana" },
+    ]);
+
+    const result = await checkAvailability({ ...base, idioma: "en-GB" });
+
+    expect(result.available).toBe(false);
+    if (!result.available) {
+      expect(result.suggestedNextSlot?.availableProfessionals[0]).toEqual({
+        id: "ana",
+        name: "Ana",
+      });
+      expect(result.enSuIdioma).toBeUndefined();
+    }
   });
 });

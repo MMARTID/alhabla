@@ -477,14 +477,27 @@ export type BookingProfessional = {
    * entiende como `normal` («Lo hace»).
    */
   serviceLevels: Record<string, Exclude<ProfessionalServiceLevel, "normal">>;
+  /**
+   * Idiomas que habla además del castellano (códigos del catálogo): la
+   * recepcionista le da primero las citas de quien llama en ellos.
+   * Opcional porque Vercel publica la app antes que el backend.
+   */
+  idiomas?: AgentLanguage[];
   createdAt: string;
   updatedAt: string;
 };
+
+/** Un idioma que se puede marcar en un profesional (todos los de la
+ * recepcionista menos el castellano, que se da por hecho). */
+export type IdiomaDelEquipo = { codigo: AgentLanguage; etiqueta: string };
 
 export type BookingSettings = {
   bookingCapacity: number;
   services: BookingService[];
   professionals: BookingProfessional[];
+  /** Los idiomas que se pueden marcar, en el orden del catálogo. Sin él (un
+   * backend anterior), el panel no enseña los idiomas. */
+  idiomasDelEquipo?: IdiomaDelEquipo[];
 };
 
 export type BookingServiceInput = {
@@ -504,6 +517,9 @@ export type BookingProfessionalInput = {
    * backend no toca los niveles que ya tuviera.
    */
   serviceLevels?: Record<string, ProfessionalServiceLevel>;
+  /** Si se manda, es la lista COMPLETA de idiomas además del castellano:
+   * reemplaza a la anterior (`[]` = solo castellano). */
+  idiomas?: AgentLanguage[];
 };
 
 export type MicrosoftCalendarOption = {

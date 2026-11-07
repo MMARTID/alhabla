@@ -23,16 +23,22 @@ import {
   resolveServiceLevel,
   type ServiceLevelMap,
 } from "@/components/professional-service-levels";
+import { IdiomasDelProfesional, idiomasEnPalabras } from "@/components/idiomas-del-profesional";
 import { SectionErrorState } from "@/components/section-card";
 import { BarraGuardar, Insignia, Interruptor, VacioMovil } from "@/components/movil/piezas";
 import { PantallaDeAjuste } from "@/components/movil/agente/pantalla-de-ajuste";
 import { Dialogo } from "@/components/escritorio/dialogo";
 import { CAMPO_EN_FILA } from "@/components/escritorio/agente/campo-en-fila";
 
-type Borrador = { nombre: string; activo: boolean; niveles: ServiceLevelMap };
+type Borrador = { nombre: string; activo: boolean; niveles: ServiceLevelMap; idiomas: string[] };
 
 function borradorDe(profesional: BookingProfessional): Borrador {
-  return { nombre: profesional.name, activo: profesional.active, niveles: profesional.serviceLevels ?? {} };
+  return {
+    nombre: profesional.name,
+    activo: profesional.active,
+    niveles: profesional.serviceLevels ?? {},
+    idiomas: profesional.idiomas ?? [],
+  };
 }
 
 function mismoBorrador(a: Borrador, b: Borrador) {
@@ -40,14 +46,16 @@ function mismoBorrador(a: Borrador, b: Borrador) {
   return (
     a.nombre === b.nombre &&
     a.activo === b.activo &&
+    a.idiomas.join() === b.idiomas.join() &&
     Array.from(claves).every((clave) => (a.niveles[clave] ?? "normal") === (b.niveles[clave] ?? "normal"))
   );
 }
 
 /**
  * Profesionales en escritorio: el equipo en una lista que se edita en la
- * fila (nombre y si está activo) y, al abrir a cada persona, su nivel en
- * cada servicio (wireframe 1l). Se guarda todo desde la barra del pie.
+ * fila (nombre y si está activo) y, al abrir a cada persona, los idiomas que
+ * habla y su nivel en cada servicio (wireframe 1l). Se guarda todo desde la
+ * barra del pie.
  */
 export function ProfesionalesEscritorio({ business }: { business: Business }) {
   const timeZone = business.timezone || "Europe/Madrid";
@@ -56,6 +64,8 @@ export function ProfesionalesEscritorio({ business }: { business: Business }) {
   const ajustes = useQuery({ queryKey: ["booking-settings"], queryFn: getBookingSettings });
   const profesionales = ajustes.data?.professionals ?? [];
   const servicios = ajustes.data?.services ?? [];
+  // Sin la lista (un backend anterior), no se enseñan los idiomas.
+  const opcionesDeIdioma = ajustes.data?.idiomasDelEquipo ?? [];
 
   const [borradores, setBorradores] = useState<Record<string, Borrador>>({});
   const [abierto, setAbierto] = useState<string | null>(null);
@@ -102,7 +112,12 @@ export function ProfesionalesEscritorio({ business }: { business: Business }) {
     mutationFn: () =>
       Promise.all(
         Object.entries(borradores).map(([id, borrador]) =>
-          updateBookingProfessional(id, { name: borrador.nombre.trim(), active: borrador.activo, serviceLevels: borrador.niveles })
+          updateBookingProfessional(id, {
+            name: borrador.nombre.trim(),
+            active: borrador.activo,
+            serviceLevels: borrador.niveles,
+            ...(opcionesDeIdioma.length > 0 ? { idiomas: borrador.idiomas } : {}),
+          })
         )
       ),
     onSuccess: async () => {
@@ -149,7 +164,7 @@ export function ProfesionalesEscritorio({ business }: { business: Business }) {
   return (
     <PantallaDeAjuste
       titulo="Profesionales"
-      subtitulo="Quién hace qué. El agente recomienda al especialista una vez y reserva igualmente si el cliente insiste."
+      subtitulo="Quién hace qué y en qué idiomas atiende. La cita va primero a quien habla el idioma del cliente y, después, al especialista."
       accion={
         <button type="button" onClick={() => setNuevo((actual) => actual ?? "")} className="btn-secondary h-10 px-4">
           <Plus className="h-4 w-4" aria-hidden="true" />
@@ -203,6 +218,7 @@ export function ProfesionalesEscritorio({ business }: { business: Business }) {
                 const loHace = servicios.filter((servicio) => resolveServiceLevel(borrador.niveles, servicio.id) === "normal").length;
                 const estaAbierto = abierto === profesional.id;
                 const nombre = borrador.nombre.trim() || profesional.name;
+                const idiomas = idiomasEnPalabras(borrador.idiomas, opcionesDeIdioma);
                 return (
                   <li
                     key={profesional.id}
@@ -231,6 +247,7 @@ export function ProfesionalesEscritorio({ business }: { business: Business }) {
                               {especialista + loHace === 0 ? <Insignia tono="aviso">sin servicios</Insignia> : null}
                             </>
                           )}
+                          {idiomas ? <Insignia tono="neutro">Habla {idiomas}</Insignia> : null}
                           {borrador.activo ? null : <Insignia tono="neutro">Inactivo</Insignia>}
                         </span>
                       </div>
@@ -241,7 +258,7 @@ export function ProfesionalesEscritorio({ business }: { business: Business }) {
                         aria-controls={`niveles-${profesional.id}`}
                         className="inline-flex h-9 items-center gap-1.5 rounded-[10px] px-3 text-sm font-semibold text-tinta-2 transition hover:bg-relleno focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-morado"
                       >
-                        Servicios que hace
+                        {opcionesDeIdioma.length > 0 ? "Servicios e idiomas" : "Servicios que hace"}
                         <ChevronDown className={`h-4 w-4 transition ${estaAbierto ? "rotate-180" : ""}`} aria-hidden="true" />
                       </button>
                       <Interruptor activo={borrador.activo} etiqueta={`${nombre} activo`} onCambiar={(activo) => cambiar(profesional, { activo })} />
@@ -264,13 +281,35 @@ export function ProfesionalesEscritorio({ business }: { business: Business }) {
                       </div>
                     ) : null}
                     {estaAbierto ? (
-                      <div id={`niveles-${profesional.id}`} className="border-t border-linea-suave bg-relleno px-4 py-4">
-                        <ProfessionalServiceLevels
-                          services={servicios}
-                          value={borrador.niveles}
-                          onChange={(niveles) => cambiar(profesional, { niveles })}
-                          idPrefix={`profesional-${profesional.id}`}
-                        />
+                      <div id={`niveles-${profesional.id}`} className="space-y-4 border-t border-linea-suave bg-relleno px-4 py-4">
+                        {opcionesDeIdioma.length > 0 ? (
+                          <section aria-labelledby={`idiomas-${profesional.id}-titulo`}>
+                            <h3 id={`idiomas-${profesional.id}-titulo`} className="mb-2 text-sm font-semibold text-tinta-2">
+                              Idiomas que habla
+                            </h3>
+                            <IdiomasDelProfesional
+                              opciones={opcionesDeIdioma}
+                              value={borrador.idiomas}
+                              onChange={(idiomas) => cambiar(profesional, { idiomas })}
+                              idPrefix={`profesional-${profesional.id}`}
+                            />
+                          </section>
+                        ) : null}
+                        <section
+                          aria-labelledby={opcionesDeIdioma.length > 0 ? `servicios-${profesional.id}-titulo` : undefined}
+                        >
+                          {opcionesDeIdioma.length > 0 ? (
+                            <h3 id={`servicios-${profesional.id}-titulo`} className="mb-2 text-sm font-semibold text-tinta-2">
+                              Servicios que hace
+                            </h3>
+                          ) : null}
+                          <ProfessionalServiceLevels
+                            services={servicios}
+                            value={borrador.niveles}
+                            onChange={(niveles) => cambiar(profesional, { niveles })}
+                            idPrefix={`profesional-${profesional.id}`}
+                          />
+                        </section>
                       </div>
                     ) : null}
                   </li>

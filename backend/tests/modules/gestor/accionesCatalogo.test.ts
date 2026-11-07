@@ -135,6 +135,7 @@ describe("registro", () => {
       "editar_servicio",
       "fijar_especialidad",
       "fijar_horario",
+      "fijar_idiomas",
       "marcar_ausencia",
       "mover_cita",
       "quitar_ausencia",
@@ -687,6 +688,77 @@ describe("retirar_profesional / fijar_especialidad", () => {
       { sync: false }
     );
     expect(mockedSync).toHaveBeenCalledTimes(2);
+  });
+});
+
+// Idiomas del equipo (lib/idiomasDelEquipo.ts, 07-11): «Laura habla catalán
+// e inglés». La lista es completa y reemplaza a la anterior.
+describe("fijar_idiomas", () => {
+  it("entiende los idiomas como los dice el dueño y los guarda como códigos, en orden", async () => {
+    mockedUpdatePro.mockResolvedValue({} as never);
+    const r = await comprobar("fijar_idiomas", {
+      profesional: "laura",
+      idiomas: ["Inglés", "valenciano", "castellano"],
+    });
+    expect(r).toMatchObject({
+      ok: true,
+      descripcion: "Laura: además del castellano, inglés y catalán",
+      parametros: { profesional: "pro_laura", idiomas: ["en-GB", "ca-ES"] },
+    });
+
+    const hecho = await ejecutar("fijar_idiomas", {
+      profesional: "pro_laura",
+      idiomas: ["en-GB", "ca-ES"],
+    });
+    expect(mockedUpdatePro).toHaveBeenCalledWith(
+      "biz_1",
+      "pro_laura",
+      { idiomas: ["en-GB", "ca-ES"] },
+      { sync: false }
+    );
+    expect(hecho).toMatchObject({ ok: true });
+    expect(hecho.mensaje).toBe(
+      "Hecho: Laura habla inglés y catalán además del castellano. A quien llame en esos idiomas se le dará cita primero con Laura."
+    );
+    expect(mockedSync).toHaveBeenCalledTimes(1);
+  });
+
+  it("[] deja solo el castellano", async () => {
+    mockedUpdatePro.mockResolvedValue({} as never);
+    expect(
+      await comprobar("fijar_idiomas", { profesional: "Marta", idiomas: [] })
+    ).toMatchObject({ ok: true, descripcion: "Marta: solo castellano" });
+    const hecho = await ejecutar("fijar_idiomas", {
+      profesional: "Marta",
+      idiomas: [],
+    });
+    expect(mockedUpdatePro).toHaveBeenCalledWith(
+      "biz_1",
+      "pro_marta",
+      { idiomas: [] },
+      { sync: false }
+    );
+    expect(hecho.mensaje).toBe("Hecho: Marta queda solo con castellano.");
+  });
+
+  it("un idioma que no está en el catálogo no se propone y dice cuáles se pueden", async () => {
+    const r = await comprobar("fijar_idiomas", {
+      profesional: "Laura",
+      idiomas: ["catalán", "chino"],
+    });
+    expect(r.ok).toBe(false);
+    if (!r.ok) {
+      expect(r.motivo).toContain("No puedo marcar «chino»");
+      expect(r.motivo).toContain("catalán");
+      expect(r.motivo).toContain("(el castellano se da por hecho)");
+    }
+    expect(mockedUpdatePro).not.toHaveBeenCalled();
+  });
+
+  it("alguien que no está en el equipo", async () => {
+    expect(
+      await comprobar("fijar_idiomas", { profesional: "Lucía", idiomas: ["inglés"] })
+    ).toEqual({ ok: false, motivo: "No encuentro a «Lucía» en el equipo." });
   });
 });
 

@@ -10,7 +10,7 @@ import {
   updateBookingProfessional,
 } from "@/lib/api";
 import { getPlanLimitInfo, planLimitUpgradeMessage } from "@/lib/plan-limit";
-import type { AusenciaDelEquipo, BookingProfessional, Business } from "@/lib/types";
+import type { AusenciaDelEquipo, BookingProfessional, Business, IdiomaDelEquipo } from "@/lib/types";
 import { AvisoFlotante, useAviso } from "@/components/aviso-flotante";
 import {
   AusenciasDeLaPersona,
@@ -23,17 +23,19 @@ import {
   ProfessionalServiceLevels,
   type ServiceLevelMap,
 } from "@/components/professional-service-levels";
+import { IdiomasDelProfesional, idiomasEnPalabras } from "@/components/idiomas-del-profesional";
 import { SectionErrorState } from "@/components/section-card";
 import { CLASES_BOTON_REDONDO } from "@/components/movil/cabecera-movil";
 import { CuerpoDeHoja, HojaInferior } from "@/components/movil/hoja-inferior";
 import { Interruptor, VacioMovil } from "@/components/movil/piezas";
 import { PantallaDeAjuste } from "@/components/movil/agente/pantalla-de-ajuste";
 
-type Borrador = { id: string | null; nombre: string; activo: boolean; niveles: ServiceLevelMap };
+type Borrador = { id: string | null; nombre: string; activo: boolean; niveles: ServiceLevelMap; idiomas: string[] };
 
 /**
- * Profesionales: la lista del equipo y una hoja por persona con su nivel en
- * cada servicio (especialista, lo hace, no sugerir), como en escritorio.
+ * Profesionales: la lista del equipo y una hoja por persona con los idiomas
+ * que habla y su nivel en cada servicio (especialista, lo hace, no
+ * sugerir), como en escritorio.
  */
 export function ProfesionalesMovil({ business }: { business: Business }) {
   const timeZone = business.timezone || "Europe/Madrid";
@@ -42,7 +44,13 @@ export function ProfesionalesMovil({ business }: { business: Business }) {
   const ajustes = useQuery({ queryKey: ["booking-settings"], queryFn: getBookingSettings });
   const profesionales = ajustes.data?.professionals ?? [];
   const servicios = ajustes.data?.services ?? [];
+  // Sin la lista (un backend anterior), no se enseñan los idiomas.
+  const opcionesDeIdioma = ajustes.data?.idiomasDelEquipo ?? [];
   const [borrador, setBorrador] = useState<Borrador | null>(null);
+  const hablaDe = (profesional: BookingProfessional) => {
+    const lista = idiomasEnPalabras(profesional.idiomas ?? [], opcionesDeIdioma);
+    return lista ? `Habla ${lista}` : null;
+  };
 
   // Ausencias por venir (las marca el Gestor): se ven y se quitan aquí. El
   // instante se redondea a la hora para que la clave de la consulta no cambie
@@ -59,14 +67,20 @@ export function ProfesionalesMovil({ business }: { business: Business }) {
   const abrir = (profesional: BookingProfessional | null) =>
     setBorrador(
       profesional
-        ? { id: profesional.id, nombre: profesional.name, activo: profesional.active, niveles: profesional.serviceLevels ?? {} }
-        : { id: null, nombre: "", activo: true, niveles: {} }
+        ? {
+            id: profesional.id,
+            nombre: profesional.name,
+            activo: profesional.active,
+            niveles: profesional.serviceLevels ?? {},
+            idiomas: profesional.idiomas ?? [],
+          }
+        : { id: null, nombre: "", activo: true, niveles: {}, idiomas: [] }
     );
 
   return (
     <PantallaDeAjuste
       titulo="Profesionales"
-      subtitulo="Quién hace qué. El agente recomienda al especialista una vez y reserva igualmente si el cliente insiste."
+      subtitulo="Quién hace qué y en qué idiomas atiende. La cita va primero a quien habla el idioma del cliente y, después, al especialista."
       accion={
         <button type="button" onClick={() => abrir(null)} aria-label="Añadir profesional" className={CLASES_BOTON_REDONDO}>
           <Plus className="h-5 w-5" aria-hidden="true" />
@@ -99,7 +113,11 @@ export function ProfesionalesMovil({ business }: { business: Business }) {
                 <span className="min-w-0 flex-1">
                   <span className="block text-base font-semibold leading-snug text-tinta">{profesional.name}</span>
                   <span className="mt-0.5 block truncate text-sm leading-snug text-muted">
-                    {[profesional.active ? null : "Inactivo", describeServiceLevels(profesional.serviceLevels ?? {}, servicios)]
+                    {[
+                      profesional.active ? null : "Inactivo",
+                      describeServiceLevels(profesional.serviceLevels ?? {}, servicios),
+                      hablaDe(profesional),
+                    ]
                       .filter(Boolean)
                       .join(" · ") || "Sin servicios todavía"}
                   </span>
@@ -123,6 +141,7 @@ export function ProfesionalesMovil({ business }: { business: Business }) {
       <HojaProfesional
         borrador={borrador}
         servicios={servicios}
+        opcionesDeIdioma={opcionesDeIdioma}
         onCambiar={setBorrador}
         onCerrar={() => setBorrador(null)}
         onHecho={async (mensaje) => {
@@ -151,6 +170,7 @@ export function ProfesionalesMovil({ business }: { business: Business }) {
 function HojaProfesional({
   borrador,
   servicios,
+  opcionesDeIdioma,
   onCambiar,
   onCerrar,
   onHecho,
@@ -158,6 +178,7 @@ function HojaProfesional({
 }: {
   borrador: Borrador | null;
   servicios: Array<{ id: string; name: string }>;
+  opcionesDeIdioma: IdiomaDelEquipo[];
   onCambiar: (borrador: Borrador) => void;
   onCerrar: () => void;
   onHecho: (mensaje: string) => Promise<void>;
@@ -170,7 +191,11 @@ function HojaProfesional({
 
   const guardar = useMutation({
     mutationFn: (datos: Borrador) => {
-      const cuerpo = { name: datos.nombre.trim(), serviceLevels: datos.niveles };
+      const cuerpo = {
+        name: datos.nombre.trim(),
+        serviceLevels: datos.niveles,
+        ...(opcionesDeIdioma.length > 0 ? { idiomas: datos.idiomas } : {}),
+      };
       return datos.id ? updateBookingProfessional(datos.id, { ...cuerpo, active: datos.activo }) : createBookingProfessional(cuerpo);
     },
     onSuccess: (_, datos) => onHecho(datos.id ? "Profesional actualizado." : "Profesional creado."),
@@ -224,6 +249,17 @@ function HojaProfesional({
             </span>
             <Interruptor activo={visible.activo} etiqueta="Profesional activo" onCambiar={(activo) => cambiar({ activo })} />
           </div>
+        ) : null}
+        {opcionesDeIdioma.length > 0 ? (
+          <fieldset className="min-w-0">
+            <legend className="mb-2 text-sm font-semibold text-tinta-2">Idiomas que habla</legend>
+            <IdiomasDelProfesional
+              opciones={opcionesDeIdioma}
+              value={visible.idiomas}
+              onChange={(idiomas) => cambiar({ idiomas })}
+              idPrefix={`movil-${visible.id ?? "nuevo"}`}
+            />
+          </fieldset>
         ) : null}
         {/* `min-w-0`: el navegador da a <fieldset> min-width: min-content y el
             segmentado desbordaría la hoja. */}

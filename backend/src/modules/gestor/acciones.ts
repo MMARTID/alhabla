@@ -213,6 +213,7 @@ const VERBO_DE_CONFIRMACION: Readonly<Record<string, string>> = {
   crear_servicios: "dar de alta",
   editar_servicio: "cambiar",
   fijar_especialidad: "fijar la especialidad de",
+  fijar_idiomas: "fijar los idiomas de",
   fijar_horario: "cambiar",
 };
 
