@@ -1436,7 +1436,10 @@ hablando por el que elige `identificarRemitente`.
   (`ACCIONES_DEL_GESTOR` = `resolver_pendiente` + `ACCIONES_DE_CATALOGO`): `crear_servicios`
   (lote de hasta 20), `editar_servicio`, `retirar_servicio`, `crear_profesionales` (lote de
   hasta 10, con `especialidades`), `retirar_profesional`, `fijar_especialidad` (tres niveles;
-  «normal» borra la fila), `fijar_horario` (la semana entera, claves en español sin tilde,
+  «normal» borra la fila), `fijar_idiomas` (desde el 2026-11-07: la lista COMPLETA de los
+  idiomas que habla alguien además del castellano, como los diga el dueño —«catalán»,
+  «valenciano», «inglés»— o por código; `[]` = solo castellano; lo que no es del catálogo no
+  se propone; `contexto_negocio` da los de cada uno en `profesionales[].idiomas`), `fijar_horario` (la semana entera, claves en español sin tilde,
   hasta 3 tramos por día; conserva las excepciones) y `cerrar_dia` (excepción `closed` por
   fecha; exige horario semanal ya fijado — un negocio recién creado tiene `schedule: {}` y no
   se le inventa una semana; la fecha tiene que existir y no haber pasado en la zona del
@@ -2460,7 +2463,8 @@ Telnyx assistant itself (MCP `ver_assistant_telnyx`), not only the DB.
   (only when `systemPrompt` changes), `provisionPhoneNumber`, the Stripe subscription webhook
   when the plan changes (`billing/service.ts`: the prompt only offers the WhatsApp reminder if
   the plan includes it) and the daily reconciler.
-- **Professional levels in the tool contract (2026-09-17).** `check_availability` translates the ranking into things the agent may say, never the internal tiers: without `professionalId` the success result carries `assignedProfessional: { id, name, isSpecialist }` (= `availableProfessionals[0]`); when the named professional is marked "no sugerir" for the requested services and someone better is free at that time, the result is **only the proposal** (2026-11-03, E20 del laboratorio): `{ available: true, cuando, recommendation: { professional, availabilityToken }, siguiente_paso }`, with the exact sentence to say («A esa hora te la puedo dejar con Laura. ¿Te parece bien?») and no reason (with the reason in front of it, GLM said it) — its own token so "vale, con Laura" books without another round-trip. The requested person's slot is not given: if the client insists, the agent calls `check_availability` again with `professionalConfirmed: true`, which only counts if the proposal was made in that same call (`claveDeRecomendacionPropuesta` in the temporary store; GLM sent it on the first check). So there is no token to book the requested person without having proposed first, and the old `PROFESSIONAL_CONFIRMATION_REQUIRED` guard of `book_appointment` is gone. Booking results now include `professionalName`. Internal fields (`specialistIds`, `recommendedProfessional`) never reach the LLM.
+- **Professional levels in the tool contract (2026-09-17).** `check_availability` translates the ranking into things the agent may say, never the internal tiers: without `professionalId` the success result carries `assignedProfessional: { id, name, isSpecialist }` (= `availableProfessionals[0]`); when the named professional is marked "no sugerir" for the requested services and someone better is free at that time, the result is **only the proposal** (2026-11-03, E20 del laboratorio): `{ available: true, cuando, recommendation: { professional, availabilityToken }, siguiente_paso }`, with the exact sentence to say («A esa hora te la puedo dejar con Laura. ¿Te parece bien?») and no reason (with the reason in front of it, GLM said it) — its own token so "vale, con Laura" books without another round-trip. The requested person's slot is not given: if the client insists, the agent calls `check_availability` again with `professionalConfirmed: true`, which only counts if the proposal was made in that same call (`claveDeRecomendacionPropuesta` in the temporary store; GLM sent it on the first check). So there is no token to book the requested person without having proposed first, and the old `PROFESSIONAL_CONFIRMATION_REQUIRED` guard of `book_appointment` is gone. Booking results now include `professionalName`. Internal fields (`specialistIds`, `hablantesIds`, `enSuIdioma`, `recommendedProfessional`) never reach the LLM.
+- **Languages of the team in the tool contract (2026-11-07).** `check_availability` passes its `idioma` (the language of the conversation; its description now says it also decides who gets the appointment) to `checkAvailability`, and `book_appointment` does too, so a pre-assigned professional who got busy is replaced by another speaker if possible. When `enSuIdioma` comes back, the result carries `en_su_idioma: { startDateTime (local, with offset), cuando, professional, availabilityToken }` and a `siguiente_paso` (`siguientePasoConSuIdioma`) to offer both options in one turn, without reasons («la hora pedida con Marta o, si prefiere que le atiendan en catalán, en_su_idioma con Laura»); provisional names are not said and the text drops the names if it would pass the 300-character cap. `como_decirlo` adds «Laura te atenderá en inglés» when the assigned professional speaks the caller's language, **only for foreign languages** (in Catalan, Galician or Basque it sounds obvious in their area). `get_catalog` lists each professional's languages («[id] Laura (habla inglés y catalán)») so the agent can answer «¿alguien habla inglés?»; «## Profesionales» says to name who speaks it if asked and to follow `siguiente_paso` when `en_su_idioma` comes back.
 - **Cambio de cita y teléfono del cliente (auditoría del 16-10,
   `docs/auditorias/2026-10-16-pipelines-ue-y-datos.md`).** Cambiar una cita ya no es
   «cancelar y reservar» (en un chat real del 13-10 la reserva nueva falló con la vieja ya
@@ -3155,7 +3159,10 @@ El alta de Apple es la tarjeta «Conecta el calendario de Apple» de `/agente`
 
 - `Service` — `name`, `durationMinutes` (5–480), `priceCents` (optional, in cents; read by
   `get_catalog` and «Dar precios»), `active`, `deletedAt`.
-- `Professional` — `name`, `active`, `deletedAt`.
+- `Professional` — `name`, `active`, `deletedAt` and, since 2026-11-07, `idiomas String[]`: the
+  languages they speak **besides Spanish** (codes of the receptionist catalog, never `es-ES`;
+  `lib/idiomasDelEquipo.ts` cleans them on read: no repeats, catalog order, retired codes ignored).
+  Empty = not said. See § Availability for what they do at booking time.
 - `ProfessionalService` — many-to-many link with, since 2026-09-17,
   `level: ESPECIALISTA | NO_SUGERIR`. **No row = "lo hace" (normal)**, the default for
   any active professional. Rows that predate the column were the old "especialidad"
@@ -3183,6 +3190,10 @@ persistencia y sincronización vive en `service.ts`, y los contratos Zod en
   lo hace) y `serviceIds` (= solo especialistas, para clientes antiguos). Cada
   guardado dispara `syncBookingConfiguration` (caché + resync de agentes), aunque
   `availability.ts` lee los niveles de la BD en cada tool call y no depende de esa caché.
+  Idiomas (2026-11-07): `idiomas: string[]` en POST y PATCH es la lista COMPLETA de los que
+  habla además del castellano (reemplaza a la anterior; `[]` = solo castellano; `es-ES` o un
+  código fuera del catálogo → 400). La respuesta siempre lleva `idiomas`, y `GET /` añade
+  `idiomasDelEquipo: [{ codigo, etiqueta }]` (lo que el panel ofrece, sin repetir el catálogo).
 - `GET /absences?desde&hasta` y `DELETE /absences/:id` — ausencias de profesionales (lógica en
   `ausencias.ts`); se crean con `POST /business/me/absences` (ver § Modo de agenda).
 
@@ -3205,13 +3216,14 @@ operativos o de auditoría creados por sus flujos específicos.
 
 ### Availability (`backend/src/lib/availability.ts`)
 
-`checkAvailability({ businessId, schedule, timezone, bookingCapacity, startDateTime, durationMinutes, serviceIds?, professionalId? })`
+`checkAvailability({ businessId, schedule, timezone, bookingCapacity, startDateTime, durationMinutes, serviceIds?, professionalId?, idioma? })`
 
 1. Validates business hours first.
 2. Loads **all** active professionals of the business (ordered by `createdAt`) and computes each one's tier *for the requested services* (`professionalTierFor`): `no_sugerir` if any requested service is marked NO_SUGERIR for them, `especialista` if all requested services are marked ESPECIALISTA, `normal` otherwise (no row = normal). If `professionalId` was given and is not in the list → `PROFESSIONAL_NOT_FOUND`.
    - **Client named nobody:** candidates are everyone except `no_sugerir` (they are never auto-assigned). If that leaves nobody → `NO_AVAILABLE_PROFESSIONAL` with a message saying so.
    - **Client named someone:** candidates = that person only, whatever their tier — asking for someone by name is always honoured. If their tier is `no_sugerir`, the result also carries `recommendedProfessional` (best free member of the automatic pool at that same time, with `isSpecialist`), computed even when the requested person is busy.
-   - **Order among candidates** (`ordenarParaAsignar`): tier first (especialista before normal), then fewest bookings that local day (counted from the already-loaded bookings, in the business timezone — "quien tenga el día más despejado"), then sign-up order. `availableProfessionals[0]` is who gets the appointment; `specialistIds` lists which of them are specialists in everything requested.
+   - **Order among candidates** (`ordenarParaAsignar`): since 2026-11-07, **language first** — who speaks the caller's `idioma` (`Professional.idiomas`; with Spanish, no `idioma` or an unknown code everybody counts as speaking it, so nothing changes) —, then tier (especialista before normal), then fewest bookings that local day (counted from the already-loaded bookings, in the business timezone — "quien tenga el día más despejado"), then sign-up order. `availableProfessionals[0]` is who gets the appointment; `specialistIds` lists which of them are specialists in everything requested and `hablantesIds` which speak the caller's language.
+   - **Language decisions (user, 2026-11-07):** language outranks speciality and load; `no_sugerir` stays out of the automatic pool even if they are the only speaker; a named professional is honoured whatever they speak. When what is offered (the requested time, or `suggestedNextSlot` if it is taken) would go to someone who does not speak the caller's language and some candidate does, the result also carries **`enSuIdioma`**: the closest slot (same search, `buscarTambienAntes` included) with a speaker, so the receptionist offers both and the client chooses («ofrecer las dos»). Why: in Catalonia the establishment must be able to attend in Catalan (Llei 1/1998 art. 32.1, Codi de consum art. 128-1); per STC 88/2017 that is a duty of the establishment, not of each employee, which is exactly what routing by language organises. The state law (Ley 10/2025) only binds companies with ≥250 employees or >50 M€ and basic services.
 3. Finds overlapping bookings in the time slot, using each booking's stored `durationMinutes` for overlap calculation.
    - **Also counted as occupancy:** the busy intervals of the external calendar (`externalBusyIntervals`, with `calendarAvailabilityKnown` and `calendarOrigin`; they only reduce capacity, never make a specific professional busy), professional absences (`ProfessionalAbsence`: they make *their* professional busy without using a slot) and orphan events of cancelled bookings are reconciled so they don't block the slot forever. The booking being moved (`excluir`) is not counted. With `buscarTambienAntes` (voice receptionist) the alternative slot is the closest one before or after the requested time, not only the next one.
 4. If `bookingsInSlot >= bookingCapacity` → `CAPACITY_REACHED`.

@@ -7,6 +7,11 @@ import {
 } from "../../lib/planFeatures.js";
 import { prisma } from "../../lib/prisma.js";
 import { invalidarCacheDeVoz } from "../../lib/voiceConfigCache.js";
+import {
+  idiomasDelEquipoParaElPanel,
+  idiomasDelProfesional,
+  type IdiomaDelEquipo,
+} from "../../lib/idiomasDelEquipo.js";
 import type { ProfessionalServiceLevel } from "@prisma/client";
 import {
   ProfessionalSchema,
@@ -28,6 +33,9 @@ export type BookingSettingsPayload = {
     updatedAt: Date;
   }>;
   professionals: Array<SerializedProfessional>;
+  /** Los idiomas que se pueden marcar en un profesional, con su etiqueta
+   * (lib/idiomasDelEquipo.ts): el panel no repite el catálogo. */
+  idiomasDelEquipo: Array<{ codigo: IdiomaDelEquipo; etiqueta: string }>;
 };
 
 export type SerializedProfessional = {
@@ -40,6 +48,8 @@ export type SerializedProfessional = {
   serviceLevels: Record<string, "especialista" | "no_sugerir">;
   /** Legado (= especialistas). El panel actual ya lee serviceLevels. */
   serviceIds: string[];
+  /** Idiomas que habla además del castellano, en el orden del catálogo. */
+  idiomas: IdiomaDelEquipo[];
 };
 
 type ProfessionalWithServices = {
@@ -48,6 +58,8 @@ type ProfessionalWithServices = {
   active: boolean;
   createdAt: Date;
   updatedAt: Date;
+  /** Opcional para tolerar mocks y filas leídas sin la columna. */
+  idiomas?: string[] | null;
   serviceLinks: Array<{ serviceId: string; level?: ProfessionalServiceLevel | null }>;
 };
 
@@ -71,6 +83,7 @@ export function serializeProfessional(
     serviceIds: Object.entries(serviceLevels)
       .filter(([, level]) => level === "especialista")
       .map(([serviceId]) => serviceId),
+    idiomas: idiomasDelProfesional(professional.idiomas),
   };
 }
 
@@ -136,6 +149,7 @@ export async function getBookingSettingsPayload(
     bookingCapacity: business.bookingCapacity,
     services: business.services,
     professionals: business.professionals.map(serializeProfessional),
+    idiomasDelEquipo: idiomasDelEquipoParaElPanel(),
   };
 }
 
@@ -305,6 +319,9 @@ export async function createProfessional(
           businessId,
           name: input.name,
           active: input.active ?? true,
+          ...(input.idiomas !== undefined
+            ? { idiomas: idiomasDelProfesional(input.idiomas) }
+            : {}),
           serviceLinks: {
             create: serviceLinks,
           },
@@ -370,6 +387,10 @@ export async function updateProfessional(
       data: {
         ...(input.name !== undefined ? { name: input.name } : {}),
         ...(input.active !== undefined ? { active: input.active } : {}),
+        // La lista completa: reemplaza a la anterior ([] = solo castellano).
+        ...(input.idiomas !== undefined
+          ? { idiomas: idiomasDelProfesional(input.idiomas) }
+          : {}),
       },
       include: { serviceLinks: nonDeletedServiceLinks },
     });

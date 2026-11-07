@@ -263,6 +263,15 @@ const IDIOMA_DE_LA_RESPUESTA = {
     "El idioma en que te habla quien llama ahora (por ejemplo, en-GB si te habla en inglés). Con él, cuando llega ya en ese idioma.",
 } as const;
 
+/** `idioma` de check_availability: además, decide a quién va la cita. Va
+ * primero a quien del equipo habla el idioma de quien llama
+ * (lib/idiomasDelEquipo.ts, decisión del usuario del 2026-11-07). */
+const IDIOMA_PARA_RESERVAR = {
+  ...IDIOMA_DE_LA_RESPUESTA,
+  description:
+    "El idioma en que te habla quien llama ahora (por ejemplo, en-GB si te habla en inglés). Con él, cuando llega ya en ese idioma y la cita va, si se puede, con alguien del equipo que lo hable.",
+} as const;
+
 /**
  * Las tools de webhook del assistant de llamadas. Sin informar_al_negocio
  * desde el 2026-11-04: el informe de una llamada lo escribe el backend al
@@ -398,7 +407,7 @@ function definicionesComunes(): DefinicionDeToolDeWebhook[] {
           description:
             "Solo para cambiar una cita que ya tiene: el bookingId que devolvió find_my_appointment, o el que devolvió book_appointment si es la cita reservada en esta misma llamada. Su hora no cuenta como ocupada y, al reservar con el token de esta comprobación, el sistema anula la cita antigua (solo si la nueva queda reservada).",
         },
-        idioma: IDIOMA_DE_LA_RESPUESTA,
+        idioma: IDIOMA_PARA_RESERVAR,
       },
       required: ["startDateTime", "durationMinutes"],
     },

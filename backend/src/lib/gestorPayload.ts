@@ -89,6 +89,13 @@ export const ACCIONES_PROPONIBLES: ReadonlyArray<{
       "decir quién es especialista en qué, quién lo hace sin serlo o a quién no asignar un servicio",
   },
   {
+    tipo: "fijar_idiomas",
+    parametros:
+      "{ profesional: string (id o nombre exacto), idiomas: string[] (TODOS los que habla además del castellano, p. ej. [\"catalán\", \"inglés\"]; [] si solo castellano) }",
+    cuando:
+      "decir qué idiomas habla alguien del equipo; a quien llama en ese idioma se le da cita primero con quien lo habla",
+  },
+  {
     tipo: "fijar_horario",
     parametros:
       '{ semana: { lunes, martes, miercoles, jueves, viernes, sabado, domingo: { abierto: boolean, tramos: [{ inicio: "HH:MM", fin: "HH:MM" }] } } } (los siete días, hasta 3 tramos por día, claves sin tilde)',

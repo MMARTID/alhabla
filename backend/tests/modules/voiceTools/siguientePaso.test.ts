@@ -8,6 +8,7 @@ import { filaDeConexion } from "../../helpers/conexionDeCalendario.js";
 import {
   executeVoiceTool,
   MAX_CARACTERES_POR_INSTRUCCION,
+  siguientePasoConSuIdioma,
   siguientePasoTrasElInforme,
 } from "../../../src/modules/voiceTools/service.js";
 import { prisma } from "../../../src/lib/prisma.js";
@@ -694,6 +695,204 @@ describe("check_availability: como_decirlo del especialista", () => {
     });
 
     expect(result).not.toHaveProperty("como_decirlo");
+  });
+});
+
+// Idiomas del equipo (lib/idiomasDelEquipo.ts, decisión del usuario del
+// 2026-11-07): el reparto lo hace checkAvailability con el idioma; aquí, lo
+// que la recepcionista recibe para ofrecerlo y decirlo.
+describe("check_availability: idioma de quien llama", () => {
+  it("pasa el idioma de la conversación al reparto; el castellano no cuenta", async () => {
+    await comprobar({ idioma: "en-GB" });
+    expect(mockedCheckAvailability).toHaveBeenLastCalledWith(
+      expect.objectContaining({ idioma: "en-GB" })
+    );
+
+    await comprobar({ idioma: "es-ES" });
+    expect(mockedCheckAvailability).toHaveBeenLastCalledWith(
+      expect.objectContaining({ idioma: null })
+    );
+  });
+
+  it("si a esa hora nadie que lo hable está libre, ofrece las dos, cada una con su token", async () => {
+    mockedCheckAvailability.mockResolvedValue({
+      available: true,
+      message: "",
+      capacityUsed: 0,
+      capacityTotal: 2,
+      availableProfessionals: [{ id: "prof_marta", name: "Marta" }],
+      enSuIdioma: {
+        startDateTime: "2026-11-20T17:30:00.000Z",
+        availableProfessionals: [{ id: "prof_laura", name: "Laura" }],
+      },
+    } as any);
+
+    const { result } = await comprobar({ idioma: "ca-ES" });
+
+    expect(result!.availabilityToken).toEqual(expect.any(String));
+    expect(result!.en_su_idioma).toEqual({
+      // En hora local, como la alternativa: el LLM la copia tal cual.
+      startDateTime: "2026-11-20T18:30:00+01:00",
+      cuando: expect.any(String),
+      professional: { id: "prof_laura", name: "Laura" },
+      availabilityToken: expect.any(String),
+    });
+    expect(result!.en_su_idioma.availabilityToken).not.toBe(
+      result!.availabilityToken
+    );
+    expect(result!.siguiente_paso).toContain(
+      "Nadie que hable catalán está libre a esa hora."
+    );
+    expect(result!.siguiente_paso).toContain("la hora pedida con Marta");
+    expect(result!.siguiente_paso).toContain(
+      "si prefiere que le atiendan en catalán, en_su_idioma con Laura"
+    );
+    // Lo interno del reparto no llega al LLM.
+    expect(result).not.toHaveProperty("enSuIdioma");
+    expect(result).not.toHaveProperty("hablantesIds");
+    expectCamposCortos(result);
+  });
+
+  it("si la hora no está libre y la alternativa iría con quien no lo habla, ofrece las dos alternativas", async () => {
+    mockedCheckAvailability.mockResolvedValue({
+      available: false,
+      code: "ALL_PROFESSIONALS_BUSY",
+      message: "Todos ocupados.",
+      suggestedNextSlot: {
+        startDateTime: "2026-11-20T17:00:00.000Z",
+        availableProfessionals: [{ id: "prof_bea", name: "Bea" }],
+      },
+      enSuIdioma: {
+        startDateTime: "2026-11-20T17:30:00.000Z",
+        availableProfessionals: [{ id: "prof_ana", name: "Ana" }],
+      },
+    } as any);
+
+    const { result } = await comprobar({ idioma: "en-GB" });
+
+    expect(result!.suggestedNextSlot).toMatchObject({
+      availabilityToken: expect.any(String),
+    });
+    expect(result!.en_su_idioma).toMatchObject({
+      professional: { id: "prof_ana", name: "Ana" },
+      availabilityToken: expect.any(String),
+    });
+    expect(result!.siguiente_paso).toMatch(/^Esa hora no está libre\./);
+    expect(result!.siguiente_paso).toContain("suggestedNextSlot con Bea");
+    expect(result!.siguiente_paso).toContain(
+      "si prefiere que le atiendan en inglés, en_su_idioma con Ana"
+    );
+    expectCamposCortos(result);
+  });
+
+  it("un nombre provisional no se nombra; si con los nombres no cabe, va sin ellos", () => {
+    const provisional = siguientePasoConSuIdioma({
+      primera: "pedida",
+      quien: null,
+      hablante: "Laura",
+      idioma: "nl-NL",
+    });
+    expect(provisional).toContain(
+      "la hora pedida o, si prefiere que le atiendan en neerlandés, en_su_idioma con Laura"
+    );
+    expect(provisional.length).toBeLessThanOrEqual(MAX_CARACTERES_POR_INSTRUCCION);
+
+    const largo = "Maria de los Ángeles ".repeat(4).trim();
+    const sinNombres = siguientePasoConSuIdioma({
+      primera: "alternativa",
+      quien: largo,
+      hablante: largo,
+      idioma: "nl-NL",
+    });
+    expect(sinNombres).not.toContain(largo);
+    expect(sinNombres).toContain("suggestedNextSlot o, si prefiere");
+    expect(sinNombres.length).toBeLessThanOrEqual(MAX_CARACTERES_POR_INSTRUCCION);
+  });
+
+  it("al confirmar dice que le atenderá en su idioma, solo si es extranjero", async () => {
+    const conLaura = {
+      available: true,
+      message: "",
+      capacityUsed: 0,
+      capacityTotal: 1,
+      availableProfessionals: [{ id: "prof_laura", name: "Laura" }],
+      hablantesIds: ["prof_laura"],
+    };
+    mockedCheckAvailability.mockResolvedValue(conLaura as any);
+    const { result: ingles } = await comprobar({ idioma: "en-GB" });
+    expect(ingles!.como_decirlo).toContain("«Laura te atenderá en inglés»");
+    expectCamposCortos(ingles);
+
+    // En catalán, gallego o euskera no se dice (en su zona, obvio).
+    const { result: catalan } = await comprobar({ idioma: "ca-ES" });
+    expect(catalan).not.toHaveProperty("como_decirlo");
+  });
+
+  it("especialista y en su idioma: las dos frases juntas", async () => {
+    mockedServiceFindMany.mockResolvedValue([
+      { id: "svc_mechas", name: "Mechas" },
+    ] as any);
+    mockedCheckAvailability.mockResolvedValue({
+      available: true,
+      message: "",
+      capacityUsed: 0,
+      capacityTotal: 1,
+      availableProfessionals: [{ id: "prof_laura", name: "Laura" }],
+      specialistIds: ["prof_laura"],
+      hablantesIds: ["prof_laura"],
+    } as any);
+
+    const { result } = await comprobar({
+      idioma: "fr-FR",
+      serviceIds: ["svc_mechas"],
+    });
+
+    expect(result!.como_decirlo).toContain("«Laura es especialista en Mechas»");
+    expect(result!.como_decirlo).toContain("«Laura te atenderá en francés»");
+    expectCamposCortos(result);
+  });
+
+  it("si pidió a alguien por su nombre, no se dice nada del idioma", async () => {
+    mockedProfessionalFindFirst.mockResolvedValue({
+      id: "prof_laura",
+      name: "Laura",
+    } as any);
+    mockedCheckAvailability.mockResolvedValue({
+      available: true,
+      message: "",
+      capacityUsed: 0,
+      capacityTotal: 1,
+      availableProfessionals: [{ id: "prof_laura", name: "Laura" }],
+      hablantesIds: ["prof_laura"],
+    } as any);
+
+    const { result } = await comprobar({
+      idioma: "en-GB",
+      professionalId: "prof_laura",
+    });
+
+    expect(result).not.toHaveProperty("como_decirlo");
+    expect(result).not.toHaveProperty("en_su_idioma");
+  });
+});
+
+describe("get_catalog: idiomas del equipo", () => {
+  it("dice qué idiomas habla cada uno, en el orden del catálogo, junto a sus ausencias", async () => {
+    mockedProfessionalFindMany.mockResolvedValue([
+      { id: "prof_laura", name: "Laura", idiomas: ["ca-ES", "en-GB"] },
+      { id: "prof_ana", name: "Ana", idiomas: [] },
+    ] as any);
+
+    const { result } = await executeVoiceTool({
+      businessId: "business_123",
+      toolName: "get_catalog",
+      params: {},
+    });
+
+    const profesionales = (result as { professionals: string }).professionals;
+    expect(profesionales).toContain("[prof_laura] Laura (habla inglés y catalán)");
+    expect(profesionales).toContain("[prof_ana] Ana");
+    expect(profesionales).not.toContain("Ana (");
   });
 });
 

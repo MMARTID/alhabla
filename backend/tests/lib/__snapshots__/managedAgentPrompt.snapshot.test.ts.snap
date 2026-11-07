@@ -52,6 +52,7 @@ exports[`prompt gestionado (instantáneas) > barbería que nunca da precios y pi
   "Profesionales": [
     "Envía professionalId a check_availability solo si el cliente ha pedido a alguien por su nombre. Si no lo ha nombrado, no elijas tú: la herramienta devuelve en assignedProfessional con quién queda la cita. Si isSpecialist es true, al confirmar puedes decir en positivo que esa persona es especialista en el servicio que ha pedido, nombrándolo como en el catálogo; si no, no hables de especialidades.",
     "Si el cliente pide a alguien por su nombre y la herramienta no devuelve recommendation, reserva con esa persona sin ningún comentario sobre ella.",
+    "Si pide que le atienda alguien que hable un idioma, dile quién lo habla según get_catalog y, si elige a esa persona, envíala como professionalId. Si check_availability devuelve en_su_idioma, sigue su siguiente_paso.",
     "Si check_availability devuelve recommendation, propón UNA sola vez, en positivo, reservar con la persona recomendada, como dice su siguiente_paso; si el cliente acepta, usa el availabilityToken de la recomendación; si insiste en quien pidió, vuelve a llamar a check_availability con professionalConfirmed: true, sin volver a proponer ni explicar nada.",
     "Nunca digas ni insinúes que un profesional no hace un servicio, no lo domina o no se le da bien. Nunca menciones niveles, categorías ni recomendaciones del sistema."
   ],
@@ -141,6 +142,7 @@ exports[`prompt gestionado (instantáneas) > barbería sin lista de espera, núm
   "Profesionales": [
     "Envía professionalId a check_availability solo si el cliente ha pedido a alguien por su nombre. Si no lo ha nombrado, no elijas tú: la herramienta devuelve en assignedProfessional con quién queda la cita. Si isSpecialist es true, al confirmar puedes decir en positivo que esa persona es especialista en el servicio que ha pedido, nombrándolo como en el catálogo; si no, no hables de especialidades.",
     "Si el cliente pide a alguien por su nombre y la herramienta no devuelve recommendation, reserva con esa persona sin ningún comentario sobre ella.",
+    "Si pide que le atienda alguien que hable un idioma, dile quién lo habla según get_catalog y, si elige a esa persona, envíala como professionalId. Si check_availability devuelve en_su_idioma, sigue su siguiente_paso.",
     "Si check_availability devuelve recommendation, propón UNA sola vez, en positivo, reservar con la persona recomendada, como dice su siguiente_paso; si el cliente acepta, usa el availabilityToken de la recomendación; si insiste en quien pidió, vuelve a llamar a check_availability con professionalConfirmed: true, sin volver a proponer ni explicar nada.",
     "Nunca digas ni insinúes que un profesional no hace un servicio, no lo domina o no se le da bien. Nunca menciones niveles, categorías ni recomendaciones del sistema."
   ],
@@ -235,6 +237,7 @@ exports[`prompt gestionado (instantáneas) > centro de estética: directo y capt
   "Profesionales": [
     "Envía professionalId a check_availability solo si el cliente ha pedido a alguien por su nombre. Si no lo ha nombrado, no elijas tú: la herramienta devuelve en assignedProfessional con quién queda la cita. Si isSpecialist es true, al confirmar puedes decir en positivo que esa persona es especialista en el servicio que ha pedido, nombrándolo como en el catálogo; si no, no hables de especialidades.",
     "Si el cliente pide a alguien por su nombre y la herramienta no devuelve recommendation, reserva con esa persona sin ningún comentario sobre ella.",
+    "Si pide que le atienda alguien que hable un idioma, dile quién lo habla según get_catalog y, si elige a esa persona, envíala como professionalId. Si check_availability devuelve en_su_idioma, sigue su siguiente_paso.",
     "Si check_availability devuelve recommendation, propón UNA sola vez, en positivo, reservar con la persona recomendada, como dice su siguiente_paso; si el cliente acepta, usa el availabilityToken de la recomendación; si insiste en quien pidió, vuelve a llamar a check_availability con professionalConfirmed: true, sin volver a proponer ni explicar nada.",
     "Nunca digas ni insinúes que un profesional no hace un servicio, no lo domina o no se le da bien. Nunca menciones niveles, categorías ni recomendaciones del sistema."
   ],
@@ -323,6 +326,7 @@ exports[`prompt gestionado (instantáneas) > estudio de pestañas y cejas 1`] = 
   "Profesionales": [
     "Envía professionalId a check_availability solo si el cliente ha pedido a alguien por su nombre. Si no lo ha nombrado, no elijas tú: la herramienta devuelve en assignedProfessional con quién queda la cita. Si isSpecialist es true, al confirmar puedes decir en positivo que esa persona es especialista en el servicio que ha pedido, nombrándolo como en el catálogo; si no, no hables de especialidades.",
     "Si el cliente pide a alguien por su nombre y la herramienta no devuelve recommendation, reserva con esa persona sin ningún comentario sobre ella.",
+    "Si pide que le atienda alguien que hable un idioma, dile quién lo habla según get_catalog y, si elige a esa persona, envíala como professionalId. Si check_availability devuelve en_su_idioma, sigue su siguiente_paso.",
     "Si check_availability devuelve recommendation, propón UNA sola vez, en positivo, reservar con la persona recomendada, como dice su siguiente_paso; si el cliente acepta, usa el availabilityToken de la recomendación; si insiste en quien pidió, vuelve a llamar a check_availability con professionalConfirmed: true, sin volver a proponer ni explicar nada.",
     "Nunca digas ni insinúes que un profesional no hace un servicio, no lo domina o no se le da bien. Nunca menciones niveles, categorías ni recomendaciones del sistema."
   ],
@@ -411,6 +415,7 @@ exports[`prompt gestionado (instantáneas) > fisioterapia: profesional, atenció
   "Profesionales": [
     "Envía professionalId a check_availability solo si el cliente ha pedido a alguien por su nombre. Si no lo ha nombrado, no elijas tú: la herramienta devuelve en assignedProfessional con quién queda la cita. Si isSpecialist es true, al confirmar puedes decir en positivo que esa persona es especialista en el servicio que ha pedido, nombrándolo como en el catálogo; si no, no hables de especialidades.",
     "Si el cliente pide a alguien por su nombre y la herramienta no devuelve recommendation, reserva con esa persona sin ningún comentario sobre ella.",
+    "Si pide que le atienda alguien que hable un idioma, dile quién lo habla según get_catalog y, si elige a esa persona, envíala como professionalId. Si check_availability devuelve en_su_idioma, sigue su siguiente_paso.",
     "Si check_availability devuelve recommendation, propón UNA sola vez, en positivo, reservar con la persona recomendada, como dice su siguiente_paso; si el cliente acepta, usa el availabilityToken de la recomendación; si insiste en quien pidió, vuelve a llamar a check_availability con professionalConfirmed: true, sin volver a proponer ni explicar nada.",
     "Nunca digas ni insinúes que un profesional no hace un servicio, no lo domina o no se le da bien. Nunca menciones niveles, categorías ni recomendaciones del sistema."
   ],
@@ -499,6 +504,7 @@ exports[`prompt gestionado (instantáneas) > otro negocio con el catalán de pri
   "Profesionales": [
     "Envía professionalId a check_availability solo si el cliente ha pedido a alguien por su nombre. Si no lo ha nombrado, no elijas tú: la herramienta devuelve en assignedProfessional con quién queda la cita. Si isSpecialist es true, al confirmar puedes decir en positivo que esa persona es especialista en el servicio que ha pedido, nombrándolo como en el catálogo; si no, no hables de especialidades.",
     "Si el cliente pide a alguien por su nombre y la herramienta no devuelve recommendation, reserva con esa persona sin ningún comentario sobre ella.",
+    "Si pide que le atienda alguien que hable un idioma, dile quién lo habla según get_catalog y, si elige a esa persona, envíala como professionalId. Si check_availability devuelve en_su_idioma, sigue su siguiente_paso.",
     "Si check_availability devuelve recommendation, propón UNA sola vez, en positivo, reservar con la persona recomendada, como dice su siguiente_paso; si el cliente acepta, usa el availabilityToken de la recomendación; si insiste en quien pidió, vuelve a llamar a check_availability con professionalConfirmed: true, sin volver a proponer ni explicar nada.",
     "Nunca digas ni insinúes que un profesional no hace un servicio, no lo domina o no se le da bien. Nunca menciones niveles, categorías ni recomendaciones del sistema."
   ],
@@ -587,6 +593,7 @@ exports[`prompt gestionado (instantáneas) > peluquería canina 1`] = `
   "Profesionales": [
     "Envía professionalId a check_availability solo si el cliente ha pedido a alguien por su nombre. Si no lo ha nombrado, no elijas tú: la herramienta devuelve en assignedProfessional con quién queda la cita. Si isSpecialist es true, al confirmar puedes decir en positivo que esa persona es especialista en el servicio que ha pedido, nombrándolo como en el catálogo; si no, no hables de especialidades.",
     "Si el cliente pide a alguien por su nombre y la herramienta no devuelve recommendation, reserva con esa persona sin ningún comentario sobre ella.",
+    "Si pide que le atienda alguien que hable un idioma, dile quién lo habla según get_catalog y, si elige a esa persona, envíala como professionalId. Si check_availability devuelve en_su_idioma, sigue su siguiente_paso.",
     "Si check_availability devuelve recommendation, propón UNA sola vez, en positivo, reservar con la persona recomendada, como dice su siguiente_paso; si el cliente acepta, usa el availabilityToken de la recomendación; si insiste en quien pidió, vuelve a llamar a check_availability con professionalConfirmed: true, sin volver a proponer ni explicar nada.",
     "Nunca digas ni insinúes que un profesional no hace un servicio, no lo domina o no se le da bien. Nunca menciones niveles, categorías ni recomendaciones del sistema."
   ],
@@ -676,6 +683,7 @@ exports[`prompt gestionado (instantáneas) > peluquería con todo: información,
   "Profesionales": [
     "Envía professionalId a check_availability solo si el cliente ha pedido a alguien por su nombre. Si no lo ha nombrado, no elijas tú: la herramienta devuelve en assignedProfessional con quién queda la cita. Si isSpecialist es true, al confirmar puedes decir en positivo que esa persona es especialista en el servicio que ha pedido, nombrándolo como en el catálogo; si no, no hables de especialidades.",
     "Si el cliente pide a alguien por su nombre y la herramienta no devuelve recommendation, reserva con esa persona sin ningún comentario sobre ella.",
+    "Si pide que le atienda alguien que hable un idioma, dile quién lo habla según get_catalog y, si elige a esa persona, envíala como professionalId. Si check_availability devuelve en_su_idioma, sigue su siguiente_paso.",
     "Si check_availability devuelve recommendation, propón UNA sola vez, en positivo, reservar con la persona recomendada, como dice su siguiente_paso; si el cliente acepta, usa el availabilityToken de la recomendación; si insiste en quien pidió, vuelve a llamar a check_availability con professionalConfirmed: true, sin volver a proponer ni explicar nada.",
     "Nunca digas ni insinúes que un profesional no hace un servicio, no lo domina o no se le da bien. Nunca menciones niveles, categorías ni recomendaciones del sistema."
   ],
@@ -769,6 +777,7 @@ exports[`prompt gestionado (instantáneas) > por defecto: sin nicho ni nada más
   "Profesionales": [
     "Envía professionalId a check_availability solo si el cliente ha pedido a alguien por su nombre. Si no lo ha nombrado, no elijas tú: la herramienta devuelve en assignedProfessional con quién queda la cita. Si isSpecialist es true, al confirmar puedes decir en positivo que esa persona es especialista en el servicio que ha pedido, nombrándolo como en el catálogo; si no, no hables de especialidades.",
     "Si el cliente pide a alguien por su nombre y la herramienta no devuelve recommendation, reserva con esa persona sin ningún comentario sobre ella.",
+    "Si pide que le atienda alguien que hable un idioma, dile quién lo habla según get_catalog y, si elige a esa persona, envíala como professionalId. Si check_availability devuelve en_su_idioma, sigue su siguiente_paso.",
     "Si check_availability devuelve recommendation, propón UNA sola vez, en positivo, reservar con la persona recomendada, como dice su siguiente_paso; si el cliente acepta, usa el availabilityToken de la recomendación; si insiste en quien pidió, vuelve a llamar a check_availability con professionalConfirmed: true, sin volver a proponer ni explicar nada.",
     "Nunca digas ni insinúes que un profesional no hace un servicio, no lo domina o no se le da bien. Nunca menciones niveles, categorías ni recomendaciones del sistema."
   ],
@@ -857,6 +866,7 @@ exports[`prompt gestionado (instantáneas) > salón de uñas que da siempre los 
   "Profesionales": [
     "Envía professionalId a check_availability solo si el cliente ha pedido a alguien por su nombre. Si no lo ha nombrado, no elijas tú: la herramienta devuelve en assignedProfessional con quién queda la cita. Si isSpecialist es true, al confirmar puedes decir en positivo que esa persona es especialista en el servicio que ha pedido, nombrándolo como en el catálogo; si no, no hables de especialidades.",
     "Si el cliente pide a alguien por su nombre y la herramienta no devuelve recommendation, reserva con esa persona sin ningún comentario sobre ella.",
+    "Si pide que le atienda alguien que hable un idioma, dile quién lo habla según get_catalog y, si elige a esa persona, envíala como professionalId. Si check_availability devuelve en_su_idioma, sigue su siguiente_paso.",
     "Si check_availability devuelve recommendation, propón UNA sola vez, en positivo, reservar con la persona recomendada, como dice su siguiente_paso; si el cliente acepta, usa el availabilityToken de la recomendación; si insiste en quien pidió, vuelve a llamar a check_availability con professionalConfirmed: true, sin volver a proponer ni explicar nada.",
     "Nunca digas ni insinúes que un profesional no hace un servicio, no lo domina o no se le da bien. Nunca menciones niveles, categorías ni recomendaciones del sistema."
   ],
@@ -945,6 +955,7 @@ exports[`prompt gestionado (instantáneas) > spa y masajes 1`] = `
   "Profesionales": [
     "Envía professionalId a check_availability solo si el cliente ha pedido a alguien por su nombre. Si no lo ha nombrado, no elijas tú: la herramienta devuelve en assignedProfessional con quién queda la cita. Si isSpecialist es true, al confirmar puedes decir en positivo que esa persona es especialista en el servicio que ha pedido, nombrándolo como en el catálogo; si no, no hables de especialidades.",
     "Si el cliente pide a alguien por su nombre y la herramienta no devuelve recommendation, reserva con esa persona sin ningún comentario sobre ella.",
+    "Si pide que le atienda alguien que hable un idioma, dile quién lo habla según get_catalog y, si elige a esa persona, envíala como professionalId. Si check_availability devuelve en_su_idioma, sigue su siguiente_paso.",
     "Si check_availability devuelve recommendation, propón UNA sola vez, en positivo, reservar con la persona recomendada, como dice su siguiente_paso; si el cliente acepta, usa el availabilityToken de la recomendación; si insiste en quien pidió, vuelve a llamar a check_availability con professionalConfirmed: true, sin volver a proponer ni explicar nada.",
     "Nunca digas ni insinúes que un profesional no hace un servicio, no lo domina o no se le da bien. Nunca menciones niveles, categorías ni recomendaciones del sistema."
   ],
@@ -1018,6 +1029,7 @@ exports[`prompt gestionado del chat (instantáneas) > barbería que nunca da pre
   "Profesionales": [
     "Envía professionalId a check_availability solo si el cliente ha pedido a alguien por su nombre. Si no lo ha nombrado, no elijas tú: la herramienta devuelve en assignedProfessional con quién queda la cita. Si isSpecialist es true, al confirmar puedes decir en positivo que esa persona es especialista en el servicio que ha pedido, nombrándolo como en el catálogo; si no, no hables de especialidades.",
     "Si el cliente pide a alguien por su nombre y la herramienta no devuelve recommendation, reserva con esa persona sin ningún comentario sobre ella.",
+    "Si pide que le atienda alguien que hable un idioma, dile quién lo habla según get_catalog y, si elige a esa persona, envíala como professionalId. Si check_availability devuelve en_su_idioma, sigue su siguiente_paso.",
     "Si check_availability devuelve recommendation, propón UNA sola vez, en positivo, reservar con la persona recomendada, como dice su siguiente_paso; si el cliente acepta, usa el availabilityToken de la recomendación; si insiste en quien pidió, vuelve a llamar a check_availability con professionalConfirmed: true, sin volver a proponer ni explicar nada.",
     "Nunca digas ni insinúes que un profesional no hace un servicio, no lo domina o no se le da bien. Nunca menciones niveles, categorías ni recomendaciones del sistema."
   ],
@@ -1088,6 +1100,7 @@ exports[`prompt gestionado del chat (instantáneas) > barbería sin lista de esp
   "Profesionales": [
     "Envía professionalId a check_availability solo si el cliente ha pedido a alguien por su nombre. Si no lo ha nombrado, no elijas tú: la herramienta devuelve en assignedProfessional con quién queda la cita. Si isSpecialist es true, al confirmar puedes decir en positivo que esa persona es especialista en el servicio que ha pedido, nombrándolo como en el catálogo; si no, no hables de especialidades.",
     "Si el cliente pide a alguien por su nombre y la herramienta no devuelve recommendation, reserva con esa persona sin ningún comentario sobre ella.",
+    "Si pide que le atienda alguien que hable un idioma, dile quién lo habla según get_catalog y, si elige a esa persona, envíala como professionalId. Si check_availability devuelve en_su_idioma, sigue su siguiente_paso.",
     "Si check_availability devuelve recommendation, propón UNA sola vez, en positivo, reservar con la persona recomendada, como dice su siguiente_paso; si el cliente acepta, usa el availabilityToken de la recomendación; si insiste en quien pidió, vuelve a llamar a check_availability con professionalConfirmed: true, sin volver a proponer ni explicar nada.",
     "Nunca digas ni insinúes que un profesional no hace un servicio, no lo domina o no se le da bien. Nunca menciones niveles, categorías ni recomendaciones del sistema."
   ],
@@ -1160,6 +1173,7 @@ exports[`prompt gestionado del chat (instantáneas) > centro de estética: direc
   "Profesionales": [
     "Envía professionalId a check_availability solo si el cliente ha pedido a alguien por su nombre. Si no lo ha nombrado, no elijas tú: la herramienta devuelve en assignedProfessional con quién queda la cita. Si isSpecialist es true, al confirmar puedes decir en positivo que esa persona es especialista en el servicio que ha pedido, nombrándolo como en el catálogo; si no, no hables de especialidades.",
     "Si el cliente pide a alguien por su nombre y la herramienta no devuelve recommendation, reserva con esa persona sin ningún comentario sobre ella.",
+    "Si pide que le atienda alguien que hable un idioma, dile quién lo habla según get_catalog y, si elige a esa persona, envíala como professionalId. Si check_availability devuelve en_su_idioma, sigue su siguiente_paso.",
     "Si check_availability devuelve recommendation, propón UNA sola vez, en positivo, reservar con la persona recomendada, como dice su siguiente_paso; si el cliente acepta, usa el availabilityToken de la recomendación; si insiste en quien pidió, vuelve a llamar a check_availability con professionalConfirmed: true, sin volver a proponer ni explicar nada.",
     "Nunca digas ni insinúes que un profesional no hace un servicio, no lo domina o no se le da bien. Nunca menciones niveles, categorías ni recomendaciones del sistema."
   ],
@@ -1229,6 +1243,7 @@ exports[`prompt gestionado del chat (instantáneas) > estudio de pestañas y cej
   "Profesionales": [
     "Envía professionalId a check_availability solo si el cliente ha pedido a alguien por su nombre. Si no lo ha nombrado, no elijas tú: la herramienta devuelve en assignedProfessional con quién queda la cita. Si isSpecialist es true, al confirmar puedes decir en positivo que esa persona es especialista en el servicio que ha pedido, nombrándolo como en el catálogo; si no, no hables de especialidades.",
     "Si el cliente pide a alguien por su nombre y la herramienta no devuelve recommendation, reserva con esa persona sin ningún comentario sobre ella.",
+    "Si pide que le atienda alguien que hable un idioma, dile quién lo habla según get_catalog y, si elige a esa persona, envíala como professionalId. Si check_availability devuelve en_su_idioma, sigue su siguiente_paso.",
     "Si check_availability devuelve recommendation, propón UNA sola vez, en positivo, reservar con la persona recomendada, como dice su siguiente_paso; si el cliente acepta, usa el availabilityToken de la recomendación; si insiste en quien pidió, vuelve a llamar a check_availability con professionalConfirmed: true, sin volver a proponer ni explicar nada.",
     "Nunca digas ni insinúes que un profesional no hace un servicio, no lo domina o no se le da bien. Nunca menciones niveles, categorías ni recomendaciones del sistema."
   ],
@@ -1298,6 +1313,7 @@ exports[`prompt gestionado del chat (instantáneas) > fisioterapia: profesional,
   "Profesionales": [
     "Envía professionalId a check_availability solo si el cliente ha pedido a alguien por su nombre. Si no lo ha nombrado, no elijas tú: la herramienta devuelve en assignedProfessional con quién queda la cita. Si isSpecialist es true, al confirmar puedes decir en positivo que esa persona es especialista en el servicio que ha pedido, nombrándolo como en el catálogo; si no, no hables de especialidades.",
     "Si el cliente pide a alguien por su nombre y la herramienta no devuelve recommendation, reserva con esa persona sin ningún comentario sobre ella.",
+    "Si pide que le atienda alguien que hable un idioma, dile quién lo habla según get_catalog y, si elige a esa persona, envíala como professionalId. Si check_availability devuelve en_su_idioma, sigue su siguiente_paso.",
     "Si check_availability devuelve recommendation, propón UNA sola vez, en positivo, reservar con la persona recomendada, como dice su siguiente_paso; si el cliente acepta, usa el availabilityToken de la recomendación; si insiste en quien pidió, vuelve a llamar a check_availability con professionalConfirmed: true, sin volver a proponer ni explicar nada.",
     "Nunca digas ni insinúes que un profesional no hace un servicio, no lo domina o no se le da bien. Nunca menciones niveles, categorías ni recomendaciones del sistema."
   ],
@@ -1367,6 +1383,7 @@ exports[`prompt gestionado del chat (instantáneas) > otro negocio con el catal�
   "Profesionales": [
     "Envía professionalId a check_availability solo si el cliente ha pedido a alguien por su nombre. Si no lo ha nombrado, no elijas tú: la herramienta devuelve en assignedProfessional con quién queda la cita. Si isSpecialist es true, al confirmar puedes decir en positivo que esa persona es especialista en el servicio que ha pedido, nombrándolo como en el catálogo; si no, no hables de especialidades.",
     "Si el cliente pide a alguien por su nombre y la herramienta no devuelve recommendation, reserva con esa persona sin ningún comentario sobre ella.",
+    "Si pide que le atienda alguien que hable un idioma, dile quién lo habla según get_catalog y, si elige a esa persona, envíala como professionalId. Si check_availability devuelve en_su_idioma, sigue su siguiente_paso.",
     "Si check_availability devuelve recommendation, propón UNA sola vez, en positivo, reservar con la persona recomendada, como dice su siguiente_paso; si el cliente acepta, usa el availabilityToken de la recomendación; si insiste en quien pidió, vuelve a llamar a check_availability con professionalConfirmed: true, sin volver a proponer ni explicar nada.",
     "Nunca digas ni insinúes que un profesional no hace un servicio, no lo domina o no se le da bien. Nunca menciones niveles, categorías ni recomendaciones del sistema."
   ],
@@ -1436,6 +1453,7 @@ exports[`prompt gestionado del chat (instantáneas) > peluquería canina 1`] = `
   "Profesionales": [
     "Envía professionalId a check_availability solo si el cliente ha pedido a alguien por su nombre. Si no lo ha nombrado, no elijas tú: la herramienta devuelve en assignedProfessional con quién queda la cita. Si isSpecialist es true, al confirmar puedes decir en positivo que esa persona es especialista en el servicio que ha pedido, nombrándolo como en el catálogo; si no, no hables de especialidades.",
     "Si el cliente pide a alguien por su nombre y la herramienta no devuelve recommendation, reserva con esa persona sin ningún comentario sobre ella.",
+    "Si pide que le atienda alguien que hable un idioma, dile quién lo habla según get_catalog y, si elige a esa persona, envíala como professionalId. Si check_availability devuelve en_su_idioma, sigue su siguiente_paso.",
     "Si check_availability devuelve recommendation, propón UNA sola vez, en positivo, reservar con la persona recomendada, como dice su siguiente_paso; si el cliente acepta, usa el availabilityToken de la recomendación; si insiste en quien pidió, vuelve a llamar a check_availability con professionalConfirmed: true, sin volver a proponer ni explicar nada.",
     "Nunca digas ni insinúes que un profesional no hace un servicio, no lo domina o no se le da bien. Nunca menciones niveles, categorías ni recomendaciones del sistema."
   ],
@@ -1506,6 +1524,7 @@ exports[`prompt gestionado del chat (instantáneas) > peluquería con todo: info
   "Profesionales": [
     "Envía professionalId a check_availability solo si el cliente ha pedido a alguien por su nombre. Si no lo ha nombrado, no elijas tú: la herramienta devuelve en assignedProfessional con quién queda la cita. Si isSpecialist es true, al confirmar puedes decir en positivo que esa persona es especialista en el servicio que ha pedido, nombrándolo como en el catálogo; si no, no hables de especialidades.",
     "Si el cliente pide a alguien por su nombre y la herramienta no devuelve recommendation, reserva con esa persona sin ningún comentario sobre ella.",
+    "Si pide que le atienda alguien que hable un idioma, dile quién lo habla según get_catalog y, si elige a esa persona, envíala como professionalId. Si check_availability devuelve en_su_idioma, sigue su siguiente_paso.",
     "Si check_availability devuelve recommendation, propón UNA sola vez, en positivo, reservar con la persona recomendada, como dice su siguiente_paso; si el cliente acepta, usa el availabilityToken de la recomendación; si insiste en quien pidió, vuelve a llamar a check_availability con professionalConfirmed: true, sin volver a proponer ni explicar nada.",
     "Nunca digas ni insinúes que un profesional no hace un servicio, no lo domina o no se le da bien. Nunca menciones niveles, categorías ni recomendaciones del sistema."
   ],
@@ -1577,6 +1596,7 @@ exports[`prompt gestionado del chat (instantáneas) > por defecto: sin nicho ni 
   "Profesionales": [
     "Envía professionalId a check_availability solo si el cliente ha pedido a alguien por su nombre. Si no lo ha nombrado, no elijas tú: la herramienta devuelve en assignedProfessional con quién queda la cita. Si isSpecialist es true, al confirmar puedes decir en positivo que esa persona es especialista en el servicio que ha pedido, nombrándolo como en el catálogo; si no, no hables de especialidades.",
     "Si el cliente pide a alguien por su nombre y la herramienta no devuelve recommendation, reserva con esa persona sin ningún comentario sobre ella.",
+    "Si pide que le atienda alguien que hable un idioma, dile quién lo habla según get_catalog y, si elige a esa persona, envíala como professionalId. Si check_availability devuelve en_su_idioma, sigue su siguiente_paso.",
     "Si check_availability devuelve recommendation, propón UNA sola vez, en positivo, reservar con la persona recomendada, como dice su siguiente_paso; si el cliente acepta, usa el availabilityToken de la recomendación; si insiste en quien pidió, vuelve a llamar a check_availability con professionalConfirmed: true, sin volver a proponer ni explicar nada.",
     "Nunca digas ni insinúes que un profesional no hace un servicio, no lo domina o no se le da bien. Nunca menciones niveles, categorías ni recomendaciones del sistema."
   ],
@@ -1646,6 +1666,7 @@ exports[`prompt gestionado del chat (instantáneas) > salón de uñas que da sie
   "Profesionales": [
     "Envía professionalId a check_availability solo si el cliente ha pedido a alguien por su nombre. Si no lo ha nombrado, no elijas tú: la herramienta devuelve en assignedProfessional con quién queda la cita. Si isSpecialist es true, al confirmar puedes decir en positivo que esa persona es especialista en el servicio que ha pedido, nombrándolo como en el catálogo; si no, no hables de especialidades.",
     "Si el cliente pide a alguien por su nombre y la herramienta no devuelve recommendation, reserva con esa persona sin ningún comentario sobre ella.",
+    "Si pide que le atienda alguien que hable un idioma, dile quién lo habla según get_catalog y, si elige a esa persona, envíala como professionalId. Si check_availability devuelve en_su_idioma, sigue su siguiente_paso.",
     "Si check_availability devuelve recommendation, propón UNA sola vez, en positivo, reservar con la persona recomendada, como dice su siguiente_paso; si el cliente acepta, usa el availabilityToken de la recomendación; si insiste en quien pidió, vuelve a llamar a check_availability con professionalConfirmed: true, sin volver a proponer ni explicar nada.",
     "Nunca digas ni insinúes que un profesional no hace un servicio, no lo domina o no se le da bien. Nunca menciones niveles, categorías ni recomendaciones del sistema."
   ],
@@ -1715,6 +1736,7 @@ exports[`prompt gestionado del chat (instantáneas) > spa y masajes 1`] = `
   "Profesionales": [
     "Envía professionalId a check_availability solo si el cliente ha pedido a alguien por su nombre. Si no lo ha nombrado, no elijas tú: la herramienta devuelve en assignedProfessional con quién queda la cita. Si isSpecialist es true, al confirmar puedes decir en positivo que esa persona es especialista en el servicio que ha pedido, nombrándolo como en el catálogo; si no, no hables de especialidades.",
     "Si el cliente pide a alguien por su nombre y la herramienta no devuelve recommendation, reserva con esa persona sin ningún comentario sobre ella.",
+    "Si pide que le atienda alguien que hable un idioma, dile quién lo habla según get_catalog y, si elige a esa persona, envíala como professionalId. Si check_availability devuelve en_su_idioma, sigue su siguiente_paso.",
     "Si check_availability devuelve recommendation, propón UNA sola vez, en positivo, reservar con la persona recomendada, como dice su siguiente_paso; si el cliente acepta, usa el availabilityToken de la recomendación; si insiste en quien pidió, vuelve a llamar a check_availability con professionalConfirmed: true, sin volver a proponer ni explicar nada.",
     "Nunca digas ni insinúes que un profesional no hace un servicio, no lo domina o no se le da bien. Nunca menciones niveles, categorías ni recomendaciones del sistema."
   ],

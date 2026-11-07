@@ -1,6 +1,7 @@
 import { prisma } from "./prisma.js";
 import { checkBusinessHours } from "./businessSchedule.js";
 import type { CalendarProviderId } from "../adapters/calendar/CalendarProvider.js";
+import { hablaElIdioma, idiomaParaElReparto } from "./idiomasDelEquipo.js";
 
 export type AvailableProfessional = {
   id: string;
@@ -22,7 +23,12 @@ type ProfessionalServiceLink = {
   level?: "ESPECIALISTA" | "NO_SUGERIR" | null;
 };
 
-type RankedProfessional = AvailableProfessional & { tier: ProfessionalTier };
+type RankedProfessional = AvailableProfessional & {
+  tier: ProfessionalTier;
+  /** Habla el idioma de quien pide la cita (lib/idiomasDelEquipo.ts). Sin
+   * idioma que contar (castellano o ninguno), true en todos: no ordena. */
+  hablaSuIdioma: boolean;
+};
 
 const TIER_RANK: Record<ProfessionalTier, number> = {
   especialista: 0,
@@ -80,10 +86,12 @@ function cargaPorDiaYProfesional(
   return carga;
 }
 
-/** Orden de asignación para un instante concreto: primero el nivel
- * (especialista antes que "lo hace"), después quien tenga menos citas ese
- * día, y a igualdad el orden en que se dieron de alta. Sort estable: la
- * lista de entrada ya viene por createdAt. */
+/** Orden de asignación para un instante concreto: primero quien habla el
+ * idioma de quien pide la cita (decisión del usuario del 2026-11-07: el
+ * idioma manda), después el nivel (especialista antes que "lo hace"),
+ * después quien tenga menos citas ese día, y a igualdad el orden en que se
+ * dieron de alta. Sort estable: la lista de entrada ya viene por
+ * createdAt. */
 function ordenarParaAsignar(
   professionals: RankedProfessional[],
   slotStart: Date,
@@ -94,7 +102,10 @@ function ordenarParaAsignar(
   const cargaDelDia = carga.get(dia);
   const citasDe = (id: string) => cargaDelDia?.get(id) ?? 0;
   return [...professionals].sort(
-    (a, b) => TIER_RANK[a.tier] - TIER_RANK[b.tier] || citasDe(a.id) - citasDe(b.id)
+    (a, b) =>
+      Number(b.hablaSuIdioma) - Number(a.hablaSuIdioma) ||
+      TIER_RANK[a.tier] - TIER_RANK[b.tier] ||
+      citasDe(a.id) - citasDe(b.id)
   );
 }
 
@@ -164,7 +175,14 @@ export type AvailabilityResult =
        * pedido. Sirve para que la confirmación pueda decir "te he puesto con
        * Laura, nuestra especialista en color". */
       specialistIds?: string[];
+      /** Con un idioma que contar: IDs de availableProfessionals que lo
+       * hablan. Sirve para que la confirmación pueda decir «Laura te
+       * atenderá en inglés». */
+      hablantesIds?: string[];
       recommendedProfessional?: ProfessionalRecommendation;
+      /** Ver EnSuIdioma: a esta hora la cita iría con alguien que no habla
+       * su idioma. */
+      enSuIdioma?: SuggestedSlot;
     }
   | {
       available: false;
@@ -176,7 +194,20 @@ export type AvailabilityResult =
        * libre en la ventana de búsqueda. */
       suggestedNextSlot?: SuggestedSlot | null;
       recommendedProfessional?: ProfessionalRecommendation;
+      /** Ver EnSuIdioma: el suggestedNextSlot iría con alguien que no
+       * habla su idioma. */
+      enSuIdioma?: SuggestedSlot;
     };
+
+/**
+ * `enSuIdioma` (decisión del usuario del 2026-11-07, «ofrecer las dos»): el
+ * hueco más cercano, antes o después, con alguien que habla el idioma de
+ * quien pide la cita. Solo cuando la cita (o su alternativa) iría con alguien
+ * que no lo habla, el cliente no pidió a nadie y alguien de los que hacen el
+ * servicio sí lo habla. El cliente elige entre las dos; si no hay hueco en su
+ * idioma en la ventana de búsqueda, no viene.
+ */
+export type EnSuIdioma = SuggestedSlot;
 
 /** Nº máximo de reservas activas al mismo tiempo, en cualquier instante
  * dentro de [intervalStart, intervalEnd) — no el nº de reservas que
@@ -480,6 +511,11 @@ export async function checkAvailability(input: {
    * `noAntesDe`: ahora + la antelación mínima del negocio. Quien pase
    * externalBusyIntervals debe leerlos desde inicioDeBusquedaHaciaAtras. */
   buscarTambienAntes?: { noAntesDe: Date } | null;
+  /** El idioma en que habla quien pide la cita (el `idioma` de
+   * check_availability, un código del catálogo). Con uno que no sea el
+   * castellano, la cita va primero a quien lo habla y, si a esa hora no
+   * puede ser, viene también `enSuIdioma`. Sin él, el reparto de siempre. */
+  idioma?: string | null;
 }): Promise<AvailabilityResult> {
   const {
     businessId,
@@ -494,6 +530,7 @@ export async function checkAvailability(input: {
     excluir,
     buscarTambienAntes,
   } = input;
+  const idiomaDelReparto = idiomaParaElReparto(input.idioma);
 
   // 1. Horario comercial. Un horario mal configurado no se arregla probando
   // otra hora, así que corta aquí; "cerrado ahora mismo" en cambio sí puede
@@ -531,6 +568,7 @@ export async function checkAvailability(input: {
     id: professional.id,
     name: professional.name,
     tier: professionalTierFor(professional.serviceLinks ?? [], requestedServiceIds),
+    hablaSuIdioma: hablaElIdioma(professional.idiomas, idiomaDelReparto),
   }));
 
   const pedido = professionalId
@@ -573,6 +611,17 @@ export async function checkAvailability(input: {
   }
 
   const candidatos: RankedProfessional[] = pedido ? [pedido] : poolAutomatico;
+
+  // Quienes, de los que harían la cita, hablan el idioma de quien la pide.
+  // Solo cuentan si el cliente no pidió a nadie (su elección manda) y si no
+  // lo hablan todos: entonces la cita siempre va con alguien que lo habla.
+  // «No sugerir» ya está fuera de los candidatos: el idioma ordena solo entre
+  // quienes hacen el servicio (decisión del usuario del 2026-11-07).
+  const hablantes =
+    idiomaDelReparto && !pedido
+      ? candidatos.filter((professional) => professional.hablaSuIdioma)
+      : [];
+  const idsDeHablantes = new Set(hablantes.map((professional) => professional.id));
 
   // 3. Citas existentes en el slot — la ventana de la consulta ya cubre
   // también la búsqueda de un hueco alternativo (ver findNextAvailableSlot
@@ -755,6 +804,29 @@ export async function checkAvailability(input: {
       cargaPorDia,
       noAntesDe: buscarTambienAntes?.noAntesDe,
     });
+  // EnSuIdioma: solo si lo que se ofrece iría con alguien que no habla su
+  // idioma y alguien de los que hacen el servicio sí lo habla. Como la lista
+  // va ordenada con el idioma primero, eso quiere decir que a esa hora no
+  // hay libre nadie que lo hable.
+  const enSuIdiomaSi = (
+    asignadoId: string | undefined
+  ): { enSuIdioma?: SuggestedSlot } => {
+    if (hablantes.length === 0 || !asignadoId || idsDeHablantes.has(asignadoId)) {
+      return {};
+    }
+    const hueco = findNextAvailableSlot({
+      schedule,
+      timezone,
+      bookingCapacity,
+      startDateTime,
+      durationMinutes,
+      rankedProfessionals: hablantes,
+      bookings: overlappingBookings,
+      cargaPorDia,
+      noAntesDe: buscarTambienAntes?.noAntesDe,
+    });
+    return hueco ? { enSuIdioma: hueco } : {};
+  };
 
   // 4. Profesionales ocupados en el slot
   const busyProfessionalIds = new Set(
@@ -789,12 +861,22 @@ export async function checkAvailability(input: {
   })();
   const conRecomendacion = recomendacion ? { recommendedProfessional: recomendacion } : {};
 
+  // La alternativa a la hora pedida y, si iría con alguien que no habla su
+  // idioma, también la más cercana con alguien que sí (EnSuIdioma).
+  const alternativas = () => {
+    const sugerido = buscarSiguienteHueco();
+    return {
+      suggestedNextSlot: sugerido,
+      ...enSuIdiomaSi(sugerido?.availableProfessionals[0]?.id),
+    };
+  };
+
   if (outsideBusinessHours) {
     return {
       available: false,
       code: "OUTSIDE_BUSINESS_HOURS",
       message: hoursResult.message,
-      suggestedNextSlot: buscarSiguienteHueco(),
+      ...alternativas(),
     };
   }
 
@@ -805,7 +887,7 @@ export async function checkAvailability(input: {
       message: "El negocio ya tiene todas sus plazas ocupadas en ese horario.",
       capacityUsed: bookingsInSlot,
       capacityTotal: bookingCapacity,
-      suggestedNextSlot: buscarSiguienteHueco(),
+      ...alternativas(),
     };
   }
 
@@ -819,7 +901,7 @@ export async function checkAvailability(input: {
         "Todos los profesionales que pueden hacer este servicio están ocupados en ese horario.",
       capacityUsed: bookingsInSlot,
       capacityTotal: bookingCapacity,
-      suggestedNextSlot: buscarSiguienteHueco(),
+      ...alternativas(),
       ...conRecomendacion,
     };
   }
@@ -827,6 +909,11 @@ export async function checkAvailability(input: {
   const specialistIds = disponibles
     .filter((professional) => professional.tier === "especialista")
     .map((professional) => professional.id);
+  const hablantesIds = idiomaDelReparto
+    ? disponibles
+        .filter((professional) => professional.hablaSuIdioma)
+        .map((professional) => professional.id)
+    : [];
 
   return {
     available: true,
@@ -835,6 +922,8 @@ export async function checkAvailability(input: {
     capacityTotal: bookingCapacity,
     availableProfessionals: disponibles.map(sinNivel),
     ...(specialistIds.length > 0 ? { specialistIds } : {}),
+    ...(hablantesIds.length > 0 ? { hablantesIds } : {}),
     ...conRecomendacion,
+    ...enSuIdiomaSi(disponibles[0]?.id),
   };
 }

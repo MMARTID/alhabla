@@ -30,6 +30,13 @@ import {
   type ProfessionalServiceLevelInput,
 } from "../bookings/schemas.js";
 import { guardarHorarioDelNegocio } from "../businesses/horario.js";
+import {
+  IDIOMAS_DEL_EQUIPO,
+  idiomaDelEquipoPorNombre,
+  idiomasDelProfesional,
+  idiomasEnPalabras,
+  type IdiomaDelEquipo,
+} from "../../lib/idiomasDelEquipo.js";
 import type {
   AccionDelGestor,
   ContextoDeAccion,
@@ -909,6 +916,105 @@ const fijarEspecialidad: AccionDelGestor<
 };
 
 // ---------------------------------------------------------------------------
+// fijar_idiomas
+// ---------------------------------------------------------------------------
+
+/** La lista COMPLETA de idiomas que habla además del castellano, como los
+ * diga el dueño («catalán», «inglés», «valenciano») o por código: reemplaza
+ * a la anterior. `[]` = solo castellano. */
+const FijarIdiomasParams = z
+  .object({
+    profesional: Id,
+    idiomas: z.array(z.string().trim().min(1).max(40)).max(20),
+  })
+  .strict();
+
+/** Lo que dijo el dueño, como códigos del equipo. El castellano se ignora
+ * (se da por hecho) y lo que no es del catálogo se devuelve aparte. */
+function idiomasDichos(
+  dichos: string[]
+): { idiomas: IdiomaDelEquipo[]; desconocidos: string[] } {
+  const idiomas: IdiomaDelEquipo[] = [];
+  const desconocidos: string[] = [];
+  for (const dicho of dichos) {
+    const codigo = idiomaDelEquipoPorNombre(dicho);
+    if (codigo === null) desconocidos.push(dicho);
+    else if (codigo !== "castellano") idiomas.push(codigo);
+  }
+  return { idiomas: idiomasDelProfesional(idiomas), desconocidos };
+}
+
+function describirIdiomas(nombre: string, idiomas: IdiomaDelEquipo[]): string {
+  return idiomas.length > 0
+    ? `${nombre}: además del castellano, ${idiomasEnPalabras(idiomas)}`
+    : `${nombre}: solo castellano`;
+}
+
+const fijarIdiomas: AccionDelGestor<z.infer<typeof FijarIdiomasParams>> = {
+  schema: FijarIdiomasParams,
+  async comprobar(ctx, params) {
+    const p = buscar(
+      await profesionalesActivos(ctx.businessId),
+      params.profesional
+    );
+    if (!p.encontrado) {
+      return {
+        ok: false,
+        motivo: motivoNoEncontrado(
+          "profesional",
+          params.profesional,
+          p.ambiguo
+        ),
+      };
+    }
+    const { idiomas, desconocidos } = idiomasDichos(params.idiomas);
+    if (desconocidos.length > 0) {
+      return {
+        ok: false,
+        motivo: `No puedo marcar ${listar(desconocidos.map((d) => `«${d}»`))}: los idiomas que se pueden marcar son ${idiomasEnPalabras(IDIOMAS_DEL_EQUIPO)} (el castellano se da por hecho).`,
+      };
+    }
+    return {
+      ok: true,
+      descripcion: describirIdiomas(p.encontrado.name, idiomas),
+      parametros: { profesional: p.encontrado.id, idiomas },
+    };
+  },
+  async ejecutar(ctx, params) {
+    const pro = resolverPorIdONombre(
+      await profesionalesActivos(ctx.businessId),
+      params.profesional
+    );
+    if (!pro) return { ok: false, mensaje: "Esa persona ya no está en el equipo." };
+    const { idiomas } = idiomasDichos(params.idiomas);
+    try {
+      const actualizado = await updateProfessional(
+        ctx.businessId,
+        pro.id,
+        { idiomas },
+        { sync: false }
+      );
+      if (!actualizado)
+        return { ok: false, mensaje: "Esa persona ya no está en el equipo." };
+      await sincronizarCatalogo(ctx.businessId, "fijar_idiomas");
+      return {
+        ok: true,
+        mensaje:
+          idiomas.length > 0
+            ? `Hecho: ${pro.name} habla ${idiomasEnPalabras(idiomas)} además del castellano. A quien llame en ${idiomas.length === 1 ? "ese idioma" : "esos idiomas"} se le dará cita primero con ${pro.name}.`
+            : `Hecho: ${pro.name} queda solo con castellano.`,
+        nota: `Idiomas de ${pro.name} (id ${pro.id}) además del castellano: ${idiomas.join(", ") || "ninguno"}.`,
+      };
+    } catch (error) {
+      return {
+        ok: false,
+        mensaje: `No he podido cambiarlo: ${mensajeDeError(error, "fijar_idiomas", ctx.businessId)}`,
+      };
+    }
+  },
+};
+
+// ---------------------------------------------------------------------------
 // fijar_horario / cerrar_dia
 // ---------------------------------------------------------------------------
 
@@ -1208,6 +1314,7 @@ export const ACCIONES_DE_CATALOGO: Record<string, AccionDelGestor<unknown>> = {
   crear_profesionales: crearProfesionales as AccionDelGestor<unknown>,
   retirar_profesional: retirarProfesional as AccionDelGestor<unknown>,
   fijar_especialidad: fijarEspecialidad as AccionDelGestor<unknown>,
+  fijar_idiomas: fijarIdiomas as AccionDelGestor<unknown>,
   fijar_horario: fijarHorario as AccionDelGestor<unknown>,
   cerrar_dia: cerrarDia as AccionDelGestor<unknown>,
 };

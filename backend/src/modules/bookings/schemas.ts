@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { IDIOMAS_DEL_EQUIPO } from "../../lib/idiomasDelEquipo.js";
 
 export const ResourceIdParamsSchema = z.object({
   id: z.string().min(1),
@@ -35,6 +36,12 @@ export type ProfessionalServiceLevelInput = (typeof PROFESSIONAL_SERVICE_LEVELS)
 
 const ServiceLevelsSchema = z.record(z.string().min(1), z.enum(PROFESSIONAL_SERVICE_LEVELS));
 
+// Idiomas que habla además del castellano (lib/idiomasDelEquipo.ts): la
+// lista completa, que reemplaza a la anterior. El castellano no se marca.
+const IdiomasDelProfesionalSchema = z
+  .array(z.enum(IDIOMAS_DEL_EQUIPO as [string, ...string[]]))
+  .max(IDIOMAS_DEL_EQUIPO.length);
+
 export const ProfessionalSchema = z.object({
   name: z.string().trim().min(1).max(80),
   active: z.boolean().optional(),
@@ -43,6 +50,7 @@ export const ProfessionalSchema = z.object({
   // Legado del panel anterior a los niveles: cada id se guarda como
   // especialista, que es lo que significaba la casilla.
   serviceIds: z.array(z.string().min(1)).default([]),
+  idiomas: IdiomasDelProfesionalSchema.optional(),
 });
 
 export const UpdateProfessionalSchema = z
@@ -51,6 +59,7 @@ export const UpdateProfessionalSchema = z
     active: z.boolean().optional(),
     serviceLevels: ServiceLevelsSchema.optional(),
     serviceIds: z.array(z.string().min(1)).optional(),
+    idiomas: IdiomasDelProfesionalSchema.optional(),
   })
   .refine(
     (value) => Object.keys(value).length > 0,

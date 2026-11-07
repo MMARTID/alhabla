@@ -95,6 +95,9 @@ const NEGOCIO = {
     {
       id: "pro_1",
       name: "Laura",
+      // Desordenados y con uno que no existe: salen limpios y en el orden
+      // del catálogo.
+      idiomas: ["ca-ES", "xx-XX", "en-GB"],
       serviceLinks: [
         { serviceId: "svc_2", level: "ESPECIALISTA" },
         { serviceId: "svc_3", level: "NO_SUGERIR" },
@@ -303,12 +306,15 @@ describe("contexto_negocio", () => {
         nombre: "Laura",
         especialista: ["Color"],
         noSugerir: ["Barba"],
+        idiomas: ["inglés", "catalán"],
       },
       {
         profesionalId: "pro_2",
         nombre: "Marta",
         especialista: [],
         noSugerir: [],
+        // Sin la columna (filas viejas, mocks): ninguno.
+        idiomas: [],
       },
     ]);
     // La agenda es la de Alhabla; el calendario conectado recibe la copia.

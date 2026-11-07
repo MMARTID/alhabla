@@ -403,6 +403,10 @@ function seccionProfesionales(): Parrafos {
     // pelo (llamadas de prueba del 14-10).
     "Envía professionalId a check_availability solo si el cliente ha pedido a alguien por su nombre. Si no lo ha nombrado, no elijas tú: la herramienta devuelve en assignedProfessional con quién queda la cita. Si isSpecialist es true, al confirmar puedes decir en positivo que esa persona es especialista en el servicio que ha pedido, nombrándolo como en el catálogo; si no, no hables de especialidades.",
     "Si el cliente pide a alguien por su nombre y la herramienta no devuelve recommendation, reserva con esa persona sin ningún comentario sobre ella.",
+    // Idiomas del equipo (lib/idiomasDelEquipo.ts, 07-11): el reparto por el
+    // idioma de la conversación lo hace check_availability; esto es para
+    // quien pide a alguien que hable otro idioma (para su hija, p. ej.).
+    "Si pide que le atienda alguien que hable un idioma, dile quién lo habla según get_catalog y, si elige a esa persona, envíala como professionalId. Si check_availability devuelve en_su_idioma, sigue su siguiente_paso.",
     // Desde el 03-11 check_availability da solo la propuesta, sin el porqué
     // ni el hueco de la persona pedida: ese llega con professionalConfirmed.
     "Si check_availability devuelve recommendation, propón UNA sola vez, en positivo, reservar con la persona recomendada, como dice su siguiente_paso; si el cliente acepta, usa el availabilityToken de la recomendación; si insiste en quien pidió, vuelve a llamar a check_availability con professionalConfirmed: true, sin volver a proponer ni explicar nada.",

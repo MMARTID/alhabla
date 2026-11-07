@@ -535,6 +535,11 @@ model Professional {
   businessId   String
   name         String
   active       Boolean               @default(true)
+  /// Idiomas que habla además del castellano: códigos del catálogo de la
+  /// recepcionista (lib/idiomas/catalogo.ts), nunca «es-ES». Con ellos la
+  /// cita va primero a quien habla el idioma de quien llama
+  /// (lib/idiomasDelEquipo.ts y lib/availability.ts). Vacío: no se ha dicho.
+  idiomas      String[]              @default([])
   // Las citas históricas conservan la relación con el profesional aunque ya
   // no trabaje en el negocio.
   deletedAt    DateTime?

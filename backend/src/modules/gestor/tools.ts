@@ -7,6 +7,10 @@ import { resolvePlanId } from "../../lib/planFeatures.js";
 import { precioParaDecir } from "../../lib/precio.js";
 import { modoDeDarPrecios } from "../../lib/managedAgentPrompt.js";
 import {
+  idiomasDelProfesional,
+  nombreDelIdioma,
+} from "../../lib/idiomasDelEquipo.js";
+import {
   BUSINESS_TYPE_LABELS,
   isBusinessType,
 } from "../../lib/businessType.js";
@@ -112,6 +116,7 @@ const SELECT_NEGOCIO_DEL_GESTOR = {
     select: {
       id: true,
       name: true,
+      idiomas: true,
       serviceLinks: {
         where: { service: { deletedAt: null } },
         select: { serviceId: true, level: true },
@@ -344,6 +349,8 @@ async function contextoNegocio(businessId: string) {
             .filter((l) => l.level === "NO_SUGERIR")
             .map((l) => nombreDe(l.serviceId))
             .filter((n): n is string => n !== null),
+          // Además del castellano (lo cambia fijar_idiomas).
+          idiomas: idiomasDelProfesional(p.idiomas).map(nombreDelIdioma),
         };
       }),
       horario: formatScheduleForPrompt(business.schedule),

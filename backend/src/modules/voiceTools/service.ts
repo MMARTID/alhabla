@@ -14,6 +14,14 @@ import {
   type CodigoDeIdioma,
 } from "../../lib/idiomas/catalogo.js";
 import { nombreParaElCliente } from "../../lib/nombreProfesional.js";
+import {
+  idiomaParaElReparto,
+  idiomasDelProfesional,
+  idiomasEnPalabras,
+  nombreDelIdioma,
+  seDiceAlConfirmar,
+  type IdiomaDelEquipo,
+} from "../../lib/idiomasDelEquipo.js";
 import { precioParaDecir } from "../../lib/precio.js";
 import {
   modoDeDarPrecios,
@@ -40,6 +48,7 @@ import {
   inicioDeBusquedaHaciaAtras,
   type ExternalBusyInterval,
   type ReservaExcluida,
+  type SuggestedSlot,
 } from "../../lib/availability.js";
 import { calendarService } from "../calendar/service.js";
 import {
@@ -286,6 +295,58 @@ function comoDecirloDelEspecialista(
   const servicio = servicios.join(" y ");
   const texto = `Al confirmar, puedes decir en positivo que ${nombre} es especialista en ${servicio}: «${nombre} es especialista en ${servicio}». No hables de especialidades en otros servicios.`;
   return texto.length <= MAX_CARACTERES_POR_INSTRUCCION ? texto : null;
+}
+
+/** `como_decirlo` cuando la cita queda con alguien que habla el idioma de
+ * quien llama, solo si es extranjero (decisión del usuario del 2026-11-07:
+ * en catalán, gallego o euskera no se dice, que en su zona suena a
+ * obviedad). */
+function comoDecirloDelIdioma(
+  nombre: string,
+  idioma: IdiomaDelEquipo | null
+): string | null {
+  if (!idioma || !seDiceAlConfirmar(idioma)) return null;
+  const lengua = nombreDelIdioma(idioma);
+  return `Al confirmar, puedes decir que ${nombre} le atenderá en ${lengua}: «${nombre} te atenderá en ${lengua}».`;
+}
+
+/** Las dos frases de como_decirlo juntas si caben; si no, la primera. */
+function juntarComoDecirlo(frases: Array<string | null>): string | null {
+  const presentes = frases.filter((frase): frase is string => Boolean(frase));
+  if (presentes.length === 0) return null;
+  const juntas = presentes.join(" ");
+  return juntas.length <= MAX_CARACTERES_POR_INSTRUCCION ? juntas : presentes[0];
+}
+
+/**
+ * `siguiente_paso` cuando lo que se ofrece iría con alguien que no habla el
+ * idioma de quien llama y hay un hueco cercano con alguien que sí
+ * (`enSuIdioma` de checkAvailability): se ofrecen las dos y elige el
+ * cliente (decisión del usuario del 2026-11-07, «ofrecer las dos»). Un
+ * nombre provisional del alta no se nombra; si con los nombres no cabe en
+ * el tope, va sin ellos (están en la respuesta).
+ */
+export function siguientePasoConSuIdioma(input: {
+  /** La primera opción: la hora pedida (está libre, pero con alguien que no
+   * habla su idioma) o la de suggestedNextSlot (la pedida no está libre). */
+  primera: "pedida" | "alternativa";
+  quien: string | null;
+  hablante: string | null;
+  idioma: IdiomaDelEquipo;
+}): string {
+  const lengua = nombreDelIdioma(input.idioma);
+  const inicio =
+    input.primera === "pedida"
+      ? `Nadie que hable ${lengua} está libre a esa hora.`
+      : "Esa hora no está libre.";
+  const opcion = input.primera === "pedida" ? "la hora pedida" : "suggestedNextSlot";
+  const componer = (quien: string, hablante: string) =>
+    `${inicio} Ofrece las dos en un turno, sin motivos: ${opcion}${quien} o, si prefiere que le atiendan en ${lengua}, en_su_idioma${hablante} (di cada cuando). Con la que elija, usa su availabilityToken y sigue con el paso 3 de Reserva.`;
+  const con = (nombre: string | null) => (nombre ? ` con ${nombre}` : "");
+  const conNombres = componer(con(input.quien), con(input.hablante));
+  return conNombres.length <= MAX_CARACTERES_POR_INSTRUCCION
+    ? conNombres
+    : componer("", "");
 }
 
 function availabilityDraftKey(token: string): string {
@@ -772,20 +833,27 @@ async function executeCheckAvailability(
       ),
       buscarTambienAntes: { noAntesDe },
       excluir: citaCambiada,
+      // La cita va primero a quien habla su idioma (lib/idiomasDelEquipo.ts).
+      idioma,
     });
 
     // Lo que se le devuelve al LLM no lleva los campos internos del ranking
-    // (specialistIds, recommendedProfessional): se traducen a cosas que puede
-    // decir. Un profesional "no sugerir" nunca aparece como tal.
+    // (specialistIds, hablantesIds, enSuIdioma, recommendedProfessional): se
+    // traducen a cosas que puede decir. Un profesional "no sugerir" nunca
+    // aparece como tal.
     const { recommendedProfessional, ...sinRecomendacion } = availability;
     const specialistIds = availability.available ? availability.specialistIds : undefined;
-    const paraElAgente: Omit<typeof sinRecomendacion, "specialistIds"> & {
+    const hablantesIds = availability.available ? availability.hablantesIds : undefined;
+    const idiomaDelReparto = idiomaParaElReparto(idioma);
+    type CamposInternos = "specialistIds" | "hablantesIds" | "enSuIdioma";
+    const camposInternos = new Set<string>(["specialistIds", "hablantesIds", "enSuIdioma"]);
+    const paraElAgente: Omit<typeof sinRecomendacion, CamposInternos> & {
       cuando: string | null;
       contesta_en?: string;
     } = {
       ...(Object.fromEntries(
-        Object.entries(sinRecomendacion).filter(([clave]) => clave !== "specialistIds")
-      ) as Omit<typeof sinRecomendacion, "specialistIds">),
+        Object.entries(sinRecomendacion).filter(([clave]) => !camposInternos.has(clave))
+      ) as Omit<typeof sinRecomendacion, CamposInternos>),
       // El día y la hora pedidos, como se dicen (voiceDateTime.ts): que la
       // recepcionista no calcule el día de la semana ni del mes.
       cuando: cuandoEnSuIdioma(
@@ -794,6 +862,35 @@ async function executeCheckAvailability(
         idioma
       ),
       ...contestaEn(idioma),
+    };
+
+    // El hueco más cercano con alguien que habla su idioma, cuando lo que se
+    // ofrece iría con alguien que no (enSuIdioma de checkAvailability), listo
+    // para ofrecerlo: en hora local (como la alternativa, ver más abajo), con
+    // su cuando y su token. null si no se podría reservar.
+    const tz = business.timezone || "Europe/Madrid";
+    const prepararEnSuIdioma = async (hueco: SuggestedSlot | undefined) => {
+      const hablante = hueco?.availableProfessionals[0];
+      if (!hueco || !hablante || !idiomaDelReparto) return null;
+      const inicioLocal = instanteEnHoraLocal(hueco.startDateTime, tz);
+      if (!checkBookingRestrictions(business, inicioLocal, durationMinutes).success) {
+        return null;
+      }
+      return {
+        startDateTime: inicioLocal,
+        cuando: cuandoEnSuIdioma(inicioLocal, tz, idioma),
+        professional: hablante,
+        availabilityToken: await createAvailabilityDraft({
+          businessId: business.id,
+          callId,
+          startDateTime: inicioLocal,
+          durationMinutes,
+          serviceIds: serviceIds ?? [],
+          professionalId: hablante.id,
+          professionalRequested: false,
+          ...delCambio,
+        }),
+      };
     };
 
     // El cliente pidió por su nombre a alguien marcado "no sugerir" y hay
@@ -880,17 +977,38 @@ async function executeCheckAvailability(
       const nombreDelAsignado = asignado
         ? nombreParaElCliente(asignado.name)
         : null;
+      const asignadoHablaSuIdioma =
+        !!asignado && (hablantesIds?.includes(asignado.id) ?? false);
       const comoDecirlo =
-        !professionalId && asignadoEsEspecialista && nombreDelAsignado
-          ? comoDecirloDelEspecialista(nombreDelAsignado, nombresDeServicios)
+        !professionalId && nombreDelAsignado
+          ? juntarComoDecirlo([
+              asignadoEsEspecialista
+                ? comoDecirloDelEspecialista(nombreDelAsignado, nombresDeServicios)
+                : null,
+              asignadoHablaSuIdioma
+                ? comoDecirloDelIdioma(nombreDelAsignado, idiomaDelReparto)
+                : null,
+            ])
           : null;
+      // A esa hora nadie que hable su idioma está libre, pero hay quien lo
+      // habla en otra hora cercana: se ofrecen las dos.
+      const enSuIdioma = await prepararEnSuIdioma(availability.enSuIdioma);
       return {
         success: true,
         result: {
           ...paraElAgente,
           availabilityToken,
           ...assignedProfessional,
-          siguiente_paso: siguientePasoConHueco(canalDeLaTool(callId)),
+          ...(enSuIdioma ? { en_su_idioma: enSuIdioma } : {}),
+          siguiente_paso:
+            enSuIdioma && idiomaDelReparto
+              ? siguientePasoConSuIdioma({
+                  primera: "pedida",
+                  quien: nombreDelAsignado,
+                  hablante: nombreParaElCliente(enSuIdioma.professional.name),
+                  idioma: idiomaDelReparto,
+                })
+              : siguientePasoConHueco(canalDeLaTool(callId)),
           ...(comoDecirlo ? { como_decirlo: comoDecirlo } : {}),
         },
       };
@@ -958,6 +1076,10 @@ async function executeCheckAvailability(
         professionalRequested: Boolean(professionalId),
         ...delCambio,
       });
+      // La alternativa iría con alguien que no habla su idioma y hay otra
+      // hora cercana con quien sí: se ofrecen las dos.
+      const enSuIdioma = await prepararEnSuIdioma(availability.enSuIdioma);
+      const quienEnLaAlternativa = alternativa.availableProfessionals[0];
       return {
         success: true,
         result: {
@@ -971,8 +1093,19 @@ async function executeCheckAvailability(
             ),
             availabilityToken: suggestedToken,
           },
+          ...(enSuIdioma ? { en_su_idioma: enSuIdioma } : {}),
             ...paraCuandoNoLeVale,
-          siguiente_paso: SIGUIENTE_PASO_CON_ALTERNATIVA,
+          siguiente_paso:
+            enSuIdioma && idiomaDelReparto
+              ? siguientePasoConSuIdioma({
+                  primera: "alternativa",
+                  quien: quienEnLaAlternativa
+                    ? nombreParaElCliente(quienEnLaAlternativa.name)
+                    : null,
+                  hablante: nombreParaElCliente(enSuIdioma.professional.name),
+                  idioma: idiomaDelReparto,
+                })
+              : SIGUIENTE_PASO_CON_ALTERNATIVA,
         },
       };
     }
@@ -1160,7 +1293,7 @@ async function executeGetCatalog(
       }),
       prisma.professional.findMany({
         where: { businessId: business.id, active: true, deletedAt: null },
-        select: { id: true, name: true },
+        select: { id: true, name: true, idiomas: true },
         orderBy: { name: "asc" },
         take: MAX_CATALOG_ITEMS,
       }),
@@ -1212,7 +1345,14 @@ async function executeGetCatalog(
                 const nombre = nombreParaElCliente(professional.name)
                   ? professional.name
                   : "(sin nombre configurado: no digas este nombre al cliente, habla de «el equipo»)";
-                return `[${professional.id}] ${nombre}${fuera.length ? ` (no está ${fuera.join(", ")})` : ""}`;
+                // Para contestar «¿alguien habla inglés?»; a quién va la
+                // cita lo decide check_availability con su idioma.
+                const idiomas = idiomasDelProfesional(professional.idiomas);
+                const notas = [
+                  ...(idiomas.length ? [`habla ${idiomasEnPalabras(idiomas)}`] : []),
+                  ...(fuera.length ? [`no está ${fuera.join(", ")}`] : []),
+                ];
+                return `[${professional.id}] ${nombre}${notas.length ? ` (${notas.join("; ")})` : ""}`;
               })
               .join("\n")
           : "No hay profesionales individuales configurados.",
@@ -2594,6 +2734,9 @@ async function reservarCita(
         excluir: [reservaQueSeSustituye, citaCambiada].filter(
           (reserva): reserva is ReservaExcluida => reserva !== null
         ),
+        // Si el preasignado se ocupó, el que lo sustituye también habla su
+        // idioma si se puede (lib/idiomasDelEquipo.ts).
+        idioma,
       });
 
       if (!availability.available) {
