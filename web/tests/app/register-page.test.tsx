@@ -34,6 +34,11 @@ async function fillRequiredFields(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole("radio", { name: "Sí" }));
 }
 
+/** Marca las dos casillas del formulario: términos y DPA. */
+async function marcarCasillas(user: ReturnType<typeof userEvent.setup>) {
+  for (const casilla of screen.getAllByRole("checkbox")) await user.click(casilla);
+}
+
 describe("RegisterPage", () => {
   let location: ReturnType<typeof mockLocation>;
 
@@ -57,10 +62,10 @@ describe("RegisterPage", () => {
 
     expect(screen.getByText(/al continuar con facebook aceptas los/i)).toBeInTheDocument();
     const enlaces = screen
-      .getAllByRole("link", { name: /términos y condiciones|política de privacidad/i })
+      .getAllByRole("link", { name: /términos y condiciones|política de privacidad|contrato de tratamiento/i })
       .map((enlace) => enlace.getAttribute("href"));
     expect(enlaces).toEqual(
-      expect.arrayContaining(["/legal/aviso-legal", "/legal/privacidad"])
+      expect.arrayContaining(["/legal/aviso-legal", "/legal/privacidad", "/legal/dpa"])
     );
   });
 
@@ -76,6 +81,21 @@ describe("RegisterPage", () => {
       screen.queryByText("Debes aceptar los Términos y Condiciones y la Política de privacidad.")
     ).not.toBeInTheDocument();
     expect(location.getHref()).toBe("https://facebook.test/dialog");
+  });
+
+  it("con los términos aceptados pero sin el DPA no llama a la API y pide aceptarlo", async () => {
+    const postSpy = vi.spyOn(api, "post");
+    render(<RegisterPage />);
+    const user = userEvent.setup();
+    await fillRequiredFields(user);
+    await user.click(screen.getByRole("checkbox", { name: /términos y condiciones/i }));
+
+    fireEvent.submit(screen.getByRole("button", { name: /registrarse/i }).closest("form")!);
+
+    expect(
+      await screen.findByText("Debes aceptar el contrato de tratamiento de datos (DPA).")
+    ).toBeInTheDocument();
+    expect(postSpy).not.toHaveBeenCalled();
   });
 
   it("no llama a la API si se envía el formulario sin aceptar los términos", async () => {
@@ -103,7 +123,7 @@ describe("RegisterPage", () => {
     render(<RegisterPage />);
 
     await fillRequiredFields(user);
-    await user.click(screen.getByRole("checkbox"));
+    await marcarCasillas(user);
     await user.click(screen.getByRole("button", { name: /registrarse/i }));
 
     await waitFor(() => expect(location.getHref()).toContain("/auth/entrar?"));
@@ -114,6 +134,8 @@ describe("RegisterPage", () => {
         password: "password123",
         isEuropeanUnion: true,
         acceptedTerms: true,
+        acceptedDpa: true,
+        dpaVersion: "1.0",
         businessType: "barberia",
       })
     );
@@ -133,7 +155,7 @@ describe("RegisterPage", () => {
     render(<RegisterPage />);
 
     await fillRequiredFields(user);
-    await user.click(screen.getByRole("checkbox"));
+    await marcarCasillas(user);
     await user.click(screen.getByRole("button", { name: /registrarse/i }));
 
     expect(await screen.findByText(/Tu cuenta está creada/)).toBeInTheDocument();
@@ -146,7 +168,7 @@ describe("RegisterPage", () => {
     render(<RegisterPage />);
 
     await fillRequiredFields(user);
-    await user.click(screen.getByRole("checkbox"));
+    await marcarCasillas(user);
     await user.click(screen.getByRole("button", { name: /registrarse/i }));
 
     expect(await screen.findByText("El usuario ya existe")).toBeInTheDocument();
@@ -160,7 +182,7 @@ describe("RegisterPage", () => {
     render(<RegisterPage />);
 
     await fillRequiredFields(user);
-    await user.click(screen.getByRole("checkbox"));
+    await marcarCasillas(user);
     await user.click(screen.getByRole("button", { name: /registrarse/i }));
 
     expect(await screen.findByText("La contraseña es demasiado corta")).toBeInTheDocument();
@@ -172,7 +194,7 @@ describe("RegisterPage", () => {
     render(<RegisterPage />);
 
     await fillRequiredFields(user);
-    await user.click(screen.getByRole("checkbox"));
+    await marcarCasillas(user);
     await user.click(screen.getByRole("button", { name: /registrarse/i }));
 
     expect(await screen.findByText("Error al registrar la cuenta.")).toBeInTheDocument();

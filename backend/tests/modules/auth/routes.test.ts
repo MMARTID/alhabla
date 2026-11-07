@@ -185,7 +185,7 @@ describe("authRoutes", () => {
       const response = await fastify.inject({
         method: "POST",
         url: "/register",
-        payload: { email: "test@example.com", password: "password1", isEuropeanUnion: true, acceptedTerms: true },
+        payload: { email: "test@example.com", password: "password1", isEuropeanUnion: true, acceptedTerms: true, acceptedDpa: true, dpaVersion: "1.0" },
       });
 
       expect(response.statusCode).toBe(201);
@@ -194,6 +194,54 @@ describe("authRoutes", () => {
       expect(mockedUserCreate).toHaveBeenCalledWith(
         expect.objectContaining({ data: expect.objectContaining({ termsAcceptedAt: expect.any(Date) }) })
       );
+    });
+
+    it("guarda en el negocio cuándo aceptó el DPA y de qué versión", async () => {
+      mockedUserFindUnique.mockResolvedValue(null);
+      const business = { id: "biz_1", phone: "TEMP-1" };
+      const user = { id: "user_1", email: "test@example.com", businessId: "biz_1" };
+      (prisma.$transaction as any).mockImplementation(async (callback: any) => {
+        mockedBusinessCreate.mockResolvedValue(business as any);
+        mockedUserCreate.mockResolvedValue(user as any);
+        return callback({ business: { create: mockedBusinessCreate }, user: { create: mockedUserCreate } });
+      });
+
+      const response = await fastify.inject({
+        method: "POST",
+        url: "/register",
+        payload: { email: "test@example.com", password: "password1", isEuropeanUnion: true, acceptedTerms: true, acceptedDpa: true, dpaVersion: "1.0" },
+      });
+
+      expect(response.statusCode).toBe(201);
+      expect(mockedBusinessCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ dpaAcceptedAt: expect.any(Date), dpaVersion: "1.0" }),
+        })
+      );
+    });
+
+    it("rechaza el registro sin aceptar el DPA", async () => {
+      const response = await fastify.inject({
+        method: "POST",
+        url: "/register",
+        payload: { email: "test@example.com", password: "password1", isEuropeanUnion: true, acceptedTerms: true, dpaVersion: "1.0" },
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json().error).toMatch(/DPA/);
+      expect(mockedUserCreate).not.toHaveBeenCalled();
+    });
+
+    it("rechaza el registro si la versión del DPA que vio la persona no es la vigente", async () => {
+      const response = await fastify.inject({
+        method: "POST",
+        url: "/register",
+        payload: { email: "test@example.com", password: "password1", isEuropeanUnion: true, acceptedTerms: true, acceptedDpa: true, dpaVersion: "0.9" },
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json().error).toMatch(/actualizado/);
+      expect(mockedUserCreate).not.toHaveBeenCalled();
     });
 
     it("devuelve además un pase de un solo uso guardado 60 s; si el almacén falla, solo el token", async () => {
@@ -210,7 +258,7 @@ describe("authRoutes", () => {
       const response = await fastify.inject({
         method: "POST",
         url: "/register",
-        payload: { email: "test@example.com", password: "password1", isEuropeanUnion: true, acceptedTerms: true },
+        payload: { email: "test@example.com", password: "password1", isEuropeanUnion: true, acceptedTerms: true, acceptedDpa: true, dpaVersion: "1.0" },
       });
       expect(response.statusCode).toBe(201);
       const { pase } = response.json();
@@ -226,7 +274,7 @@ describe("authRoutes", () => {
       const sinAlmacen = await fastify.inject({
         method: "POST",
         url: "/register",
-        payload: { email: "test2@example.com", password: "password1", isEuropeanUnion: true, acceptedTerms: true },
+        payload: { email: "test2@example.com", password: "password1", isEuropeanUnion: true, acceptedTerms: true, acceptedDpa: true, dpaVersion: "1.0" },
       });
       expect(sinAlmacen.statusCode).toBe(201);
       expect(sinAlmacen.json().token).toBe("token_123");
@@ -246,6 +294,8 @@ describe("authRoutes", () => {
             password,
             isEuropeanUnion: true,
             acceptedTerms: true,
+            acceptedDpa: true,
+            dpaVersion: "1.0",
           },
         });
         expect(response.statusCode, password).toBe(400);
@@ -259,7 +309,7 @@ describe("authRoutes", () => {
       const response = await fastify.inject({
         method: "POST",
         url: "/register",
-        payload: { email: "test@example.com", password: "password1", isEuropeanUnion: true, acceptedTerms: true },
+        payload: { email: "test@example.com", password: "password1", isEuropeanUnion: true, acceptedTerms: true, acceptedDpa: true, dpaVersion: "1.0" },
       });
 
       expect(response.statusCode).toBe(400);
@@ -299,6 +349,8 @@ describe("authRoutes", () => {
           password: "password1",
           isEuropeanUnion: true,
           acceptedTerms: true,
+          acceptedDpa: true,
+          dpaVersion: "1.0",
           businessType: "peluqueria",
         },
       });

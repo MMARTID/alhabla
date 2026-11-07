@@ -19,6 +19,12 @@ model Business {
   businessDetails String? @db.Text
   agentSettings   Json?
   bookingCapacity Int     @default(1)
+  /// Prueba de aceptación del contrato de encargado del tratamiento (DPA,
+  /// art. 28 RGPD) en el registro, y de qué versión del texto. El negocio es el
+  /// responsable y firma el DPA, no la persona: por eso va aquí y no en User.
+  /// null en negocios creados antes de exigirlo.
+  dpaAcceptedAt   DateTime?
+  dpaVersion      String?
 
   // Restricciones de reserva aplicadas por check_availability y
   // book_appointment (voiceTools/service.ts). null = sin restricción.

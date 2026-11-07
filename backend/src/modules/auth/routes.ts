@@ -6,6 +6,7 @@ import jwt from "jsonwebtoken";
 import { OAuth2Client } from "google-auth-library";
 import { z } from "zod";
 import { prisma } from "../../lib/prisma.js";
+import { DPA_VERSION } from "../../lib/dpa.js";
 import { consumirClave, guardarClave } from "../../lib/almacenTemporal.js";
 import { createBusinessAgent } from "../../lib/agentBootstrap.js";
 import {
@@ -209,6 +210,11 @@ async function createUserWithBusiness(input: {
         phone: `TEMP-${Date.now()}-${randomBytes(4).toString("hex")}`,
         schedule: {},
         businessType: input.businessType ?? "other",
+        // Se llega aquí solo con los términos aceptados; el DPA va en el
+        // mismo gesto (casilla en el registro por correo, aviso en el alta
+        // social) y se guarda con la versión del texto vigente.
+        dpaAcceptedAt: new Date(),
+        dpaVersion: DPA_VERSION,
       },
     });
 
@@ -330,14 +336,23 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
       config: { rateLimit: veryStrictRateLimit },
     },
     async (request, reply) => {
-      const { email, password, isEuropeanUnion, businessType, acceptedTerms } =
-        request.body as {
-          email?: string;
-          password?: string;
-          isEuropeanUnion?: boolean;
-          businessType?: string;
-          acceptedTerms?: boolean;
-        };
+      const {
+        email,
+        password,
+        isEuropeanUnion,
+        businessType,
+        acceptedTerms,
+        acceptedDpa,
+        dpaVersion,
+      } = request.body as {
+        email?: string;
+        password?: string;
+        isEuropeanUnion?: boolean;
+        businessType?: string;
+        acceptedTerms?: boolean;
+        acceptedDpa?: boolean;
+        dpaVersion?: string;
+      };
 
       if (!email || !password) {
         return reply
@@ -368,6 +383,22 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
             error:
               "Debes aceptar los Términos y Condiciones y la Política de privacidad",
           });
+      }
+
+      if (acceptedDpa !== true) {
+        return reply.status(400).send({
+          error:
+            "Debes aceptar el contrato de encargado del tratamiento de datos (DPA)",
+        });
+      }
+      // La web manda la versión que enseñó. Si no es la vigente, la página
+      // está desfasada: mejor pedir que la recargue que guardar la aceptación
+      // de un texto que la persona no leyó.
+      if (dpaVersion !== DPA_VERSION) {
+        return reply.status(400).send({
+          error:
+            "El contrato de tratamiento de datos (DPA) se ha actualizado. Recarga la página y vuelve a aceptarlo.",
+        });
       }
 
       const normalizedEmail = email.trim().toLowerCase();

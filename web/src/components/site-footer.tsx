@@ -130,6 +130,9 @@ export function SiteFooter() {
             <Link href="/legal/privacidad" className={enlace}>
               Privacidad
             </Link>
+            <Link href="/legal/dpa" className={enlace}>
+              DPA
+            </Link>
             <Link href="/legal/aviso-legal" className={enlace}>
               Aviso legal
             </Link>
