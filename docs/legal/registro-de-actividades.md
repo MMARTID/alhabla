@@ -38,7 +38,16 @@ Cubierto por el DPA publicado en `alhabla.ai/legal/dpa`, que cada negocio acepta
 - Copias de seguridad de la base de datos: dónde están, cuánto duran, cómo se borran.
 - Si los datos del negocio borrados siguen en copias de seguridad y durante cuánto tiempo.
 - Contrato y DPA firmados con **cada** proveedor: Telnyx, Google Cloud, Cloudflare, Vercel, Zoho, Stripe. Guardar copia y fecha.
-- Dónde se procesan los datos del modelo de lenguaje de la voz y cuál es el proveedor final (en curso con Telnyx).
+- Región de los modelos de lenguaje de la voz: **cerrado el 2026-11-07**, sin garantía de región (la garantía
+  `in_transit_data_locality` corta llamadas y no admite Soniox ni Kimi). El DPA y la política lo dicen. Reabrir si
+  Telnyx contesta a la consulta del 06-11 o si la garantía se estabiliza.
+- Telnyx: DPA público leído el 2026-11-07 (certificada en el Marco de Privacidad de Datos UE-EE. UU.; cláusulas
+  contractuales tipo en su apartado 5; responsable independiente de los datos técnicos y de la mejora del servicio,
+  apartados 2 y 3). Falta firmarlo desde el portal y guardar copia y fecha.
+- Mecanismo de transferencia de OpenAI, Soniox, Zoho y Vercel (certificación en el Marco de Privacidad de Datos o
+  cláusulas contractuales tipo): comprobarlo y guardar la prueba. El DPA publicado promete que solo se usan con una.
+- Jurisdicción del bucket de Cloudflare R2 (UE o por defecto).
+- Evaluación de impacto de la transferencia (TIA), una por proveedor fuera del EEE.
 - Si Alhabla Growth guarda datos personales de contactos y con qué plazo.
 
 ## 4. Historial de cambios
@@ -46,3 +55,4 @@ Cubierto por el DPA publicado en `alhabla.ai/legal/dpa`, que cada negocio acepta
 | Fecha | Cambio |
 |---|---|
 | 2026-11-06 | Primera versión. |
+| 2026-11-07 | DPA, política y registro alineados con lo que hace Telnyx de verdad: sin garantía de UE para los modelos de lenguaje; redacción de datos solo en voz. |

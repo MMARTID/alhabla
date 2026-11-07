@@ -73,7 +73,7 @@ export default function PrivacidadPage() {
     <LegalPage
       title="Política de privacidad"
       description="Aquí te contamos qué datos tratamos, para qué, quién más interviene y qué puedes exigirnos. Sin cláusulas copiadas: solo lo que el producto hace de verdad."
-      updatedAt="2026-11-05"
+      updatedAt="2026-11-07"
     >
       <LegalSection title="Quién es el responsable">
         <p>
@@ -204,7 +204,8 @@ export default function PrivacidadPage() {
           los datos de tu cuenta, facturación y seguridad del servicio, Alhabla es responsable del tratamiento.
         </p>
         <p>
-          En Alhabla, las grabaciones y transcripciones se almacenan cifradas y solo son accesibles desde tu cuenta.
+          En Alhabla, las grabaciones y transcripciones se guardan en almacenamiento privado (Cloudflare R2 y Google Cloud), que cifra los
+          datos en reposo, y solo son accesibles desde tu cuenta.
           Telnyx, nuestro proveedor de telefonía, guarda además su propia copia, como explicamos en «Cuánto tiempo
           conservamos los datos». Puedes solicitar la eliminación de la nuestra escribiéndonos.
         </p>
@@ -292,8 +293,11 @@ export default function PrivacidadPage() {
             <strong className="font-semibold text-tinta">Telnyx.</strong> Proporciona telefonía, mensajería y
             WhatsApp para cursar llamadas y comunicaciones del servicio, y la recepcionista con inteligencia
             artificial que atiende a quien llama o escribe por WhatsApp: transcribe la voz, genera las respuestas y,
-            en las llamadas, las convierte en voz. Para generar las respuestas usa un modelo de lenguaje de OpenAI,
-            que recibe el texto de la conversación. Puedes consultar su{" "}
+            en las llamadas, las convierte en voz. Para generar las respuestas usa modelos de lenguaje que aloja
+            Telnyx y, en tu asistente por WhatsApp (el Gestor), un modelo de OpenAI; todos reciben el texto de la
+            conversación. Telnyx trata además como responsable independiente sus datos técnicos de uso y puede usar el
+            contenido para mejorar sus servicios en los términos de su anexo, que le impide entrenar con él modelos de
+            otros clientes sin consentimiento, salvo con datos desidentificados. Puedes consultar su{" "}
             <a
               href="https://telnyx.com/privacy-policy"
               target="_blank"
@@ -312,6 +316,14 @@ export default function PrivacidadPage() {
               anexo de tratamiento de datos
             </a>
             .
+          </li>
+          <li>
+            <strong className="font-semibold text-tinta">Soniox.</strong> Transcribe y sintetiza la voz en catalán,
+            euskera y gallego, solo en los negocios de esas zonas.
+          </li>
+          <li>
+            <strong className="font-semibold text-tinta">Meta (WhatsApp Business).</strong> Entrega los mensajes de
+            WhatsApp entre Alhabla y quienes escriben al negocio.
           </li>
           <li>
             <strong className="font-semibold text-tinta">Google Cloud.</strong> Aloja el servidor y la base de datos
@@ -349,11 +361,14 @@ export default function PrivacidadPage() {
 
       <LegalSection title="Transferencias internacionales" id="transferencias">
         <p>
-          Algunos proveedores pueden procesar datos fuera del Espacio Económico Europeo. Por ejemplo, el modelo de
-          lenguaje de OpenAI con el que Telnyx genera las respuestas de la recepcionista procesa el texto de la
-          conversación fuera del Espacio Económico Europeo, y Telnyx publica los mecanismos que emplea para
-          transferencias internacionales. Cuando corresponde, las transferencias se amparan en una decisión de adecuación, el Marco de
-          Privacidad de Datos UE-EE. UU. o cláusulas contractuales tipo, según el proveedor y el tratamiento.
+          Algunos proveedores pueden procesar datos fuera del Espacio Económico Europeo, y hoy no podemos garantizar que todo
+          se procese dentro de la UE. Nuestra cuenta de Telnyx tiene localidad de datos en Alemania y el audio se procesa
+          en Fráncfort, pero Telnyx no asegura en qué región ejecuta los modelos de lenguaje que generan las respuestas, y
+          el modelo de OpenAI de tu asistente por WhatsApp o Soniox, entre otros, pueden tratar datos fuera del Espacio
+          Económico Europeo. Telnyx está certificada en el Marco de Privacidad de Datos UE-EE. UU. y su anexo de
+          tratamiento de datos incorpora las cláusulas contractuales tipo de la Comisión Europea. Para el resto de
+          proveedores, las transferencias se amparan en una decisión de adecuación, el Marco de Privacidad de Datos o
+          cláusulas contractuales tipo, según el proveedor y el tratamiento.
         </p>
         <p>
           Los proveedores solo reciben los datos necesarios para su función. Puedes pedir información actualizada sobre

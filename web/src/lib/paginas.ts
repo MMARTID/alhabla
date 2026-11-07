@@ -203,14 +203,14 @@ export const PAGINAS: readonly PaginaIndexable[] = [
     resumen: "Qué datos trata Alhabla, con qué proveedores y cómo ejercer tus derechos.",
     seccion: "legal",
     // La misma fecha que enseña la página (updatedAt de legal/*/page.tsx).
-    actualizado: "2026-10-20",
+    actualizado: "2026-11-07",
   },
   {
     ruta: "/legal/dpa",
     nombre: "Contrato de encargado del tratamiento (DPA)",
     resumen: "El contrato de tratamiento de datos que aceptas al registrarte: qué hace Alhabla con los datos de tus clientes y cómo los protege.",
     seccion: "legal",
-    actualizado: "2026-11-06",
+    actualizado: "2026-11-07",
   },
 ];
 

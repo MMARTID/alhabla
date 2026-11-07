@@ -139,6 +139,13 @@ export default function DpaPage() {
             </tbody>
           </table>
         </div>
+                <p>
+          Telnyx, además de tratar el contenido por cuenta del Responsable, actúa como responsable independiente de sus
+          datos técnicos de uso (marcas de hora, número de tokens, latencias o códigos de error) y puede tratar el
+          contenido para mejorar sus servicios en los términos de su anexo de tratamiento de datos, que le impide usarlo
+          para entrenar modelos que ofrezca a otros sin consentimiento previo por escrito, salvo con datos
+          desidentificados.
+        </p>
         <p>
           Google, Microsoft y Apple no son subencargados de Alhabla: son los proveedores de calendario que el Responsable
           decide conectar.
@@ -146,12 +153,22 @@ export default function DpaPage() {
       </LegalSection>
 
       <LegalSection title="Transferencias internacionales" id="transferencias">
+                <p>
+          Algunos subencargados pueden tratar datos fuera del Espacio Económico Europeo.{" "}
+          <strong className={fuerte}>Alhabla no garantiza hoy que todo se procese dentro de la UE:</strong> la cuenta de
+          Alhabla en Telnyx tiene localidad de datos en Alemania y el audio se procesa en Fráncfort, pero la región de los
+          modelos de lenguaje que ejecuta Telnyx no está asegurada, y el modelo de OpenAI de tu asistente por WhatsApp
+          puede procesar fuera del EEE. Alhabla avisará si esto cambia.
+        </p>
         <p>
-          Algunos subencargados pueden tratar datos fuera del Espacio Económico Europeo. Alhabla solo los usa si la
-          transferencia se ampara en una decisión de adecuación (incluido el Marco de Privacidad de Datos UE-EE. UU. si el
-          proveedor está certificado), en cláusulas contractuales tipo de la Comisión Europea u otra garantía del
-          capítulo V del RGPD, y facilitará al Responsable información sobre las garantías aplicables si la pide en
-          privacidad@alhabla.ai.
+          Telnyx está certificada en el Marco de Privacidad de Datos UE-EE. UU., y su contrato de tratamiento de datos
+          incorpora las cláusulas contractuales tipo de la Comisión Europea (Decisión 2021/914) para toda transferencia a
+          un país sin decisión de adecuación y, si esa certificación dejara de estar vigente, para Estados Unidos; además,
+          se compromete a asegurar una garantía válida antes de cualquier transferencia a sus propios subencargados fuera
+          del EEE. Para el resto de subencargados, Alhabla solo los usa si la transferencia se ampara en una decisión de
+          adecuación (incluido el Marco de Privacidad de Datos UE-EE. UU. si el proveedor está certificado), en cláusulas
+          contractuales tipo u otra garantía del capítulo V del RGPD, y facilitará al Responsable información sobre las
+          garantías aplicables si la pide en privacidad@alhabla.ai.
         </p>
       </LegalSection>
 
@@ -189,10 +206,14 @@ export default function DpaPage() {
             clave en un gestor de secretos.
           </li>
           <li>
-            El almacenamiento de grabaciones es privado y se reproduce con enlaces firmados que caducan; el audio se borra a
-            los 30 días y el texto a los 90.
+            El almacenamiento de grabaciones es privado y se reproduce con enlaces firmados que caducan; los proveedores
+            (Cloudflare R2 y Google Cloud) cifran los datos en reposo. El audio se borra a los 30 días y el texto a los 90.
           </li>
-          <li>Los datos personales de las conversaciones se redactan en la copia que conserva Telnyx.</li>
+          <li>
+            En las llamadas de voz, los datos personales (nombre, teléfono, correo y dirección) se redactan en la copia que
+            conserva Telnyx. En los mensajes de WhatsApp esa redacción no está disponible y Telnyx conserva el texto tal
+            cual.
+          </li>
           <li>Los webhooks de proveedores se verifican con firma criptográfica y las peticiones tienen límite de uso.</li>
           <li>Acceso del equipo limitado a lo necesario para dar soporte o resolver incidencias.</li>
           <li>Procedimiento escrito de respuesta ante brechas, con aviso al Responsable en 24 horas.</li>

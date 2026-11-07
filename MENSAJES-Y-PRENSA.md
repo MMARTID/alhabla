@@ -144,9 +144,14 @@ Revisado el 06-11-2026 contra `backend/src` y `web/src/app/legal/privacidad/page
 - «Las grabaciones están cifradas por nosotros»: la política lo dice, pero el código de la aplicación no cifra el
   audio; lo cifra el almacenamiento (Cloudflare R2) en reposo. Pedir confirmar la redacción.
 
-**Desfase de la política publicada (a corregir antes de hablar de datos con la prensa):**
-- Dice que la recepcionista usa «un modelo de lenguaje de OpenAI». Desde el 04-11 la voz usa GLM-5.3-Flash vía Telnyx;
-  OpenAI solo en el Gestor. Hay que reescribir esa frase y la de transferencias internacionales.
+**Política y DPA alineados con el código (07-11-2026, PR #441):**
+- La política ya no dice que la recepcionista usa «un modelo de OpenAI»: la voz y el chat con clientes usan modelos
+  que aloja Telnyx (GLM-5.3-Flash, con respaldo Kimi-K2.6) y OpenAI solo está en el Gestor. Tampoco dice «cifradas»
+  como si lo hiciera Alhabla: cifran Cloudflare R2 y Google Cloud en reposo.
+- Admiten que no hay garantía de UE para los modelos. Telnyx está certificada en el Marco de Privacidad de Datos
+  UE-EE. UU. y su DPA público (leído el 07-11) incluye cláusulas contractuales tipo.
+- La redacción de datos personales (`pii_redaction`) solo vale para las llamadas de voz, no para WhatsApp: no
+  decir «Telnyx guarda todo redactado».
 
 ## 8. Pendiente
 
