@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { appUrl } from "@/lib/app-url";
-import { BrandMark } from "@/components/brand-mark";
 import { MobileNav } from "@/components/mobile-nav";
 import { SectorsMenu } from "@/components/sectors-menu";
 import type { SectorSlug } from "@/lib/sectores/tipos";
@@ -31,8 +30,21 @@ export function SiteHeader({ niche, inicio = "" }: { niche?: SectorSlug; inicio?
             isotipo de 44 px y «Alhabla» en negrita normal, no en black.
             Entre 768 y 840 px, solo el isotipo: con los enlaces y los dos
             botones la fila no cabe (medido el 29-10). */}
+        {/* El logo es un <img> con dirección propia (`/brand/alhabla-isotipo.svg`),
+            con «logo» en el alt y en la clase, y no el BrandMark de data URI de
+            las demás páginas: los importadores de marca (ElevenLabs y similares)
+            buscan en la cabecera una imagen descargable con «logo» y, si no la
+            hallan, se quedan con la imagen OG (7-11). Fuera de Next no se rompe:
+            design-sync embebe esa ruta en `recursosPublicos`. */}
         <Link href="/" aria-label="Ir al inicio de Alhabla" className="flex min-w-0 items-center gap-3">
-          <BrandMark className="h-10 w-10 shrink-0 lg:h-11 lg:w-11" />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/brand/alhabla-isotipo.svg"
+            alt="Alhabla logo"
+            width={44}
+            height={44}
+            className="logo h-10 w-10 shrink-0 lg:h-11 lg:w-11"
+          />
           <p className="text-base font-bold leading-none text-[#0a0a0a] md:max-[839px]:hidden">Alhabla</p>
         </Link>
 
